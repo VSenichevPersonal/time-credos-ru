@@ -1,0 +1,568 @@
+=== EntityType: 258 ===
+ActOfAcceptance: props=74 navs=25 keys=['id']
+ActOfAcceptanceLine: props=11 navs=3 keys=['id']
+CachedDatasetData: props=5 navs=1 keys=['id']
+CalculatedField: props=13 navs=3 keys=['id']
+Dashboard: props=14 navs=4 keys=['id']
+DashboardGrant: props=9 navs=4 keys=['id']
+ReportTypeV2: props=6 navs=0 keys=['id']
+ReportUserSettings: props=7 navs=2 keys=['id']
+ReportV2: props=15 navs=4 keys=['id']
+StoredDataset: props=8 navs=2 keys=['id']
+WidgetDataset: props=1 navs=1 keys=[]
+Invoice: props=84 navs=28 keys=['id']
+InvoiceLine: props=28 navs=8 keys=['id']
+InvoiceTemplate: props=18 navs=3 keys=['id']
+OrganizationBillingInfo: props=15 navs=2 keys=['id']
+VatRate: props=9 navs=2 keys=['id']
+Campaign: props=65 navs=23 keys=['id']
+CampaignEntry: props=63 navs=22 keys=['id']
+Contact: props=73 navs=24 keys=['id']
+ContactInteraction: props=6 navs=2 keys=['id']
+Deal: props=79 navs=32 keys=['id']
+DealContact: props=63 navs=22 keys=['id']
+Email: props=13 navs=1 keys=['id']
+EmailSyncLog: props=6 navs=0 keys=['id']
+EmailTemplate: props=10 navs=2 keys=['id']
+ExtendedInteraction: props=4 navs=2 keys=['id']
+Interaction: props=14 navs=6 keys=['id']
+InteractionScenario: props=8 navs=2 keys=['id']
+InteractionType: props=6 navs=0 keys=['id']
+Organization: props=84 navs=30 keys=['id']
+OrganizationLegal: props=13 navs=3 keys=['id']
+OrganizationRelation: props=7 navs=3 keys=['id']
+OrganizationTariff: props=9 navs=4 keys=['id']
+OrganizationTariffRate: props=9 navs=2 keys=['id']
+OrganizationTotal: props=48 navs=1 keys=['id']
+Comment: props=11 navs=3 keys=['id']
+CustomField: props=18 navs=3 keys=['id']
+ScheduledJobLog: props=10 navs=0 keys=['id']
+CustomHookLog: props=10 navs=0 keys=['id']
+LifecycleRoleResolverLog: props=10 navs=0 keys=['id']
+NumberingPolicy: props=11 navs=2 keys=['id']
+NumberingPolicyValue: props=7 navs=1 keys=['id']
+ScheduledJob: props=13 navs=2 keys=['id']
+BoardCard: props=12 navs=3 keys=['id']
+BoardColumn: props=13 navs=5 keys=['id']
+Sprint: props=12 navs=3 keys=['id']
+View: props=25 navs=5 keys=['id']
+ViewSetting: props=19 navs=4 keys=['id']
+ViewTeamMember: props=9 navs=4 keys=['id']
+WikiPage: props=28 navs=12 keys=['id']
+WikiPageComment: props=12 navs=4 keys=['id']
+WikiPageCommentThread: props=10 navs=5 keys=['id']
+WikiPageGranted: props=11 navs=4 keys=['id']
+WikiPageRevision: props=8 navs=3 keys=['id']
+WikiSpace: props=15 navs=5 keys=['id']
+WikiSpaceGranted: props=11 navs=4 keys=['id']
+Directory: props=11 navs=4 keys=['id']
+DirectoryEntry: props=14 navs=3 keys=['id']
+DirectoryGrant: props=9 navs=4 keys=['id']
+UiListView: props=6 navs=1 keys=['id']
+UiListViewSavedFilter: props=11 navs=3 keys=['id']
+ExpenseRequest: props=80 navs=31 keys=['id']
+ExpenseRequestLine: props=77 navs=25 keys=['id']
+AccountingEntry: props=29 navs=12 keys=['id']
+AccountingEntryMode: props=6 navs=0 keys=['id']
+AccountingPeriod: props=9 navs=2 keys=['id']
+Contract: props=72 navs=26 keys=['id']
+FinancialAccount: props=68 navs=23 keys=['id']
+FinancialAccountType: props=6 navs=0 keys=['id']
+IncomingActOfAcceptance: props=79 navs=28 keys=['id']
+IncomingActOfAcceptanceDocument: props=7 navs=3 keys=['id']
+IncomingActOfAcceptanceLine: props=12 navs=4 keys=['id']
+GitLabCommit: props=14 navs=1 keys=['id']
+GitLabMergeRequest: props=20 navs=1 keys=['id']
+GitLabRepository: props=13 navs=2 keys=['id']
+GitLabRepositoryBranch: props=12 navs=2 keys=['id']
+Issue: props=85 navs=38 keys=['id']
+IssueCommitLink: props=6 navs=2 keys=['id']
+IssueFollower: props=6 navs=2 keys=['id']
+IssueLink: props=7 navs=3 keys=['id']
+IssueLinkType: props=9 navs=2 keys=['id']
+IssueMergeRequestLink: props=6 navs=2 keys=['id']
+ProjectIssuePermission: props=11 navs=4 keys=['id']
+ProjectIssueType: props=6 navs=2 keys=['id']
+HistoryLogEntry: props=11 navs=1 keys=['id']
+LoginLogEntry: props=10 navs=2 keys=['id']
+PortfolioContentItem: props=14 navs=8 keys=['id']
+PortfolioContentItemType: props=6 navs=0 keys=['id']
+Program: props=71 navs=26 keys=['id']
+ProgramCoManager: props=6 navs=2 keys=['id']
+ProgramTotal: props=45 navs=1 keys=['id']
+Checkpoint: props=86 navs=33 keys=['id']
+ProjectModel: props=7 navs=2 keys=['id']
+ProjectModelStage: props=7 navs=2 keys=['id']
+Project: props=101 navs=58 keys=['id']
+ProjectArtifact: props=69 navs=25 keys=['id']
+ProjectArtifactType: props=11 navs=2 keys=['id']
+ProjectBillingEstimate: props=16 navs=5 keys=['id']
+ProjectBillingType: props=6 navs=0 keys=['id']
+ProjectCoManager: props=6 navs=2 keys=['id']
+ProjectCostCenter: props=65 navs=24 keys=['id']
+ProjectExpenseEstimate: props=17 navs=7 keys=['id']
+ProjectPortfolio: props=68 navs=26 keys=['id']
+ProjectPortfolioCoOwner: props=6 navs=2 keys=['id']
+ProjectRevenueEstimate: props=13 navs=4 keys=['id']
+ProjectTariff: props=11 navs=6 keys=['id']
+ProjectTariffAssignment: props=7 navs=2 keys=['id']
+ProjectTariffRate: props=9 navs=2 keys=['id']
+ProjectTotal: props=78 navs=1 keys=['id']
+ProjectVersion: props=73 navs=36 keys=['id']
+ProjectVersionSnapshot: props=6 navs=6 keys=['id']
+RecurringExpenseRule: props=21 navs=7 keys=['id']
+ResourcePlanData: props=7 navs=2 keys=['id']
+ResourcePlanEntry: props=16 navs=6 keys=['id']
+ResourcePlanProjectSummary: props=22 navs=3 keys=['id']
+RiskRequest: props=18 navs=8 keys=['id']
+RiskRequestType: props=6 navs=0 keys=['id']
+ProjectRisk: props=75 navs=27 keys=['id']
+ProjectRiskTotal: props=18 navs=1 keys=['id']
+ProjectRiskType: props=16 navs=3 keys=['id']
+SubcontractorPaymentEstimate: props=16 navs=6 keys=['id']
+ProjectTask: props=85 navs=31 keys=['id']
+ProjectTaskAssignment: props=10 navs=3 keys=['id']
+ProjectTaskCategory: props=6 navs=0 keys=['id']
+ProjectTeamMember: props=67 navs=29 keys=['id']
+ProjectTeamMemberCostValue: props=9 navs=2 keys=['id']
+ProjectTeamMemberCurrentRate: props=6 navs=1 keys=['id']
+BookingDetailEntry: props=11 navs=3 keys=['id']
+BookingEntry: props=19 navs=8 keys=['id']
+ResourceRequest: props=28 navs=16 keys=['id']
+ResourceRequestChangeEntry: props=9 navs=1 keys=['id']
+ResourceRequestPreferredResource: props=6 navs=2 keys=['id']
+ResourceRequestRequirementEntry: props=11 navs=3 keys=['id']
+EntitySearchItem: props=13 navs=2 keys=['id']
+FileSearchItem: props=14 navs=2 keys=['id']
+AccrualPolicy: props=8 navs=2 keys=['id']
+AccrualPolicyExcludedTimeOffType: props=6 navs=2 keys=['id']
+Activity: props=8 navs=2 keys=['id']
+Agent: props=11 navs=3 keys=['id']
+AgentRun: props=11 navs=1 keys=['id']
+AiContextSchema: props=9 navs=2 keys=['id']
+AiPrompt: props=13 navs=3 keys=['id']
+Certificate: props=68 navs=24 keys=['id']
+CostNormalizationRule: props=9 navs=3 keys=['id']
+CostNormalizationRuleExcludedTimeOffType: props=6 navs=2 keys=['id']
+Currency: props=9 navs=3 keys=['id']
+CurrencyExchangeRate: props=8 navs=1 keys=['id']
+Import: props=8 navs=3 keys=['id']
+ImportEntity: props=9 navs=1 keys=['id']
+ImportState: props=6 navs=0 keys=['id']
+LegalEntity: props=68 navs=24 keys=['id']
+GroupPermissionSet: props=6 navs=2 keys=['id']
+PermissionSet: props=9 navs=5 keys=['id']
+PermissionSetDetail: props=11 navs=1 keys=['id']
+UserPermissionSet: props=6 navs=2 keys=['id']
+RateMatrix: props=14 navs=5 keys=['id']
+RateMatrixLine: props=13 navs=8 keys=['id']
+RateMatrixType: props=6 navs=0 keys=['id']
+ResourcePool: props=12 navs=5 keys=['id']
+ResourcePoolCoManager: props=6 navs=2 keys=['id']
+Avatar: props=9 navs=0 keys=['id']
+Competence: props=66 navs=23 keys=['id']
+Resource: props=77 navs=37 keys=['id']
+Department: props=1 navs=2 keys=[]
+Generic: props=3 navs=2 keys=[]
+Grade: props=9 navs=3 keys=['id']
+Group: props=8 navs=4 keys=['id']
+Level: props=10 navs=2 keys=['id']
+Location: props=10 navs=2 keys=['id']
+ResourceCurrentRate: props=5 navs=1 keys=['id']
+Role: props=66 navs=23 keys=['id']
+Skill: props=8 navs=2 keys=['id']
+User: props=12 navs=19 keys=[]
+UserActivity: props=6 navs=2 keys=['id']
+UserCostValue: props=9 navs=2 keys=['id']
+UserGroup: props=6 navs=2 keys=['id']
+UserLockout: props=8 navs=0 keys=['id']
+UserProduct: props=6 navs=1 keys=['id']
+UserRole: props=6 navs=3 keys=['id']
+UserRoleCompetence: props=6 navs=2 keys=['id']
+UserSetting: props=14 navs=1 keys=['id']
+UserSkill: props=7 navs=2 keys=['id']
+UserSkillEstimationByProject: props=8 navs=3 keys=['id']
+UserSubstitute: props=8 navs=2 keys=['id']
+UserTotal: props=20 navs=2 keys=['id']
+Vacancy: props=0 navs=0 keys=[]
+ExceptionDay: props=11 navs=3 keys=['id']
+PatternDay: props=7 navs=0 keys=['id']
+Schedule: props=12 navs=5 keys=['id']
+ScheduleException: props=8 navs=3 keys=['id']
+UserSchedule: props=8 navs=2 keys=['id']
+UserScheduleDay: props=8 navs=1 keys=['id']
+ApiToken: props=9 navs=2 keys=['id']
+AuthProvider: props=9 navs=2 keys=['id']
+SetPasswordKey: props=7 navs=1 keys=['id']
+UserActivityEvent: props=6 navs=1 keys=['id']
+UserOtpSecret: props=6 navs=1 keys=['id']
+UserPassword: props=7 navs=0 keys=['id']
+SharedToken: props=12 navs=0 keys=['id']
+CapitalChargeRate: props=8 navs=1 keys=['id']
+TenantSetting: props=19 navs=3 keys=['id']
+TimeOffType: props=13 navs=5 keys=['id']
+TimeOffTypeUnit: props=6 navs=0 keys=['id']
+TimeSheetPeriod: props=12 navs=3 keys=['id']
+TimeSheetPeriodScope: props=6 navs=0 keys=['id']
+TimeSheetPeriodType: props=6 navs=0 keys=['id']
+TimeSheetTemplate: props=20 navs=6 keys=['id']
+TimeSheetTemplateCustomField: props=6 navs=2 keys=['id']
+TimeSheetTemplateProjectState: props=6 navs=2 keys=['id']
+TimeSheetTemplateValidationRule: props=6 navs=2 keys=['id']
+ValidationRule: props=12 navs=3 keys=['id']
+ValidationRuleExceptionsPerformer: props=9 navs=4 keys=['id']
+ValidationRuleType: props=6 navs=0 keys=['id']
+TimeZone: props=8 navs=2 keys=['id']
+UsingPolicy: props=5 navs=1 keys=['id']
+BillingReportLineType: props=6 navs=0 keys=['id']
+FileMetadata: props=11 navs=2 keys=['id']
+FinanceReportLineType: props=6 navs=0 keys=['id']
+InvoiceLineReportLineType: props=6 navs=0 keys=['id']
+MentionLog: props=6 navs=1 keys=['id']
+Notification: props=10 navs=1 keys=['id']
+ObjectStorageFile: props=5 navs=0 keys=['id']
+TimeOffBalanceEntry: props=13 navs=4 keys=['id']
+TimeOffBalanceEntryMode: props=6 navs=0 keys=['id']
+TimeOffBalanceEntryType: props=6 navs=0 keys=['id']
+TimeOffRequest: props=79 navs=28 keys=['id']
+TimeOffRequestTotal: props=6 navs=1 keys=['id']
+BillCode: props=11 navs=2 keys=['id']
+TimeAllocation: props=88 navs=36 keys=['id']
+TimeAllocationProjectSummary: props=21 navs=1 keys=['id']
+TimeAllocationRate: props=14 navs=1 keys=['id']
+TimeSheet: props=17 navs=12 keys=['id']
+TimeSheetLine: props=71 navs=29 keys=['id']
+TimeSheetNotificationState: props=6 navs=1 keys=['id']
+TimeSheetTotal: props=8 navs=1 keys=['id']
+MetaEntitySettings: props=10 navs=0 keys=['id']
+Lifecycle: props=11 navs=3 keys=['id']
+LifecycleRole: props=14 navs=3 keys=['id']
+State: props=14 navs=3 keys=['id']
+StateHistoryLog: props=10 navs=4 keys=['id']
+WorkflowDeclaration: props=10 navs=3 keys=['id']
+WorkflowEntity: props=9 navs=3 keys=['id']
+WorkflowInstance: props=14 navs=4 keys=['id']
+WorkflowTask: props=20 navs=8 keys=['id']
+WorkflowTaskEntity: props=9 navs=3 keys=['id']
+MetaEntity: props=25 navs=0 keys=['name']
+LeaveScheduleDay: props=3 navs=1 keys=['id']
+LeaveSchedule: props=2 navs=1 keys=['userId']
+ReportSourceDescription: props=7 navs=0 keys=['name']
+TenantDomainDto: props=3 navs=0 keys=['domainName']
+TenantDto: props=9 navs=0 keys=['id']
+LifecycleInfo: props=7 navs=3 keys=['id']
+LifecycleEntityTypeInfo: props=1 navs=2 keys=['id']
+IWorkflowFunction: props=4 navs=0 keys=['id']
+ProjVersionMergeSourceEntry: props=3 navs=0 keys=['id']
+LifecycleInfoWorkflowTaskAction: props=6 navs=0 keys=['id']
+LifecycleInfoTransition: props=5 navs=0 keys=['id']
+LifecycleEntityTypeInfoTransition: props=5 navs=0 keys=['id']
+
+=== EnumType: 79 ===
+ListSortDirection: ['Ascending', 'Descending']
+EntityState: ['Detached', 'Unchanged', 'Deleted', 'Modified', 'Added']
+SearchItemKind: ['Entity', 'File']
+DateScale: ['Date', 'Week', 'Month', 'Quarter', 'Year']
+PlanningScale: ['Day', 'Week', 'Month', 'Quarter', 'Year']
+RevenueEstimateCalculationMethod: ['BillingRate', 'TargetProfitability', 'Fixed']
+ProjVersionMergeType: ['Replace', 'Add']
+ProjVersionMergeOption: ['Default', 'Combine']
+DayPart: ['FullDay', 'Hours', 'Half', 'ThreeQuarters', 'Quarter', 'Octet']
+ReportFieldType: ['String', 'Integer', 'Decimal', 'Date', 'Bool', 'Percent', 'EntityId', 'Enum', 'DateTimeOffset', 'State', 'Directory', 'User', 'Undefined']
+ResourcePlanSummaryValueMode: ['Hours', 'Cost', 'Percent', 'FTE']
+KpiType: ['Plan', 'Actual', 'Forecast', 'Estimate', 'Booked', 'Scheduled']
+PnlStatementGroupType: ['Month', 'Quarter', 'Year']
+PnlStatementDateType: ['DocumentDate', 'Date']
+TrackTimeStrategy: ['CreateNew', 'Replace', 'Merge']
+DisplayMode: ['List', 'Board', 'Burndown', 'Backlog', 'Plan']
+ColumnType: ['StateBased', 'Custom']
+AuthProviderType: ['Local', 'AzureAd', 'OpenId']
+LicenseProduct: ['Projects', 'TimeTracking', 'Expenses', 'Resources', 'Finance', 'Billing', 'Corp', 'Clients', 'Tasks', 'LegacyStarter', 'LegacyBasic', 'LegacyStandard']
+ValidationRuleLevel: ['Error', 'Warning']
+MetaEntityPropertyType: ['String', 'Decimal', 'DateTime', 'Integer', 'DateOnly', 'Text', 'Directory', 'Navigation', 'Boolean', 'Percent', 'Currency', 'Phone', 'Url', 'Email', 'Enum', 'User', 'Duration', 'MarkdownText', 'Checklist', 'DirectorySet', 'Collection', 'WorkflowEntity', 'Money']
+Language: ['Ru', 'En']
+FormColumn: ['Left', 'Right']
+CostNormalizationMethod: ['PaidProjectsFirst', 'Evenly']
+AccrualPolicyPeriod: ['Week', 'Month', 'Year']
+AccrualPolicyType: ['Fixed', 'Overhours']
+EmailFolder: ['Inbox', 'Sent']
+ResourceType: ['User', 'Department', 'Resource', 'Vacancy', 'Generic']
+ProjectTaskType: ['FixedUnits', 'FixedWork', 'FixedDuration']
+ProjectTaskDependencyType: ['FinishToStart', 'StartToStart', 'FinishToFinish', 'StartToFinish']
+PageSize: ['A4', 'Letter']
+PageOrientation: ['Portrait', 'Landscape']
+InvoiceLineType: ['Time', 'Expense', 'Custom']
+BoardType: ['Kanban', 'Scrum']
+FilterGroupOperator: ['And', 'Or']
+FilterOperator: ['Equal', 'NotEqual', 'Greater', 'Less', 'GreaterOrEqual', 'LessOrEqual', 'Contains', 'DoesNotContain', 'Between', 'InPeriod', 'InHierarchy', 'IsNull', 'IsNotNull', 'StartsWith', 'EndsWith', 'CurrentUser']
+FilterQuantifier: ['Any']
+ViewScopeType: ['Shared', 'User']
+SprintPeriod: ['OneWeek', 'TwoWeeks', 'ThreeWeeks', 'FourWeeks', 'Custom']
+BillingMode: ['Manual', 'Automatic']
+DynamicCodeLogLevel: ['Info', 'Error']
+ViewTotalFunction: ['Sum', 'Count']
+ScopeType: ['System', 'Shared', 'User']
+DatePeriodType: ['ThisWeek', 'PrevWeek', 'ThisMonth', 'PrevMonth', 'ThisQuarter', 'PrevQuarter', 'ThisYear', 'PrevYear', 'Custom', 'NextWeek', 'NextMonth', 'NextQuarter', 'NextYear', 'Last7Days', 'Last30Days', 'Past', 'Future']
+WikiSpaceScopeType: ['Shared', 'Project']
+HistoryLogType: ['Modify', 'Add', 'Remove']
+RuleCalculationMethod: ['Fixed', 'Percent']
+RuleCalculationBase: ['LaborCost', 'Revenue', 'WorkingCapital']
+RecurringExpenseFrequency: ['Week', 'Month', 'Quarter', 'Year']
+ProjectRiskCalculationType: ['Percent', 'Fixed']
+ProjectRiskCalculationBase: ['Cost', 'Revenue', 'Expense']
+ProjectRiskAccrualFrequency: ['Week', 'Month', 'Quarter', 'Year', 'OnProjectEndDate']
+BookingType: ['Hard', 'Soft']
+PlanningMethod: ['Manual', 'FrontLoad', 'RemainingCapacity', 'Evenly', 'SchedulePercent']
+AgentRunStatus: ['Running', 'Error', 'Succeeded', 'Canceling', 'Canceled']
+RateMatrixAnalytics: ['Role', 'Competence', 'Level', 'Grade', 'Location', 'ResourcePool', 'LegalEntity']
+TimeInputType: ['Decimal', 'HoursAndMinutes', 'SchedulePercent']
+Theme: ['Light', 'Dark', 'System']
+SetPasswordOption: ['ResetPassword', 'SetNewPassword']
+ForecastPeriod: ['Day', 'Week', 'Month']
+BookingMode: ['Basic', 'Detailed']
+DayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+WorkflowFunctionType: ['Start', 'Finish', 'Task', 'Condition', 'Notification']
+CreateProjectVersionMode: ['Empty', 'CopyEstimate', 'CopyForecast']
+DateFormat: ['Default', 'Deadline']
+MetaEntityPropertyKind: ['Primitive', 'Navigation', 'Collection', 'Complex', 'Directory', 'DirectorySet', 'Total', 'WorkflowTask', 'WorkflowInstance']
+FilterMode: ['Used', 'Favorite', 'Group', 'UsedWithoutGroup', 'FavoriteWithoutGroup', 'ExpandedOnly']
+KpiKind: ['Hours', 'Cost', 'Revenue', 'Expenses', 'Profit', 'Profitability', 'Billing', 'Duration']
+ProjVersionMergeDetailType: ['Add', 'Update', 'Delete', 'Conflict']
+ProjVersionMergeDetailEntityType: ['TeamMember', 'Generic', 'TeamMemberCostValue', 'Tariff', 'TariffRate', 'TariffAssignment', 'Task', 'Risk', 'TaskAssignment', 'ResourcePlanEntry', 'RecurringExpenseRule', 'Checkpoint', 'SubcontractorPaymentEstimate']
+ProjVersionMergeKpiKind: ['Hours', 'Cost', 'Revenue', 'Billing', 'Expenses', 'Profitability', 'SubcontractorPayments']
+TotalFunction: ['None', 'Count', 'Sum', 'CountAndSum', 'Average', 'Max', 'Min', 'All', 'Calculate']
+ResourceGapSummaryValueType: ['ByBooking', 'ByProjects']
+PredefinedEntityValues: ['My']
+BookingEntryType: ['Booking', 'ResourceRequest']
+PnlStatementEntryKind: ['Unspecified', 'Revenue', 'Expenses', 'Risks', 'InnerExpenseLine', 'ExpenseRule', 'ExpenseRisk', 'WorkingCapital', 'OutstandingCost', 'Hours', 'Billing', 'Collection']
+PnlTableBodyRowType: ['Separator', 'RevenueGroup', 'ExpenseGroup', 'RiskGroup', 'InformationGroup', 'RevenueItem', 'ExpenseItem', 'ExpenseSubgroup', 'ManualExpenseSubItem', 'ExpenseRuleSubItem', 'RiskSubgroup', 'ExpenseRiskSubItem', 'GrossMargin', 'Profitability', 'InformationHoursItem', 'InformationBillingItem', 'InformationCollectionItem', 'ExtendedGrossMargin', 'ExtendedProfitability', 'WorkingCapital', 'OutstandingCost', 'CapitalCharge']
+ActivityItemType: ['Comment', 'TaskPerformed', 'WorkflowStarted', 'WorkflowStopped', 'StateChanged']
+TaskPlanNodeType: ['Wbs', 'Issue']
+
+=== ComplexType: 226 ===
+ReferencingRowInfo: 4 props
+EntityDto: 1 props
+NamedEntityDto: 1 props
+HistorySubjectDto: 5 props
+HistoryValueDto: 5 props
+HistoryChangeDto: 6 props
+HistoryFeedCursorDto: 2 props
+HistoryFeedItemDto: 7 props
+HistoryFeedPageDto: 3 props
+UserInfo: 3 props
+UserToSubstitute: 5 props
+DirectorySetEntry: 7 props
+LookupValueDto: 2 props
+ClientSession: 16 props
+CustomFieldConfiguration: 6 props
+NavigationItemDto: 12 props
+OpenTypeDto: 0 props
+DateHours: 2 props
+AiSettings: 4 props
+GitLabSettings: 4 props
+Culture: 2 props
+Country: 2 props
+EntityTypeDescription: 2 props
+LicenseInfo: 2 props
+ActorRoleDto: 2 props
+GlobalSearchHit: 9 props
+AiTextCommandModel: 2 props
+UserExperienceOverviewDto: 6 props
+LicenseProductInfo: 5 props
+UserEmailSettings: 7 props
+AuthProviderDto: 1 props
+KeyValuePair_2OfString_Nullable_1OfDecimal: 0 props
+TimeOffBalanceProfileLine: 5 props
+UserDateDuration: 3 props
+KpiDto: 3 props
+KpiRequestParam: 4 props
+KpiTrendsRequestParam: 4 props
+KpiTrendsValue: 3 props
+OrganizationGraphDto: 3 props
+OrganizationLegalDuplicateItem: 3 props
+OrganizationInfoByTaxNumberResult: 6 props
+EmailAddress: 2 props
+EmailContent: 2 props
+FunnelStageStatsItem: 10 props
+LostResolutionItem: 5 props
+FilterGroup: 3 props
+ResourceDto: 3 props
+ResourceRequestTemplateDto: 12 props
+GenericCalculatedInfoFilter: 8 props
+GenericCalculatedInfoDto: 2 props
+BookingDetailDto: 4 props
+TaskLine: 4 props
+ProjectRbcCalendarSectionDto: 4 props
+ProjectExpensesCalendarFilter: 2 props
+ProjectExpensesCalendarTaskLine: 3 props
+ProjectExpensesCalendarAccountLine: 6 props
+ProjectExpensesCalendarSectionDto: 4 props
+ProjectDto: 4 props
+UserRoleDto: 4 props
+ProjectTaskDto: 8 props
+NamedEntityWithPrimaryFlagDto: 1 props
+ProjectTaskInfoDto: 6 props
+ProjVersionMergeDetailsDto: 2 props
+ProjVersionMergeSource: 0 props
+ProjVersionMergeTarget: 3 props
+ProjectTaskSearchRecordDto: 5 props
+DatePeriod: 3 props
+TimesheetValidationError: 8 props
+CodedEntityDto: 1 props
+LeaveScheduleFilter: 7 props
+ReportField: 14 props
+ProjectSummaryPageDto: 1 props
+ProjectSummaryFilter: 6 props
+ProjectSummaryResourcePlanDto: 5 props
+ResourceSummaryPageOptions: 6 props
+ResourceSummaryPageDto: 2 props
+ResourceSummaryEntriesOptions: 7 props
+ResourceSummaryResourceEntryDto: 8 props
+ResourceGapSummaryOptions: 6 props
+ResourceGapSummaryDto: 1 props
+BookingProjectDto: 1 props
+BookingActionsAvailability: 2 props
+ResourceInfo: 4 props
+BookingResourcesFilter: 22 props
+BookingsFilter: 5 props
+ResourcePlanGroup: 5 props
+ResourcePlan: 9 props
+ResourcePlanTask: 6 props
+TaskInfo: 4 props
+ResourcePlanEntryDto: 7 props
+UpdateResourcePlanDto: 3 props
+PnlStatementEntry: 11 props
+PnlDisplayPeriod: 2 props
+PnlStatementFilter: 9 props
+PnlTableBodyCell: 5 props
+PnlTableDateGroupSlot: 2 props
+PnlTableOptions: 15 props
+PnlTable: 4 props
+PnlStatement: 7 props
+InvoiceLineInfoDto: 15 props
+PersonContactInfo: 3 props
+CompanyBillingInfo: 4 props
+TenantOverviewDto: 9 props
+BillingContactDto: 8 props
+AccountDocumentDto: 8 props
+LicenseOrderCalculation: 3 props
+TenantLicenseDto: 4 props
+AllocationData: 15 props
+AgentProperty: 4 props
+AgentPropertyValue: 2 props
+TrackTimeEntry: 15 props
+TransitionFormValue: 2 props
+StateConfiguration: 5 props
+StateTransition: 8 props
+WorkflowSchema: 5 props
+ActivityItem: 11 props
+CommentAttachmentDto: 6 props
+ResourceRequirementsResourceGroup: 8 props
+ResourceRequirementsPlan: 6 props
+StateDto: 1 props
+NavigationItem: 3 props
+BurndownChartPointDto: 2 props
+BurndownChartDto: 4 props
+Paging: 3 props
+EpicPanelItemDto: 4 props
+FilterPreset: 3 props
+OrderByValue: 2 props
+ListColumn: 3 props
+UiFilter: 2 props
+PlanItemDto: 6 props
+PlanProjectTaskDto: 6 props
+PlanIssueDto: 12 props
+PlanDirectoryEntryDto: 5 props
+PlanStateDto: 4 props
+IssueHierarchySummaryDto: 4 props
+IssueDevelopmentDto: 2 props
+IssueDevelopmentCommitDto: 6 props
+IssueDevelopmentMergeRequestDto: 13 props
+RiskInfoDto: 4 props
+TransitionFormProperty: 2 props
+GetTransitionFormPropertyValue: 1 props
+TransitionFormDescription: 3 props
+TransitionFormPropertyValue: 2 props
+LocalProviderConfiguration: 9 props
+LocalString: 2 props
+Performer: 4 props
+TransitionForm: 3 props
+SchemaView: 2 props
+CheckListItem: 4 props
+ProjectTaskDependency: 3 props
+FilterProperty: 3 props
+FilterCondition: 2 props
+InteractionScenarioStep: 7 props
+Money: 2 props
+DisplayModeFilterSettings: 3 props
+HistoryLogEntryChange: 3 props
+HistoryLogEntryAttribute: 2 props
+Lexeme: 1 props
+UserNotification: 4 props
+TasksSettings: 1 props
+TargetMetadata: 3 props
+KeyValuePair_2OfLanguage_String: 0 props
+DirectoryEntryDto: 3 props
+FinancialAccountDto: 5 props
+CurrencyDto: 1 props
+ProjectRiskExpenseDto: 4 props
+ProjectRiskExpenseInnerDto: 2 props
+ProjectSummaryTeamMemberDto: 3 props
+ProjectSummaryResourcePlanTotalValueDto: 2 props
+CreateProjectVersionDto: 3 props
+RecurringExpenseRuleDto: 8 props
+RecurringExpenseRuleInnerDto: 6 props
+RecurringExpenseBaseEntry: 6 props
+ResourceForTeamDto: 12 props
+TimeOffDateHours: 1 props
+ResourceSummaryResourceLineDto: 1 props
+ResourceSummaryResourceTotalValueDto: 2 props
+StatedEntityDto: 1 props
+ResourceRequestDto: 3 props
+ResourceRequestForGroupingDto: 2 props
+MetaEntityLogAttribute: 3 props
+ValueTuple_2OfString_String: 0 props
+MetaEntityPrimitiveProperty: 20 props
+EnumValue: 2 props
+MetaEntityPropertyViewConfiguration: 7 props
+MetaEntityNavigationProperty: 16 props
+MetaEntityWorkflowTaskProperty: 0 props
+MetaEntityWorkflowInstanceProperty: 0 props
+MetaEntityTotalProperty: 0 props
+MetaEntityDirectoryProperty: 2 props
+MetaEntityComplexProperty: 15 props
+MetaEntityDirectorySetProperty: 2 props
+MetaEntityCollectionProperty: 1 props
+Permission: 6 props
+EntityAccess: 4 props
+ClientSessionConfiguration: 16 props
+Metamodel: 1 props
+TeamMemberInfo: 1 props
+OrganizationRelationDto: 2 props
+DateAmount: 2 props
+RuleDateAmount: 1 props
+ProjectRbcCalendarGroupDto: 2 props
+OtherLine: 2 props
+ProjectExpensesCalendarInnerFinancialAccountLine: 4 props
+ProjectExpensesCalendarExpenseRuleLine: 5 props
+ProjectExpensesCalendarRiskLine: 5 props
+ProjectExpensesCalendarSectionGroup: 2 props
+ProjectExpensesCalendarOtherLine: 1 props
+ProjVersionMergeDetail: 1 props
+ProjVersionMergeDetailEntry: 3 props
+ProjVersionMergeKpi: 1 props
+ProjVersionMergeKpiEntry: 4 props
+ResourceGapSummaryLineDto: 3 props
+TaskEntryDto: 4 props
+ResourcePlanOtherGroup: 3 props
+PnlTableHeader: 1 props
+PnlTableHeaderRow: 1 props
+PnlTableHeaderCell: 2 props
+PnlTableBody: 1 props
+PnlTableBodyRow: 7 props
+BillingAddress: 3 props
+LicenseOrderCalculationWithPrice: 1 props
+LicenseProductCost: 2 props
+LicenseProductConfiguration: 2 props
+LifecycleInfoWorkflowStartAction: 3 props
+WorkflowIndicatorData: 4 props

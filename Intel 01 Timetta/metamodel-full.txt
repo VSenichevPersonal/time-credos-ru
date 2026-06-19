@@ -1,0 +1,1587 @@
+=== 186 ENTITIES IN METAMODEL ===
+AccountingEntry: RU=Проводка EN=Accounting entry | lifecycle=False custom=False | primProps=10 navProps=9
+  .Amount: Decimal
+  .Date: DateOnly
+  .Hours: Decimal
+  .DocumentDescription: String
+  .Id: String
+  ... +5 more
+  ->Project: Navigation
+  ->ProjectTask: Navigation
+  ->LegalEntity: Navigation
+  ->... +6 more
+AccountingPeriod: RU=Учётный период EN=Accounting period | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Activity: RU=Вид работы EN=Activity | lifecycle=False custom=False | primProps=6 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ActOfAcceptance: RU=Акт EN=Act of acceptance | lifecycle=True custom=True | primProps=11 navProps=4
+  .Amount: Decimal
+  .Date: DateOnly
+  .DateOfAcceptance: DateOnly
+  .Code: String
+  .Id: String
+  ... +6 more
+  ->Project: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->... +1 more
+ActOfAcceptanceLine: RU=Строка акта EN=Act of acceptance Line | lifecycle=False custom=False | primProps=7 navProps=3
+  .Amount: Decimal
+  .ExchangeRate: Decimal
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  ... +2 more
+  ->Account: Navigation
+  ->ProjectTask: Navigation
+  ->ActOfAcceptance: Navigation
+Agent: RU=Agent EN=Agent | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+AgentRun: RU=AgentRun EN=AgentRun | lifecycle=False custom=False | primProps=7 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Status: Enum
+  ... +2 more
+  ->Agent: Navigation
+AiContextSchema: RU=Модель контекста ИИ EN=AI context model | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+AiPrompt: RU=Запрос к ИИ EN=AI prompt | lifecycle=False custom=False | primProps=10 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +5 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->AiContextSchema: Navigation
+ApiToken: RU=API-токен EN=API token | lifecycle=False custom=False | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+BillCode: RU=Код оплаты EN=Bill code | lifecycle=False custom=False | primProps=9 navProps=2
+  .CostAdjustment: Decimal
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+BookingEntry: RU=Бронирование EN=Booking entry | lifecycle=False custom=False | primProps=12 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Description: Text
+  ... +7 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Project: Navigation
+  ->... +1 more
+CalculatedField: RU=Вычисляемое поле EN=Calculated field | lifecycle=False custom=False | primProps=7 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->ReportType: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Campaign: RU=Кампания EN=Campaign | lifecycle=False custom=True | primProps=6 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Manager: User
+CampaignEntry: RU=Элемент кампании EN=Campaign entry | lifecycle=False custom=True | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Description: Text
+  ->Campaign: Navigation
+  ->Organization: Navigation
+Certificate: RU=Сертификат EN=Certificate | lifecycle=True custom=True | primProps=8 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +1 more
+Checkpoint: RU=Контрольная точка EN=Checkpoint | lifecycle=True custom=True | primProps=17 navProps=8
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .CrossId: String
+  ... +12 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +5 more
+Competence: RU=Компетенция EN=Competence | lifecycle=False custom=True | primProps=7 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->Role: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Contact: RU=Контакт EN=Contact | lifecycle=False custom=True | primProps=13 navProps=3
+  .Email: Email
+  .FirstName: String
+  .LastName: String
+  .Patronymic: String
+  .Phone: Phone
+  ... +8 more
+  ->Organization: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ContactInteraction: RU=ContactInteraction EN=ContactInteraction | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Interaction: Navigation
+  ->Contact: Navigation
+Contract: RU=Договор EN=Contract | lifecycle=True custom=True | primProps=11 navProps=5
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +6 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +2 more
+CostNormalizationRule: RU=Правило нормализации себестоимости EN=Cost normalization rule | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+CostNormalizationRuleExcludedTimeOffType: RU=CostNormalizationRuleExcludedTimeOffType EN=CostNormalizationRuleExcludedTimeOffType | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->CostNormalizationRule: Navigation
+  ->TimeOffType: Navigation
+Currency: RU=Валюта EN=Currency | lifecycle=False custom=False | primProps=7 navProps=2
+  .Alpha3Code: String
+  .Symbol: String
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+CurrencyExchangeRate: RU=CurrencyExchangeRate EN=CurrencyExchangeRate | lifecycle=False custom=False | primProps=7 navProps=1
+  .EffectiveDate: DateOnly
+  .ExpiryDate: DateOnly
+  .ExchangeRate: Decimal
+  .Id: String
+  .Created: DateTime
+  ... +2 more
+  ->Currency: Navigation
+CustomField: RU=Дополнительное свойство EN=Custom field | lifecycle=False custom=False | primProps=13 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +8 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Dashboard: RU=Дашборд EN=Dashboard | lifecycle=False custom=False | primProps=9 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Owner: User
+Deal: RU=Сделка EN=Deal | lifecycle=True custom=True | primProps=12 navProps=7
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +7 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +4 more
+DealContact: RU=Контакт сделки EN=Deal contact | lifecycle=False custom=True | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Description: Text
+  ->Deal: Navigation
+  ->Contact: Navigation
+Department: RU=Подразделение EN=Department | lifecycle=False custom=True | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->LeadDepartment: Navigation
+  ->Role: Navigation
+  ->CreatedBy: User
+  ->... +1 more
+Directory: RU=Справочник EN=Directory | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+DirectoryEntry: RU=Запись справочника EN=Directory entry | lifecycle=False custom=False | primProps=11 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +6 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+CustomHookLog: RU=CustomHookLog EN=CustomHookLog | lifecycle=False custom=False | primProps=10 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Timestamp: DateOnly
+  ... +5 more
+ScheduledJobLog: RU=ScheduledJobLog EN=ScheduledJobLog | lifecycle=False custom=False | primProps=10 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Timestamp: DateOnly
+  ... +5 more
+LifecycleRoleResolverLog: RU=LifecycleRoleResolverLog EN=LifecycleRoleResolverLog | lifecycle=False custom=False | primProps=10 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Timestamp: DateOnly
+  ... +5 more
+EmailTemplate: RU=EmailTemplate EN=EmailTemplate | lifecycle=False custom=False | primProps=8 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ExpenseRequest: RU=Заявка на затраты EN=Expense request | lifecycle=True custom=True | primProps=12 navProps=10
+  .Date: DateOnly
+  .TotalAmount: Decimal
+  .TotalBillable: Decimal
+  .TotalReimbursementBC: Decimal
+  .TotalReimbursementRC: Decimal
+  ... +7 more
+  ->Project: Navigation
+  ->ProjectCostCenter: Navigation
+  ->User: User
+  ->... +7 more
+ExpenseRequestLine: RU=Строка заявки на затраты EN=Expense request line | lifecycle=False custom=True | primProps=15 navProps=4
+  .Reimburse: Boolean
+  .AmountPC: Decimal
+  .Amount: Decimal
+  .AmountBC: Decimal
+  .Unit: String
+  ... +10 more
+  ->Currency: Navigation
+  ->Account: Navigation
+  ->ProjectTask: Navigation
+  ->... +1 more
+FinancialAccount: RU=Учётная статья EN=Financial account | lifecycle=False custom=True | primProps=9 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Type: Navigation
+Generic: RU=Generic EN=Generic | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+GitLabRepository: RU=GitLabRepository EN=GitLabRepository | lifecycle=False custom=False | primProps=11 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +6 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Grade: RU=Грейд EN=Grade | lifecycle=False custom=False | primProps=6 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->Level: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Group: RU=Группа EN=Group | lifecycle=False custom=False | primProps=6 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+HistoryLogEntry: RU=HistoryLogEntry EN=HistoryLogEntry | lifecycle=False custom=False | primProps=8 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EntityId: String
+  ... +3 more
+  ->User: User
+Import: RU=Import EN=Import | lifecycle=False custom=False | primProps=5 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+IncomingActOfAcceptance: RU=Входящий акт EN=Incoming act of acceptance | lifecycle=True custom=True | primProps=16 navProps=6
+  .Name: String
+  .Amount: Decimal
+  .AmountBC: Decimal
+  .Date: DateOnly
+  .DateOfAcceptance: DateOnly
+  ... +11 more
+  ->Project: Navigation
+  ->Subcontractor: Navigation
+  ->Currency: Navigation
+  ->... +3 more
+IncomingActOfAcceptanceLine: RU=Строка входящего акта EN=Incoming act of acceptance line | lifecycle=False custom=False | primProps=8 navProps=4
+  .Amount: Decimal
+  .AmountBC: Decimal
+  .ExchangeRate: Decimal
+  .Id: String
+  .Created: DateTime
+  ... +3 more
+  ->Account: Navigation
+  ->ProjectTask: Navigation
+  ->Project: Navigation
+  ->... +1 more
+IncomingActOfAcceptanceDocument: RU=Документ акта EN=Act document | lifecycle=False custom=False | primProps=4 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->IncomingActOfAcceptance: Navigation
+  ->TimeSheet: Navigation
+  ->ExpenseRequest: Navigation
+Interaction: RU=Взаимодействие EN=Interaction | lifecycle=False custom=False | primProps=10 navProps=5
+  .IsPlanned: Boolean
+  .IsSent: Boolean
+  .SendAutomatically: Boolean
+  .Date: DateTime
+  .Subject: String
+  ... +5 more
+  ->Type: Navigation
+  ->Organization: Navigation
+  ->Deal: Navigation
+  ->... +2 more
+ExtendedInteraction: RU=ExtendedInteraction EN=ExtendedInteraction | lifecycle=False custom=False | primProps=4 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Interaction: Navigation
+Email: RU=Email EN=Email | lifecycle=False custom=False | primProps=5 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Folder: Enum
+InteractionScenario: RU=InteractionScenario EN=InteractionScenario | lifecycle=False custom=False | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Invoice: RU=Счёт EN=Invoice | lifecycle=True custom=True | primProps=16 navProps=6
+  .BillingAddress: String
+  .Code: String
+  .IssueDate: DateOnly
+  .PaymentDate: DateOnly
+  .PaymentDueDate: DateOnly
+  ... +11 more
+  ->Organization: Navigation
+  ->Project: Navigation
+  ->InvoiceTemplate: Navigation
+  ->... +3 more
+InvoiceLine: RU=Строка счёта EN=Invoice line | lifecycle=False custom=False | primProps=11 navProps=7
+  .Amount: Decimal
+  .Quantity: Decimal
+  .Unit: String
+  .Rate: Decimal
+  .Date: DateOnly
+  ... +6 more
+  ->ProjectCostCenter: Navigation
+  ->ProjectTariff: Navigation
+  ->Account: Navigation
+  ->... +4 more
+InvoiceTemplate: RU=Шаблон счёта EN=Invoice template | lifecycle=False custom=False | primProps=14 navProps=3
+  .CompanyAddress: String
+  .CompanyName: String
+  .CompanyPhone: String
+  .PageOrientation: Enum
+  .PageSize: Enum
+  ... +9 more
+  ->VatRate: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Issue: RU=Задача EN=Issue | lifecycle=True custom=True | primProps=12 navProps=10
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +7 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +7 more
+IssueFollower: RU=Наблюдатель задачи EN=Issue follower | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Issue: Navigation
+  ->Follower: User
+IssueLink: RU=Связь задачи EN=Issue link | lifecycle=False custom=False | primProps=0 navProps=3
+  ->Source: Navigation
+  ->Destination: Navigation
+  ->LinkType: Navigation
+IssueLinkType: RU=Тип связи задачи EN=Issue link type | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+LegalEntity: RU=Юридическое лицо EN=Legal entity | lifecycle=False custom=True | primProps=8 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Manager: User
+  ->... +1 more
+Level: RU=Уровень EN=Level | lifecycle=False custom=False | primProps=8 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Lifecycle: RU=Lifecycle EN=Lifecycle | lifecycle=False custom=False | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+LifecycleRole: RU=Роль жизненного цикла EN=Lifecycle role | lifecycle=False custom=False | primProps=10 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +5 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Lifecycle: Navigation
+Location: RU=Локация EN=Location | lifecycle=False custom=False | primProps=8 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+LoginLogEntry: RU=LoginLogEntry EN=LoginLogEntry | lifecycle=False custom=False | primProps=8 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Email: Email
+  ... +3 more
+  ->User: User
+  ->AuthProvider: Navigation
+NumberingPolicy: RU=Политика нумерации EN=Numbering policy | lifecycle=False custom=False | primProps=9 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+NumberingPolicyValue: RU=Политика нумерации (значение) EN=Numbering policy value | lifecycle=False custom=False | primProps=6 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .NextIndex: Integer
+  ... +1 more
+  ->NumberingPolicy: Navigation
+OrganizationBillingInfo: RU=OrganizationBillingInfo EN=OrganizationBillingInfo | lifecycle=False custom=False | primProps=13 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .TimeAmountBC: Decimal
+  ... +8 more
+  ->Project: Navigation
+  ->Organization: Navigation
+Organization: RU=Организация EN=Organization | lifecycle=True custom=True | primProps=22 navProps=5
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +17 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +2 more
+OrganizationTotal: RU=Показатели организации EN=Organization indicators | lifecycle=False custom=False | primProps=48 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EstimatedHours: Decimal
+  ... +43 more
+OrganizationTariff: RU=Тариф организации EN=Organization tariff | lifecycle=False custom=False | primProps=6 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->Organization: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+OrganizationTariffRate: RU=OrganizationTariffRate EN=OrganizationTariffRate | lifecycle=False custom=False | primProps=7 navProps=1
+  .EffectiveDate: DateOnly
+  .ExpiryDate: DateOnly
+  .Value: Decimal
+  .Id: String
+  .Created: DateTime
+  ... +2 more
+  ->Currency: Navigation
+OrganizationLegal: RU=Клиент (юр. лицо) EN=Organization legal | lifecycle=False custom=False | primProps=11 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +6 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+OrganizationRelation: RU=Связь организаций EN=Organization relation | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Parent: Navigation
+  ->Child: Navigation
+PermissionSet: RU=Набор прав EN=Permission set | lifecycle=False custom=False | primProps=7 navProps=2
+  .RoleName: String
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+PermissionSetDetail: RU=PermissionSetDetail EN=PermissionSetDetail | lifecycle=False custom=False | primProps=10 navProps=1
+  .EditEnabled: Boolean
+  .ViewEnabled: Boolean
+  .DeleteEnabled: Boolean
+  .ActionEnabled: Boolean
+  .ScopeName: String
+  ... +5 more
+  ->PermissionSet: Navigation
+PortfolioContentItem: RU=Элемент портфеля EN=Portfolio content item | lifecycle=False custom=False | primProps=6 navProps=8
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +5 more
+Program: RU=Программа EN=Program | lifecycle=False custom=True | primProps=10 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +5 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Manager: User
+  ->... +1 more
+ProgramTotal: RU=Показатели программы EN=Program indicators | lifecycle=False custom=False | primProps=45 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EstimatedHours: Decimal
+  ... +40 more
+ProgramCoManager: RU=ProgramCoManager EN=ProgramCoManager | lifecycle=False custom=False | primProps=0 navProps=1
+  ->User: User
+ProjectArtifact: RU=Документ проекта EN=Project document | lifecycle=True custom=True | primProps=8 navProps=5
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +2 more
+ProjectArtifactType: RU=Тип документа EN=Document type | lifecycle=False custom=False | primProps=9 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ProjectBillingEstimate: RU=ProjectBillingEstimate EN=ProjectBillingEstimate | lifecycle=False custom=False | primProps=8 navProps=5
+  .Amount: Decimal
+  .BillingDate: DateOnly
+  .CollectionDate: DateOnly
+  .Id: String
+  .Created: DateTime
+  ... +3 more
+  ->ProjectTask: Navigation
+  ->Project: Navigation
+  ->Version: Navigation
+  ->... +2 more
+Project: RU=Проект EN=Project | lifecycle=True custom=True | primProps=27 navProps=14
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +22 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +11 more
+ProjectTotal: RU=Показатели проекта EN=Project indicators | lifecycle=False custom=False | primProps=78 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EstimatedHours: Decimal
+  ... +73 more
+ProjectCoManager: RU=Со-менеджер проекта EN=Project co-manager | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->User: User
+  ->Project: Navigation
+ProjectCostCenter: RU=Центр затрат EN=Project cost center | lifecycle=False custom=True | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ProjectExpenseEstimate: RU=ProjectExpenseEstimate EN=ProjectExpenseEstimate | lifecycle=False custom=False | primProps=7 navProps=5
+  .Amount: Decimal
+  .Date: DateOnly
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  ... +2 more
+  ->ProjectTask: Navigation
+  ->Account: Navigation
+  ->Project: Navigation
+  ->... +2 more
+ProjectModel: RU=Модель этапов проекта EN=Project stages model | lifecycle=False custom=False | primProps=5 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ProjectModelStage: RU=Этап модели EN=Model stage | lifecycle=False custom=False | primProps=4 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Model: Navigation
+ProjectPortfolio: RU=Портфель проекта EN=Project portfolio | lifecycle=False custom=True | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Portfolio: Navigation
+  ->... +1 more
+ProjectPortfolioCoOwner: RU=ProjectPortfolioCoOwner EN=ProjectPortfolioCoOwner | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Portfolio: Navigation
+  ->User: User
+ProjectRevenueEstimate: RU=ProjectRevenueEstimate EN=ProjectRevenueEstimate | lifecycle=False custom=False | primProps=7 navProps=3
+  .Amount: Decimal
+  .Date: DateOnly
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  ... +2 more
+  ->ProjectTask: Navigation
+  ->Project: Navigation
+  ->Version: Navigation
+ProjectRisk: RU=Риск проекта EN=Project risk | lifecycle=False custom=True | primProps=13 navProps=6
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .CrossId: String
+  ... +8 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Project: Navigation
+  ->... +3 more
+ProjectRiskTotal: RU=ProjectRiskTotal EN=ProjectRiskTotal | lifecycle=False custom=False | primProps=18 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EstimatedAmount: Decimal
+  ... +13 more
+ProjectRiskType: RU=Тип риска проекта EN=Project risk type | lifecycle=False custom=False | primProps=13 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +8 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Account: Navigation
+ProjectTariff: RU=Тариф проекта EN=Project tariff | lifecycle=False custom=False | primProps=6 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->Project: Navigation
+  ->Version: Navigation
+  ->CreatedBy: User
+  ->... +1 more
+ProjectTariffRate: RU=ProjectTariffRate EN=ProjectTariffRate | lifecycle=False custom=False | primProps=7 navProps=1
+  .EffectiveDate: DateOnly
+  .ExpiryDate: DateOnly
+  .Value: Decimal
+  .Id: String
+  .Created: DateTime
+  ... +2 more
+  ->Currency: Navigation
+ProjectTariffAssignment: RU=ProjectTariffAssignment EN=ProjectTariffAssignment | lifecycle=False custom=False | primProps=5 navProps=2
+  .IsAllTeamRole: Boolean
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->ProjectTeamMember: Navigation
+  ->ProjectTariff: Navigation
+ProjectTaskAssignment: RU=ProjectTaskAssignment EN=ProjectTaskAssignment | lifecycle=False custom=False | primProps=4 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+ProjectTask: RU=Работа проекта EN=Project work item | lifecycle=False custom=True | primProps=16 navProps=5
+  .StructNumber: String
+  .Number: Integer
+  .Type: Enum
+  .EffortDriven: Boolean
+  .StartDate: DateOnly
+  ... +11 more
+  ->Project: Navigation
+  ->LeadTask: Navigation
+  ->Category: Navigation
+  ->... +2 more
+ProjectTeamMember: RU=Член команды EN=Team member | lifecycle=False custom=True | primProps=5 navProps=6
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Description: Text
+  ->Resource: Navigation
+  ->Role: Navigation
+  ->Competence: Navigation
+  ->... +3 more
+ProjectTeamMemberCostValue: RU=ProjectTeamMemberCostValue EN=ProjectTeamMemberCostValue | lifecycle=False custom=False | primProps=7 navProps=2
+  .EffectiveDate: DateOnly
+  .ExpiryDate: DateOnly
+  .Value: Decimal
+  .Id: String
+  .Created: DateTime
+  ... +2 more
+  ->Currency: Navigation
+  ->TeamMember: Navigation
+ProjectVersion: RU=Версия проекта EN=Project version | lifecycle=True custom=True | primProps=6 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->MainProject: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->... +1 more
+RateMatrix: RU=Матрица ставок EN=Rate matrix | lifecycle=True custom=False | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +1 more
+RateMatrixLine: RU=RateMatrixLine EN=RateMatrixLine | lifecycle=False custom=False | primProps=5 navProps=7
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Rate: Decimal
+  ->Role: Navigation
+  ->Level: Navigation
+  ->Grade: Navigation
+  ->... +4 more
+ReportV2: RU=ReportV2 EN=ReportV2 | lifecycle=False custom=False | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Owner: User
+  ->... +1 more
+Resource: RU=Ресурс EN=Resource | lifecycle=False custom=False | primProps=7 navProps=11
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Role: Navigation
+  ->... +8 more
+ResourcePlanEntry: RU=ResourcePlanEntry EN=ResourcePlanEntry | lifecycle=False custom=False | primProps=28 navProps=5
+  .Hours: Decimal
+  .Date: DateOnly
+  .Week: DateOnly
+  .Month: DateOnly
+  .BillingRate: Decimal
+  ... +23 more
+  ->Project: Navigation
+  ->Version: Navigation
+  ->Resource: Navigation
+  ->... +2 more
+ResourcePool: RU=Ресурсный пул EN=Resource pool | lifecycle=False custom=False | primProps=8 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->Manager: User
+  ->LeadResourcePool: Navigation
+  ->CreatedBy: User
+  ->... +1 more
+ResourcePoolCoManager: RU=ResourcePoolCoManager EN=ResourcePoolCoManager | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->ResourcePool: Navigation
+  ->User: User
+ResourceRequest: RU=Запрос ресурсов EN=Resource request | lifecycle=True custom=False | primProps=11 navProps=11
+  .RequestedHours: Duration
+  .BookedHours: Duration
+  .From: DateOnly
+  .To: DateOnly
+  .ResourceDescription: Text
+  ... +6 more
+  ->Role: Navigation
+  ->Level: Navigation
+  ->Grade: Navigation
+  ->... +8 more
+RiskRequest: RU=Запрос на использование риска EN=Risk request | lifecycle=True custom=False | primProps=10 navProps=8
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +5 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +5 more
+Role: RU=Роль EN=Role | lifecycle=False custom=True | primProps=8 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Schedule: RU=Расписание EN=Schedule | lifecycle=False custom=False | primProps=9 navProps=3
+  .DaysCount: String
+  .FirstDay: DateOnly
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  ... +4 more
+  ->ScheduleException: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ScheduledJob: RU=Задание по расписанию EN=Scheduled job | lifecycle=False custom=False | primProps=11 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +6 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ScheduleException: RU=Исключения расписания EN=Schedule exception | lifecycle=False custom=False | primProps=6 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ExceptionDay: RU=День исключения EN=Exception day | lifecycle=False custom=False | primProps=8 navProps=3
+  .Date: DateOnly
+  .DayLength: Decimal
+  .ExcludeFromCalendarDuration: Boolean
+  .Id: String
+  .Created: DateTime
+  ... +3 more
+  ->ScheduleException: Navigation
+  ->CreatedBy: User
+  ->ModifiedBy: User
+Skill: RU=Навык EN=Skill | lifecycle=False custom=False | primProps=6 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+State: RU=Состояние EN=State | lifecycle=False custom=False | primProps=8 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+SubcontractorPaymentEstimate: RU=Оценка платежа субподрядчику EN=Subcontractor payment estimate | lifecycle=False custom=False | primProps=9 navProps=6
+  .Amount: Decimal
+  .AmountBC: Decimal
+  .BillingDate: DateOnly
+  .PaymentDate: DateOnly
+  .Id: String
+  ... +4 more
+  ->ProjectTask: Navigation
+  ->Project: Navigation
+  ->Version: Navigation
+  ->... +3 more
+TimeAllocation: RU=Ячейка таймшита EN=Timesheet cell | lifecycle=False custom=True | primProps=25 navProps=15
+  .Hours: Decimal
+  .Date: DateOnly
+  .Cost: Decimal
+  .CostRate: Decimal
+  .CostRateBC: Decimal
+  ... +20 more
+  ->TimeSheet: Navigation
+  ->TimeSheetLine: Navigation
+  ->Project: Navigation
+  ->... +12 more
+TimeOffBalanceEntry: RU=Баланс отсутствий (запись) EN=Time-off balance entry | lifecycle=False custom=False | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Code: String
+  ... +2 more
+  ->User: User
+  ->Type: Navigation
+  ->Mode: Navigation
+  ->... +1 more
+TimeOffRequest: RU=Заявка на отсутствие EN=Time-off request | lifecycle=True custom=True | primProps=13 navProps=6
+  .StartDate: DateOnly
+  .FinishDate: DateOnly
+  .FinishDayHours: Decimal
+  .StartDayHours: Decimal
+  .StartDayInterval: Enum
+  ... +8 more
+  ->Department: Navigation
+  ->TimeOffType: Navigation
+  ->User: User
+  ->... +3 more
+TimeOffRequestTotal: RU=TimeOffRequestTotal EN=TimeOffRequestTotal | lifecycle=False custom=False | primProps=6 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .TimeOffDuration: Decimal
+  ... +1 more
+TimeOffType: RU=Тип отсутствия EN=Time-off type | lifecycle=False custom=False | primProps=8 navProps=5
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->AccrualPolicy: Navigation
+  ->... +2 more
+TimeSheet: RU=Таймшит EN=Timesheet | lifecycle=True custom=False | primProps=9 navProps=6
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +3 more
+TimeSheetTotal: RU=TimeSheetTotal EN=TimeSheetTotal | lifecycle=False custom=False | primProps=8 navProps=0
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .BillableDuration: Decimal
+  ... +3 more
+TimeSheetLine: RU=Строка таймшита EN=Timesheet line | lifecycle=False custom=True | primProps=0 navProps=8
+  ->Project: Navigation
+  ->ProjectTask: Navigation
+  ->Activity: Navigation
+  ->... +5 more
+TimeSheetPeriod: RU=Период таймшита EN=Timesheet period | lifecycle=False custom=False | primProps=9 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EffectiveDate: DateOnly
+  ... +4 more
+  ->PeriodType: Navigation
+  ->PeriodScope: Navigation
+  ->Department: Navigation
+TimeSheetTemplate: RU=TimeSheetTemplate EN=TimeSheetTemplate | lifecycle=False custom=False | primProps=18 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +13 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+TimeSheetTemplateValidationRule: RU=TimeSheetTemplateValidationRule EN=TimeSheetTemplateValidationRule | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->TimeSheetTemplate: Navigation
+  ->ValidationRule: Navigation
+TimeSheetTemplateCustomField: RU=TimeSheetTemplateCustomField EN=TimeSheetTemplateCustomField | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->TimeSheetTemplate: Navigation
+  ->CustomField: Navigation
+TimeSheetTemplateProjectState: RU=TimeSheetTemplateProjectState EN=TimeSheetTemplateProjectState | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->TimeSheetTemplate: Navigation
+  ->State: Navigation
+ValidationRuleExceptionsPerformer: RU=ValidationRuleExceptionsPerformer EN=ValidationRuleExceptionsPerformer | lifecycle=False custom=False | primProps=5 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Role: String
+  ->Template: Navigation
+  ->User: User
+  ->Group: Navigation
+  ->... +1 more
+User: RU=Пользователь EN=User | lifecycle=False custom=True | primProps=13 navProps=15
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +8 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Department: Navigation
+  ->... +12 more
+UserTotal: RU=UserTotal EN=UserTotal | lifecycle=False custom=False | primProps=19 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .ActualHours: Decimal
+  ... +14 more
+  ->CurrentCostCurrency: Navigation
+Vacancy: RU=Vacancy EN=Vacancy | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+ValidationRule: RU=ValidationRule EN=ValidationRule | lifecycle=False custom=False | primProps=8 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->ValidationRuleType: Navigation
+VatRate: RU=Ставка НДС EN=VAT rates | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +2 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+View: RU=Представление EN=View | lifecycle=False custom=False | primProps=17 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +12 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Project: Navigation
+  ->... +1 more
+ViewTeamMember: RU=Член команды представления EN=View team member | lifecycle=False custom=False | primProps=5 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Role: String
+  ->View: Navigation
+  ->User: User
+  ->PermissionSet: Navigation
+  ->... +1 more
+ViewSetting: RU=ViewSetting EN=ViewSetting | lifecycle=False custom=False | primProps=7 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .DisplayMode: Enum
+  ... +2 more
+  ->View: Navigation
+BoardColumn: RU=BoardColumn EN=BoardColumn | lifecycle=False custom=False | primProps=6 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->ViewSetting: Navigation
+BoardCard: RU=BoardCard EN=BoardCard | lifecycle=False custom=False | primProps=8 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .StatedColumnRank: String
+  ... +3 more
+  ->StatedColumn: Navigation
+  ->CustomColumn: Navigation
+  ->ViewSetting: Navigation
+WikiPage: RU=Статья Вики EN=Wiki page | lifecycle=False custom=False | primProps=22 navProps=8
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +17 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->WikiSpace: Navigation
+  ->... +5 more
+WikiPageComment: RU=WikiPageComment EN=WikiPageComment | lifecycle=False custom=False | primProps=8 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Text: String
+  ... +3 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Thread: Navigation
+  ->... +1 more
+WikiPageCommentThread: RU=WikiPageCommentThread EN=WikiPageCommentThread | lifecycle=False custom=False | primProps=5 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .ResolvedAt: DateOnly
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->WikiPage: Navigation
+  ->... +1 more
+WikiPageGranted: RU=WikiPageGranted EN=WikiPageGranted | lifecycle=False custom=False | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Role: String
+  ... +2 more
+  ->WikiPage: Navigation
+  ->User: User
+  ->Group: Navigation
+  ->... +1 more
+WikiPageRevision: RU=WikiPageRevision EN=WikiPageRevision | lifecycle=False custom=False | primProps=5 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Body: String
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->WikiPage: Navigation
+WikiSpace: RU=Область Wiki EN=Wiki space | lifecycle=False custom=False | primProps=9 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Project: Navigation
+  ->... +1 more
+WikiSpaceGranted: RU=WikiSpaceGranted EN=WikiSpaceGranted | lifecycle=False custom=False | primProps=7 navProps=4
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Role: String
+  ... +2 more
+  ->WikiSpace: Navigation
+  ->User: User
+  ->PermissionSet: Navigation
+  ->... +1 more
+WorkflowDeclaration: RU=WorkflowDeclaration EN=WorkflowDeclaration | lifecycle=False custom=False | primProps=6 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->Lifecycle: Navigation
+WorkflowEntity: RU=Сущность воркфлоу EN=Workflow entity | lifecycle=False custom=False | primProps=6 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+WorkflowInstance: RU=Процесс EN=Process | lifecycle=False custom=False | primProps=5 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Finished: DateOnly
+  ->Entity: WorkflowEntity
+  ->Initiator: User
+  ->WorkflowDeclaration: Navigation
+WorkflowTask: RU=Задание воркфлоу EN=Workflow task | lifecycle=True custom=False | primProps=9 navProps=8
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->State: Navigation
+  ->... +5 more
+WorkflowTaskEntity: RU=WorkflowTaskEntity EN=WorkflowTaskEntity | lifecycle=False custom=False | primProps=6 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +1 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+UserCostValue: RU=UserCostValue EN=UserCostValue | lifecycle=False custom=False | primProps=7 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .EffectiveDate: DateOnly
+  ... +2 more
+  ->Currency: Navigation
+  ->User: User
+UserGroup: RU=Группа пользователей EN=User group | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Group: Navigation
+  ->User: User
+UserPermissionSet: RU=UserPermissionSet EN=UserPermissionSet | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->PermissionSet: Navigation
+  ->User: User
+UserSchedule: RU=UserSchedule EN=UserSchedule | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Schedule: Navigation
+  ->User: User
+UserRole: RU=UserRole EN=UserRole | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Role: Navigation
+  ->User: User
+UserSkill: RU=UserSkill EN=UserSkill | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Skill: Navigation
+  ->User: User
+UserRoleCompetence: RU=UserRoleCompetence EN=UserRoleCompetence | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Competence: Navigation
+  ->UserRole: Navigation
+UserActivity: RU=UserActivity EN=UserActivity | lifecycle=False custom=False | primProps=4 navProps=2
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  ->Activity: Navigation
+  ->User: User
+UserProduct: RU=UserProduct EN=UserProduct | lifecycle=False custom=False | primProps=5 navProps=1
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Product: Enum
+  ->User: User
+Sprint: RU=Спринт EN=Sprint | lifecycle=False custom=False | primProps=9 navProps=3
+  .Id: String
+  .Created: DateTime
+  .Modified: DateTime
+  .IsActive: Boolean
+  .Name: String
+  ... +4 more
+  ->CreatedBy: User
+  ->ModifiedBy: User
+  ->View: Navigation
+ReportTypeV2: RU=ReportTypeV2 EN=ReportTypeV2 | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+InteractionType: RU=Тип взаимодействия EN=Interaction type | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+AccountingEntryMode: RU=AccountingEntryMode EN=AccountingEntryMode | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+FinancialAccountType: RU=FinancialAccountType EN=FinancialAccountType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+PortfolioContentItemType: RU=Тип элемента портфеля EN=Portfolio content item type | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+ProjectBillingType: RU=Тип биллинга проекта EN=Project billing type | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+RiskRequestType: RU=RiskRequestType EN=RiskRequestType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+ProjectTaskCategory: RU=ProjectTaskCategory EN=ProjectTaskCategory | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+ImportState: RU=ImportState EN=ImportState | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+RateMatrixType: RU=RateMatrixType EN=RateMatrixType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+TimeOffTypeUnit: RU=Единица учета EN=Unit | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+TimeSheetPeriodScope: RU=TimeSheetPeriodScope EN=TimeSheetPeriodScope | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+TimeSheetPeriodType: RU=TimeSheetPeriodType EN=TimeSheetPeriodType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+ValidationRuleType: RU=ValidationRuleType EN=ValidationRuleType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+BillingReportLineType: RU=BillingReportLineType EN=BillingReportLineType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+FinanceReportLineType: RU=FinanceReportLineType EN=FinanceReportLineType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+InvoiceLineReportLineType: RU=InvoiceLineReportLineType EN=InvoiceLineReportLineType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+TimeOffBalanceEntryMode: RU=TimeOffBalanceEntryMode EN=TimeOffBalanceEntryMode | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
+TimeOffBalanceEntryType: RU=TimeOffBalanceEntryType EN=TimeOffBalanceEntryType | lifecycle=False custom=False | primProps=2 navProps=0
+  .Name: String
+  .Code: String
