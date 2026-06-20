@@ -88,6 +88,7 @@ Settings → AI → MCP в Twenty. Endpoint `/mcp`. Конфиг Claude Code (`s
 | поле `position` конфликтует | системное поле POSITION | переименовать (напр. `jobTitle`) |
 | объект не виден в UI | нет view+nav | добавить `defineView` + `defineNavigationMenuItem` |
 | токен истёк (playground 2ч) | playground-токен | использовать постоянный API_KEY (exp далеко) |
+| front-component краш `getBoundingClientRect is not a function` | песочница Web Worker (Remote DOM) — НЕТ host DOM | не использовать getBoundingClientRect/window.innerHeight/document.* в front; направление/замеры — без DOM |
 | `/rest/core/...` → 400 | нюанс пути | данные через `/rest/<object>` (напр. `/rest/companies`) |
 
 ## 10. Безопасность (нерушимо)
