@@ -35,8 +35,16 @@ yarn twenty dev --once --dry-run    # предпросмотр: typecheck + diff
 yarn twenty dev --once              # НАКАТ: применяет изменения на dev-сервер
 yarn twenty dev                     # watch-режим (live-sync при сохранении файлов)
 yarn lint                           # oxlint
+yarn test:unit                      # vitest unit (без сервера, vitest.unit.config.ts)
+yarn test                           # vitest integration (нужен сервер)
 ```
 Правило: сперва `--dry-run` (чисто) → потом `dev --once` (накат).
+
+**DevOps-обёртки ([infra/scripts/](../../infra/scripts/)):**
+- `./infra/scripts/sync.sh` — безопасный накат: dry-run → подтверждение → apply (вместо ручного `dev --once`).
+- `./infra/scripts/health.sh [--quiet]` — прозвон healthz/metadata/graphql/mcp (запускать из КОРНЯ репо).
+- `./infra/scripts/secret-scan.sh [--all]` — скан секретов+ПДн (см. §10).
+- Регламенты: [runbooks/](runbooks/) (deploy-sync, rollback, sdk-bump, incident-health, secrets-pii, prod-standup).
 
 ## 4. Создание сущностей
 - **Рекомендуется CLI** (автогенерит UUID v4): `yarn twenty dev:add <type>`
@@ -92,8 +100,9 @@ Settings → AI → MCP в Twenty. Endpoint `/mcp`. Конфиг Claude Code (`s
 | `/rest/core/...` → 400 | нюанс пути | данные через `/rest/<object>` (напр. `/rest/companies`) |
 
 ## 10. Безопасность (нерушимо)
-- Секреты ТОЛЬКО в `.env` (gitignored). Никогда не коммитить токены/пароли.
-- Перед коммитом: `git diff --cached --name-only | xargs grep -lE "eyJhbGciOiJF|RAILWAY_TOKEN=" ` → должно быть пусто.
+- Секреты ТОЛЬКО в `.env` (gitignored). Никогда не коммитить токены/пароли. Реальные ПДн сотрудников (ФИО/`@credos.ru`) в коде — недопустимо (CISO-001/152-ФЗ).
+- **Автоматический guard:** `./infra/scripts/secret-scan.sh` — скан staged (`--all` по всему дереву) на токены (`eyJ…`, `RAILWAY_TOKEN=`, `Bearer …`) + ПДн (`@credos.ru`). Scope ПДн — только код `apps/**`/`infra/**` (research/docs/.AITEAM — политика CISO, см. `runbooks/secrets-pii.md`).
+- **Pre-commit hook** (блокирует коммит при находке): включить один раз — `git config core.hooksPath infra/git-hooks`. Обход в исключении — `git commit --no-verify`.
 - Токены — только в заголовке Authorization, не в URL.
 
 ## 11. Git

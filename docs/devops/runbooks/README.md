@@ -9,6 +9,7 @@
 | [sdk-bump.md](sdk-bump.md) | Поднятие версии twenty-sdk при апдейте сервера |
 | [incident-health.md](incident-health.md) | Сервер недоступен / health != 200 / 5xx |
 | [secrets-pii.md](secrets-pii.md) | Утечка/риск секретов или ПДн (CISO-findings), ротация |
+| [prod-standup.md](prod-standup.md) | Прод-развёртывание time-app (ADR-0005, Стратегия C, ENCRYPTION_KEY, Company-sync) |
 
 ## Операционные скрипты ([infra/scripts/](../../../infra/scripts/))
 
