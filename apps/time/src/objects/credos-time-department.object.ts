@@ -7,10 +7,13 @@ import {
 
 import { DEPARTMENT_CODE_OPTIONS } from 'src/constants/select-options';
 import {
+  CREDOS_TIME_DEPARTMENT_DEPT_PLANS_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_PROJECTS_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_WORK_TYPES_FIELD_ID,
+  CREDOS_TIME_DEPT_PLAN_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_DEPT_PLAN_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
@@ -102,6 +105,19 @@ export default defineObject({
         CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
         CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,
+      universalSettings: { relationType: RelationType.ONE_TO_MANY },
+    },
+    // REQ-0012: плановые загрузки отдела без проекта (резерв/пресейл-бронь).
+    {
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_DEPT_PLANS_FIELD_ID,
+      name: 'deptPlans',
+      type: FieldType.RELATION,
+      label: 'Плановые загрузки (без проекта)',
+      icon: 'IconCalendarStats',
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPT_PLAN_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPT_PLAN_DEPARTMENT_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

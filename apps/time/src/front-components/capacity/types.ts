@@ -33,6 +33,19 @@ export type CapProject = {
   endDate: string | null; // ISO
 };
 
+// REQ-0012: плановая загрузка отдела БЕЗ привязки к проекту (резерв/пресейл-бронь
+// /прочее). plannedEffort раскидывается по периоду той же логикой, что у проекта,
+// и суммируется к загрузке отдела на доске.
+export type DeptPlan = {
+  id: string;
+  label: string;
+  departmentId: string | null;
+  category: string | null;
+  plannedEffort: number | null; // плановые часы
+  startDate: string | null; // ISO
+  endDate: string | null; // ISO
+};
+
 // День производственного календаря (для ёмкости недели).
 export type CalendarDay = {
   date: string; // YYYY-MM-DD
@@ -66,6 +79,13 @@ export type ProjectPatch = {
 // Вклад проекта в загрузку отдела за период (для детализации).
 export type ProjectLoad = {
   project: CapProject;
+  perPeriod: number[]; // часы по колонкам горизонта
+  total: number; // всего часов в горизонте
+};
+
+// REQ-0012: вклад плановой загрузки отдела (без проекта) за период.
+export type DeptPlanLoad = {
+  plan: DeptPlan;
   perPeriod: number[]; // часы по колонкам горизонта
   total: number; // всего часов в горизонте
 };

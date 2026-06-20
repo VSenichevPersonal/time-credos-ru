@@ -352,3 +352,37 @@ export const CALENDAR_MONTHLY_PAGE_LAYOUT_TAB_UNIVERSAL_IDENTIFIER =
   '3e4f5061-7283-494a-9b52-cd3e4f506172';
 export const CALENDAR_MONTHLY_PAGE_WIDGET_UNIVERSAL_IDENTIFIER =
   '4f506172-8394-4a5b-8c63-de4f50617283';
+
+// --- SUMMARY: вкладка «Сводка» (1-я) карточки проекта — дашборд-саммари (Dev1) ---
+export const CREDOS_TIME_PROJECT_SUMMARY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  '5a6b7c8d-9e0f-4a1b-8c2d-3e4f5a6b7c8d';
+export const CREDOS_TIME_PROJECT_RP_TAB_SUMMARY_UNIVERSAL_IDENTIFIER =
+  '6b7c8d9e-0f1a-4b2c-9d3e-4f5a6b7c8d9e';
+export const CREDOS_TIME_PROJECT_RP_W_SUMMARY_UNIVERSAL_IDENTIFIER =
+  '7c8d9e0f-1a2b-4c3d-8e4f-5a6b7c8d9e0f';
+
+// --- REQ-0012 (DEPT-PLAN): плановая загрузка отдела БЕЗ проекта (резерв/пресейл-бронь) ---
+// Объект credosTimeDeptPlan + поля + view + nav + обратная связь на Department.
+export const CREDOS_TIME_DEPT_PLAN_OBJECT_UNIVERSAL_IDENTIFIER =
+  '6e90db7b-ad77-4e50-84e5-d96bd309aa85';
+// Скаляры объекта.
+export const CREDOS_TIME_DEPT_PLAN_LABEL_FIELD_ID =
+  'f4a35256-8f31-4ad5-9723-d3b1f29ebd09';
+export const CREDOS_TIME_DEPT_PLAN_PLANNED_EFFORT_FIELD_ID =
+  '9ac36cd9-47cc-463d-b250-ebf704ab89fd';
+export const CREDOS_TIME_DEPT_PLAN_START_DATE_FIELD_ID =
+  '04ff7a4b-60f3-40e5-97aa-efe361e33af7';
+export const CREDOS_TIME_DEPT_PLAN_END_DATE_FIELD_ID =
+  '25eeba36-6215-4293-b939-e1f4511554de';
+export const CREDOS_TIME_DEPT_PLAN_CATEGORY_FIELD_ID =
+  '284baef1-bd19-421d-b9d9-de840917d625';
+// DeptPlan.department -> Department.deptPlans (MANY_TO_ONE + обратная ONE_TO_MANY).
+export const CREDOS_TIME_DEPT_PLAN_DEPARTMENT_FIELD_ID =
+  '29c236e7-2dbf-4955-8baf-291b67426803';
+export const CREDOS_TIME_DEPARTMENT_DEPT_PLANS_FIELD_ID =
+  '324ab6da-106a-4060-aa2b-4d7302076df2';
+// Index-view + nav.
+export const CREDOS_TIME_DEPT_PLAN_VIEW_UNIVERSAL_IDENTIFIER =
+  '3b9e2ebc-92de-40b3-8a84-a19a894f77a4';
+export const CREDOS_TIME_DEPT_PLAN_NAV_UNIVERSAL_IDENTIFIER =
+  '5f7a2f23-eb17-43f8-a9d8-bcac6d1c214b';

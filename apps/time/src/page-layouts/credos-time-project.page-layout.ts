@@ -23,6 +23,9 @@ import {
   CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_TEAM_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_BUDGET_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_TAB_SUMMARY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_SUMMARY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_SUMMARY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -44,12 +47,33 @@ export default definePageLayout({
   type: 'RECORD_PAGE',
   objectUniversalIdentifier: CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   tabs: [
+    // 0. Сводка — ключевые метрики проекта одним экраном (front-component).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_SUMMARY_UNIVERSAL_IDENTIFIER,
+      title: 'Сводка',
+      position: 0,
+      icon: 'IconLayoutDashboard',
+      layoutMode: PageLayoutTabLayoutMode.CANVAS,
+      widgets: [
+        {
+          universalIdentifier: CREDOS_TIME_PROJECT_RP_W_SUMMARY_UNIVERSAL_IDENTIFIER,
+          title: 'Сводка проекта',
+          type: 'FRONT_COMPONENT',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier:
+              CREDOS_TIME_PROJECT_SUMMARY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+          },
+        },
+      ],
+    },
     // 1. Обзор — реквизиты проекта.
     {
       universalIdentifier:
         CREDOS_TIME_PROJECT_RP_TAB_OVERVIEW_UNIVERSAL_IDENTIFIER,
       title: 'Обзор',
-      position: 0,
+      position: 1,
       icon: 'IconFileDescription',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
@@ -73,7 +97,7 @@ export default definePageLayout({
       universalIdentifier:
         CREDOS_TIME_PROJECT_RP_TAB_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
       title: 'Трудозатраты',
-      position: 1,
+      position: 2,
       icon: 'IconClock',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
@@ -96,7 +120,7 @@ export default definePageLayout({
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_STAGES_UNIVERSAL_IDENTIFIER,
       title: 'Этапы',
-      position: 2,
+      position: 3,
       icon: 'IconListTree',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
@@ -120,7 +144,7 @@ export default definePageLayout({
       universalIdentifier:
         CREDOS_TIME_PROJECT_RP_TAB_BILLING_UNIVERSAL_IDENTIFIER,
       title: 'Связи с 1С',
-      position: 3,
+      position: 4,
       icon: 'IconLink',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
@@ -143,7 +167,7 @@ export default definePageLayout({
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_BUDGET_UNIVERSAL_IDENTIFIER,
       title: 'Бюджет',
-      position: 4,
+      position: 5,
       icon: 'IconChartHistogram',
       layoutMode: PageLayoutTabLayoutMode.CANVAS,
       widgets: [
@@ -165,7 +189,7 @@ export default definePageLayout({
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_TEAM_UNIVERSAL_IDENTIFIER,
       title: 'Команда',
-      position: 5,
+      position: 6,
       icon: 'IconUsers',
       layoutMode: PageLayoutTabLayoutMode.CANVAS,
       widgets: [
@@ -186,7 +210,7 @@ export default definePageLayout({
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_DOCS_UNIVERSAL_IDENTIFIER,
       title: 'Документы',
-      position: 6,
+      position: 7,
       icon: 'IconPaperclip',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [

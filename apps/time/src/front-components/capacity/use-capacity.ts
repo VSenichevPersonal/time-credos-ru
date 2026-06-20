@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   fetchCalendar,
   fetchDepartments,
+  fetchDeptPlans,
   fetchEmployees,
   fetchProjects,
   resolveSelfIsManager,
@@ -11,6 +12,7 @@ import { buildPeriods } from 'src/front-components/capacity/calc-load';
 import type {
   CalendarDay,
   CapProject,
+  DeptPlan,
   DeptRef,
   EmployeeRef,
   Period,
@@ -35,6 +37,7 @@ type State = {
   departments: DeptRef[];
   employees: EmployeeRef[];
   projects: CapProject[];
+  deptPlans: DeptPlan[];
   calendar: CalendarDay[];
 };
 
@@ -49,6 +52,7 @@ export const useCapacity = (granularity: Granularity) => {
     departments: [],
     employees: [],
     projects: [],
+    deptPlans: [],
     calendar: [],
   });
 
@@ -59,10 +63,11 @@ export const useCapacity = (granularity: Granularity) => {
       fetchDepartments(),
       fetchEmployees(),
       fetchProjects(),
+      fetchDeptPlans(),
       fetchCalendar(range.from, range.to),
       resolveSelfIsManager(null),
     ])
-      .then(([departments, employees, projects, calendar, isManagerInWorkspace]) => {
+      .then(([departments, employees, projects, deptPlans, calendar, isManagerInWorkspace]) => {
         if (!alive) return;
         // TODO(rbac): RBAC-гейт «Планировать» отложен в RBAC-волну. В песочнице
         // front-component текущего пользователя надёжно получить нельзя (токен =
@@ -76,6 +81,7 @@ export const useCapacity = (granularity: Granularity) => {
           departments,
           employees,
           projects,
+          deptPlans,
           calendar,
         });
       })

@@ -4,7 +4,10 @@ import {
   buildPeriods,
   deptCapacity,
   deptLoadCells,
+  deptPlanHoursInPeriod,
+  deptPlanLoads,
   deptProjectLoads,
+  employeeLoadCells,
   firstFreePeriod,
   projectHoursInPeriod,
   summaryCells,
@@ -12,7 +15,9 @@ import {
 import type {
   CalendarDay,
   CapProject,
+  DeptPlan,
   DeptRef,
+  EmployeeRef,
   LoadCell,
   Period,
 } from 'src/front-components/capacity/types';
@@ -49,6 +54,18 @@ const project = (over: Partial<CapProject> = {}): CapProject => ({
   code: 'DEV-2026-001',
   name: 'Проект',
   departmentId: 'd1',
+  plannedEffort: 100,
+  startDate: '2026-01-01',
+  endDate: '2026-01-10',
+  ...over,
+});
+
+// REQ-0012: плановая загрузка отдела без проекта (раскид той же логикой).
+const deptPlan = (over: Partial<DeptPlan> = {}): DeptPlan => ({
+  id: 'dp1',
+  label: 'Резерв',
+  departmentId: 'd1',
+  category: null,
   plannedEffort: 100,
   startDate: '2026-01-01',
   endDate: '2026-01-10',
@@ -262,5 +279,89 @@ describe('summaryCells', () => {
     const perDept = [[cell(100, 40)], []]; // второй отдел без ячеек
     const [s0] = summaryCells(perDept, [periods[0]]);
     expect(s0).toMatchObject({ capacity: 100, load: 40 });
+  });
+});
+
+// REQ-0012: раскид плановой загрузки отдела без проекта — та же логика, что у
+// проекта (равномерно по дням [start, end], пересечение с периодом).
+describe('deptPlanHoursInPeriod', () => {
+  const p = period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40); // 5 дней
+
+  it('раскидывает план равномерно по дням и берёт пересечение', () => {
+    // план 2026-01-01..01-10 = 10 дней, 100ч → 10ч/день; пересечение 5 дней → 50
+    expect(deptPlanHoursInPeriod(deptPlan(), p)).toBe(50);
+  });
+
+  it('0 без плана или без дат', () => {
+    expect(deptPlanHoursInPeriod(deptPlan({ plannedEffort: null }), p)).toBe(0);
+    expect(deptPlanHoursInPeriod(deptPlan({ startDate: null }), p)).toBe(0);
+    expect(deptPlanHoursInPeriod(deptPlan({ endDate: null }), p)).toBe(0);
+  });
+
+  it('0 при отсутствии пересечения и при end < start', () => {
+    const far = period('w', utc(2026, 5, 1), utc(2026, 5, 7), 40);
+    expect(deptPlanHoursInPeriod(deptPlan(), far)).toBe(0);
+    expect(
+      deptPlanHoursInPeriod(deptPlan({ startDate: '2026-01-10', endDate: '2026-01-01' }), p),
+    ).toBe(0);
+  });
+
+  it('план целиком внутри периода → весь план', () => {
+    const wide = period('w', utc(2025, 11, 1), utc(2026, 1, 1), 40);
+    expect(deptPlanHoursInPeriod(deptPlan(), wide)).toBe(100);
+  });
+});
+
+describe('deptLoadCells с deptPlans (REQ-0012)', () => {
+  const periods = [period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40)];
+
+  it('суммирует проекты и плановые загрузки отдела', () => {
+    // проект 50 + резерв 50 = 100 загрузки за период; ёмкость 160
+    const [c] = deptLoadCells(dept(), [project()], periods, [deptPlan()]);
+    expect(c.capacity).toBe(160);
+    expect(c.load).toBe(100);
+    expect(c.ratio).toBeCloseTo(100 / 160);
+  });
+
+  it('фильтрует deptPlans по отделу', () => {
+    const [c] = deptLoadCells(dept(), [], periods, [
+      deptPlan({ id: 'x', departmentId: 'other' }),
+    ]);
+    expect(c.load).toBe(0);
+  });
+
+  it('обратная совместимость: без аргумента deptPlans загрузка только из проектов', () => {
+    const [c] = deptLoadCells(dept(), [project()], periods);
+    expect(c.load).toBe(50);
+  });
+});
+
+describe('employeeLoadCells с deptPlans (REQ-0012)', () => {
+  const periods = [period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40)];
+  const emp: EmployeeRef = { id: 'e1', name: 'Иванов', departmentId: 'd1' };
+
+  it('плановая загрузка отдела делится поровну на численность', () => {
+    // резерв 50ч на период, headcount 5 → 10ч на человека; ёмкость 40×0.8=32
+    const [c] = employeeLoadCells(emp, dept(), [], periods, [deptPlan()]);
+    expect(c.capacity).toBeCloseTo(32);
+    expect(c.load).toBeCloseTo(10);
+  });
+});
+
+describe('deptPlanLoads (REQ-0012)', () => {
+  const periods = [
+    period('w1', utc(2026, 0, 1), utc(2026, 0, 5), 40),
+    period('w2', utc(2026, 0, 6), utc(2026, 0, 10), 40),
+  ];
+
+  it('детализирует планы отдела, сортирует по сумме часов desc, фильтрует чужие/нулевые', () => {
+    const big = deptPlan({ id: 'big', label: 'Резерв', plannedEffort: 100 });
+    const small = deptPlan({ id: 'small', label: 'Прочее', plannedEffort: 10 });
+    const other = deptPlan({ id: 'o', departmentId: 'other' });
+    const future = deptPlan({ id: 'f', startDate: '2027-01-01', endDate: '2027-02-01' });
+
+    const loads = deptPlanLoads(dept(), [small, big, other, future], periods);
+    expect(loads.map((x) => x.plan.id)).toEqual(['big', 'small']);
+    expect(loads[0].total).toBeGreaterThan(loads[1].total);
   });
 });

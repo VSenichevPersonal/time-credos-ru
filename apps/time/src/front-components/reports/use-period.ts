@@ -18,7 +18,7 @@ export type PeriodState = {
 };
 
 // Границы периода по гранулярности и смещению (offset: 0 = текущий, −1 = предыдущий).
-const computeRange = (gran: PeriodGran, offset: number, now: Date): PeriodState => {
+export const calcPeriodRange = (gran: PeriodGran, offset: number, now: Date): PeriodState => {
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   let from: Date;
@@ -51,7 +51,7 @@ export const usePeriod = () => {
   const [gran, setGran] = useState<PeriodGran>('month');
   const [offset, setOffset] = useState(0);
 
-  const period = useMemo(() => computeRange(gran, offset, now), [gran, offset, now]);
+  const period = useMemo(() => calcPeriodRange(gran, offset, now), [gran, offset, now]);
 
   const changeGran = (g: PeriodGran) => {
     setGran(g);

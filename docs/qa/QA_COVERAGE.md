@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **711 + 19 todo** (21 файлов, все зелёные) |
+| unit-тестов | **845 + 19 todo** (31 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -38,10 +38,18 @@
 | `front-components/reports/report-tokens.ts` | `fmtUtil`/`fmtHrs`/`fmtUnder`/`underTone`/`utilTone` | ✅ covered | `front-components/reports/report-tokens.test.ts` |
 | `front-components/capacity/capacity-rest.ts` | `resolveSelfIsManager` (byRef + fallback) | ✅ covered + 1 todo [bug]#3 | `front-components/capacity/capacity-rest.test.ts` |
 | **SSOT-guard категорий** | `domain-types → select-options → tag-color-hex → category-meta` | ✅ 13 тестов + 2 todo | `__tests__/ssot-categories.test.ts` |
+| `front-components/shared/category-meta.ts` | `categoryMeta` SSOT-резолв + fallback OTHER/неизвестный | ✅ 7 тестов | `front-components/shared/category-meta.test.ts` |
 | `front-components/reports/category-bar.ts` | `toSegments` — порядок/ширина/цвет/фильтрация ([bug]#4 регресс-guard) | ✅ 7 тестов | `front-components/reports/category-bar.test.ts` |
 | `front-components/reports/bar.ts` | `pctOfNorm` — форматирование % (null/0/over-100) | ✅ 8 тестов | `front-components/reports/bar.test.ts` |
 | `front-components/capacity/cap-tokens.ts` | `loadTone`/`formatPct`/`formatCell` — тон ёмкости/метрики | ✅ 15 тестов | `front-components/capacity/cap-tokens.test.ts` |
 | `front-components/grid/use-timesheet-actions.ts` | `calcCopyWithHours` — копирование недели со часами (Timetta UX) | ✅ 9 тестов | `front-components/grid/use-timesheet-actions.test.ts` |
+| `front-components/shared/tag-color-hex.ts` | `TAG_COLOR_HEX` palette guard + `tagColorHex` fallback | ✅ 8 тестов | `front-components/shared/tag-color-hex.test.ts` |
+| `front-components/reports/use-period.ts` | `calcPeriodRange` — month/quarter/year границы (UTC, високос) | ✅ 11 тестов | `front-components/reports/use-period.test.ts` |
+| `front-components/settings/settings-rest.ts` | `fetchDeptSettings`/`fetchHeadcounts`/`patchDept` — REST + дефолты | ✅ 10 тестов | `front-components/settings/settings-rest.test.ts` |
+| `front-components/reports/reports-rest.ts` | `fetchReports` — ok/ok=false/null/throw Error/throw non-Error | ✅ 8 тестов | `front-components/reports/reports-rest.test.ts` |
+| `front-components/calendar/calendar-rest.ts` | `fetchCalendarYear` — дефолты/paginация/cursor/стоп без cursor | ✅ 7 тестов | `front-components/calendar/calendar-rest.test.ts` |
+| `front-components/grid/time-rest.ts` | `resolveEmployeeId`/`fetchProjects`/`fetchEntries`/`upsertEntry`/`deleteEntry` | ✅ 16 тестов | `front-components/grid/time-rest.test.ts` |
+| `front-components/grid/approval-rest.ts` | `submitEntries`/`resolveEntries` — route+fallback+approve/reject | ✅ 9 тестов | `front-components/grid/approval-rest.test.ts` |
 | `logic-functions/approval.logic.ts` | RBAC runSubmit/runResolve + SoD (CISO-002) | ✅ covered | `logic-functions/approval.logic.test.ts` |
 | `logic-functions/time-entry-api.logic.ts` | security-регресс CISO-005/006/007/008 | 🟦 todo-спека | `logic-functions/time-entry-api.logic.test.ts` |
 | `front-components/grid/use-week.ts` | дата-логика недели | 🟡 в хуке — нужен вынос (Dev 1) | — |
@@ -70,5 +78,5 @@
 2. 🔴 **QA-1 browser-smoke** (`QA_SMOKE_CHECKLIST.md`) — ждёт --isolated в chrome-devtools-mcp
 3. 🔴 **CISO-005/006/007** → конвертировать `it.todo` в реальные тесты после Dev 2 фикса
 4. 🟡 grid: вынести чистую логику из `use-week` → покрыть тоталы/дни (arch arch-ok #10)
-5. 🟡 `use-period.ts`: вынести `computeRange` → покрыть месяц/квартал/год границы (не exported сейчас)
+5. ✅ `use-period.ts`: `calcPeriodRange` вынесена, 11 тестов
 6. 🟡 `use-grid-model.ts` агрегация (dayTotals/weekTotal) — нужен `@testing-library/react` или вынос логики

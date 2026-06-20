@@ -3,6 +3,7 @@ import { RestApiClient } from 'twenty-client-sdk/rest';
 import type {
   CalendarDay,
   CapProject,
+  DeptPlan,
   DeptRef,
   EmployeeRef,
   ProjectPatch,
@@ -100,6 +101,34 @@ export const fetchProjects = async (): Promise<CapProject[]> => {
     plannedEffort: p.plannedEffort ?? null,
     startDate: p.startDate ?? null,
     endDate: p.endDate ?? null,
+  }));
+};
+
+type RawDeptPlan = {
+  id: string;
+  label?: string | null;
+  departmentId?: string | null;
+  category?: string | null;
+  plannedEffort?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+// REQ-0012: плановые загрузки отдела БЕЗ проекта (резерв/пресейл-бронь/прочее).
+// Суммируются к загрузке отдела на доске наравне с проектами.
+export const fetchDeptPlans = async (): Promise<DeptPlan[]> => {
+  const resp = await client().get<ListResp<RawDeptPlan>>(
+    '/rest/credosTimeDeptPlans',
+    { query: { limit: '300', orderBy: 'startDate[AscNullsFirst]' } },
+  );
+  return pickList(resp, 'credosTimeDeptPlans').map((d) => ({
+    id: d.id,
+    label: d.label ?? '',
+    departmentId: d.departmentId ?? null,
+    category: d.category ?? null,
+    plannedEffort: d.plannedEffort ?? null,
+    startDate: d.startDate ?? null,
+    endDate: d.endDate ?? null,
   }));
 };
 

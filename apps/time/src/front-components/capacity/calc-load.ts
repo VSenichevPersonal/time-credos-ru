@@ -1,6 +1,8 @@
 import type {
   CalendarDay,
   CapProject,
+  DeptPlan,
+  DeptPlanLoad,
   DeptRef,
   EmployeeRef,
   LoadCell,
@@ -82,35 +84,64 @@ export const buildPeriods = (
 export const deptCapacity = (dept: DeptRef, period: Period): number =>
   period.workHours * dept.headcount * dept.capacityFactor;
 
-// Часы проекта, попадающие в период: plannedEffort раскидан РАВНОМЕРНО по
-// календарным дням периода действия проекта, пересечённым с колонкой.
-export const projectHoursInPeriod = (
-  project: CapProject,
+// Раскид плановых часов РАВНОМЕРНО по календарным дням диапазона [startDate,
+// endDate], пересечённым с колонкой периода. Общая логика для проектов и плановых
+// загрузок отдела без проекта (REQ-0012).
+const plannedHoursInPeriod = (
+  plannedEffort: number | null,
+  startDate: string | null,
+  endDate: string | null,
   period: Period,
 ): number => {
-  if (!project.plannedEffort || !project.startDate || !project.endDate) return 0;
-  const ps = utcDay(new Date(project.startDate));
-  const pe = utcDay(new Date(project.endDate));
+  if (!plannedEffort || !startDate || !endDate) return 0;
+  const ps = utcDay(new Date(startDate));
+  const pe = utcDay(new Date(endDate));
   if (pe < ps) return 0;
   const totalDays = pe - ps + 1;
   const cs = utcDay(period.from);
   const ce = utcDay(period.to);
   const overlap = Math.min(pe, ce) - Math.max(ps, cs) + 1;
   if (overlap <= 0) return 0;
-  return (project.plannedEffort * overlap) / totalDays;
+  return (plannedEffort * overlap) / totalDays;
 };
 
-// Ячейки загрузки отдела по всем периодам.
+// Часы проекта, попадающие в период: plannedEffort раскидан РАВНОМЕРНО по
+// календарным дням периода действия проекта, пересечённым с колонкой.
+export const projectHoursInPeriod = (
+  project: CapProject,
+  period: Period,
+): number =>
+  plannedHoursInPeriod(
+    project.plannedEffort,
+    project.startDate,
+    project.endDate,
+    period,
+  );
+
+// REQ-0012: часы плановой загрузки отдела (без проекта), попадающие в период.
+// Раскид той же логикой, что и projectHoursInPeriod.
+export const deptPlanHoursInPeriod = (
+  plan: DeptPlan,
+  period: Period,
+): number =>
+  plannedHoursInPeriod(plan.plannedEffort, plan.startDate, plan.endDate, period);
+
+// Ячейки загрузки отдела по всем периодам. Загрузка = Σ часов проектов отдела +
+// Σ плановых загрузок отдела без проекта (REQ-0012).
 export const deptLoadCells = (
   dept: DeptRef,
   projects: CapProject[],
   periods: Period[],
+  deptPlans: DeptPlan[] = [],
 ): LoadCell[] =>
   periods.map((period) => {
     const capacity = deptCapacity(dept, period);
     let load = 0;
     for (const p of projects) {
       if (p.departmentId === dept.id) load += projectHoursInPeriod(p, period);
+    }
+    for (const dp of deptPlans) {
+      if (dp.departmentId === dept.id) load += deptPlanHoursInPeriod(dp, period);
     }
     return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
   });
@@ -124,6 +155,7 @@ export const employeeLoadCells = (
   dept: DeptRef | undefined,
   projects: CapProject[],
   periods: Period[],
+  deptPlans: DeptPlan[] = [],
 ): LoadCell[] => {
   const factor = dept?.capacityFactor ?? 0.8;
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
@@ -133,6 +165,10 @@ export const employeeLoadCells = (
     if (dept) {
       for (const p of projects) {
         if (p.departmentId === dept.id) deptLoad += projectHoursInPeriod(p, period);
+      }
+      // REQ-0012: плановые загрузки отдела без проекта тоже делятся поровну.
+      for (const dp of deptPlans) {
+        if (dp.departmentId === dept.id) deptLoad += deptPlanHoursInPeriod(dp, period);
       }
     }
     const load = deptLoad * share;
@@ -187,4 +223,23 @@ export const deptProjectLoads = (
   }
   planned.sort((a, b) => b.total - a.total);
   return { planned, unplanned };
+};
+
+// REQ-0012: детализация плановых загрузок отдела без проекта по периодам.
+// Возвращает только записи с ненулевым вкладом в горизонт, отсортированные по
+// сумме часов desc. Для опциональной детализации в UI карточки отдела (Dev1).
+export const deptPlanLoads = (
+  dept: DeptRef,
+  deptPlans: DeptPlan[],
+  periods: Period[],
+): DeptPlanLoad[] => {
+  const out: DeptPlanLoad[] = [];
+  for (const plan of deptPlans) {
+    if (plan.departmentId !== dept.id) continue;
+    const perPeriod = periods.map((per) => deptPlanHoursInPeriod(plan, per));
+    const total = perPeriod.reduce((a, b) => a + b, 0);
+    if (total > 0) out.push({ plan, perPeriod, total });
+  }
+  out.sort((a, b) => b.total - a.total);
+  return out;
 };

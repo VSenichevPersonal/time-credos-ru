@@ -2,15 +2,17 @@ import { HourCell } from 'src/front-components/grid/hour-cell';
 import { T } from 'src/front-components/grid/tokens';
 import { GRID_TEMPLATE } from 'src/front-components/grid/week-header';
 import { fmtTotal } from 'src/front-components/grid/format';
+import { categoryMeta } from 'src/front-components/shared/category-meta';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { Nav } from 'src/front-components/grid/use-keyboard';
 
-// Строка сетки: метка (проект 600 / вид работ 400 приглушён) + 7 ячеек + итог.
-// Ячейки адресуются (rowIndex, dayIndex) для клавиатурной навигации.
+// Строка сетки: цвет-точка категории + метка (проект 600 / вид работ 400) + 7
+// ячеек + итог. Ячейки адресуются (rowIndex, dayIndex) для клавиатуры.
 
 type Props = {
   rowIndex: number;
   projectName: string;
+  category: string | null;
   workTypeName: string;
   days: WeekDay[];
   hoursByDay: number[];
@@ -23,6 +25,7 @@ type Props = {
 export const GridRow = ({
   rowIndex,
   projectName,
+  category,
   workTypeName,
   days,
   hoursByDay,
@@ -40,18 +43,31 @@ export const GridRow = ({
     }}
   >
     <div style={{ padding: '5px 12px', borderRight: `1px solid ${T.border}`, minWidth: 0 }}>
-      <div
-        title={projectName}
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: T.text,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {projectName}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+        <span
+          aria-hidden
+          title={category ? categoryMeta(category).label : undefined}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            flexShrink: 0,
+            background: category ? categoryMeta(category).solid : T.border,
+          }}
+        />
+        <div
+          title={projectName}
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: T.text,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {projectName}
+        </div>
       </div>
       <div
         title={workTypeName}

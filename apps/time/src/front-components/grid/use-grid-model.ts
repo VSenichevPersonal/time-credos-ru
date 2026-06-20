@@ -18,6 +18,7 @@ export type GridRowModel = {
   projectId: string;
   workTypeId: string;
   projectName: string;
+  category: string | null; // категория проекта (UPPER_CASE) — для цвет-кодинга
   workTypeName: string;
   hoursByDay: number[]; // длина 7
   entryIdByDay: (string | null)[];
@@ -51,6 +52,7 @@ export const useGridModel = (
           projectId,
           workTypeId,
           projectName: project?.name ?? 'Проект',
+          category: project?.category ?? null,
           workTypeName: wtName.get(workTypeId) ?? 'Без вида работ',
           hoursByDay: Array(7).fill(0),
           entryIdByDay: Array(7).fill(null),

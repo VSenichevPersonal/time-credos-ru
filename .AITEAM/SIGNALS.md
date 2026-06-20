@@ -1705,6 +1705,17 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
+### 2026-06-21 04:25 — [deployed] «Деплой» (приказ заказчика) → REQ-0012 + новый объект на сервере ✅
+
+Заказчик: «деплой». Накатал текущее дерево (`dev --once`, typecheck чист). **14 файлов, 24 изменения applied:**
+- **created object `credosTimeDeptPlan`** (REQ-0012 плановая загрузка отдела без проекта) + поля (deptPlans, relations) + view «Плановые загрузки (без проекта)» + nav + frontComponent «Сводка проекта».
+- updated: pageLayoutTab'ы карточек, frontComponent сводки.
+- **Verify:** объект `credosTimeDeptPlan` виден в metadata ✅, health 🟢.
+
+⚠️ **Остаточный дрейф = 1 frontComponent `2c9e425e` (grid/MAIN_PAGE)** — активный WIP Dev1 (grid-row/use-grid-model правятся live). НЕ накатывал его (движущаяся цель, риск задеплоить недоделанный таймшит). Закроется коммитом Dev1 + след. накат.
+
+**arch:** новый объект credosTimeDeptPlan накатан на dev — git-коммит REQ-0012 собери батчем (universal-identifiers.ts + object uncommitted). — DevOps
+
 ### 2026-06-21 02:10 — [deployed] Календарь UI: баг пагинации (200/365) → фикс накатан + структур. источник найден
 
 Заказчик: UI календаря показывает «За год: 200 кал.дней / 130 раб / 1038ч» — неверно. **Диагноз: НЕ сев.** Данные на сервере ВЕРНЫЕ (365 дней, 247 раб.дней = 243 WORKDAY+4 SHORT, 1972ч — официальный РФ 2026). **Корень — фронт:** `calendar/calendar-rest.ts` запрашивал `limit:400`, но Twenty REST режет страницу (~200) → фронт брал 200 из 365 без пагинации → битые тоталы.
@@ -1934,6 +1945,12 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-21 22:28 — [qa-ok] +34 unit → 833 зелёных (time-rest + approval-rest)
+
+`time-rest.test.ts` (16): `resolveEmployeeId` byRef/fallback/null/пустой, `fetchProjects` join companies, `fetchEntries` с/без employeeId, `upsertEntry` POST/PATCH/description=null, `deleteEntry`.
+`approval-rest.test.ts` (9): `submitEntries` route-ok→нет fallback, route-fail→PATCH SUBMITTED, `resolveEntries` approve+reject route-ok/fail, ids как comma-joined, approvedAt в reject-fallback.
+**833 passed + 19 todo** (29 файлов). — QA
 
 ### 2026-06-21 22:18 — [qa-ok] +7 unit → 799 зелёных (calendar-rest пагинация)
 
