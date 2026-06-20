@@ -277,9 +277,18 @@ export const CREDOS_TIME_PROJECT_RP_W_TEAM_UNIVERSAL_IDENTIFIER =
   '36ea47c9-bdd0-4627-a13b-20a35300bee0';
 export const CREDOS_TIME_PROJECT_RP_W_DOCS_UNIVERSAL_IDENTIFIER =
   'c44c8f2a-62ff-4a77-916a-7113a97c4700';
+// Front-component вкладки «Команда» (агрегат участников из записей проекта).
+export const CREDOS_TIME_PROJECT_TEAM_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  '7c3e9b14-2a6d-4f81-b5e0-9d4a1c8f2e63';
 // Доп. viewField-UUID для card-view (колонки).
 export const CREDOS_TIME_PROJECT_CARD_VF_1 = '2d3d5289-4d74-4f1b-b007-02d33f9d4d2f';
 export const CREDOS_TIME_PROJECT_CARD_VF_2 = '98efe4a1-4425-4715-afb2-70118f2224db';
 export const CREDOS_TIME_PROJECT_CARD_VF_3 = '27b0f7e2-d2bd-47fa-a2ca-05f0bb50cd60';
 export const CREDOS_TIME_PROJECT_CARD_VF_4 = '7fc790c3-f9a9-43dc-b5fe-e426f4ca666d';
 export const CREDOS_TIME_PROJECT_CARD_VF_5 = '94bccf56-ad28-48ca-bd23-cf0b1058a258';
+
+// --- Wave 2 (REPORTS): агрегатная аналитика /s/reports ---
+// Logic-функция /s/reports (утилизация + загрузка/недогруз, группировки
+// dept/project/employee). Контракт для Dev 1 — docs/data-model/REPORTS_CONTRACT.md.
+export const REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '5536742c-7217-41c3-a2a6-8d0788f9bd88';

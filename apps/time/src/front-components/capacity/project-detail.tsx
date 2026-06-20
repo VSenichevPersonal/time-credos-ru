@@ -15,8 +15,9 @@ type Props = {
   nameWidth: number;
 };
 
-const title = (p: CapProject): string =>
-  [p.code, p.name].filter(Boolean).join(' · ');
+// UX-5: name уже содержит «КОД · Клиент · Название» — показываем как есть,
+// без повторного префикса code (иначе дубль кода в строке).
+const title = (p: CapProject): string => p.name;
 
 const cellNum = (v: number): string =>
   v > 0 ? String(Math.round(v)) : '';

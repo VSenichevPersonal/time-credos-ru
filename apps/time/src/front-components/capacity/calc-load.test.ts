@@ -5,14 +5,25 @@ import {
   deptCapacity,
   deptLoadCells,
   deptProjectLoads,
+  firstFreePeriod,
   projectHoursInPeriod,
+  summaryCells,
 } from 'src/front-components/capacity/calc-load';
 import type {
   CalendarDay,
   CapProject,
   DeptRef,
+  LoadCell,
   Period,
 } from 'src/front-components/capacity/types';
+
+// LoadCell-фикстура: ratio и free выводятся из capacity/load (как в calc-load).
+const cell = (capacity: number, load: number): LoadCell => ({
+  capacity,
+  load,
+  free: capacity - load,
+  ratio: capacity > 0 ? load / capacity : null,
+});
 
 const utc = (y: number, m: number, d: number): Date => new Date(Date.UTC(y, m, d));
 
@@ -184,5 +195,72 @@ describe('deptProjectLoads', () => {
     const { planned, unplanned } = deptProjectLoads(dept(), [future], periods);
     expect(planned).toHaveLength(0);
     expect(unplanned.map((x) => x.id)).toEqual(['fut']);
+  });
+});
+
+// DP-0001: бейдж «свободен с {мес}» — первый период с ratio < threshold.
+describe('firstFreePeriod', () => {
+  const periods = [
+    period('p0', utc(2026, 0, 1), utc(2026, 0, 7), 40),
+    period('p1', utc(2026, 1, 1), utc(2026, 1, 7), 40),
+    period('p2', utc(2026, 2, 1), utc(2026, 2, 7), 40),
+  ].map((p, i) => ({ ...p, label: ['янв', 'фев', 'мар'][i] }));
+
+  it('возвращает label первого периода с ratio < threshold (0.9)', () => {
+    // 1.2 загружен, 0.95 загружен, 0.8 свободен → «мар»
+    const cells = [cell(100, 120), cell(100, 95), cell(100, 80)];
+    expect(firstFreePeriod(cells, periods)).toBe('мар');
+  });
+
+  it('null, если отдел загружен во всём горизонте', () => {
+    const cells = [cell(100, 110), cell(100, 100), cell(100, 95)];
+    expect(firstFreePeriod(cells, periods)).toBeNull();
+  });
+
+  it('пропускает ratio=null (нулевая ёмкость не считается «свободной»)', () => {
+    const cells = [cell(0, 0), cell(100, 50)];
+    expect(firstFreePeriod(cells, periods)).toBe('фев');
+  });
+
+  it('граница threshold: ratio == threshold не свободен, чуть меньше — свободен', () => {
+    expect(firstFreePeriod([cell(100, 90)], periods, 0.9)).toBeNull();
+    expect(firstFreePeriod([cell(100, 89)], periods, 0.9)).toBe('янв');
+  });
+
+  it('кастомный threshold', () => {
+    const cells = [cell(100, 85)];
+    expect(firstFreePeriod(cells, periods, 0.8)).toBeNull(); // 0.85 не < 0.8
+    expect(firstFreePeriod(cells, periods, 0.9)).toBe('янв'); // 0.85 < 0.9
+  });
+});
+
+// DP-0001: сводная строка «Все отделы» — сумма ёмкости/загрузки по периодам.
+describe('summaryCells', () => {
+  const periods = [
+    period('p0', utc(2026, 0, 1), utc(2026, 0, 7), 40),
+    period('p1', utc(2026, 1, 1), utc(2026, 1, 7), 40),
+  ];
+
+  it('суммирует capacity/load по отделам, считает free и ratio', () => {
+    const perDept = [
+      [cell(100, 50), cell(100, 120)], // отдел A
+      [cell(50, 25), cell(50, 10)], // отдел B
+    ];
+    const [s0, s1] = summaryCells(perDept, periods);
+    expect(s0).toMatchObject({ capacity: 150, load: 75, free: 75 });
+    expect(s0.ratio).toBeCloseTo(0.5);
+    expect(s1).toMatchObject({ capacity: 150, load: 130, free: 20 });
+    expect(s1.ratio).toBeCloseTo(130 / 150);
+  });
+
+  it('нет отделов → нулевая ёмкость, ratio null', () => {
+    const [s0] = summaryCells([], periods);
+    expect(s0).toMatchObject({ capacity: 0, load: 0, free: 0, ratio: null });
+  });
+
+  it('переносит пропуски ячеек (jagged) как 0', () => {
+    const perDept = [[cell(100, 40)], []]; // второй отдел без ячеек
+    const [s0] = summaryCells(perDept, [periods[0]]);
+    expect(s0).toMatchObject({ capacity: 100, load: 40 });
   });
 });

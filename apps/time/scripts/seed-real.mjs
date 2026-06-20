@@ -189,16 +189,23 @@ const WORK_TYPES = [
 ];
 
 // --- Сотрудники (ПДн-safe, 152-ФЗ / CISO #001) ---
-// Реальные ФИО+email НЕ хранятся в git. Если рядом лежит gitignored
-// `.employees.local.json` (массив [first,last,email,dept]) — берём его (реальный сид
-// на dev). Иначе — синтетический набор @example.test с сохранением распределения
-// по отделам. Формат файла: [["Имя","Фамилия","mail@example.test","OV"], ...].
+// ПРИНЦИП: реальные ФИО/email НЕ хранятся в трекаемых файлах. Источник реальных
+// ПДн читается в рантайме из gitignored-файлов (см. .gitignore). Сам скрипт
+// содержит ТОЛЬКО синтетический набор (@example.test). Приоритет источников:
+//   1. research/directum5/bitrix-users/roster.csv (gitignored) — первичный реестр
+//      Битрикс. Формат: "Сотрудник,Подразделение,E-Mail". Парсится в рантайме,
+//      подразделение мэппится на код отдела, посторонние подразделения отсеиваются.
+//   2. apps/time/scripts/.employees.local.json (gitignored) — массив
+//      [["Имя","Фамилия","mail","OV"], ...] (явный override на dev).
+//   3. Синтетический набор @example.test (если gitignored-источников нет).
+// Цель: 0 реальных @credos.ru/ФИО в трекаемых файлах.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const LOCAL_EMP = join(__dir, '.employees.local.json');
+const ROSTER_CSV = resolve(__dir, '../../../research/directum5/bitrix-users/roster.csv');
 
 // Синтетический набор: распределение OV 11 / OIB 11 / OPIB 9 / TC 6 / OPR 5 = 42.
 const SYNTH_DIST = { OV: 11, OIB: 11, OPIB: 9, TC: 6, OPR: 5 };
@@ -211,15 +218,55 @@ const SYNTH_EMPLOYEES = Object.entries(SYNTH_DIST).flatMap(([dept, n]) =>
   ]),
 );
 
-const EMPLOYEES = existsSync(LOCAL_EMP)
-  ? JSON.parse(readFileSync(LOCAL_EMP, 'utf8'))
-  : SYNTH_EMPLOYEES;
+// Маппинг названий подразделений Битрикса -> код отдела модели (5 учётных отделов).
+// Подразделения вне этого набора (АХО, Руководство, бухгалтерия и т.п.) отсеиваются.
+const ROSTER_DEPT_MAP = [
+  [/проектирован|внедрен/i, 'OV'],
+  [/практическ/i, 'OPIB'],
+  [/информационной безопасн/i, 'OIB'],
+  [/технический центр/i, 'TC'],
+  [/продуктов|разработк/i, 'OPR'],
+];
 
-if (!existsSync(LOCAL_EMP)) {
-  console.log(
-    '  [сотрудники] .employees.local.json не найден — синтетический набор (@example.test).',
-  );
+// Парсер roster.csv (gitignored): "Полное ФИО, Подразделение, email".
+// ФИО приходит как "Имя Фамилия" (иногда с отчеством) — берём первое слово как
+// имя, последнее как фамилию. Возвращает строки формата [first, last, email, dept].
+function parseRoster(text) {
+  const rows = [];
+  const lines = text.split(/\r?\n/).slice(1); // пропускаем заголовок
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    // Простой CSV с кавычками вокруг поля подразделения.
+    const cells = line.match(/(?:"[^"]*"|[^,])+/g);
+    if (!cells || cells.length < 3) continue;
+    const [fio, deptRaw, email] = cells.map((c) => c.replace(/^"|"$/g, '').trim());
+    if (!email) continue;
+    const matched = ROSTER_DEPT_MAP.find(([re]) => re.test(deptRaw));
+    if (!matched) continue; // не учётный отдел
+    const parts = fio.split(/\s+/).filter(Boolean);
+    if (parts.length < 2) continue;
+    const first = parts[0];
+    const last = parts[parts.length === 3 ? 1 : parts.length - 1];
+    rows.push([first, last, email, matched[1]]);
+  }
+  return rows;
 }
+
+let EMPLOYEES;
+let empSource;
+if (existsSync(ROSTER_CSV)) {
+  EMPLOYEES = parseRoster(readFileSync(ROSTER_CSV, 'utf8'));
+  empSource = `roster.csv (${EMPLOYEES.length} чел.)`;
+}
+if ((!EMPLOYEES || EMPLOYEES.length === 0) && existsSync(LOCAL_EMP)) {
+  EMPLOYEES = JSON.parse(readFileSync(LOCAL_EMP, 'utf8'));
+  empSource = `.employees.local.json (${EMPLOYEES.length} чел.)`;
+}
+if (!EMPLOYEES || EMPLOYEES.length === 0) {
+  EMPLOYEES = SYNTH_EMPLOYEES;
+  empSource = `синтетический набор @example.test (${EMPLOYEES.length} чел.)`;
+}
+console.log(`  [сотрудники] источник: ${empSource}`);
 
 // --- РЕАЛЬНЫЕ клиенты Директум5: ключ = короткое имя (Company.name), legal = юрлицо.
 const CLIENTS = [
@@ -394,6 +441,16 @@ async function run() {
   const projects = []; // { id, dept, category, code }
   let projNew = 0;
 
+  // D2-2: раскидать endDate по H1-H2 2026 (часть продлить за июнь), чтобы CAPACITY
+  // вперёд (июль+) не была пустой. Детерминированно по счётчику (≈5/7 уходят в H2).
+  const PROJECT_END_DATES = [
+    '2026-06-26', '2026-07-31', '2026-08-28', '2026-09-25',
+    '2026-10-30', '2026-11-27', '2026-12-25',
+  ];
+  let endSpreadIdx = 0;
+  const nextEndDate = () =>
+    `${PROJECT_END_DATES[endSpreadIdx++ % PROJECT_END_DATES.length]}T18:00:00.000Z`;
+
   // 5a. ОВ — реальные Directum-проекты
   for (const p of OV_PROJECTS) {
     const rec = await post('credosTimeProjects', {
@@ -403,7 +460,7 @@ async function run() {
       status: 'ACTIVE',
       plannedEffort: 80 + (p.code.length * 13) % 320,
       startDate: '2026-01-12T09:00:00.000Z',
-      endDate: '2026-06-26T18:00:00.000Z',
+      endDate: nextEndDate(),
       departmentId: deptIdByCode.OV,
       companyId: clientCompanyId[p.client],
     });
@@ -430,7 +487,7 @@ async function run() {
         name, code, category: CAT[it.category], status: 'ACTIVE',
         plannedEffort: 40 + (idx * 37) % 280,
         startDate: '2026-02-02T09:00:00.000Z',
-        endDate: '2026-06-19T18:00:00.000Z',
+        endDate: nextEndDate(),
         departmentId: deptIdByCode[dept],
       };
       // Клиентские/пилотные привязываем к реальной Company.

@@ -6,8 +6,8 @@ export type Ref = { id: string; name: string };
 export type ProjectRef = {
   id: string;
   code: string | null;
-  name: string; // «КОД · Клиент · Название»
-  rawName: string; // имя проекта без кода/клиента (для поиска)
+  name: string; // отображаемое имя; после пере-сида = «КОД · Клиент · Название»
+  rawName: string; // сырое имя проекта из БД (резерв для поиска/диагностики)
   client: string | null;
   departmentId: string | null;
   category: string | null; // UPPER_CASE код категории

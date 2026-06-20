@@ -21,6 +21,7 @@ import {
   CREDOS_TIME_PROJECT_RP_W_STAGES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_TEAM_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_TEAM_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -161,25 +162,23 @@ export default definePageLayout({
         },
       ],
     },
-    // 5b. Команда — placeholder «скоро».
+    // 5b. Команда — таблица участников (front-component, агрегат из записей).
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_TEAM_UNIVERSAL_IDENTIFIER,
       title: 'Команда',
       position: 5,
       icon: 'IconUsers',
-      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      layoutMode: PageLayoutTabLayoutMode.CANVAS,
       widgets: [
         {
           universalIdentifier: CREDOS_TIME_PROJECT_RP_W_TEAM_UNIVERSAL_IDENTIFIER,
           title: 'Команда проекта',
-          type: 'STANDALONE_RICH_TEXT',
-          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
+          type: 'FRONT_COMPONENT',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
           configuration: {
-            configurationType: 'STANDALONE_RICH_TEXT',
-            body: {
-              markdown:
-                '### Команда — скоро\n\nЗдесь будет список сотрудников, **списывавших время** на проект, с суммарными часами по каждому. Источник — записи трудозатрат проекта (поле «Работник»).',
-            },
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier:
+              CREDOS_TIME_PROJECT_TEAM_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
           },
         },
       ],

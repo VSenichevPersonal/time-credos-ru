@@ -6,9 +6,11 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **315 + 8 todo** (8 файлов, все зелёные) |
+| unit-тестов | **467 + 8 todo** (8 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
-| browser-smoke (QA-1) | ⬜ чеклист готов (`reports/QA_SMOKE_CHECKLIST.md`), прогон блокирован (см. ниже) |
+| backend-smoke (REST) | ✅ health 200 + 8/8 объектов 200 (без браузера, `reports/QA_SMOKE_CHECKLIST.md` §0-API) |
+| browser-smoke UI (QA-1) | ⬜ §1-7 — блокирован (профиль+креды) |
+| oxlint | ✅ correctness=warn (61 правило, было 1) |
 | lint | ✅ 0/0 (112 файлов) |
 | typecheck | ✅ `tsc -b tsconfig.spec.json` exit 0 |
 

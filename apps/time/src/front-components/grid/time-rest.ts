@@ -61,7 +61,9 @@ export const fetchProjects = async (): Promise<ProjectRef[]> => {
   );
   return pickList(projResp, 'credosTimeProjects').map((p) => {
     const client = p.companyId ? companyName.get(p.companyId) ?? null : null;
-    const parts = [p.code, client, p.name].filter(Boolean);
+    // UX-5: поле name после пере-сида уже = «КОД · Клиент · Название».
+    // Показываем его как есть, БЕЗ повторного префикса code/client (иначе дубль
+    // «ОПИБ-2026-005 · … · ОПИБ-2026-005 · …»). code/client храним для фильтров.
     return {
       id: p.id,
       code: p.code ?? null,
@@ -70,7 +72,7 @@ export const fetchProjects = async (): Promise<ProjectRef[]> => {
       departmentId: p.departmentId ?? null,
       category: p.category ?? null,
       approvalRequired: p.approvalRequired ?? null,
-      name: parts.join(' · '),
+      name: p.name,
     };
   });
 };

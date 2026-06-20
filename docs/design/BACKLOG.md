@@ -8,11 +8,13 @@
 
 | # | Задача | Приор | Статус | Файлы / связь |
 |---|---|---|---|---|
-| FE-1 | **Фикс переполнения дропдаунов** (add-row таймшита у нижней кромки → клип). Системный авто-флип + кап высоты, вынесен в SSOT-хук `use-dropdown-direction`. | 🔴 | **DONE (локально)** — lint+tsc+аудит чисто, ждёт пуша arch | `grid/autocomplete.tsx`, `grid/use-dropdown-direction.ts`. [UI_PLAYBOOK §2.1](UI_PLAYBOOK.md) |
+| FE-1 | **Фикс переполнения дропдаунов** (add-row внизу → клип). **DOM-free** (front-component = Web Worker, нет host DOM → замеры крашат): направление из структурного пропа `dropUp`, add-row открывает вверх. | 🔴 | **DONE (локально)** — 51 файл 0/0, DOM-free verified, ждёт пуша | `grid/{autocomplete,add-row}.tsx`. [UI_PLAYBOOK §0,§2.1](UI_PLAYBOOK.md) |
 | FE-2 | **Редизайн доски «Планирование»** (P0+P1: «свободен с», метрика-тоггл, каркас времени, перекрас, убрать mode-switcher). | 🔴 | **`[arch-ok]` 19:35 — следующий после волны-1** | [DP-0001](proposals/DP-0001-capacity-board-redesign.md), `capacity/*` |
 | FE-9 | **R2-D1 Дашборд «Отчёты»** (front+nav, reuse filters-bar, impeccable) — волна-2 от arch. | 🔴 | TODO (волна-2) | новый front-component + nav-item |
 | FE-10 | **approval-bar UI-gate** — прятать approve/reject при `!isManager`. Контракт: читать employee текущего юзера по `workspaceMemberRef` → `isManager`; в logic-функцию approve/reject передавать `workspaceMemberRef` actor'а в params. | 🔴 | TODO (Dev 2 поле `isManager` накатано) | `grid/approval-bar.tsx`, `grid/use-approval.ts` |
-| FE-3 | **Карточка проекта → вкладка «Трудозатраты»: табличный вью** как в таблице трудозатрат. | 🔴 | TODO (дизайн + коорд. Dev 2 по агрегатам) → `[design-proposal]` | front-component (page-layout проекта) |
+| FE-11 | **Карточка проекта → вкладка «Команда»: таблица участников** (сотрудники из записей: часы/доля/записей/последняя). | 🔴 | **DONE (локально)** — front-component, ждёт app sync (новый UUID + page-layout) | `front-components/project-team/*`, `project-team.front-component.tsx`, page-layout вкладка 5b |
+| FE-12 | Права/видимость вкладки «Команда» (кто видит чьи часы) | 🟢 | TODO (бэклог по запросу заказчика — не настраиваем сейчас) | `roles/` (Dev 2) + UI-gate |
+| FE-3 | **Карточка проекта → вкладка «Трудозатраты»: табличный вью.** NB: вкладка УЖЕ инлайн-таблица (FIELDS по relation timeEntries — ядро рендерит таблицу дочерних). Проверить рендер в UI; при необходимости — стилизация под главный таймшит. | 🟡 | TODO (верифицировать в UI) | page-layout проекта |
 | FE-4 | **Ревизия вкладок карточек на табличный вью** — где список лучше заменить на грид. | 🟡 | TODO | `views/`, `page-layouts/` |
 
 ## Из UX-бэклога (моя зона, чистый фронт)

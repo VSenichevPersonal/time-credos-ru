@@ -59,6 +59,7 @@ export const AddRow = ({ projects, workTypes, recentProjectIds, onAdd }: Props) 
         value={projectId}
         onChange={setProjectId}
         width={260}
+        dropUp
       />
       <Autocomplete
         placeholder="Вид работ…"
@@ -66,6 +67,7 @@ export const AddRow = ({ projects, workTypes, recentProjectIds, onAdd }: Props) 
         value={workTypeId}
         onChange={setWorkTypeId}
         width={200}
+        dropUp
       />
       <button
         onClick={add}

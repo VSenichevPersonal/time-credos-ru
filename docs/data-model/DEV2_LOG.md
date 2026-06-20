@@ -43,6 +43,35 @@
 
 ---
 
+## 2026-06-20 — R-EMP: ADR-0006 «Модель сотрудника»
+
+Задача arch (вопрос заказчика «справочники для работников — норм?»). Свёрился с native Twenty 2.14 (WorkspaceMember/Person/Company по openapi).
+- **ADR-0006** PROPOSED (`docs/adr/0006-employee-model.md`): решение = оставить `credosTimeEmployee` (профиль) + `workspaceMemberRef`→WorkspaceMember (источник истины ФИО/email для юзеров). Паттерн staff≠users.
+- 3 альтернативы отклонены (только WorkspaceMember / только Person / extend WM как профиль) с обоснованием.
+- Предложение: убрать дубль ФИО/email для юзеров (читать из WorkspaceMember) — миграция дешёвая (1 затронутая запись сейчас). Связал CISO-004, ADR-0003/0005.
+
+---
+
+## 2026-06-20 — координация волна-2 + ADR-0005
+
+- Параллельный Dev2-агент ведёт код-пакет (seed/D2-2/R2-D2). Мой трек — доки/контракты/ADR/ревью (без коллизий кода).
+- **REQ-0003 выровнен** под форму arch `{byDept,byProject,byEmployee,totals,period}` (был groupBy/rows) → Dev1 стартует дашборд на mock.
+- **ADR-0005 «Прод-топология»** PROPOSED (`docs/adr/0005-prod-topology.md`): вариант B (отдельный Twenty 2.14 в РФ-контуре + синк Company по API). Отклонены A (апгрейд форка) и shared-DB. Прод-гейты: РФ-хостинг (152FZ-001 P0), локализация, синк-модель. Связал ADR-0002/0003/0006, CISO-004.
+- Открыто к arch: approve ADR-0005/0006; ENV-allowlist (REQ-0001).
+
+---
+
+## 2026-06-20 — Dev 2 BACK: backend-фиксы волны-2
+
+Роль уточнена: Dev 2 **BACK** (бэкенд-имплементатор).
+- **reports.logic.ts P1-фикс:** Core REST max 60/страница → код брал 60 вместо ~420 записей (норма календаря врала). Добавил `restGetAll()` пагинацию (starting_after+pageInfo), заменил 5 fetch'ей. oxlint/tsc чисто.
+- **D2-2 seed H2:** project endDate раскинуты `nextEndDate()` по июн–дек 2026 (CAPACITY июль+ оживёт). `node --check` ок.
+- На сервере не прогонял (creds/мутация) → DevOps при reseed/sync.
+- **reports-calc.ts:** вынес чистый расчёт из reports.logic в тестируемый модуль (паттерн «calc в .ts»). `computeReports()` без сети. reports.logic = fetch+пагинация+вызов.
+- **reports-calc.test.ts:** 14 unit (vitest.unit.config) — edge по запросу arch: праздники вне нормы, 0 ёмкость→norm0/under=-fact, пустой период→util=null, capacityFactor 0.8, запись без employeeId→через проект, Σ byDept==totals. Всё зелёное. oxlint/tsc чисто.
+
+---
+
 ## Карта рабочих доков Dev 2
 
 | Что | Где |

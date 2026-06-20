@@ -122,3 +122,74 @@ describe('целостность ссылок: view→объект и nav→view
     },
   );
 });
+
+// --- Поля объектов ---
+type FieldDef = {
+  universalIdentifier: string;
+  name: string;
+  type: string;
+  options?: Array<{ value: string }>;
+};
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const fieldsByObject = objects.map((o) => ({
+  path: o.path,
+  fields: (cfg<FieldDef[]>(o.res, 'fields') ?? []) as FieldDef[],
+}));
+const allFields = fieldsByObject.flatMap((o) => o.fields.map((f) => ({ obj: o.path, f })));
+
+describe('поля объектов: UUID + нейминг', () => {
+  it.each(allFields.map(({ obj, f }) => [`${obj}:${f.name}`, f] as const))(
+    '%s — universalIdentifier валидный UUID v4',
+    (_label, f) => {
+      expect(f.universalIdentifier).toMatch(UUID_V4);
+    },
+  );
+
+  it.each(allFields.map(({ obj, f }) => [`${obj}:${f.name}`, f] as const))(
+    '%s — name camelCase, непустой',
+    (_label, f) => {
+      expect(f.name).toMatch(/^[a-z][a-zA-Z0-9]*$/);
+    },
+  );
+});
+
+describe('поля: уникальность имён внутри объекта', () => {
+  it.each(fieldsByObject.map((o) => [o.path, o.fields] as const))(
+    '%s — имена полей уникальны',
+    (_path, fields) => {
+      const names = fields.map((f) => f.name);
+      expect(new Set(names).size).toBe(names.length);
+    },
+  );
+});
+
+describe('поля: глобальная уникальность UUID (нет коллизий сущностей)', () => {
+  it('все UUID полей уникальны и не пересекаются с object/view/nav UUID', () => {
+    const fieldIds = allFields.map(({ f }) => f.universalIdentifier.toLowerCase());
+    const entityIds = [
+      ...objects.map((o) => cfg<string>(o.res, 'universalIdentifier')),
+      ...views.map((v) => cfg<string>(v.res, 'universalIdentifier')),
+      ...navs.map((n) => cfg<string>(n.res, 'universalIdentifier')),
+    ].map((id) => id.toLowerCase());
+
+    const all = [...fieldIds, ...entityIds];
+    expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+describe('поля SELECT: непустой набор options', () => {
+  const selectFields = allFields.filter(({ f }) => f.type === 'SELECT');
+
+  it('есть хотя бы одно SELECT-поле (sanity)', () => {
+    expect(selectFields.length).toBeGreaterThan(0);
+  });
+
+  it.each(selectFields.map(({ obj, f }) => [`${obj}:${f.name}`, f] as const))(
+    '%s — options непустой',
+    (_label, f) => {
+      expect(Array.isArray(f.options)).toBe(true);
+      expect((f.options ?? []).length).toBeGreaterThan(0);
+    },
+  );
+});

@@ -1,5 +1,3 @@
-import { useEffect } from 'react';
-
 import { GridRow } from 'src/front-components/grid/grid-row';
 import { WeekHeader } from 'src/front-components/grid/week-header';
 import { FooterTotals } from 'src/front-components/grid/footer-totals';
@@ -43,24 +41,23 @@ export const WeekGrid = ({
   const nav = useKeyboard(rowList.length, 7);
 
   // Shift+Enter на активной ячейке: bulk-fill её значения на будни строки.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && e.shiftKey && nav.active) {
-        const row = rowList[nav.active.row];
-        const val = row?.hoursByDay[nav.active.col];
-        if (row && val && val > 0) {
-          e.preventDefault();
-          onBulkFill(row.key, val);
-        }
+  // Слушаем onKeyDown на контейнере (React-событие), а НЕ window.addEventListener:
+  // в песочнице Web Worker (Remote DOM) глобальные window-слушатели host-клавиатуры
+  // не срабатывают. UI_PLAYBOOK §0.
+  const onContainerKeyDown = (e: { key: string; shiftKey: boolean; preventDefault: () => void }) => {
+    if (e.key === 'Enter' && e.shiftKey && nav.active) {
+      const row = rowList[nav.active.row];
+      const val = row?.hoursByDay[nav.active.col];
+      if (row && val && val > 0) {
+        e.preventDefault();
+        onBulkFill(row.key, val);
       }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [nav.active, rowList, onBulkFill]);
+    }
+  };
 
   return (
     <>
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} onKeyDown={onContainerKeyDown}>
         <WeekHeader days={days} leftLabel="Проект / вид работ" />
         {loading && rowList.length === 0 ? (
           <Center>Загрузка…</Center>

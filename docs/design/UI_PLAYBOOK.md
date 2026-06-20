@@ -6,12 +6,25 @@
 
 ---
 
+## 0. 🔴 Среда исполнения — Web Worker (Remote DOM), НЕТ host DOM
+
+**Front-component исполняется в Web Worker через Remote DOM, а НЕ в обычном DOM браузера.** Прямого доступа к host-DOM нет. Краш-API (бросают `... is not a function` / undefined):
+
+- ❌ `element.getBoundingClientRect()` — **краш**.
+- ❌ `window.innerHeight / innerWidth / scrollY`, `document.*`, `getComputedStyle`.
+- ❌ `requestAnimationFrame`, измерения размеров/позиции любого узла.
+- ✅ Доступно: React-стейт/хуки, `setTimeout`/`setInterval`, `fetch` (через `RestApiClient`), SDK-хуки (`useSelectedRecordIds`, `useUserId`, …), CSS inline-стили.
+
+**Вывод:** верстаем **без замеров DOM**. Направление/размер поповера — из **структурного знания** (где компонент стоит), не из `getBoundingClientRect`. Анимации — CSS-transition на `opacity`/`color`, не JS-измерения.
+
+> Источник: `research/twenty-sdk/fresh/layout/front-components.md`. Грабли стоили рабочего фикса (флип через `getBoundingClientRect` крашил в воркере).
+
 ## 1. Базовый закон
 
 **Виджет — это коробка фикс-высоты с `overflow: hidden`.** Любой `position: absolute` элемент, выходящий за её низ/право, обрезается. Портала наружу нет. Значит:
 
 - ❌ Нельзя рассчитывать, что поповер «просто откроется поверх всего».
-- ✅ Всё держим **внутри** коробки: меняем направление, ограничиваем высоту, скроллим локально.
+- ✅ Всё держим **внутри** коробки: направление — структурно, высота — фикс-кап, скролл локальный.
 
 CLAUDE.md pitfall (verbatim): *«Creating a front-end component that has a scroll instead of being responsive to its fixed widget height and width, unless it is specifically meant to be used in a canvas tab.»*
 
@@ -21,24 +34,19 @@ CLAUDE.md pitfall (verbatim): *«Creating a front-end component that has a scrol
 
 ### 2.1 Поповеры / дропдауны / автокомплиты / тултипы
 
-- **Авто-флип направления.** На открытии измерь `getBoundingClientRect()` инпута. Если места снизу мало — открывай **вверх**. Никаких безусловных `top: 33`.
-- **Кап высоты.** `maxHeight = clamp(120, доступное_место − отступ, 260)` + `overflowY: auto`. Меню само скроллится, не растягивает виджет.
-- **Переиспользуй SSOT.** Комбобокс уже флипается — `grid/autocomplete.tsx`. **Не плодить инлайновые дропдауны**: новый — оборачивай в общий компонент или вынеси флип-хук.
+- **Направление — СТРУКТУРНОЕ, не по замерам.** `getBoundingClientRect`/`window` крашат в воркере (§0). Направление решает **вызывающий**, который знает свою позицию: дропдаун у нижней кромки (add-row, футер) → проп `dropUp`. Никаких безусловных `top: 33` и никаких DOM-замеров.
+- **Кап высоты — фикс-константа.** `maxHeight: 260` + `overflowY: auto`. Меню само скроллится, не растягивает виджет. (Без измерения доступного места — его не узнать.)
+- **Переиспользуй SSOT.** Комбобокс — `grid/autocomplete.tsx` (проп `dropUp`). **Не плодить инлайновые дропдауны**: новый — оборачивай в общий компонент.
 
 Эталон (реализован):
-```ts
-const openMenu = () => {
-  const r = inputRef.current?.getBoundingClientRect();
-  if (r) {
-    const below = window.innerHeight - r.bottom - 8;
-    const above = r.top - 8;
-    const up = below < 200 && above > below;
-    setDropUp(up);
-    setMaxH(Math.max(120, Math.min(260, up ? above : below)));
-  }
-  setOpen(true);
-};
-// style: ...(dropUp ? { bottom: 33 } : { top: 33 }), maxHeight: maxH
+```tsx
+// grid/autocomplete.tsx — направление из пропа, без замеров:
+type Props = { /* … */ dropUp?: boolean };
+const MAX_MENU_HEIGHT = 260;
+// style меню: ...(dropUp ? { bottom: 33 } : { top: 33 }), maxHeight: MAX_MENU_HEIGHT
+
+// grid/add-row.tsx — add-row структурно внизу → открывает вверх:
+<Autocomplete … dropUp />
 ```
 
 ### 2.2 Длинный текст (имена проектов, ФИО, виды работ)

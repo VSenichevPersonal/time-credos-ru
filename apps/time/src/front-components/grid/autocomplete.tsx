@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 
 import { T } from 'src/front-components/grid/tokens';
-import { useDropdownDirection } from 'src/front-components/grid/use-dropdown-direction';
 
 // Комбобокс с автокомплитом: печатаешь — фильтрует, ↑↓ выбор, Enter подтверждает.
 // «Недавние» опции (recentIds) поднимаются вверх под подзаголовком.
@@ -17,7 +16,12 @@ type Props = {
   onConfirm?: () => void; // Tab/Enter после выбора (переход к следующему полю)
   width?: number;
   autoFocus?: boolean;
+  // Открывать меню вверх. Структурно: у нижней кромки виджета (add-row), иначе
+  // обрежется overflow:hidden. БЕЗ DOM-замеров (Web Worker, нет host DOM). UI_PLAYBOOK §0.
+  dropUp?: boolean;
 };
+
+const MAX_MENU_HEIGHT = 260;
 
 export const Autocomplete = ({
   placeholder,
@@ -28,16 +32,14 @@ export const Autocomplete = ({
   onConfirm,
   width = 240,
   autoFocus,
+  dropUp = false,
 }: Props) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [hi, setHi] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Направление меню: у нижней кромки фикс-виджета открываем вверх (UI_PLAYBOOK §2.1).
-  const { dropUp, maxH, measure } = useDropdownDirection();
 
   const openMenu = () => {
-    measure(inputRef.current);
     setOpen(true);
     setHi(0);
   };
@@ -119,7 +121,7 @@ export const Autocomplete = ({
             left: 0,
             zIndex: 12,
             width,
-            maxHeight: maxH,
+            maxHeight: MAX_MENU_HEIGHT,
             overflowY: 'auto',
             background: T.surface,
             border: `1px solid ${T.borderStrong}`,
@@ -166,6 +168,28 @@ export const Autocomplete = ({
               )}
             </button>
           ))}
+        </div>
+      )}
+      {open && flat.length === 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            ...(dropUp ? { bottom: 33 } : { top: 33 }),
+            left: 0,
+            zIndex: 12,
+            width,
+            background: T.surface,
+            border: `1px solid ${T.borderStrong}`,
+            borderRadius: 9,
+            boxShadow: dropUp
+              ? '0 -8px 24px rgba(29,31,38,0.14)'
+              : '0 8px 24px rgba(29,31,38,0.14)',
+            padding: '10px 12px',
+            fontSize: 12.5,
+            color: T.textMuted,
+          }}
+        >
+          {items.length === 0 ? 'Нет доступных вариантов' : 'Ничего не найдено'}
         </div>
       )}
     </div>

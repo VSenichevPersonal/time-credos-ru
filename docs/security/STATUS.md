@@ -15,6 +15,7 @@
 | [CISO-002](findings/CISO-002-approval-rbac.md) | P2 | approval без авторизации actor + separation of duties (зависит от server-side identity, см. CISO-005) | Dev 2 + Dev 1 |
 | CISO-003 | P3 | manager.role без field-level прав | Dev 2 (отложено) |
 | CISO-004 | P2 | ADR-0003: общий Employee → PII видна продажам/каталогу | arch (до catalog) |
+| [CISO-006](findings/CISO-006-filter-injection.md) | **P2** | filter injection в logic-functions: client params → Twenty filter string без валидации; обход status-check в runSubmit | Dev 2 |
 
 ## Лог
 

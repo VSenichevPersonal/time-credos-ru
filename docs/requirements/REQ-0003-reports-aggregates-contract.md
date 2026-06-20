@@ -24,33 +24,40 @@
 
 | param | знач | дефолт |
 |---|---|---|
-| `groupBy` | `department` \| `employee` \| `project` \| `category` \| `period` | `department` |
 | `from`,`to` | ISO date | обяз. |
-| `period` | `week` \| `month` (бакеты для `groupBy=period`) | `month` |
+| `period` | `week` \| `month` (бакеты периода) | `month` |
 | `departmentId`,`employeeId`,`projectId` | фильтры (опц.) | — |
 
-## Ответ (схема)
+## Ответ (схема) — форма arch (`{ byDept, byProject, byEmployee, period }`)
+
+> Согласовано с arch (SIGNALS 20:20): отдаём ВСЕ срезы в одном ответе, не `groupBy`-параметр. Реализует параллельный Dev2-агент; этот контракт — для Dev 1/QA.
 
 ```json
 {
   "ok": true,
-  "groupBy": "employee",
-  "from": "2026-01-01", "to": "2026-06-30",
-  "rows": [
-    {
-      "key": "<id>",
-      "label": "Иванов И.",
-      "factHours": 720.5,
-      "clientHours": 540.0,
-      "utilization": 0.749,
-      "normHours": 880.0,
-      "underloadHours": 159.5,
-      "byCategory": { "Client": 540, "Internal": 120, "Presale": 60.5 }
-    }
-  ],
-  "totals": { "factHours": 0, "clientHours": 0, "utilization": 0, "normHours": 0, "underloadHours": 0 }
+  "from": "2026-01-01", "to": "2026-06-30", "period": "month",
+  "byDept":     [ { "key": "<id>", "label": "ОВ", ...metrics } ],
+  "byProject":  [ { "key": "<id>", "label": "ОВ-2026-001", "code": "ОВ-2026-001", "category": "CLIENT", "plannedEffort": 120, "budgetUsed": 0.6, ...metrics } ],
+  "byEmployee": [ { "key": "<id>", "label": "Иванов И.", ...metrics } ],
+  "totals": { ...metrics }
 }
 ```
+
+`...metrics` (единый объект для каждой строки и totals):
+
+```json
+{
+  "factHours": 720.5,
+  "clientHours": 540.0,
+  "utilization": 0.749,
+  "normHours": 880.0,
+  "underloadHours": 159.5,
+  "byCategory": { "Client": 540, "Internal": 120, "Presale": 60.5 }
+}
+```
+
+- `byEmployee` покрывает **UX-2** (доска «по людям») + дашборд.
+- `period` бакеты (week/month) — для трендов; если не нужны Dev1 на старте, можно опустить временные ряды в v1, оставить агрегат за весь `from..to`.
 
 ## UX-2 (по сотруднику — для capacity-доски)
 
@@ -59,7 +66,7 @@
 
 ## Критерии приёмки (QA R2-QA)
 
-1. `groupBy=department` Σ rows.factHours == totals.factHours.
+1. Σ `byDept[].factHours` == `totals.factHours` (и аналогично byProject/byEmployee).
 2. utilization = clientHours/factHours (0..1), факт=0 → utilization=0 (без NaN).
 3. normHours учитывает праздники РФ (WorkdayCalendar), не фикс. 8×календарных дней.
 4. underloadHours = normHours − factHours (знак сохраняется).

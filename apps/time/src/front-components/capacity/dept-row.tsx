@@ -30,6 +30,8 @@ export const DeptRow = ({
   // Полное название — в тултипе (title).
   const shortName = dept.code ? departmentLabel(dept.code, { short: true }) : dept.name;
   const fullName = dept.code ? departmentLabel(dept.code) : dept.name;
+  // Без ёмкости (headcount 0 / нет календаря) «нет окна» врёт — отделяем кейс.
+  const hasCapacity = cells.some((c) => c.capacity > 0);
   return (
   <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
     <button
@@ -70,7 +72,9 @@ export const DeptRow = ({
         </span>
       </span>
       <span style={{ paddingLeft: 16, fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' }}>
-        {freeFrom ? (
+        {!hasCapacity ? (
+          <span style={{ color: T.textFaint }}>ёмкость не задана</span>
+        ) : freeFrom ? (
           <span style={{ color: '#15803d' }}>свободен с {freeFrom}</span>
         ) : (
           <span style={{ color: T.textFaint }}>нет окна в горизонте</span>

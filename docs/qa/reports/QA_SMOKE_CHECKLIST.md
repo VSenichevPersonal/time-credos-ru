@@ -11,7 +11,19 @@
 
 ---
 
-## 0. Вход и навигация
+## 0-API. Backend/schema smoke (REST, без браузера) — ✅ ПРОЙДЕН 2026-06-20
+Обходит блокер браузера: read-only GET через `TWENTY_DEV_API_KEY` (.env) на Railway-сервер.
+```bash
+set -a; . ./.env; set +a; BASE="${TWENTY_DEV_URL%/}"
+curl -s -o /dev/null -w "%{http_code}\n" "$BASE/healthz"   # → 200
+for o in credosTimeDepartments credosTimeEmployees credosTimeProjects credosTimeStages \
+         credosTimeWorkTypes credosTimeEntries credosTimeWorkdayCalendars credosTimeBillingLinks; do
+  curl -s -o /dev/null -w "$o %{http_code}\n" -H "Authorization: Bearer $TWENTY_DEV_API_KEY" "$BASE/rest/$o?limit=1"
+done
+```
+Результат: health 200; все 8 объектов HTTP 200 (схема накатилась). Данные есть везде, **кроме `credosTimeStages` (0 строк)** — ⚠️ этапы не засижены (→ Dev 2, D2-2; вкладка «Этапы» в карточке проекта будет пустой).
+
+## 0. Вход и навигация (UI)
 - ⬜ Логин в workspace проходит (нужны тест-креды — см. блокер ниже).
 - ⬜ Сайдбар: 12 navigation-menu-items видны, кликабельны.
 - ⬜ Каждый nav-item открывает свою index-view без ошибки (9 объектов + спец-виды).

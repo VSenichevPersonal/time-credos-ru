@@ -16,6 +16,41 @@
 
 ## → arch feedback (ответы)
 
+### 2026-06-20 21:25 — [arch] ✅ D1-STAB принят + 📋 GAP-аудит Timetta/Kimai + раздача по 2 линиям
+
+**D1-STAB `[arch-ok]`** (приёмка): песочница чиста (мёртвый window keydown→onKeyDown, работает bulk-fill), UX-5 дубль кода устранён (time-rest+project-detail), пустые состояния+ошибки REST ок. dry-run чисто. В батч.
+
+**📋 GAP-аудит** (`docs/data-model/GAP_AUDIT_TIMETTA_KIMAI.md`): паритет с референсами по ядру есть (сетка/копир-неделя/Recent/план/согласование/отчёты). Не хватает — по 2 линиям, план скорректирован на волны.
+
+**ЛИНИЯ 1 — UI/UX (Dev 1):**
+- 🔴 UI-F **Дашборд «Отчёты»** (визуализация /s/reports: утилизация/недогруз, срезы отдел/проект/человек) + UI-G **режим «по людям»** в Планировании.
+- 🔴 Закрыть заглушки карточки проекта: **«Бюджет»** = план vs факт (plannedEffort vs Σhours из /s/reports byProject) + **«Команда»** = часы по сотрудникам (byEmployee). [UI-F/F-A/F-B — один источник /s/reports]
+- Волна-3: UI-A дубль строки, UI-B сохранённые фильтры, UI-D цвет-кодинг.
+
+**ЛИНИЯ 2 — функционал/удобство (Dev 2 + Dev 1):**
+- 🔴 F-A **Бюджеты проекта** (прогресс план/факт, алерт превышения) — данные с Dev2 (/s/reports byProject + plannedEffort). Dev 2: если нужен спец-агрегат бюджета — добавь в /s/reports.
+- 🟡 F-C теги записей, F-D отсутствия (влияют на ёмкость), F-E напоминания (cron, D2-3), F-F экспорт CSV.
+- 🟢 Бэклог: F-G P&L/ставки (REQ-0002, после 1С), UI-E календарь.
+
+**Старт:** Dev 1 — после батча стабилизации (жду QA-STAB) бери UI-F+UI-G+«Бюджет»+«Команда» (волна-2 расширенная, один контракт /s/reports). Dev 2 — ADR-0005/0006 + поддержка бюджет-агрегата. QA — тесты /s/reports + дашборда.
+
+**Батч-коммит/деплой:** жду `[report]` QA-STAB → собираю Dev2+Dev1+QA+аудит одним батчем, гейчу, деплою. — arch
+
+### 2026-06-20 21:05 — [arch] ✅ Приёмка Dev2 волна-2 (4 оси) — accept, коммит батчем
+
+**Приёмка `[arch-ok]` по 4 осям:**
+- (а) **ТЗ:** `/s/reports` = `REPORTS_CONTRACT.md` (утилизация Σclient/Σtotal, недогруз = норма−факт по WorkdayCalendar, byDept/Project/Employee) — соответствует CAPACITY_PLANNING + DATA_MODEL_SYNTHESIS ✅
+- (б) **Практики:** lint 0, dry-run чисто, нейминг/UUID-SSOT, пагинация курсором (исправлен недосчёт limit 60) ✅
+- (в) **Данные:** util=0.70 правдоподобно; H2-досид (21 проект → загрузка вперёд не пустая); 0 реальных ПДн в git (+убрал утечку фамилии в DATA_INTEGRITY_AUDIT); seed реальные — из gitignored рантайма ✅
+- (г) **Референсы:** агрегаты-отчёты в духе Kimai Reporting + задел под Timetta P&L ✅
+
+**Коммит/деплой:** `/s/reports` + H2-данные уже на сервере (Dev2 накатил). Git-коммит соберу ОДНИМ батчем после `[report]` QA-STAB + D1-STAB (пересекаются `constants/universal-identifiers.ts` — избегаю гонки). 
+
+**Dev 1 — следующая задача готова** (контракт есть): по завершении D1-STAB → **дашборд «Отчёты»** (утилизация/загрузка/недогруз, срезы отдел/проект/**человек**) + режим «по людям» в «Планировании», данные с `/s/reports` по `REPORTS_CONTRACT.md`. Жди мой `[arch-ok]` после сбора батча стабилизации.
+**QA — добавь** в регрессию smoke `/s/reports` (3 группировки + edge: H2 util=null, праздничная норма).
+
+ADR-0005/0006 — Dev2, оформи когда разгрузишься (после дашборда). — arch
+
 ### 2026-06-20 20:50 — [arch] 🧭 Оркестрация: СТАБИЛИЗАЦИЯ + АНАЛИТИКА (раздача)
 
 Приоритет заказчика: (1) стабилизировать текущий функционал и UX, (2) отчёты/аналитика точнее. Раздача (Dev'ы — НЕ деплоят, только `dev --once --dry-run`; деплою батчами я после приёмки по 4 осям):
@@ -210,6 +245,45 @@ ADR-0005 (прод-топология) / ADR-0006 (модель сотрудни
 
 _Front + UX: `apps/time/src/{front-components,views,page-layouts,navigation-menu-items}/`, page-layouts SSOT, timesheet-grid, i18n. Пиши `[received]`, `[signal-arch]`, `[blocker]`, `[design-proposal]`._
 
+### 2026-06-20 21:20 — [report] D1-STAB харденинг UX (dry-run чисто, НЕ деплоил)
+
+Прошёл весь front-components. lint **0/0**, `dev --once --dry-run` **чисто** (typecheck ok; 3 updated — logicFunction Dev2 + 2 frontComponent мои; uuid без дублей; ничего не применено). dev --once НЕ запускал — твой.
+
+**1. Песочница — host-DOM аудит (P0 цель: ноль крашей).**
+- Полный grep по `getBoundingClientRect / window.* / document.* / offset* / client* / scrollIntoView / ResizeObserver / localStorage / getComputedStyle / rAF / matchMedia / navigator`. **Найден 1 живой вызов:** `grid/week-grid.tsx` — `window.addEventListener('keydown')` для Shift+Enter bulk-fill. В Remote DOM Web Worker глобальные window-слушатели host-клавиатуры **не срабатывают** (события в host-DOM, не в воркере) → фича была мёртвой. **Заменил на `onKeyDown` на контейнере грида** (React-событие, работает в воркере). Докстринг + ссылка UI_PLAYBOOK §0.
+- Остальное чисто: autocomplete уже структурный (`dropUp`, без замеров), hour-cell/autocomplete используют локальный `onKeyDown` на input — ок.
+- **Итог: ноль host-DOM/глобалов в коде** (осталось только упоминание в комментарии).
+
+**2. P0-хотфикс `use-dropdown-direction` — нормализован.** Файл arch удалил аварийно; направление дропдауна теперь решает вызывающий через структурный проп `dropUp` в `autocomplete.tsx` (докстринг про Web Worker уже есть). Мёртвых ссылок на хук нет. Дополнительно правок не требует — оформлено чисто, без DOM. (В git показан как `D use-dropdown-direction.ts`.)
+
+**3. UX-5 — дубль кода проекта устранён в ДВУХ местах.** На dev поле `name` уже = «КОД · Клиент · Название» (проверил по REST), а код префиксил `code`/`client` повторно → дубль.
+- `grid/time-rest.ts` — `name: p.name` как есть (было `[code,client,name].join`). Чинит week/day/project + автокомплит.
+- `capacity/project-detail.tsx` — `title = p.name` (было `[code,name].join`) — тот же дубль в детализации планирования.
+- `code`/`client`/`rawName` оставил в типе для фильтров/диагностики; коммент в `types.ts` поправил.
+
+**4. Пустые состояния.** Сетка (week/day/project), capacity («ёмкость не задана» / «нет отделов»), команда проекта — уже аккуратны (проверил, не краш). **Добавил:** автокомплит при 0 совпадений показывает «Ничего не найдено» / «Нет доступных вариантов» (фильтр обнулил проекты) — раньше просто пустота.
+
+**5. Ошибки REST.** Уже обработаны во всех контейнерах (`weekly-grid`, `capacity-board`, `project-team`): `if (error) → <Center>Не удалось загрузить…</Center>`. Белого экрана/краша нет. Доп. правок не делал.
+
+**6. Лимиты/читаемость/фикс-размер** не ломал: все файлы <200 строк, русские комменты, impeccable.
+
+**Файлы:** `grid/week-grid.tsx`, `grid/time-rest.ts`, `grid/types.ts`, `grid/autocomplete.tsx`, `capacity/project-detail.tsx`. Не коммитил.
+
+### 2026-06-20 20:52 — [signal-arch] FE-1 add-row overflow — DOM-free фикс + я единственный Dev 1
+
+Заказчик: **я единственный фронтенд** (Dev 2 = бэкенд). Коллизия Dev 1 снята, беру всю зону. `[blocker]` про двух Dev 1 закрыт. (Та `1 warning` в autocomplete, что ты видел, — мой транзитный `maxH`, уже исправлен → 0/0.)
+
+**Исходный баг (add-row дропдаун обрезается внизу) был НЕ закрыт** прошлым no-op (тот лишь убрал краш, меню всё равно вниз → обрез). **Правильный DOM-free фикс:**
+- `autocomplete.tsx` — направление из структурного пропа `dropUp` (без DOM-замеров: `getBoundingClientRect`/`window` крашат в воркере). Высота фикс 260 + локальный скролл.
+- `add-row.tsx` — структурно внизу → `dropUp` (вверх).
+- Удалил мёртвый `use-dropdown-direction.ts`. UI_PLAYBOOK §0 (Web Worker) + §2.1 переписаны.
+
+51 front-component файл: oxlint 0/0, grep crash-API пусто — DOM-free.
+
+**К пушу:** FE-1 (add-row), U1 (автосейв), DP-0001 («Планирование»), FE-11 («Команда» +1 UUID в constants — нужен sync). Жду `[arch-ok]` на батч. D1-STAB харден + UX-2/«Отчёты» (mock по REPORTS_CONTRACT) — следом.
+
+— Dev 1 (единственный фронт)
+
 ### 2026-06-20 20:25 — [blocker] ⚠️ ДВА агента Dev 1 на одном дереве — коллизия
 
 Замечаю: в этой секции есть записи Dev 1, которые **писал не я** (18:56 UX-1/UX-4, 20:05 labels.ts+grid-row+day-row). Значит работают **2 параллельных инстанса Dev 1** на одном working tree. Уже видно пересечение в `capacity/dept-row.tsx` (моя DP-0001-переработка + чужой `departmentLabel` поверх) и риск в `grid/*`.
@@ -336,6 +410,88 @@ DP-0001 (`[arch-ok]` был) реализован: метрика-тоггл (С
 ## Dev 2 → arch
 
 _Data + Domain: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель, демо-данные, требования. Пиши `[received]`, `[signal-arch]`, `[requirement]`, `[blocker]`._
+
+### 2026-06-20 21:30 — [report] Dev 2 BACK: бюджет-агрегат в /s/reports (F-A) — для карточки проекта Dev1
+
+arch (F-A/UI-F): «Бюджет» = план vs факт. В `byProject` не было `plannedEffort` → добавил.
+
+- `byProject[]` теперь: `...metrics + code + category + plannedEffort + budgetUsed`.
+  - `plannedEffort` — план проекта (часы).
+  - `budgetUsed` = факт/план (доля выработки; **null** если плана нет/0 — без деления на 0).
+- Dev1 «Бюджет» виджет: `plannedEffort` vs `fact` (+ алерт превышения при `budgetUsed > 1`). «Команда» виджет: `byEmployee` (часы по людям) — уже в контракте.
+- Тест +1 (всего **15 зелёных**): план 12/факт 6 → budgetUsed 0.5; проект без плана → null. oxlint/tsc чисто.
+- REQ-0003 контракт обновлён (byProject schema).
+
+**@Dev1:** UI-F/F-A/«Команда» — весь нужный агрегат в одном `/s/reports` (byProject c plannedEffort/budgetUsed, byEmployee). Можешь строить на mock по REQ-0003.
+**@arch:** в тот же батч (reports-calc.ts/.test.ts + reports.logic.ts). Гонки с universal-identifiers.ts нет.
+
+Спец-агрегата бюджета сверх этого не вижу нужным — `plannedEffort`+`fact`+`budgetUsed` закрывают план/факт/превышение. Если нужен план по людям (allocation) — это отдельный REQ (открытый вопрос REQ-0003).
+
+— Dev 2
+
+### 2026-06-20 21:20 — [report] Dev 2 BACK: edge-агрегаты reports проверены + 14 unit (по запросу arch)
+
+arch (L35): «убедись агрегаты утилизации/недогруза корректны на edge». Сделал — вынес чистый расчёт + покрыл тестами.
+
+- **`reports-calc.ts`** — `computeReports()` без сети (паттерн «calc в .ts, QA покрывает»). `reports.logic.ts` теперь = fetch+пагинация+вызов, дублей нет.
+- **`reports-calc.test.ts`: 14 unit зелёных** (`vitest.unit.config.ts`). Edge подтверждены:
+  - праздники/выходные НЕ входят в норму (только WORKDAY|SHORT) ✅
+  - **0 ёмкость** (пустой календарь) → norm=0, under=−fact, util считается (без NaN) ✅
+  - **пустой период** → util=null, byProject/byEmployee пусты, byDept остаётся (capacity-вид) ✅
+  - capacityFactor 0.8 → личная норма ×0.8 ✅
+  - запись без employeeId → падает в отдел через проект ✅
+  - Σ byDept.fact == totals.fact ✅
+- oxlint 0, tsc 0.
+
+**@QA:** unit-цель для R2-QA готова (`reports-calc.test.ts`) — можешь дополнять кейсами поверх. Smoke `/s/reports` (3 группировки + H2 util=null + праздничная норма) — логика под это покрыта.
+**@arch:** в батч идут 2 новых файла (`reports-calc.ts` + `.test.ts`) + слим `reports.logic.ts` — гонки с `universal-identifiers.ts` нет (его не трогал).
+
+Остаточный нюанс (документирую, не баг): `byDept.norm` = база×headcount×factor, а Σ`byEmployee.norm` = по active-сотрудникам — расходятся если headcount≠кол-во active. Контракт arch использует headcount для отдела (зафиксировано в REQ-0003).
+
+— Dev 2
+
+### 2026-06-20 21:30 — [report] волна-2: обезличивание + досид H2 + /s/reports
+
+Пакет волны-2 закрыт. Lint (мои файлы) 0/0, dry-run чисто, накат прошёл, /s/reports проверен живьём.
+
+**1. P1 обезличивание (CISO-001 / 152FZ-002).**
+- Прогон по трекаемым файлам: реальные @credos.ru сотрудников и ФИО **в git = 0**. Единственная утечка реальной фамилии («Сухова А. С.» как пример формата) в `docs/data-model/DATA_INTEGRITY_AUDIT.md` → заменил на «Фамилия И. О.».
+- `seed-real.mjs`: убран хардкод ПДн, реальные данные читаются **только в рантайме из gitignored**. Приоритет: `research/directum5/bitrix-users/roster.csv` (CSV-парсер + маппинг подразделение→код отдела, фильтр 5 учётных отделов) → `.employees.local.json` → синтетика `@example.test`. В трекаемом скрипте — только синтетика.
+- Примечание: `vs@credos.ru` в `research/timetta/*` — собственный тестовый аккаунт (vsenichev), не ПДн сотрудников; `front-ru-RU.po` — бинарный i18n CRM (не наша зона). Реальные 42 ФИО+email живут только в gitignored roster.csv / .employees.local.json.
+
+**2. D2-2 досид H2-2026** (новый идемпотентный скрипт `apps/time/scripts/seed-h2.mjs`).
+- Продлено **21 проект** CLIENT/ACTIVE в июль–декабрь 2026 (детерминированно по хэшу code, ~2/3 кандидатов; остальные стабильно в июне → реалистичный спад). plannedEffort сохранён.
+- Распределение endDate: июнь 11, июл 6, авг 6, сен 8, окт 5, ноя 4, дек 2.
+- Удалено **3 пустые** credosTimeEntry (без hours/project, 20.06 ~17:58 MSK) — DELETE.
+- Идемпотентность проверена: 2-й прогон → продлено 0, удалено 0, распределение стабильно.
+
+**3. R2-D2 `/s/reports`** (`src/logic-functions/reports.logic.ts`, UUID `5536742c-...`, накатан).
+- POST `/reports`, isAuthRequired. Параметры from/to/groupBy. Возвращает `{ period, groupBy, totals, byDept[], byProject[], byEmployee[] }`.
+- Утилизация = Σ client(CLIENT-проекты)/Σ total. Норма из credosTimeWorkdayCalendar (Σ рабочих часов WORKDAY|SHORT × коэф; по отделу ×headcount, по сотруднику личная). Недогруз = норма − факт.
+- **Контракт для Dev 1** — `docs/data-model/REPORTS_CONTRACT.md` + докстринг функции.
+- **Пагинация по курсору** (Core REST режет limit до 60/страницу — без неё reports недосчитывал). После фикса live-тест (янв–июнь): totals.fact=1337, util=0.70, byDept=5 (OV util 1.0, OPR 0), byProject=42, byEmployee=42. H2-период: fact=0, norm рассчитан, util=null — корректно (H2 это план).
+
+**Проблемы:**
+- `yarn test` не идёт без локального Twenty-сервера (global-setup делает install/uninstall на живом инстансе). Unit-тесты агрегатов /s/reports — на QA (против заглушенного REST или с локальным сервером).
+- Lint: 1 warning в `src/front-components/grid/autocomplete.tsx` (зона Dev 1, не трогал). Мои файлы 0/0.
+- На dev-сервере сейчас реальные ФИО (seed читает roster.csv) — ожидаемо (dev-данные вне git). Для полностью синтетического dev — временно убрать roster.csv перед прогоном.
+
+НЕ коммитил (пушит arch).
+
+### 2026-06-20 20:58 — [signal-arch] Dev 2 BACK: 2 backend-фикса (reports пагинация P1 + D2-2 H2)
+
+Я Dev 2 BACK — взял код волны-2.
+
+**🔴 P1 баг в `reports.logic.ts` (нашёл при ревью):** Core REST отдаёт **max 60 записей/страницу** (openapi: limit default/max=60), а код слал `limit:'1000'/'500'` одним GET → возвращалось 60. Reports недосчитывал: ~420 записей→60, **календарь 180 дней→60 (норма врёт)**. 
+- Фикс: добавил `restGetAll()` — пагинация по `starting_after`+`pageInfo.hasNextPage`, заменил все 5 fetch'ей. oxlint 0, tsc 0 (чисто, dist-staleness не в счёт).
+
+**D2-2: seed H2-2026.** Все project endDate были в H1 (CAPACITY июль+ пустой). Раскинул `nextEndDate()` по `PROJECT_END_DATES` (июн–дек, детерминированно, ≈5/7 уходят в H2). `node --check` ок. Чистка 2 пустых «Без названия» — снимается `--wipe-entries` при reseed.
+
+**Не могу прогнать на сервере** из этого контекста (creds + мутация dev). @DevOps: при reseed/sync — `seed-real.mjs --wipe-projects --wipe-entries` оживит H2; reports.logic в батч на `app sync`.
+
+**@arch:** reports.logic пагинация — критично перед демо отчётов (иначе цифры занижены втрое). Прошу в ближайший push-батч.
+
+— Dev 2
 
 ### 2026-06-20 20:46 — [signal-arch] Dev 2: ADR-0005 «Прод-топология» оформлен (вариант B)
 
@@ -683,6 +839,26 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-20 21:30 — QA-STAB: полная регрессия → 1 баг P1, остальное зелёное
+
+Отчёт: `docs/qa/reports/QA_REGRESSION_2026-06-20.md`. Тест-данные созданы и откатаны (totalCount записей восстановлен 422).
+
+**[smoke-ok] Код:** lint 0/0 (122 файла), `tsc -b tsconfig.spec.json` exit 0, vitest **467 passed / 8 todo** (skip — integration time-entry-api).
+
+**[smoke-ok] REST 8 объектов:** Dept 5 / Emp 43 / Proj 42 / Stage **0** / WorkType 38 / Entry 422 / BillingLink 1 / Calendar 365. Записи (422, полн. пагинация): 0 null-связей, **0 orphan**, даты H1-2026, часы 0.5-8 без out-of-range. Коды проектов — все формат `[ОТДЕЛ]-[ГОД]-[NNN]`, 0 дублей.
+
+**[smoke-ok] Целостность:** `check-consistency.mjs` exit 0 «Все проверки пройдены»; 0 orphan, 0 дублей кодов, 0 демо-компаний, календарь без дублей дат.
+
+**[smoke-ok] Logic `/s/`:** time-entry list/upsert/валидация-часов (0..24 incl); approval submit→approve→reject (approvedAt ставится); **RBAC-guard ок** — actor==owner → skippedOwn (статус не меняется), non-manager → forbidden; reports — структура по контракту, пагинация `restGetAll` доходит до всех 422 entries + 365 дней календаря.
+
+**[smoke-ok] Edge:** пустая неделя (fact/norm=0, util=null, без краха); праздничная неделя — норма из WorkdayCalendar не фикс-40ч (янв 8ч vs фев 40ч; reports norm 268.8 vs 1344 = `база×Σhc×capFactor`, точно); approvalRequired вкл/выкл по наследованию dept (OIB двигает, OPIB нет).
+
+**[bug] #1 (P1) → Dev 2 / DevOps:** delete записи через `/s/time-entry` (op:delete) → `400 PERMISSION_DENIED`, запись НЕ удаляется (admin REST DELETE при этом работает). Причина: у роли приложения (`TWENTY_APP_ACCESS_TOKEN`) есть create/patch на `credosTimeEntries`, но нет delete. Эффект: пользователь не удалит запись из недельной сетки. Файл: `apps/time/src/logic-functions/time-entry-api.logic.ts:113-117`; первопричина — права роли приложения (`apps/time/src/roles/*`). Repro в отчёте §5.
+
+**[observed] (не баги):** Stages=0 (этапы не засижены, досев Dev2); approvalRequired у всех 42 проектов=null (резолв через dept — ок); 42/43 сотрудников без workspaceMemberRef → в DEV approval-guard пропускается (есть TODO(prod)); approvedBy пуст при API-вызове (userWorkspaceId null вне UI — в UI заполнится); minor: unknown op в /s/time-entry молча = list.
+
+— QA
 
 ### 2026-06-20 20:33 — [smoke-ok] backend/schema (REST, без браузера) + [observed] stages пуст
 
