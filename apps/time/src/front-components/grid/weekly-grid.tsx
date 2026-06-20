@@ -100,7 +100,7 @@ export const WeeklyGrid = () => {
 
   // REQ-0015 §1: пробелы недели (пустые/недозаполненные будни) для pre-submit
   // предупреждения в подвале. Клиентский расчёт по загруженной неделе.
-  const weekGaps = useMemo(() => calcWeekGaps(week.days, dayTotals), [week.days, dayTotals]);
+  const weekGaps = useMemo(() => calcWeekGaps(week.days, dayTotals, normFor), [week.days, dayTotals, normFor]);
 
   const addRow = (key: string) =>
     setExtraRowKeys((prev) => [...new Set([...prev, key])]);

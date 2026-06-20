@@ -108,6 +108,12 @@ const LegendDot = ({ color, hollow, line, text }: { color: string; hollow?: bool
   </span>
 );
 
+const Stat = ({ label, value, color }: { label: string; value: string; color: string }) => (
+  <span>
+    {label}: <b style={{ color, fontVariantNumeric: 'tabular-nums' }}>{value}</b>
+  </span>
+);
+
 export const TrendView = ({ deptOptions }: Props) => {
   const nowYear = new Date().getUTCFullYear();
   const [year, setYear] = useState(nowYear);
@@ -171,16 +177,9 @@ export const TrendView = ({ deptOptions }: Props) => {
         <ErrorBoundary title="Не удалось показать тренд" resetKeys={[year, deptId ?? '']}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '0 14px 16px', overflow: 'auto' }}>
             <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 12, color: T.textMuted }}>
-              <span>
-                Утилизация за год:{' '}
-                <b style={{ color: T.accent, fontVariantNumeric: 'tabular-nums' }}>{fmtUtil(yearUtil)}</b>
-              </span>
-              <span>
-                Факт: <b style={{ color: T.text, fontVariantNumeric: 'tabular-nums' }}>{fmtHrs(totalFact)} ч</b>
-              </span>
-              <span>
-                Норма: <b style={{ color: T.text, fontVariantNumeric: 'tabular-nums' }}>{fmtHrs(totalNorm)} ч</b>
-              </span>
+              <Stat label="Утилизация за год" value={fmtUtil(yearUtil)} color={T.accent} />
+              <Stat label="Факт" value={`${fmtHrs(totalFact)} ч`} color={T.text} />
+              <Stat label="Норма" value={`${fmtHrs(totalNorm)} ч`} color={T.text} />
             </div>
             <div
               style={{

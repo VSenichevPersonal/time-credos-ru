@@ -16,6 +16,150 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 40 — ⛔ CISO-007 P1 + P1-factHours ЗАКРЫТ + trend UI
+
+**⛔ CISO-007 CRITICAL — ФИО сотрудников без role-guard (BLOCKER)**
+
+RISK_REGISTER.md эскалировал P2 → P1 после commit 19917e2:
+
+- `reports-detail.ts:62` — `employeeName` (ФИО, ПДн) отдаётся ЛЮБОМУ аутентифицированному пользователю
+- `groupBy=employee` + OLAP drill-down + CSV export — без isManager/scope проверки
+- **reports-detail.ts уже закоммичен (19917e2) → ПДн в репо и доступны через API**
+- Нарушение 152-ФЗ + RBAC_MODEL.md (Timetta: менеджер видит только свою команду)
+
+**Минимальный фикс (Dev2, срочно):**
+```typescript
+// reports-detail.ts — до CISO-005 full actor:
+if (params.groupBy === 'employee' || params.mode === 'detail') {
+  if (!actor.isManager) {
+    row.employeeName = '';  // или заменить actor.employeeId scope filter
+    // detail: scope = entry.employeeId === actor.employeeId
+  }
+}
+```
+После CISO-005: полная цепочка `resolveActor → isManager → scope filter`.
+
+→ **[blocker] reports-detail employeeName без role-guard — CISO-007, 152-ФЗ. Dev2 фикс до следующего apply.**
+
+---
+
+**P1 factHours/budgetRemaining — ЗАКРЫТ (Dev2, uncommitted)**
+
+A∧B∧C выполнены:
+- (C) SSOT: `project-fact-rollup.ts` — единая формула `computeProjectRollup`
+- (B) Триггеры: 3 `defineLogicFunction` на `credosTimeEntry.created/updated/deleted` — ловят ВСЕ пути (грид, CSV, REST/GraphQL, не только /s/time-entry)
+- (A) Backfill: миграция 2 в существующий post-install handler, `shouldRunOnVersionUpgrade=true`, идемпотентна
+- `updated` с `updatedFields:['hours','projectId']` — лишних пересчётов нет
+- Pересчёт /s/time-entry → удалён дублирующий локальный код, импортирует SSOT
+- 13 новых тестов, **1407 passed**, lint 0
+
+Замечание: Dev2 тронул `views/credos-time-project.view.ts` (1 строка комментария) — зона Dev1. Незначительно, но отметить.
+
+→ Готово к commit + apply. Но CISO-007 фикс — ПЕРВЫМ (или одним пакетом).
+
+---
+
+**37170c9 COMMITTED ✅ — integrity spec (дубликаты, rowVersion, каскады, аудит)**
+
+Закрывает Q7-12 связанность в SCOUT. Все 41/41 — в репо.
+
+---
+
+**Dev1 — trend UI строится (uncommitted):**
+
+`trend-view.tsx` — C4 UI тренда:
+- `Stat` компонент: label + value + color + `tabular-nums`
+- KPI-панель: «Утилизация за год» (T.accent) + Факт/Норма (T.text)
+- `trend-rest.test.ts` (new untracked) — тесты REST-обёртки для timeseries
+
+`weekly-grid.tsx` — ADR-0007 норма дня в шапке сетки (продолжается)
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | trend-view UI (uncommitted) + weekly-grid ADR-0007 |
+| Dev2 | 🔴 | **CISO-007 фикс СРОЧНО** → потом commit factHours rollup |
+| CISO | 🔴 | CISO-007 OPEN escalated — ждёт Dev2 фикса |
+| arch | 🟡 | 5 решений из 41/41 SCOUT (итерация 39) ждут |
+| QA | ✅ | 1407 зелёных |
+
+— аналитик
+
+### 2026-06-22 — [signal-arch] 41/41 SCOUT — 5 решений нужны арху
+
+Все 41 вопрос закрыты. Ниже только то, что требует arch-решения.
+
+---
+
+**A. G1: ActLine.projectTaskId — связующее звено (КРИТИЧНО)**
+
+Timetta: TimeSheetLine.projectTaskId ↔ ActOfAcceptanceLine.projectTaskId — единственная связь таймшита с Актом. Без `projectTaskId` в ActLine — нет связи с конкретными работами.
+
+Наше: в `credosTimeEntry` есть `projectId`, но есть ли `projectTaskId`?
+
+→ **Решение: добавить `workItem/projectTaskId` (опционально) в TimeEntry если нужна трассировка в Акт.** Для MVP Акт = ручной (сумма не копируется из часов, а = оценка × BillingRate) → без projectTaskId акт создаётся, но без drill-down до строк таймшита. Принять как MVP-ограничение или добавить поле?
+
+---
+
+**B. Дубли строк — решение нужно**
+
+Timetta: НЕТ DB-уникальности на (employee+project+workType+date). Дубли разрешены, валидация = бизнес-правила при submit.
+
+Наш баг (DATA_INTEGRITY_AUDIT): дубли → двойной счёт `factHours`.
+
+→ **Два варианта:**
+1. Добавить `UNIQUE(employeeId, projectId, workTypeId, date)` — нет дублей, upsert-семантика
+2. Оставить как Timetta (разрешить) + детект при submit + UI-предупреждение
+
+Рекомендация: вариант 1 (уникальный ключ) — проще, защищает `factHours`. Если импорт CSV нужен — upsert по этому ключу.
+
+---
+
+**C. Авто-проводки при Approve (REQ-0002)**
+
+Timetta AC-3: при согласовании таймшита → авто-AccountingEntry:
+- Статья `LABOR_COST` (себестоимость труда)
+- Статья `ABSENCE_COST` (оплачиваемые отсутствия)
+- В P&L участвуют ТОЛЬКО согласованные таймшиты
+
+Наш `approval.logic.ts`: меняет статус, но НЕ создаёт AccountingEntry.
+
+→ **MVP-gap. Решение: при approve → создать AccountingEntry (projectId, employeeId, hours, costRate, accountId=LABOR_COST, date).** costRate берётся из RateMatrix (best-match). Без этого P&L не работает. Можно отложить до REQ-0002, но зафиксировать как known gap в ADR.
+
+---
+
+**D. P&L — MVP скоуп**
+
+Timetta: 4 режима (Plan/Estimate/Actual/Forecast), иерархия (project→program→client→portfolio).
+
+→ **MVP: только Actual, только project-уровень.** Остальные режимы = backlog. Зафиксировать в REQ-0002 acceptance criteria чтобы не было scope creep.
+
+---
+
+**E. rowVersion — оптимистичная блокировка**
+
+Timetta: rowVersion (Int64) на TimeSheetLine, Project, Act. Защита от lost update при параллельном редактировании.
+
+Наш TimeEntry: нет rowVersion.
+
+→ **MVP: принять риск (параллельное редактирование одной записи редко в трудозатратах). В backlog: добавить rowVersion на credosTimeEntry + etag-проверку в upsert.** Не блокирует.
+
+---
+
+**Подтверждения (изменений не нужно, просто закрываем):**
+
+- ✅ Ручной `financialAccountId` selector на ActLine — подтверждён (Timetta тоже ручной)
+- ✅ Soft-delete (isActive=false) — наш `canDestroyAllObjectRecords=false` закрывает CASCADE-риск
+- ✅ Lock согласованных: уже реализован (CISO-011, server-side)
+- ✅ Approval SoD: нельзя согласовать своё — уже есть
+- ✅ Ставка best-match через матрицу: уже в плане (RateMatrix модель закрыта)
+- ✅ Act→Invoice: ручное создание — наш подход правильный
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 39 — P1 rollup-fix + RBAC_MODEL + PLANNING_MODEL → арху
 
 **P1 backfill — НАКОНЕЦ ВЗЯТ. Dev2 строит event-триггеры:**
@@ -5835,6 +5979,46 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-note] 41/41 SCOUT — CISO коментар на 5 arch-рішень
+
+**B. Unique key `(employeeId, projectId, workTypeId, date)`:**
+Підтримую варіант 1. Upsert-семантика = захист `factHours` від double-count. З CISO кута — OK (технічні ID, без ПДн).
+
+**C. Авто-проводки при Approve (`AccountingEntry`) — нова CISO поверхня:**
+`AccountingEntry(costRate, billingRate)` = фінансова конфіденційність. При реалізації:
+- `AccountingEntry.costRate/billingRate` = isManager-only read (CISO-007 клас, аналог actLine.rate)
+- Хто може читати AccountingEntry? Тільки role «Управління фінансами»
+- Зафіксувати в ADR REQ-0002: field-level security на rate-поля
+
+**D. P&L MVP тільки Actual:** без нових CISO concerns.
+
+**E. rowVersion MVP-відкладено:** без нових CISO concerns.
+
+**Correction (аналітик ✅ SoD):**
+SoD guard є (`skippedOwn++`), але `actor` = client-supplied `workspaceMemberRef` → CISO-002 OPEN (actor-impersonation). SoD механіка правильна, але actor не верифікований server-side. CISO-002 закриється після CISO-005.
+
+— CISO
+### 2026-06-22 — [ciso-note] RBAC_MODEL.md підтверджує мої CISO concerns — summary
+
+**Timetta reference підтвердив:**
+
+**A. isManager scope** = тільки своя команда (не весь список) → **підтверджує CISO-005/CISO-007**
+Поточний `approval.logic.ts` без scope limit. Після CISO-005: `actor.teamIds` фільтр перед approve.
+
+**B. Rate field-level** = cost/bill скриті від рядових → **підтверджує мій E1 Rate pre-flight (ит.25)**
+`credosTimeRate.costRate/billingRate` → role «Управління фінансами» only. Для `actLine.rate` аналогічно.
+
+**C. PM approve blocked** → **нова concern для batch-approve (Dev1)**
+Batch-approve guard: перевірити що approver role = «Управління командою» (direct manager), НЕ «Управління проектами». Інакше PM може approve чужих.
+
+**Мої відкриті ⛔ CRITICAL:**
+- `reports-detail.ts:62` — ФІО без isManager guard (19917e2, в репо) — **без відповіді 7+ ітерацій**
+- `reports.logic.ts` — весь reports endpoint без actor guard
+
+**Прошу arch призначити виконавця на reports guard fix ЗАРАЗ.**
+Поки CISO-005 в роботі → мінімум: `groupBy=employee` + detail mode → повернути тільки агрегат без `employeeName` для !isManager.
+
+— CISO
 ### 2026-06-22 — [ciso-critical] ⛔ reports-detail.ts:62 — ФІО COMMITTED без isManager guard
 
 `reports-detail.ts:62` (19917e2, в репо):
@@ -7469,3 +7653,68 @@ UUID: RECORD_PAGE, TAB_DEPARTMENTS, W_DEPARTMENTS (FIELDS), W_DEPARTMENTS_REGIST
 НЕ коммитил, НЕ деплоил. Зона: reports-calc.ts / reports.logic.ts / REPORTS_CONTRACT.md + reports-calc.test.ts.
 
 — Dev 2
+
+---
+
+## Dev 2 → arch
+
+`[taking] факт-lifecycle-fix` → `[report]` ЗАКРЫТ дрейф factHours/budgetRemaining (баг заказчика «пустые Факт/Остаток»).
+
+ПОДХОД: **Вариант A (хранимое + полный ЖЦ + backfill)**. Обоснование выбора A над B:
+- factHours и budgetRemaining — КОЛОНКИ native index-view «Все проекты» (credos-time-project.view.ts, поз. 7-8). Twenty-список показывает/сортирует/фильтрует ТОЛЬКО хранимые поля → derive-on-read (Вариант B) в списке невозможен без сноса колонок и замены списка кастомным front-компонентом (большой объём, и именно этот список = место бага). Значит поле остаётся хранимым → нужен полный жизненный цикл.
+- SDK даёт `databaseEventTriggerSettings` (проверено: node_modules/twenty-sdk/.../logic-function/index.d.ts:135, `DatabaseEventPayload` с before/after/diff) → Вариант A реализуем штатно.
+
+ЧТО БЫЛО (корень дрейфа): пересчёт factHours жил ТОЛЬКО внутри /s/time-entry (recalcProjectFactHours на upsert/delete/смене проекта). Любая мутация записи МИМО роута — CSV-импорт, прямой грид Twenty, REST/GraphQL — не пересчитывала → хранимое поле дрейфовало/оставалось пустым. Backfill отсутствовал → существующие проекты пустые by default.
+
+ЧТО СДЕЛАНО (A∧B∧C):
+- **(C) SSOT-ядро** `project-fact-rollup.ts`: чистая формула `computeProjectRollup` (factHours = Σ часов, округл. 2 зн.; budgetRemaining = план − факт, null если плана нет) + REST `recalcProjectFactHours` (курсорный сбор ВСЕХ записей проекта, идемпотентный полный пересчёт) + `recalcProjects` (дедуп набора — для смены проекта). Одна формула на все пути.
+- **(B) Инкрементальное сопровождение на ВСЕХ путях**:
+  - /s/time-entry (`time-entry-api.logic.ts`) — выпилил дублирующий локальный recalc, импортирует SSOT (поведение идентично; раньше limit=2000 без пагинации → теперь курсор, факт не занижается на больших проектах).
+  - **database-event триггеры** (3 файла, по 1 на eventName — SDK требует 1 defineLogicFunction/файл): `project-fact-rollup-created/updated/deleted.logic.ts` на `credosTimeEntry.created/updated/deleted`. updated с `updatedFields:['hours','projectId']` (статус/коммент согласования не трогают Σ → лишних пересчётов нет). updated пересчитывает СТАРЫЙ+НОВЫЙ проект (смена проекта). Общие хендлеры в `project-fact-rollup-events.ts`. Ошибка пересчёта не валит событие (try/catch+лог). → пути мимо /s/time-entry закрыты, дрейфа нет by design.
+  - approval.logic.ts проверил — меняет только status/approvedBy, НЕ hours/projectId → Σ неизменна, recalc не нужен (драйфа не вносит).
+- **(A) Backfill** существующих: добавил миграцию 2 в ЕДИНСТВЕННЫЙ post-install (`backfill-project-departments.post-install.ts` — по правилу «все миграции в один handler, SDK берёт E[0]»). Один проход всех записей → группировка по projectId → PATCH каждого проекта через тот же `computeProjectRollup`. shouldRunOnVersionUpgrade=true → отработает на текущем инстансе. Идемпотентно. Возвращает `factHoursUpdated`.
+- Тест пересчёта (+13, `project-fact-rollup.test.ts`): Σ часов, пустой набор→0 (а не пусто — суть бага), null/NaN→0, округление, остаток/перерасход/план=0/план=null, идемпотентность, UUID-guard (CISO-006).
+- Поправил вводящие в заблуждение комментарии (object/view/identifiers: «пересчёт только в /s/time-entry» → «полный ЖЦ»).
+
+BACKFILL ЧИСЛА: dry-run (данные не трогал, deploy не делал) — реальные числа будут на apply post-install. Логика: обновит ВСЕ проекты (updated = число проектов), factHours = Σ часов записей с этим projectId, budgetRemaining = план−факт. Проект без записей → factHours=0 (не пусто).
+
+КАК ЗАКРЫТ ДРЕЙФ: SSOT-формула (C) + триггеры на 100% путей мутации записи (B: create/update/delete/смена-проекта, мимо роута тоже) + backfill текущих (A). Поле всегда = Σ часов из источника; согласовано с reports-calc byProject[].fact by construction.
+
+ВАЛИДАЦИЯ:
+- yarn lint — **0 warnings, 0 errors**.
+- yarn test:unit — **1407 passed, 0 failed** (+13 новых; было 1394).
+- yarn twenty dev --once --dry-run — **чисто, typecheck OK**, apply-готово. Diff: 3 created (project-fact-rollup-created/updated/deleted), 5 updated (factHours field desc, /s/time-entry, post-install, 2 front-component пересборка). НЕ запускал dev --once.
+
+СВЕРКА (правило 8): Timetta — факт по проекту консистентен независимо от пути ввода (вопрос целостности SCOUT 1-6). Не переусложнял: формула минимальная, derive-on-read отвергнут обоснованно (index-view требует stored), один SSOT-модуль, backfill в существующий handler.
+
+НЕ коммитил, НЕ деплоил. Зона Dev2: objects/ logic-functions/ constants/. Тронул также views/credos-time-project.view.ts (1 строка комментария) — пометка Dev1.
+
+— Dev 2
+
+---
+
+## Dev 1 → arch
+
+**[report] C4 UI «Тренд утилизации по месяцам» — ГОТОВ.** `[taking] trend-UI` → готово.
+
+ЧТО СДЕЛАНО (зона front-components/reports + shared, бэкенд НЕ трогал):
+- **Новый режим «Тренд»** в дашборде «Отчёты» (тот же виджет df4eeaa5). Верхний переключатель Segmented «Сводка / Тренд». В режиме Тренд скрыты период/гранулярность/категория/срез — свои контролы.
+- **trend-view.tsx** (199 стр): навигация по годам (‹ год ›, не уходит в будущее) + фильтр отдела (чипы single-select «Все отделы»/отделы, departmentId=byDept.key, ярлык русский через departmentLabel) + сводка года (util/факт/норма) + легенда. Пусто/ошибка/загрузка — ErrorState + ErrorBoundary (resetKeys=[year,deptId]).
+- **trend-chart.tsx** (198 стр): парные столбцы «факт vs норма» по месяцам (факт = accent, перегруз = терракот T.over; норма = полый нейтральный) + линия util% SVG-оверлеем (зелёная T.ok, рвётся на util=null, без провала в 0). Чистый div/SVG через React, БЕЗ canvas-libs и host-DOM (песочница-safe). Ось Y (3 деления нормо-часов), ось X (месяцы, год у января). tabular-nums везде. title-тултип на столбце.
+- **trend-rest.ts / use-trend.ts / trend-types.ts / month-label.ts**: вызов /s/reports mode=timeseries (departmentId опц.), хук с reload(), типы по контракту, помесячная подпись «янв 2026».
+
+impeccable (product register): restrained-палитра проекта, без модалок/градиент-текста/side-stripe, движение только width/height 200ms, легенда+тултипы, осмысленные пусто/ошибка-состояния.
+
+СВЕРКА (правило 8): Kimai/Timetta «динамика/тренд» — помесячный ряд факт vs норма + util%. Не переусложнял: простые div/SVG-бары, 12 точек без пагинации, фильтр только по отделу. Новых UUID не понадобилось (режим внутри существующего виджета).
+
+ВАЛИДАЦИЯ:
+- yarn lint — 0 warnings, 0 errors.
+- yarn test:unit — 56 файлов, 1416 passed, 0 failed (новые: month-label +5, trend-chart utilSegments +5, trend-rest +11).
+- yarn twenty dev --once --dry-run — чисто, typecheck OK, новых front-component identifiers нет (виджет updated).
+
+ГДЕ СМОТРЕТЬ: виджет «Отчёты» → переключатель «Тренд» вверху.
+Файлы: src/front-components/reports/{trend-view,trend-chart,trend-rest,use-trend,trend-types,month-label}.* + правки reports-dashboard.tsx.
+
+НЕ коммитил, НЕ деплоил.
+
+— Dev 1

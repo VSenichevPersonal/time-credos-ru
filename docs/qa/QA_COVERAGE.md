@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1381 + 15 todo** (50 файл, все зелёные) |
+| unit-тестов | **1416 + 15 todo** (51 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -67,6 +67,8 @@
 | `front-components/my-time/period-status.ts` | `aggregateStatus` (vacuous-truth фикс) + `summarizeWeeks` (round2, weekBoundaries) | ✅ 10 тестов | `front-components/my-time/period-status.test.ts` |
 | `front-components/my-time/use-my-hours.ts` | `buildProjectHours` — sum/sort/fallback/null/round2 | ✅ 7 тестов (incl. round2 guard) | `front-components/my-time/use-my-hours.test.ts` |
 | `front-components/my-time/status-meta.ts` | `statusMeta` — метка/тон 4 статусов + fallback + SSOT-guard | ✅ 6 тестов | `front-components/my-time/status-meta.test.ts` |
+| `logic-functions/reports-detail.ts` | `computeDetail` drill-down фильтры+маппинг + `detailToCsv` RFC 4180 | ✅ 14 тестов | `logic-functions/reports-detail.test.ts` |
+| `front-components/reports/trend-rest.ts` | `fetchTimeseries` REST-контракт тренда | ✅ 35 тестов (Dev 2) | `front-components/reports/trend-rest.test.ts` |
 | **UI-экраны (timesheet/capacity/настройки/календарь)** | **browser-smoke** | **⬜ QA-1** | `reports/QA_SMOKE_CHECKLIST.md` |
 
 Легенда: ✅ covered · 🟦 todo-спека · 🔴 gap · 🟡 предложено · ⚪ низкий приоритет.
