@@ -30,3 +30,14 @@ export type BillingDocType = 'Order' | 'Payment' | 'Act';
 
 // Тип отсутствия (F-D) — вычитается из ёмкости сотрудника при планировании
 export type AbsenceType = 'Vacation' | 'Sick' | 'Unpaid' | 'Other';
+
+// Тег записи трудозатрат (W3-2, паттерн Kimai tags) — свободная метка для
+// срезов/группировки в отчётах. Контролируемый словарь (MULTI_SELECT), не
+// справочник-объект: проще и даёт типобезопасные срезы/цвета.
+export type EntryTag =
+  | 'Overtime'
+  | 'Urgent'
+  | 'Remote'
+  | 'OnSite'
+  | 'Rework'
+  | 'Research';

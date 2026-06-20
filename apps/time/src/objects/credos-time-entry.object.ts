@@ -9,6 +9,7 @@ import {
 import {
   ENTRY_STATUS_DEFAULT,
   ENTRY_STATUS_OPTIONS,
+  ENTRY_TAG_OPTIONS,
 } from 'src/constants/select-options';
 import {
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
@@ -20,6 +21,7 @@ import {
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
   CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
+  CREDOS_TIME_ENTRY_TAGS_FIELD_ID,
   CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_TIME_ENTRIES_FIELD_ID,
@@ -76,6 +78,18 @@ export default defineObject({
       icon: 'IconProgress',
       defaultValue: ENTRY_STATUS_DEFAULT,
       options: ENTRY_STATUS_OPTIONS,
+    },
+    // Теги записи (W3-2, Kimai tags) — свободные метки для срезов/группировки
+    // в отчётах. MULTI_SELECT (несколько на запись). nullable (миграция).
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_TAGS_FIELD_ID,
+      name: 'tags',
+      type: FieldType.MULTI_SELECT,
+      label: 'Теги',
+      icon: 'IconTags',
+      isNullable: true,
+      defaultValue: null,
+      options: ENTRY_TAG_OPTIONS,
     },
     // Кто согласовал/отклонил (userWorkspaceId руководителя). Заполняет /s/approval.
     {

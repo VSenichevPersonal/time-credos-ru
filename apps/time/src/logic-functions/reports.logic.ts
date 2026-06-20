@@ -3,6 +3,7 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 
 import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
+import { validDateParam } from './params-validate';
 import {
   computeOlap,
   computeReports,
@@ -141,8 +142,9 @@ const readOlap = (
 
 const run = async (event: RoutePayload) => {
   const params = readParams(event);
-  const from = params.from ?? '1970-01-01T00:00:00.000Z';
-  const to = params.to ?? '2999-12-31T23:59:59.999Z';
+  // CISO-006: from/to валидируем как ISO-date перед интерполяцией в filter-строку.
+  const from = validDateParam(params.from, '1970-01-01T00:00:00.000Z');
+  const to = validDateParam(params.to, '2999-12-31T23:59:59.999Z');
   const olap = readOlap(event, params);
 
   const [entries, projects, employees, departments, calendar, absences, workTypes] = await Promise.all([

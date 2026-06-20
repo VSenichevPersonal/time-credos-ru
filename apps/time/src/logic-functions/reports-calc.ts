@@ -17,6 +17,11 @@ export type RawEntry = {
   employeeId: string | null;
   workTypeId?: string | null; // W4-1 OLAP: ось «вид работ»/«группа видов».
   stageId?: string | null; // W4-1 OLAP: ось «этап».
+  // W3-2: теги записи (MULTI_SELECT). Многозначны → срез по тегу = отдельный
+  // fan-out проход (часы разносятся по каждому тегу), а не как одно-значные оси
+  // выше. Чтобы не ломать одно-ключевой OLAP-движок, полноценная ось «тег» —
+  // follow-up; здесь только переносим данные в расчёт.
+  tags?: string[] | null;
 };
 // Справочник видов работ — для осей workType/workTypeGroup (W4-1).
 export type RawWorkType = { id: string; name: string | null; group: string | null };

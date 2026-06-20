@@ -12,6 +12,7 @@ const noFilter = (): FilterState => ({
   workType: new Set(),
   category: new Set(),
   employee: new Set(),
+  status: new Set(),
 });
 
 const proj = (

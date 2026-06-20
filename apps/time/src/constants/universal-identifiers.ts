@@ -386,3 +386,9 @@ export const CREDOS_TIME_DEPT_PLAN_VIEW_UNIVERSAL_IDENTIFIER =
   '3b9e2ebc-92de-40b3-8a84-a19a894f77a4';
 export const CREDOS_TIME_DEPT_PLAN_NAV_UNIVERSAL_IDENTIFIER =
   '5f7a2f23-eb17-43f8-a9d8-bcac6d1c214b';
+
+// --- W3-2 (TAGS): теги записей трудозатрат (паттерн Kimai tags) ---
+// MULTI_SELECT-поле tags на credosTimeEntry — свободные метки для срезов в
+// отчётах. nullable (миграция). Опции: ENTRY_TAG_OPTIONS (select-options).
+export const CREDOS_TIME_ENTRY_TAGS_FIELD_ID =
+  '39113fed-1f5b-47f4-b357-5835994b9401';

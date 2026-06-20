@@ -24,9 +24,11 @@ import type {
 export type Granularity = 'week' | 'month';
 
 // Горизонт: недели = 16 (~4 мес), месяцы = 6. Якорь — текущая дата (UTC).
-const HORIZON: Record<Granularity, number> = { week: 16, month: 6 };
+export const HORIZON: Record<Granularity, number> = { week: 16, month: 6 };
 
-const horizonRange = (anchor: Date, g: Granularity): { from: string; to: string } => {
+// Чистая функция: диапазон дат для загрузки данных доски (REST-запросы).
+// from = начало месяца anchor; to = конец (months) месяцев включительно.
+export const horizonRange = (anchor: Date, g: Granularity): { from: string; to: string } => {
   const from = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
   const months = g === 'month' ? HORIZON.month + 1 : 5;
   const to = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + months, 0));

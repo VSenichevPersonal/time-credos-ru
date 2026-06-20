@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **931 + 19 todo** (35 файлов, все зелёные) |
+| unit-тестов | **998 + 19 todo** (37 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -59,6 +59,10 @@
 | `front-components/grid/use-keyboard.ts` | `keyAction` (стрелки/Tab/Enter/цифры/Delete) + `clampCell` (границы сетки) | ✅ 28 тестов | `front-components/grid/use-keyboard.test.ts` |
 | `front-components/capacity/calc-load.ts` | W3-1: `buildHoursByDay`/`absenceHoursInPeriod`/`absenceHoursByEmpInPeriod` + вычет из `deptCapacity`/`employeeLoadCells` | ✅ +20 тестов (Dev2) | `front-components/capacity/calc-load.test.ts` |
 | `front-components/grid/use-approval.ts` | `calcApprovalByProject` (резолв флага проект+отдел) + `calcPeriodStatus` (приоритет REJECTED>SUBMITTED>APPROVED>DRAFT) | ✅ 17 тестов | `front-components/grid/use-approval.test.ts` |
+| `front-components/capacity/use-capacity.ts` | `HORIZON` (16 нед/6 мес) + `horizonRange` (from/to для REST, переходы через год) | ✅ 11 тестов | `front-components/capacity/use-capacity.test.ts` |
+| `front-components/grid/use-grid-model.ts` | **[bug-fix]** `FilterState.status` (W3-3): NO_FILTERS обновлён + 6 тестов фильтрации по статусу согласования | ✅ 17 тестов | `front-components/grid/use-grid-model.test.ts` |
+| `default-role.ts` + `roles/manager.role.ts` | **security-guard** CISO-002/[bug]#1: canDestroy=false, canSoftDelete=true (8 и 7 объектов), уникальные UUIDs, canBeAssignedToApiKeys=false | ✅ 19 тестов | `__tests__/role-guard.test.ts` |
+| `logic-functions/reports-calc.ts` | **+computeOlap W4-1**: groupBy×5 осей, фильтры, норма (dept/emp/null для factCutting), сортировка, пагинация, availableDims, dimLabel | ✅ +28 тестов | `logic-functions/reports-calc.test.ts` |
 | **UI-экраны (timesheet/capacity/настройки/календарь)** | **browser-smoke** | **⬜ QA-1** | `reports/QA_SMOKE_CHECKLIST.md` |
 
 Легенда: ✅ covered · 🟦 todo-спека · 🔴 gap · 🟡 предложено · ⚪ низкий приоритет.

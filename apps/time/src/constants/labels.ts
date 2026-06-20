@@ -6,6 +6,7 @@ import {
   type BillingDocType,
   type DepartmentCode,
   type EntryStatus,
+  type EntryTag,
   type WorkCategory,
   type WorkTypeGroup,
 } from 'src/constants/domain-types';
@@ -76,6 +77,16 @@ export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
   Sick: 'Больничный',
   Unpaid: 'Без содержания',
   Other: 'Иное',
+};
+
+// Теги записи трудозатрат (W3-2, Kimai tags) — свободные метки для срезов
+export const ENTRY_TAG_LABELS: Record<EntryTag, string> = {
+  Overtime: 'Переработка',
+  Urgent: 'Срочно',
+  Remote: 'Удалённо',
+  OnSite: 'На площадке',
+  Rework: 'Доработка',
+  Research: 'Исследование',
 };
 
 // Норма часов в неделю на сотрудника (для планирования загрузки)

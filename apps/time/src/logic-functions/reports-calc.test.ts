@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  computeOlap,
   computeReports,
   finalize,
   util,
+  type OlapParams,
   type ReportsInput,
 } from './reports-calc';
 
@@ -327,5 +329,227 @@ describe('computeReports — byCategory (R3-D2)', () => {
     inp.entries = [];
     const res = computeReports(inp, PERIOD);
     expect(res.totals.byCategory).toEqual([]);
+  });
+});
+
+// ─── computeOlap ─────────────────────────────────────────────────────────────
+
+const olapBase = (): ReportsInput => ({
+  entries: [
+    { hours: 6, projectId: 'p-cli', employeeId: 'e1', workTypeId: 'w1' },
+    { hours: 2, projectId: 'p-int', employeeId: 'e1', workTypeId: 'w2' },
+    { hours: 4, projectId: 'p-cli', employeeId: 'e2', workTypeId: 'w1' },
+  ],
+  projects: [
+    { id: 'p-cli', name: 'Клиент', code: 'CLI', category: 'CLIENT', departmentId: 'd1', plannedEffort: null },
+    { id: 'p-int', name: 'Внутр', code: 'INT', category: 'INTERNAL', departmentId: 'd1', plannedEffort: null },
+  ],
+  employees: [
+    { id: 'e1', firstName: 'Иван', lastName: 'Иванов', departmentId: 'd1' },
+    { id: 'e2', firstName: 'Мария', lastName: 'Петрова', departmentId: 'd1' },
+  ],
+  departments: [{ id: 'd1', code: 'OV', capacityFactor: 1 }],
+  calendar: [{ hours: 8, dayType: 'WORKDAY', date: '2026-06-01' }],
+  workTypes: [
+    { id: 'w1', name: 'Разработка', group: 'DEV' },
+    { id: 'w2', name: 'Тестирование', group: 'QA' },
+  ],
+});
+
+const olap = (params: OlapParams) => computeOlap(olapBase(), PERIOD, params);
+
+describe('computeOlap — базовый groupBy', () => {
+  it('groupBy=project → 2 строки (p-cli + p-int)', () => {
+    const { rows } = olap({ groupBy: 'project' });
+    expect(rows).toHaveLength(2);
+    expect(rows.map((r) => r.key).sort()).toEqual(['p-cli', 'p-int']);
+  });
+
+  it('groupBy=project → факт агрегируется (p-cli = 6+4 = 10)', () => {
+    const { rows } = olap({ groupBy: 'project' });
+    const cli = rows.find((r) => r.key === 'p-cli');
+    expect(cli?.fact).toBe(10);
+  });
+
+  it('groupBy=employee → e1 = 8 (6+2), e2 = 4', () => {
+    const { rows } = olap({ groupBy: 'employee' });
+    const e1 = rows.find((r) => r.key === 'e1');
+    const e2 = rows.find((r) => r.key === 'e2');
+    expect(e1?.fact).toBe(8);
+    expect(e2?.fact).toBe(4);
+  });
+
+  it('groupBy=dept → 1 строка (d1 = 12)', () => {
+    const { rows } = olap({ groupBy: 'dept' });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe('d1');
+    expect(rows[0].fact).toBe(12);
+  });
+
+  it('groupBy=workType → w1=10, w2=2', () => {
+    const { rows } = olap({ groupBy: 'workType' });
+    expect(rows.find((r) => r.key === 'w1')?.fact).toBe(10);
+    expect(rows.find((r) => r.key === 'w2')?.fact).toBe(2);
+  });
+
+  it('groupBy=workTypeGroup → DEV=10, QA=2', () => {
+    const { rows } = olap({ groupBy: 'workTypeGroup' });
+    expect(rows.find((r) => r.key === 'DEV')?.fact).toBe(10);
+    expect(rows.find((r) => r.key === 'QA')?.fact).toBe(2);
+  });
+});
+
+describe('computeOlap — totals', () => {
+  it('totals.fact = Σ всех записей', () => {
+    const { totals } = olap({ groupBy: 'project' });
+    expect(totals.fact).toBe(12); // 6+2+4
+  });
+
+  it('hours=0 не учитываются', () => {
+    const inp = olapBase();
+    inp.entries.push({ hours: 0, projectId: 'p-cli', employeeId: 'e1' });
+    const { totals } = computeOlap(inp, PERIOD, { groupBy: 'project' });
+    expect(totals.fact).toBe(12); // 0 не плюсуется
+  });
+});
+
+describe('computeOlap — фильтры', () => {
+  it('filter category=CLIENT → только CLIENT-записи (p-cli)', () => {
+    const { rows, totals } = olap({
+      groupBy: 'project',
+      filters: [{ dim: 'category', value: 'CLIENT' }],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe('p-cli');
+    expect(totals.fact).toBe(10);
+  });
+
+  it('filter employee=e1 → только записи e1 (8 ч)', () => {
+    const { totals } = olap({
+      groupBy: 'project',
+      filters: [{ dim: 'employee', value: 'e1' }],
+    });
+    expect(totals.fact).toBe(8); // 6+2
+  });
+
+  it('appliedFilters содержит label', () => {
+    const { appliedFilters } = olap({
+      groupBy: 'project',
+      filters: [{ dim: 'dept', value: 'd1' }],
+    });
+    expect(appliedFilters[0].label).toBe('OV'); // dept.code
+  });
+});
+
+describe('computeOlap — норма', () => {
+  it('groupBy=dept → норма = baseNorm * headcount * capacityFactor', () => {
+    // baseNorm=8 (1 WORKDAY), headcount d1=2, capacityFactor=1 → норма=16
+    const { rows } = olap({ groupBy: 'dept' });
+    expect(rows[0].norm).toBe(16);
+  });
+
+  it('groupBy=employee → норма = baseNorm * capacityFactor сотрудника', () => {
+    // baseNorm=8, capacityFactor=1 → 8 на каждого
+    const { rows } = olap({ groupBy: 'employee' });
+    expect(rows.every((r) => r.norm === 8)).toBe(true);
+  });
+
+  it('groupBy=project → норма null (факт-режущий groupBy)', () => {
+    const { rows } = olap({ groupBy: 'project' });
+    expect(rows.every((r) => r.norm === null)).toBe(true);
+  });
+
+  it('groupBy=dept с filter category=CLIENT → норма null (fact-cutting фильтр)', () => {
+    const { rows } = olap({
+      groupBy: 'dept',
+      filters: [{ dim: 'category', value: 'CLIENT' }],
+    });
+    expect(rows[0].norm).toBeNull();
+  });
+});
+
+describe('computeOlap — сортировка', () => {
+  it('дефолт: по fact убыв (p-cli=10 перед p-int=2)', () => {
+    const { rows } = olap({ groupBy: 'project' });
+    expect(rows[0].key).toBe('p-cli');
+    expect(rows[1].key).toBe('p-int');
+  });
+
+  it('sort by name asc → алфавит', () => {
+    const { rows } = olap({ groupBy: 'project', sort: { by: 'name', dir: 'asc' } });
+    const names = rows.map((r) => r.name);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+  });
+
+  it('sort by fact asc → p-int(2) перед p-cli(10)', () => {
+    const { rows } = olap({ groupBy: 'project', sort: { by: 'fact', dir: 'asc' } });
+    expect(rows[0].key).toBe('p-int');
+  });
+});
+
+describe('computeOlap — пагинация', () => {
+  it('limit=1 → 1 строка, hasNextPage=true, endCursor="1"', () => {
+    const { rows, pageInfo } = olap({ groupBy: 'project', limit: 1 });
+    expect(rows).toHaveLength(1);
+    expect(pageInfo.hasNextPage).toBe(true);
+    expect(pageInfo.endCursor).toBe('1');
+  });
+
+  it('cursor="1" + limit=1 → вторая страница', () => {
+    const first = olap({ groupBy: 'project', limit: 1 });
+    const second = olap({ groupBy: 'project', limit: 1, cursor: first.pageInfo.endCursor });
+    expect(second.rows[0].key).not.toBe(first.rows[0].key);
+  });
+
+  it('limit > total → hasNextPage=false, endCursor=null', () => {
+    const { pageInfo } = olap({ groupBy: 'project', limit: 100 });
+    expect(pageInfo.hasNextPage).toBe(false);
+    expect(pageInfo.endCursor).toBeNull();
+  });
+});
+
+describe('computeOlap — availableDims и drillable', () => {
+  it('groupBy=project → "project" не в availableDims', () => {
+    const { availableDims } = olap({ groupBy: 'project' });
+    expect(availableDims).not.toContain('project');
+  });
+
+  it('filter dept + groupBy=employee → оба не в availableDims', () => {
+    const { availableDims } = olap({
+      groupBy: 'employee',
+      filters: [{ dim: 'dept', value: 'd1' }],
+    });
+    expect(availableDims).not.toContain('employee');
+    expect(availableDims).not.toContain('dept');
+  });
+
+  it('drillable каждой строки == availableDims', () => {
+    const { rows, availableDims } = olap({ groupBy: 'project' });
+    expect(rows.every((r) => r.drillable === availableDims || JSON.stringify(r.drillable) === JSON.stringify(availableDims))).toBe(true);
+  });
+});
+
+describe('computeOlap — dimLabel', () => {
+  it('groupBy=employee → name = "Фамилия Имя"', () => {
+    const { rows } = olap({ groupBy: 'employee' });
+    expect(rows.find((r) => r.key === 'e1')?.name).toBe('Иванов Иван');
+  });
+
+  it('groupBy=dept → name = dept.code', () => {
+    const { rows } = olap({ groupBy: 'dept' });
+    expect(rows[0].name).toBe('OV');
+  });
+
+  it('groupBy=project → name = project.name', () => {
+    const { rows } = olap({ groupBy: 'project' });
+    expect(rows.find((r) => r.key === 'p-cli')?.name).toBe('Клиент');
+  });
+
+  it('entry без employeeId (dimValue null) → строка не создаётся при groupBy=employee', () => {
+    const inp = olapBase();
+    inp.entries.push({ hours: 5, projectId: 'p-cli', employeeId: null });
+    const { rows } = computeOlap(inp, PERIOD, { groupBy: 'employee' });
+    expect(rows.find((r) => r.key === null)).toBeUndefined();
+    expect(rows.map((r) => r.key)).not.toContain(null);
   });
 });

@@ -6,6 +6,7 @@ import {
   BILLING_DOC_TYPE_LABELS,
   DEPARTMENT_LABELS,
   ENTRY_STATUS_LABELS,
+  ENTRY_TAG_LABELS,
   WORK_CATEGORY_LABELS,
   WORK_TYPE_GROUP_LABELS,
 } from 'src/constants/labels';
@@ -14,6 +15,7 @@ import {
   type BillingDocType,
   type DepartmentCode,
   type EntryStatus,
+  type EntryTag,
   type WorkCategory,
   type WorkTypeGroup,
 } from 'src/constants/domain-types';
@@ -180,6 +182,30 @@ export const ABSENCE_TYPE_OPTIONS: SelectOption[] = buildOptions(
   ABSENCE_TYPE_COLORS,
 );
 export const ABSENCE_TYPE_DEFAULT = "'VACATION'";
+
+// Теги записи трудозатрат (W3-2, Kimai tags). MULTI_SELECT — несколько меток
+// на запись для срезов/группировки в отчётах. Значения UPPER_CASE, ярлыки рус.
+const ENTRY_TAG_ORDER: ReadonlyArray<EntryTag> = [
+  'Overtime',
+  'Urgent',
+  'Remote',
+  'OnSite',
+  'Rework',
+  'Research',
+];
+const ENTRY_TAG_COLORS: Record<EntryTag, TagColor> = {
+  Overtime: 'red',
+  Urgent: 'orange',
+  Remote: 'sky',
+  OnSite: 'turquoise',
+  Rework: 'yellow',
+  Research: 'purple',
+};
+export const ENTRY_TAG_OPTIONS: SelectOption[] = buildOptions(
+  ENTRY_TAG_ORDER,
+  ENTRY_TAG_LABELS,
+  ENTRY_TAG_COLORS,
+);
 
 // Тип дня производственного календаря РФ. Значения UPPER_CASE (требование SDK),
 // ярлыки русские. Используется объектом credosTimeWorkdayCalendar.

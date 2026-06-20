@@ -30,7 +30,7 @@ const entry = (
 
 const NO_FILTERS: FilterState = {
   project: new Set(), department: new Set(), workType: new Set(),
-  category: new Set(), employee: new Set(),
+  category: new Set(), employee: new Set(), status: new Set(),
 };
 
 // ─── Тесты ────────────────────────────────────────────────────────────────
@@ -178,5 +178,64 @@ describe('calcGridModel — категория проекта', () => {
       DAYS, [], NO_FILTERS,
     );
     expect(rowList[0].category).toBe('CLIENT');
+  });
+});
+
+describe('calcGridModel — фильтр status (W3-3)', () => {
+  const withStatus = (status: string | null): ApiEntry => ({
+    id: `e1`, date: '2026-06-22', hours: 8,
+    description: null, projectId: 'p1', workTypeId: 'w1', status,
+  });
+
+  const statusFilter = (...statuses: string[]): FilterState => ({
+    ...NO_FILTERS, status: new Set(statuses),
+  });
+
+  it('пустой фильтр status → все записи (нет ограничений)', () => {
+    const { rowList } = calcGridModel(
+      [withStatus('DRAFT'), withStatus('SUBMITTED')],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], NO_FILTERS,
+    );
+    expect(rowList[0].hoursByDay[0]).toBe(16); // обе записи суммируются
+  });
+
+  it('фильтр SUBMITTED → только SUBMITTED-записи', () => {
+    const { rowList } = calcGridModel(
+      [withStatus('DRAFT'), withStatus('SUBMITTED')],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], statusFilter('SUBMITTED'),
+    );
+    expect(rowList[0].hoursByDay[0]).toBe(8); // только SUBMITTED
+  });
+
+  it('фильтр DRAFT → только DRAFT-записи', () => {
+    const { rowList } = calcGridModel(
+      [withStatus('DRAFT'), withStatus('APPROVED')],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], statusFilter('DRAFT'),
+    );
+    expect(rowList[0].hoursByDay[0]).toBe(8);
+  });
+
+  it('фильтр APPROVED → запись со status=null не проходит', () => {
+    const { rowList } = calcGridModel(
+      [withStatus(null), withStatus('APPROVED')],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], statusFilter('APPROVED'),
+    );
+    expect(rowList[0].hoursByDay[0]).toBe(8); // null → '' не в Set(['APPROVED'])
+  });
+
+  it('фильтр нескольких статусов: DRAFT|SUBMITTED', () => {
+    const { rowList } = calcGridModel(
+      [withStatus('DRAFT'), withStatus('SUBMITTED'), withStatus('APPROVED')],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], statusFilter('DRAFT', 'SUBMITTED'),
+    );
+    expect(rowList[0].hoursByDay[0]).toBe(16); // DRAFT + SUBMITTED, APPROVED отфильтрован
+  });
+
+  it('фильтр статуса убирает строку если все записи отфильтрованы', () => {
+    const { rowList } = calcGridModel(
+      [withStatus('APPROVED')],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], statusFilter('DRAFT'),
+    );
+    expect(rowList).toHaveLength(0); // строка не создаётся без записей
   });
 });
