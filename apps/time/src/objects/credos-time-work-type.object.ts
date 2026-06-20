@@ -35,14 +35,6 @@ export default defineObject({
       icon: 'IconCategory',
       options: WORK_TYPE_GROUP_OPTIONS,
     },
-    {
-      universalIdentifier: '67343191-444f-4599-886f-0ea441e6ebfd',
-      name: 'billableByDefault',
-      type: FieldType.BOOLEAN,
-      label: 'Биллируемый по умолчанию',
-      icon: 'IconCoin',
-      defaultValue: false,
-    },
     // WorkType.department -> Department.workTypes (MANY_TO_ONE, nullable).
     {
       universalIdentifier: CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,

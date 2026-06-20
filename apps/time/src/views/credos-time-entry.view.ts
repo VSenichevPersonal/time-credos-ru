@@ -1,7 +1,6 @@
 import { defineView, ViewKey } from 'twenty-sdk/define';
 
 import {
-  CREDOS_TIME_ENTRY_BILLABLE_FIELD_ID,
   CREDOS_TIME_ENTRY_DATE_FIELD_ID,
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ENTRY_HOURS_FIELD_ID,
@@ -54,13 +53,6 @@ export default defineView({
       position: 4,
       isVisible: true,
       size: 160,
-    },
-    {
-      universalIdentifier: '1adff363-b9b6-41c7-ab69-d8ae82d127c9',
-      fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_BILLABLE_FIELD_ID,
-      position: 5,
-      isVisible: true,
-      size: 120,
     },
   ],
 });

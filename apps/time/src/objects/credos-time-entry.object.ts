@@ -63,14 +63,6 @@ export default defineObject({
       defaultValue: null,
     },
     {
-      universalIdentifier: '257e813a-60be-4bb2-ae41-660cfbdc5f73',
-      name: 'billable',
-      type: FieldType.BOOLEAN,
-      label: 'Биллируемая',
-      icon: 'IconCoin',
-      defaultValue: false,
-    },
-    {
       universalIdentifier: '60cc0ef7-38ef-42aa-903a-2e13d178fafc',
       name: 'status',
       type: FieldType.SELECT,

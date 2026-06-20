@@ -1,7 +1,6 @@
 import { defineView, ViewKey } from 'twenty-sdk/define';
 
 import {
-  CREDOS_TIME_PROJECT_BILLABLE_FIELD_ID,
   CREDOS_TIME_PROJECT_CATEGORY_FIELD_ID,
   CREDOS_TIME_PROJECT_CODE_FIELD_ID,
   CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
@@ -49,16 +48,9 @@ export default defineView({
       size: 220,
     },
     {
-      universalIdentifier: 'd8d0cab9-5057-493f-b0ff-53d2adab5eca',
-      fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_BILLABLE_FIELD_ID,
-      position: 4,
-      isVisible: true,
-      size: 120,
-    },
-    {
       universalIdentifier: 'e04d79e6-cd68-4f87-b21e-620e581ca0bc',
       fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_PLANNED_EFFORT_FIELD_ID,
-      position: 5,
+      position: 4,
       isVisible: true,
       size: 140,
     },

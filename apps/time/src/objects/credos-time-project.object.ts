@@ -55,14 +55,6 @@ export default defineObject({
       options: WORK_CATEGORY_OPTIONS,
     },
     {
-      universalIdentifier: 'bca013ca-1fef-44ce-b56a-8603618ef1c4',
-      name: 'billable',
-      type: FieldType.BOOLEAN,
-      label: 'Биллируемый',
-      icon: 'IconCoin',
-      defaultValue: true,
-    },
-    {
       universalIdentifier: '8098049a-872d-4c33-8f27-f05d15a53cc1',
       name: 'status',
       type: FieldType.SELECT,

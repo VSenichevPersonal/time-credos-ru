@@ -48,8 +48,5 @@ export const BILLING_DOC_TYPE_LABELS: Record<BillingDocType, string> = {
   Act: 'Акт',
 };
 
-// Категории, считающиеся billable (для утилизации)
-export const BILLABLE_CATEGORIES: ReadonlyArray<WorkCategory> = ['Client'];
-
 // Норма часов в неделю на сотрудника (для планирования загрузки)
 export const WEEKLY_NORM_HOURS = 40;
