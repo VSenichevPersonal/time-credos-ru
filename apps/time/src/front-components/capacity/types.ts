@@ -33,6 +33,18 @@ export type CapProject = {
   endDate: string | null; // ISO
 };
 
+// REQ-0013 13b: доля участия отдела в проекте (join credosTimeProjectDepartment).
+// plannedEffortShare — ЧАСЫ доли отдела в проекте (не %). Загрузка отдела на доске
+// = Σ долей ЭТОГО отдела, каждая раскидана по периоду действия проекта той же
+// логикой plannedHoursInPeriod (даты берутся у проекта, эффорт — доля отдела).
+// Σ долей проекта ≈ его plannedEffort (валидация мягкая). projectId связывает
+// долю с датами проекта (start/end у доли нет).
+export type ProjectDeptShare = {
+  projectId: string | null;
+  departmentId: string | null;
+  plannedEffortShare: number | null; // плановые часы доли отдела
+};
+
 // REQ-0012: плановая загрузка отдела БЕЗ привязки к проекту (резерв/пресейл-бронь
 // /прочее). plannedEffort раскидывается по периоду той же логикой, что у проекта,
 // и суммируется к загрузке отдела на доске.

@@ -8,6 +8,7 @@ import type {
   EmployeeRef,
   LoadCell,
   Period,
+  ProjectDeptShare,
   ProjectLoad,
 } from 'src/front-components/capacity/types';
 
@@ -214,6 +215,64 @@ export const projectHoursInPeriod = (
     period,
   );
 
+// ===========================================================================
+// REQ-0013 13b: загрузка отдела по ДОЛЯМ (credosTimeProjectDepartment).
+// Часы доли отдела раскидываются по периоду ДЕЙСТВИЯ ПРОЕКТА (start/end проекта,
+// у доли своих дат нет), но эффорт = plannedEffortShare (часы доли), а не весь
+// plannedEffort. Σ долей проекта ≈ его plannedEffort. Сверка с Timetta: часы
+// проекта раскладываются по подразделениям команды.
+// ===========================================================================
+
+// Карта projectId → его доли отделов. Доли без projectId отбрасываются.
+export const buildSharesByProject = (
+  shares: ProjectDeptShare[],
+): Map<string, ProjectDeptShare[]> => {
+  const m = new Map<string, ProjectDeptShare[]>();
+  for (const s of shares) {
+    if (!s.projectId) continue;
+    const arr = m.get(s.projectId) ?? [];
+    arr.push(s);
+    m.set(s.projectId, arr);
+  }
+  return m;
+};
+
+// Часы доли отдела ОДНОГО проекта в периоде: plannedEffortShare раскидан по датам
+// проекта (та же plannedHoursInPeriod). 0, если у проекта нет дат/доли пусты.
+export const projectShareHoursInPeriod = (
+  project: CapProject,
+  share: ProjectDeptShare,
+  period: Period,
+): number =>
+  plannedHoursInPeriod(
+    share.plannedEffortShare,
+    project.startDate,
+    project.endDate,
+    period,
+  );
+
+// Часы ОДНОГО проекта, попадающие в загрузку ОТДЕЛА за период, с учётом долей.
+// Если у проекта есть доли (sharesByProject) → Σ часов долей ЭТОГО отдела (раскид
+// по датам проекта). Fallback (обратная совместимость): у проекта нет ни одной
+// доли → старое поведение: весь plannedEffort на project.departmentId.
+const projectDeptHoursInPeriod = (
+  project: CapProject,
+  deptId: string,
+  period: Period,
+  sharesByProject?: Map<string, ProjectDeptShare[]>,
+): number => {
+  const shares = sharesByProject?.get(project.id);
+  if (shares && shares.length > 0) {
+    let sum = 0;
+    for (const s of shares) {
+      if (s.departmentId === deptId) sum += projectShareHoursInPeriod(project, s, period);
+    }
+    return sum;
+  }
+  // Fallback: долей нет → целый plannedEffort на «родной» отдел проекта.
+  return project.departmentId === deptId ? projectHoursInPeriod(project, period) : 0;
+};
+
 // REQ-0012: часы плановой загрузки отдела (без проекта), попадающие в период.
 // Раскид той же логикой, что и projectHoursInPeriod.
 export const deptPlanHoursInPeriod = (
@@ -223,19 +282,21 @@ export const deptPlanHoursInPeriod = (
   plannedHoursInPeriod(plan.plannedEffort, plan.startDate, plan.endDate, period);
 
 // Ячейки загрузки отдела по всем периодам. Загрузка = Σ часов проектов отдела +
-// Σ плановых загрузок отдела без проекта (REQ-0012).
+// Σ плановых загрузок отдела без проекта (REQ-0012). REQ-0013 13b: вклад проектов
+// считается по долям отделов (sharesByProject), с fallback на целый plannedEffort.
 export const deptLoadCells = (
   dept: DeptRef,
   projects: CapProject[],
   periods: Period[],
   deptPlans: DeptPlan[] = [],
   ctx?: AbsenceCtx,
+  sharesByProject?: Map<string, ProjectDeptShare[]>,
 ): LoadCell[] =>
   periods.map((period) => {
     const capacity = deptCapacity(dept, period, ctx);
     let load = 0;
     for (const p of projects) {
-      if (p.departmentId === dept.id) load += projectHoursInPeriod(p, period);
+      load += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject);
     }
     for (const dp of deptPlans) {
       if (dp.departmentId === dept.id) load += deptPlanHoursInPeriod(dp, period);
@@ -254,6 +315,7 @@ export const employeeLoadCells = (
   periods: Period[],
   deptPlans: DeptPlan[] = [],
   ctx?: AbsenceCtx,
+  sharesByProject?: Map<string, ProjectDeptShare[]>,
 ): LoadCell[] => {
   const factor = dept?.capacityFactor ?? 0.8;
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
@@ -267,8 +329,9 @@ export const employeeLoadCells = (
     const capacity = Math.max(0, baseCapacity - absHours);
     let deptLoad = 0;
     if (dept) {
+      // REQ-0013 13b: загрузка отдела по долям проектов (fallback на plannedEffort).
       for (const p of projects) {
-        if (p.departmentId === dept.id) deptLoad += projectHoursInPeriod(p, period);
+        deptLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject);
       }
       // REQ-0012: плановые загрузки отдела без проекта тоже делятся поровну.
       for (const dp of deptPlans) {
@@ -307,20 +370,32 @@ export const summaryCells = (perDept: LoadCell[][], periods: Period[]): LoadCell
   });
 
 // Детализация: вклад каждого проекта отдела по периодам (только с планом/датами).
+// REQ-0013 13b: проект попадает в детализацию отдела, если у отдела есть доля в нём
+// (sharesByProject), и его вклад = часы ДОЛИ (раскид по датам проекта). Fallback
+// (у проекта нет долей): прежнее — проект «родного» отдела по целому plannedEffort.
 export const deptProjectLoads = (
   dept: DeptRef,
   projects: CapProject[],
   periods: Period[],
+  sharesByProject?: Map<string, ProjectDeptShare[]>,
 ): { planned: ProjectLoad[]; unplanned: CapProject[] } => {
   const planned: ProjectLoad[] = [];
   const unplanned: CapProject[] = [];
   for (const p of projects) {
-    if (p.departmentId !== dept.id) continue;
-    if (!p.plannedEffort || !p.startDate || !p.endDate) {
+    const shares = sharesByProject?.get(p.id);
+    const hasShares = !!shares && shares.length > 0;
+    // Относится ли проект к отделу: по доле (13b) либо по departmentId (fallback).
+    const belongs = hasShares
+      ? shares.some((s) => s.departmentId === dept.id)
+      : p.departmentId === dept.id;
+    if (!belongs) continue;
+    if (!p.startDate || !p.endDate) {
       unplanned.push(p);
       continue;
     }
-    const perPeriod = periods.map((per) => projectHoursInPeriod(p, per));
+    const perPeriod = periods.map((per) =>
+      projectDeptHoursInPeriod(p, dept.id, per, sharesByProject),
+    );
     const total = perPeriod.reduce((a, b) => a + b, 0);
     if (total > 0) planned.push({ project: p, perPeriod, total });
     else unplanned.push(p);

@@ -176,8 +176,9 @@ describe('integrity guard (CISO-011)', () => {
   });
 
   it('op=upsert (patch), запись со статусом APPROVED → cannot_modify_approved (нет PATCH-запроса)', async () => {
+    // DEV-fallback должен вернуть сотрудника — иначе 'employee not resolved' раньше CISO-011
     const mockFn = mockFetch([
-      emptyEmployees, // resolveEmployeeId DEV-fallback
+      { data: { credosTimeEmployees: [{ id: 'emp-fallback', name: 'Test' }] } }, // resolveEmployeeId DEV-fallback
       { data: { credosTimeEntries: [{ id: VALID_ID, status: 'APPROVED', projectId: null }] } }, // pre-read
     ]);
     vi.stubGlobal('fetch', mockFn);

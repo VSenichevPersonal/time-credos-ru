@@ -6,10 +6,15 @@ import {
   fetchDepartments,
   fetchDeptPlans,
   fetchEmployees,
+  fetchProjectDeptShares,
   fetchProjects,
 } from 'src/front-components/capacity/capacity-rest';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
-import { buildAbsenceCtx, buildPeriods } from 'src/front-components/capacity/calc-load';
+import {
+  buildAbsenceCtx,
+  buildPeriods,
+  buildSharesByProject,
+} from 'src/front-components/capacity/calc-load';
 import type { AbsenceCtx } from 'src/front-components/capacity/calc-load';
 import type {
   Absence,
@@ -19,6 +24,7 @@ import type {
   DeptRef,
   EmployeeRef,
   Period,
+  ProjectDeptShare,
 } from 'src/front-components/capacity/types';
 
 export type Granularity = 'week' | 'month';
@@ -44,6 +50,7 @@ type State = {
   deptPlans: DeptPlan[];
   calendar: CalendarDay[];
   absences: Absence[]; // W3-1: отсутствия для вычета из ёмкости доски
+  shares: ProjectDeptShare[]; // REQ-0013 13b: доли отделов в проектах
 };
 
 // Загрузка данных доски + расчёт колонок горизонта. reloadProjects() — точечный
@@ -63,6 +70,7 @@ export const useCapacity = (granularity: Granularity) => {
     deptPlans: [],
     calendar: [],
     absences: [],
+    shares: [],
   });
   // reload() — полный повтор загрузки доски (кнопка «Повторить» при ошибке).
   const [nonce, setNonce] = useState(0);
@@ -78,8 +86,9 @@ export const useCapacity = (granularity: Granularity) => {
       fetchDeptPlans(),
       fetchCalendar(range.from, range.to),
       fetchAbsences(range.from, range.to),
+      fetchProjectDeptShares(),
     ])
-      .then(([departments, employees, projects, deptPlans, calendar, absences]) => {
+      .then(([departments, employees, projects, deptPlans, calendar, absences, shares]) => {
         if (!alive) return;
         setState({
           loading: false,
@@ -90,6 +99,7 @@ export const useCapacity = (granularity: Granularity) => {
           deptPlans,
           calendar,
           absences,
+          shares,
         });
       })
       .catch((e: unknown) => {
@@ -111,6 +121,12 @@ export const useCapacity = (granularity: Granularity) => {
   const reloadDeptPlans = useCallback(async () => {
     const deptPlans = await fetchDeptPlans();
     setState((s) => ({ ...s, deptPlans }));
+  }, []);
+
+  // REQ-0013 13b: точечный рефетч долей отделов (после правки мульти-отдел раскида).
+  const reloadShares = useCallback(async () => {
+    const shares = await fetchProjectDeptShares();
+    setState((s) => ({ ...s, shares }));
   }, []);
 
   const periods: Period[] = useMemo(

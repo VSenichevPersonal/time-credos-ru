@@ -164,6 +164,24 @@ const run = async (event: RoutePayload) => {
     // CISO-006: id в REST-путь PATCH — только UUID. Проверяем ДО резолва сотрудника,
     // чтобы невалидный id сразу падал на 'invalid id', а не на 'employee not resolved'.
     if (params.id && !isUuid(params.id)) return { ok: false, error: 'invalid id' };
+
+    // CISO-011: для существующей записи читаем status+projectId РАНЬШЕ проверок
+    // часов/сотрудника. Согласованную запись нельзя менять независимо от резолва
+    // актора — иначе 'employee not resolved'/'hours out of range' маскируют guard
+    // целостности. Один GET; prevProjectId переиспользуем ниже для rollup-пересчёта.
+    let prevProjectId: string | null = null;
+    if (params.id) {
+      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
+        '/rest/credosTimeEntries',
+        { filter: `id[eq]:${params.id}`, limit: '1' },
+      );
+      const prevEntry = prevRes.data?.credosTimeEntries?.[0];
+      if (prevEntry?.status === ENTRY_STATUS.APPROVED) {
+        return { ok: false, error: 'cannot_modify_approved' };
+      }
+      prevProjectId = prevEntry?.projectId ?? null;
+    }
+
     const hours = Number(params.hours);
     if (Number.isNaN(hours) || hours < HOURS_MIN || hours > HOURS_MAX)
       return { ok: false, error: 'hours out of range' };
@@ -180,17 +198,6 @@ const run = async (event: RoutePayload) => {
     };
 
     if (params.id) {
-      // Читаем status + старый projectId (CISO-011 guard + rollup пересчёт).
-      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
-        '/rest/credosTimeEntries',
-        { filter: `id[eq]:${params.id}`, limit: '1' },
-      );
-      const prevEntry = prevRes.data?.credosTimeEntries?.[0];
-      // CISO-011: согласованные записи нельзя изменять — целостность табеля/1С.
-      if (prevEntry?.status === ENTRY_STATUS.APPROVED) {
-        return { ok: false, error: 'cannot_modify_approved' };
-      }
-      const prevProjectId = prevEntry?.projectId ?? null;
       const res = await api.patch<{ data: { updateCredosTimeEntry: TimeEntry } }>(
         `/rest/credosTimeEntries/${params.id}`,
         data,

@@ -110,3 +110,66 @@ describe('calcCopyWithHours', () => {
     expect(inputs[0].id).toBeUndefined();
   });
 });
+
+// REQ-0015 §2: шаблон «8×5»
+const row = (
+  hoursByDay: number[],
+  lockedByDay: boolean[] = Array(7).fill(false),
+  projectId = 'proj-1',
+  workTypeId = 'wt-1',
+): GridRowModel => ({
+  key: `${projectId}|${workTypeId}`,
+  projectId,
+  workTypeId,
+  projectName: 'Проект',
+  category: null,
+  workTypeName: 'Разработка',
+  hoursByDay,
+  entryIdByDay: Array(7).fill(null),
+  descByDay: Array(7).fill(null),
+  lockedByDay,
+  tags: [],
+  rowTotal: hoursByDay.reduce((s, n) => s + n, 0),
+});
+
+describe('calcFillStandardWeek', () => {
+  it('пустая строка → 8ч во все 5 будней, выходные не трогаются', () => {
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK);
+    expect(inputs).toHaveLength(5);
+    expect(inputs.every((i) => i.hours === 8)).toBe(true);
+    expect(inputs.map((i) => i.date)).toEqual([
+      '2026-06-22', '2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26',
+    ]);
+  });
+
+  it('заполненные будни не перетираются', () => {
+    const inputs = calcFillStandardWeek([row([4, 0, 0, 0, 0, 0, 0])], CUR_WEEK);
+    expect(inputs).toHaveLength(4); // Пн уже 4ч — пропущен
+    expect(inputs.some((i) => i.date === '2026-06-22')).toBe(false);
+  });
+
+  it('заблокированная (согласованная) ячейка пропускается', () => {
+    const locked = [true, false, false, false, false, false, false];
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0), locked)], CUR_WEEK);
+    expect(inputs).toHaveLength(4);
+    expect(inputs.some((i) => i.date === '2026-06-22')).toBe(false);
+  });
+
+  it('несколько строк → 8ч в будни каждой', () => {
+    const inputs = calcFillStandardWeek(
+      [row(Array(7).fill(0), undefined, 'p1', 'w1'), row(Array(7).fill(0), undefined, 'p2', 'w2')],
+      CUR_WEEK,
+    );
+    expect(inputs).toHaveLength(10);
+  });
+
+  it('полностью заполненная неделя → пустой результат', () => {
+    const inputs = calcFillStandardWeek([row([8, 8, 8, 8, 8, 0, 0])], CUR_WEEK);
+    expect(inputs).toHaveLength(0);
+  });
+
+  it('id всегда undefined (новые записи)', () => {
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK);
+    expect(inputs.every((i) => i.id === undefined)).toBe(true);
+  });
+});

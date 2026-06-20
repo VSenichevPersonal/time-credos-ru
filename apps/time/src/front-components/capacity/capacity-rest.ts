@@ -7,6 +7,7 @@ import type {
   DeptPlan,
   DeptRef,
   EmployeeRef,
+  ProjectDeptShare,
   ProjectPatch,
 } from 'src/front-components/capacity/types';
 
@@ -102,6 +103,28 @@ export const fetchProjects = async (): Promise<CapProject[]> => {
     plannedEffort: p.plannedEffort ?? null,
     startDate: p.startDate ?? null,
     endDate: p.endDate ?? null,
+  }));
+};
+
+type RawProjectDeptShare = {
+  projectId?: string | null;
+  departmentId?: string | null;
+  plannedEffortShare?: number | null;
+};
+
+// REQ-0013 13b: доли участия отделов в проектах (project × department × часы).
+// Раскид загрузки на доске идёт по этим долям (с fallback на целый plannedEffort
+// проекта, если у проекта НЕТ ни одной доли). Берём за весь горизонт — даты у
+// доли нет, период раскида определяет проект; фильтра по дате тут не нужно.
+export const fetchProjectDeptShares = async (): Promise<ProjectDeptShare[]> => {
+  const resp = await client().get<ListResp<RawProjectDeptShare>>(
+    '/rest/credosTimeProjectDepartments',
+    { query: { limit: '300', orderBy: 'createdAt[AscNullsFirst]' } },
+  );
+  return pickList(resp, 'credosTimeProjectDepartments').map((s) => ({
+    projectId: s.projectId ?? null,
+    departmentId: s.departmentId ?? null,
+    plannedEffortShare: s.plannedEffortShare ?? null,
   }));
 };
 
