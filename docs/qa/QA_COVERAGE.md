@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1119 + 15 todo** (42 файл, все зелёные) |
+| unit-тестов | **1133 + 15 todo** (43 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -82,6 +82,9 @@
 | [bug]#1 | P1 | `op:delete` → 400 PERMISSION_DENIED (нужен `canDestroyObjectRecords` в default-role) | `roles/default-role.ts` | ❌ ждёт [synced] |
 | [bug]#2 | P3 | `calc-month.ts`: NaN month-index проходит guard (crash вместо skip) | `front-components/calendar/calc-month.ts:19` | ⚠️ задокументирован `it.todo` |
 | [bug]#3 | P2 | `resolveSelfIsManager` fallback: `orderBy=boolean` не работает в Twenty REST | `capacity/capacity-rest.ts` | ✅ CLOSED Dev 1: `filter=isManager[eq]:true` |
+| [ciso-006-gap]#1 | P2 | `fetchProjectEntries(projectId)` — нет isUuid guard, прямая интерполяция в filter | `project-team/team-rest.ts` | ⚠️ регрессионный тест добавлен, ждёт guard от Dev2 |
+| [ciso-006-gap]#2 | P2 | `fetchProjectSummary(projectId)` — нет isUuid guard, прямая интерполяция в URL+filter | `project-summary/summary-rest.ts` | ⚠️ регрессионный тест добавлен, ждёт guard от Dev2 |
+| `shared/use-self-employee.ts` | `resolveSelfEmployee` A1 резолвер | ✅ 11 тестов | `shared/use-self-employee.test.ts` |
 
 ## Очередь (next)
 1. 🔴 **[bug]#1** → пере-валидация после `canDestroyObjectRecords` (arch `[synced]`)

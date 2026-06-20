@@ -158,15 +158,10 @@ export const fetchEmployees = async (): Promise<EmployeeRef[]> => {
 
 type RawSelf = { id: string; isManager?: boolean | null };
 
-// Текущий сотрудник руководитель? Резолв по workspaceMemberRef (как в timesheet).
-// TODO(rbac): в песочнице front-component нет надёжного источника текущего юзера —
-// RestApiClient ходит под токеном РОЛИ приложения, а не залогиненного пользователя,
-// SDK не отдаёт currentWorkspaceMember/me. Поэтому workspaceMemberRef тут всегда
-// null и реальный резолв невозможен до RBAC-волны (см. useCapacity).
-// [bug]#3 fix: orderBy=isManager[DescNullsLast] НЕ сортирует boolean custom-field
-// в Twenty REST → раньше fallback брал первого по позиции (обычно не-менеджера) и
-// «Планировать» не появлялась. Заменили на filter=isManager[eq]:true → проверяем
-// существование хотя бы одного руководителя в воркспейсе.
+// @deprecated A2: резолв роли перенесён в shared/use-self-employee.ts (useUserId →
+// workspaceMember → employee.isManager, реальный текущий юзер). useCapacity больше
+// не вызывает эту функцию. Оставлена с тестами как справочная; fallback
+// «существует хоть один менеджер» давал ложный true всем — не использовать.
 export const resolveSelfIsManager = async (
   workspaceMemberRef: string | null,
 ): Promise<boolean> => {

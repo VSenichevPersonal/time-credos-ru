@@ -101,4 +101,14 @@ describe('fetchProjectSummary', () => {
       expect.objectContaining({ query: expect.objectContaining({ filter: 'projectId[eq]:proj-42' }) }),
     );
   });
+
+  // CISO-006 регрессионный тест: projectId используется в URL и filter без isUuid guard.
+  // Текущее поведение зафиксировано. При внедрении guard — заменить на throw-тест.
+  it('[ciso-006-todo] инъекция в projectId проходит без guard (фиксация текущего поведения)', async () => {
+    setup({ name: 'X' }, [], []);
+    const evil = 'x%0aX-Injected:true';
+    await fetchProjectSummary(evil);
+    // нет guard → прямая интерполяция в URL и filter
+    expect(mockGet).toHaveBeenCalledWith(`/rest/credosTimeProjects/${evil}`);
+  });
 });

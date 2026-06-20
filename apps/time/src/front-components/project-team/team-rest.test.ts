@@ -36,6 +36,20 @@ describe('fetchProjectEntries', () => {
     mockGet.mockResolvedValueOnce(list('credosTimeEntries', []));
     expect(await fetchProjectEntries('p')).toEqual([]);
   });
+
+  // CISO-006 регрессионный тест: filter строится прямой интерполяцией (нет isUuid guard).
+  // При внедрении guard — заменить на it.todo для негативного кейса (инъекция → reject).
+  it('[ciso-006-todo] передаёт projectId в filter без валидации — будущий guard-тест', async () => {
+    mockGet.mockResolvedValueOnce(list('credosTimeEntries', []));
+    await fetchProjectEntries('x];delete--');
+    // сейчас инъекция проходит — фиксируем поведение, ждём guard от Dev2
+    expect(mockGet).toHaveBeenCalledWith(
+      '/rest/credosTimeEntries',
+      expect.objectContaining({
+        query: expect.objectContaining({ filter: 'projectId[eq]:x];delete--' }),
+      }),
+    );
+  });
 });
 
 describe('fetchEmployees', () => {

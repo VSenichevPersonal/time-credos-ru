@@ -16,14 +16,17 @@ import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
+import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 
 // Корневой компонент таймшита. Виджет фиксированного размера: скроллится только
 // тело таблицы. 3 режима (День/Неделя/Проект), клавиатура, мультиселект-фильтры.
-// TODO(manager): роль «Руководитель» из контекста — пока фильтр сотрудника скрыт.
+// Роль «Руководитель» резолвится единым хуком useSelfEmployee (A2): кнопки
+// согласования (approval-bar) и фильтр «Сотрудник» видны только руководителю.
+// TODO(ciso-005): это UX-гейт, не защита — реальный RBAC на сервере (approval.logic).
 
 export const WeeklyGrid = () => {
   const week = useWeek();
-  const isManager = false; // TODO: определять по роли пользователя (useUserId + roles)
+  const { isManager } = useSelfEmployee();
   const [viewEmployeeId] = useState<string | null>(null);
 
   const data = useGridData(week.range.from, week.range.to, viewEmployeeId);

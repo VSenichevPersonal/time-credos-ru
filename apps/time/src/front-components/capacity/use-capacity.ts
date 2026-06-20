@@ -7,8 +7,8 @@ import {
   fetchDeptPlans,
   fetchEmployees,
   fetchProjects,
-  resolveSelfIsManager,
 } from 'src/front-components/capacity/capacity-rest';
+import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 import { buildAbsenceCtx, buildPeriods } from 'src/front-components/capacity/calc-load';
 import type { AbsenceCtx } from 'src/front-components/capacity/calc-load';
 import type {
@@ -38,7 +38,6 @@ export const horizonRange = (anchor: Date, g: Granularity): { from: string; to: 
 type State = {
   loading: boolean;
   error: string | null;
-  isManager: boolean;
   departments: DeptRef[];
   employees: EmployeeRef[];
   projects: CapProject[];
@@ -51,10 +50,13 @@ type State = {
 // рефетч проектов после правки плана (пересчёт загрузки на лету, без всей доски).
 export const useCapacity = (granularity: Granularity) => {
   const anchor = useMemo(() => new Date(), []);
+  // A2: единый источник роли (useUserId → workspaceMember → employee.isManager).
+  // Заменяет прежний форс isManager:true всем (TODO(rbac) снят). Гейт «Планировать»
+  // теперь по реальной роли. TODO(ciso-005): UX-гейт, защита — на сервере.
+  const { isManager } = useSelfEmployee();
   const [state, setState] = useState<State>({
     loading: true,
     error: null,
-    isManager: false,
     departments: [],
     employees: [],
     projects: [],
@@ -76,19 +78,12 @@ export const useCapacity = (granularity: Granularity) => {
       fetchDeptPlans(),
       fetchCalendar(range.from, range.to),
       fetchAbsences(range.from, range.to),
-      resolveSelfIsManager(null),
     ])
-      .then(([departments, employees, projects, deptPlans, calendar, absences, isManagerInWorkspace]) => {
+      .then(([departments, employees, projects, deptPlans, calendar, absences]) => {
         if (!alive) return;
-        // TODO(rbac): RBAC-гейт «Планировать» отложен в RBAC-волну. В песочнице
-        // front-component текущего пользователя надёжно получить нельзя (токен =
-        // роль приложения, SDK не отдаёт currentWorkspaceMember), поэтому кнопку
-        // показываем ВСЕМ. isManagerInWorkspace оставляем для будущего гейта.
-        void isManagerInWorkspace;
         setState({
           loading: false,
           error: null,
-          isManager: true,
           departments,
           employees,
           projects,
@@ -130,5 +125,5 @@ export const useCapacity = (granularity: Granularity) => {
     [state.absences, state.employees, state.calendar],
   );
 
-  return { ...state, periods, absenceCtx, anchor, reload, reloadProjects, reloadDeptPlans };
+  return { ...state, isManager, periods, absenceCtx, anchor, reload, reloadProjects, reloadDeptPlans };
 };

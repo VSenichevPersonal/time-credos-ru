@@ -16,6 +16,30 @@
 
 ## Аналитик → команда
 
+### 2026-06-21 01:04 — [observed] Итерация 9 — 🎯 A1 РЕШЁН (useUserId=ДА): мой финдинг №1 разблокирован
+
+**ГЛАВНОЕ — линчпин снят:**
+- 🎯 **arch A1 ВЕРДИКТ: ДА** — current-user во фронте ЕСТЬ (`useUserId()` → workspaceMembers → credosTimeEmployees → isManager). Мост рабочий (HTTP 200).
+- → **Мой финдинг №1 (approval мёртв в UI, `weekly-grid.tsx:25` хардкод) разблокирован.** План arch: Dev1 СЛЕДУЮЩЕЙ задачей меняет хардкод на резолв useUserId → кнопки «Согласовать/Отклонить» + фильтр сотрудника оживают. Один заход питает A2/A3/REQ-0014/REQ-0008.
+- Нюанс: `workspaceMemberRef` заполнен 1/43 → массовый rollout = онбординг (прод, Dev2 скрипт-мост). Server-RBAC по-прежнему за CISO-005 (R2, прод-гейт). Для dev клиентский гейт ок.
+
+**Находки внедрены:**
+- ✅ **Dev1** `[report]` T1 error-boundary + UC10 friendly-error ГОТОВЫ (lint 0 / unit **1113** / dry-run чисто). Мои слой3/слой5 в коде.
+- ✅ CISO-011 закрыт (серверная часть T3).
+
+**Новое от QA:** `[ciso-006-gap]` team-rest `fetchProjectEntries` — нет isUuid guard. Это остаток CISO-006 = подтверждает мой **T10** (guards только unit-покрыты, интеграционные дыры остаются). → в трек CISO/QA.
+
+**Картина:**
+| Поток | Статус |
+|---|---|
+| A1 current-user | ✅ ВЕРДИКТ ДА → разблокировка approval next (Dev1) |
+| T1+UC10 | ✅ готовы (1113 тестов) |
+| T3/CISO-011 | ✅ серверный guard закрыт |
+| approval оживление (A2) | next Dev1 после T1/UC10 |
+| ciso-006-gap team-rest | новый, QA нашёл (=T10) |
+
+Все 5 слоёв в активной разработке. Финдинг №1 (самый дорогой) — на финишной прямой. — аналитик
+
 ### 2026-06-21 00:59 — [observed] Итерация 8 — находки внедряются + решение заказчика E1→бэклог
 
 **📌 Решение заказчика (2026-06-21):** **E1 ставки→рентабельность — пока НЕ вводим**, отложено до RBAC/решения по ставкам → REQ-0002 P&L 🟢 БЭКЛОГ. Обновил `docs/analysis/ANALYST_FINDINGS.md` (блок E1 + сквозные приоритеты). Сквозные 🔴 теперь: A1, T1+T2, B1/B2, F (орг-риски).
@@ -2702,6 +2726,15 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
 
 
+### 2026-06-22 01:06 — [qa-ok] use-self-employee.test.ts — 11 тестов (A1 резолвер)
+
+[qa-ok] НОВЫЙ ФАЙЛ use-self-employee.test.ts (11 тестов): resolveSelfEmployee покрыт полностью.
+CISO-006: null/пустой/не-UUID userId → рядовой без fetch (4 теста). Цепочка member+employee: нет member, нет emp, isManager true/false/null/undefined, filter strings. 1133 passed + 15 todo (43 файла). Dev 1 — хорошая работа с resolveSelfEmployee, чистый unit-тестируемый паттерн. — QA
+
+### 2026-06-22 01:02 — [ciso-006-gap] team-rest fetchProjectEntries — нет isUuid guard
+
+[security-gap] fetchProjectEntries(projectId) — filter строится прямой интерполяцией: projectId[eq]:{projectId} без isUuid(). Вектор инъекции в REST filter параметр. Регрессионный тест добавлен (фиксирует текущее поведение). Нужен guard: if (!isUuid(projectId)) throw. Зона: Dev2 или Dev1 (team-rest.ts фронт). 1120 passed + 15 todo. — QA
+
 ### 2026-06-22 01:00 — [qa-ok] SSOT-guard WORKDAY_TYPES + OLAP_DIMENSIONS → 1119 зелёных
 
 [qa-ok] reports-calc.test.ts +6 SSOT-guard тестов: WORKDAY_TYPES (2 рабочих типа, size=2, нет HOLIDAY/DAYOFF); OLAP_DIMENSIONS (7 осей, нет дублей, все присутствуют). 1119 passed + 15 todo (42 файла). Остаток: ждём A1 plan impl → CISO-005 it.todo. — QA
@@ -3342,6 +3375,23 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-finding] CISO-006 Level 2 gap + A1 security note
+
+**CISO-006 НЕ повністю закритий — Level 2:**
+- QA знайшов: `project-team/team-rest.ts:20` `fetchProjectEntries` — `filter: \`projectId[eq]:${projectId}\`` без `isUuid()`
+- CISO верифікував: підтверджено. Тот самий клас filter injection, що в logic-functions
+- RISK_REGISTER: CISO-006 → MITIGATING (L1 ok, L2 open)
+- Fix: `if (!isUuid(projectId)) throw new Error('invalid id parameter')` перед L20 — одна строка, Dev1 або Dev2
+- Файл: `apps/time/src/front-components/project-team/team-rest.ts:17`
+- Імпорт вже є в `params-validate.ts` (SSOT)
+
+**A1 security note для arch:**
+- `useUserId()` client-side chain (фронт-резолв) ≠ CISO-005 fix (server-side)
+- Dev-середовище: клієнтський gate прийнятний тимчасово
+- Прод-гейт: CISO-005 (`time-entry-api.logic.ts` все ще використовує client-supplied `params.workspaceMemberRef`)
+- CISO-005 залишається OPEN P1 до server-side резолву в logic-function
+
+— CISO
 ### 2026-06-22 — [ciso-note] T1+UC10 — CISO review
 
 **Ок:**
