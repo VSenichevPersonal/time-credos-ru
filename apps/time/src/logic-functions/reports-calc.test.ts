@@ -5,6 +5,7 @@ import {
   WORKDAY_TYPES,
   computeOlap,
   computeReports,
+  computeTimeseries,
   finalize,
   fteHeadcountByDept,
   util,
@@ -656,5 +657,131 @@ describe('computeReports норма по FTE (REQ-0011)', () => {
     const res = computeReports(base(), PERIOD);
     const dept = res.byDept.find((r) => r.key === 'd1');
     expect(dept?.norm).toBeCloseTo(15, 2);
+  });
+});
+
+// ─── computeTimeseries (C4 «Тренд утилизации по месяцам») ────────────────────
+describe('computeTimeseries — тренд по месяцам', () => {
+  const YEAR = { from: '2026-01-01', to: '2026-12-31' };
+
+  // 2 отдела. Календарь: янв = 2 раб. дня по 8ч (16ч), фев = 1 раб. день 8ч.
+  // Записи: янв — e1 (d1) 6ч клиент + 2ч внутр; фев — e2 (d2) 4ч клиент.
+  const ts = (): ReportsInput => ({
+    entries: [
+      { hours: 6, projectId: 'p-cli', employeeId: 'e1', date: '2026-01-15T00:00:00.000Z' },
+      { hours: 2, projectId: 'p-int', employeeId: 'e1', date: '2026-01-20T00:00:00.000Z' },
+      { hours: 4, projectId: 'p-cli', employeeId: 'e2', date: '2026-02-10T00:00:00.000Z' },
+    ],
+    projects: [
+      { id: 'p-cli', name: 'Клиент', code: 'OV-1', category: 'CLIENT', departmentId: 'd1', plannedEffort: null },
+      { id: 'p-int', name: 'Внутр', code: 'OV-2', category: 'INTERNAL', departmentId: 'd1', plannedEffort: null },
+    ],
+    employees: [
+      { id: 'e1', firstName: 'Иван', lastName: 'Иванов', departmentId: 'd1' },
+      { id: 'e2', firstName: 'Пётр', lastName: 'Петров', departmentId: 'd2' },
+    ],
+    departments: [
+      { id: 'd1', code: 'OV', capacityFactor: 1 },
+      { id: 'd2', code: 'OIB', capacityFactor: 1 },
+    ],
+    calendar: [
+      { hours: 8, dayType: 'WORKDAY', date: '2026-01-12T00:00:00.000Z' },
+      { hours: 8, dayType: 'WORKDAY', date: '2026-01-13T00:00:00.000Z' },
+      { hours: 8, dayType: 'WORKDAY', date: '2026-02-09T00:00:00.000Z' },
+    ],
+  });
+
+  it('раскладывает факт/клиента по месяцам даты записи', () => {
+    const res = computeTimeseries(ts(), YEAR);
+    const jan = res.months.find((m) => m.month === '2026-01');
+    const feb = res.months.find((m) => m.month === '2026-02');
+    expect(jan?.fact).toBe(8); // 6 + 2
+    expect(jan?.client).toBe(6);
+    expect(jan?.util).toBeCloseTo(6 / 8, 4);
+    expect(feb?.fact).toBe(4);
+    expect(feb?.client).toBe(4);
+    expect(feb?.util).toBe(1);
+  });
+
+  it('норма месяца = Σ раб. часы × headcount по отделам (2 отдела)', () => {
+    const res = computeTimeseries(ts(), YEAR);
+    const jan = res.months.find((m) => m.month === '2026-01');
+    const feb = res.months.find((m) => m.month === '2026-02');
+    // янв база 16ч × 2 отдела (по 1 чел.) = 32; фев база 8ч × 2 = 16.
+    expect(jan?.norm).toBe(32);
+    expect(feb?.norm).toBe(16);
+    expect(jan?.under).toBe(32 - 8);
+    expect(feb?.under).toBe(16 - 4);
+  });
+
+  it('ИНВАРИАНТ: Σ по месяцам fact/client/norm == годовой итог (computeReports)', () => {
+    const res = computeTimeseries(ts(), YEAR);
+    const annual = computeReports(ts(), YEAR);
+    const sum = (k: 'fact' | 'client' | 'norm') =>
+      res.months.reduce((s, m) => s + m[k], 0);
+    expect(sum('fact')).toBeCloseTo(annual.totals.fact, 2);
+    expect(sum('client')).toBeCloseTo(annual.totals.client, 2);
+    expect(sum('norm')).toBeCloseTo(annual.totals.norm ?? 0, 2);
+  });
+
+  it('пустой месяц (норма есть, факта нет) → fact=0, util=null, under=norm', () => {
+    const inp = ts();
+    // Добавим раб. день в марте без записей — должен дать точку с фактом 0.
+    inp.calendar.push({ hours: 8, dayType: 'WORKDAY', date: '2026-03-05T00:00:00.000Z' });
+    const res = computeTimeseries(inp, YEAR);
+    const mar = res.months.find((m) => m.month === '2026-03');
+    expect(mar).toBeDefined();
+    expect(mar?.fact).toBe(0);
+    expect(mar?.client).toBe(0);
+    expect(mar?.util).toBeNull(); // деление 0/0 → null
+    expect(mar?.norm).toBe(16); // 8ч × 2 отдела
+    expect(mar?.under).toBe(16); // недогруз = вся норма
+  });
+
+  it('фильтр отдела: только записи и норма этого отдела', () => {
+    const res = computeTimeseries(ts(), YEAR, { departmentId: 'd1' });
+    expect(res.departmentId).toBe('d1');
+    const jan = res.months.find((m) => m.month === '2026-01');
+    const feb = res.months.find((m) => m.month === '2026-02');
+    // d1: янв факт 8 (e1), норма 16 (1 отдел × 16ч). фев — записей d1 нет, факт 0.
+    expect(jan?.fact).toBe(8);
+    expect(jan?.norm).toBe(16);
+    expect(feb?.fact).toBe(0); // e2 ∈ d2 — отфильтрован
+    expect(feb?.norm).toBe(8); // норма d1 за фев (нет записей, но норма есть)
+  });
+
+  it('фильтр отдела + FTE: численность = Σ FTE назначений отдела', () => {
+    const inp = ts();
+    inp.assignments = [
+      { employeeId: 'e1', departmentId: 'd1', ftePercent: 50, startDate: null, endDate: null },
+    ];
+    const res = computeTimeseries(inp, YEAR, { departmentId: 'd1' });
+    const jan = res.months.find((m) => m.month === '2026-01');
+    expect(jan?.norm).toBe(16 * 0.5); // база 16 × FTE 0.5
+  });
+
+  it('отсутствие вычитает раб. часы из нормы своего месяца', () => {
+    const inp = ts();
+    // e1 (d1) отсутствует 2026-01-12 (раб. день 8ч).
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2026-01-12T00:00:00.000Z', endDate: '2026-01-12T23:59:59.000Z' },
+    ];
+    const res = computeTimeseries(inp, YEAR, { departmentId: 'd1' });
+    const jan = res.months.find((m) => m.month === '2026-01');
+    expect(jan?.norm).toBe(16 - 8); // 16 − 8ч отсутствия
+  });
+
+  it('запись без date в бакеты не попадает (безопасная деградация)', () => {
+    const inp = ts();
+    inp.entries.push({ hours: 99, projectId: 'p-cli', employeeId: 'e1', date: null });
+    const res = computeTimeseries(inp, YEAR);
+    const totalFact = res.months.reduce((s, m) => s + m.fact, 0);
+    expect(totalFact).toBe(12); // 99ч без date проигнорированы
+  });
+
+  it('месяцы отсортированы по возрастанию', () => {
+    const res = computeTimeseries(ts(), YEAR);
+    const keys = res.months.map((m) => m.month);
+    expect(keys).toEqual([...keys].sort());
   });
 });

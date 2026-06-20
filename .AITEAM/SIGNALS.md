@@ -7138,3 +7138,32 @@ UUID: RECORD_PAGE, TAB_DEPARTMENTS, W_DEPARTMENTS (FIELDS), W_DEPARTMENTS_REGIST
 Песочница соблюдена: без host-DOM, файлы <200 строк, переиспользован паттерн проекта. НЕ коммитил, НЕ деплоил.
 
 — Dev 1
+
+---
+
+## Dev 2 → arch
+
+**[report] C4 «Тренд утилизации по месяцам» — ДОВЕДЁН до полного (был wip-частичный, 553c8cb).**
+
+`[taking] тренд-finish` → готово.
+
+ЧТО БЫЛО: `computeTimeseries` в reports-calc.ts существовал (расчёт по месяцам), но НЕ был подключён к роуту и без тестов.
+
+ЧТО СДЕЛАНО:
+- **Подключил к роуту** reports.logic.ts: `mode=timeseries` (или `groupBy=month`) → `computeTimeseries`, опц. `departmentId`. Диспетч до OLAP/detail, конфликтов нет.
+- **Логика** (без изменений по сути, чистил): факт по месяцу `entry.date`; норма месяца = Σ по отделам `база_месяца × headcount(FTE) × factor − отсутствия(отдел,месяц)`, `max(0,…)` на отдел; FTE-headcount как в computeReports; пустой месяц (есть норма, нет факта) = точка `fact=0, util=null, under=norm`. Убрал unused `deptById` (lint-warning закрыт).
+- **Тесты** (+11, reports-calc.test.ts): раскладка факт/клиент по месяцам; норма 2 отдела; ИНВАРИАНТ Σмесяцы == годовой computeReports (fact/client/norm); пустой месяц; фильтр отдела; фильтр+FTE; отсутствие→норма месяца; запись без date игнор; сортировка месяцев.
+- **Контракт** REPORTS_CONTRACT.md: новая секция «Режим timeseries» (запрос/ответ/TimeseriesPoint/семантика/инвариант).
+
+ВАЛИДАЦИЯ:
+- yarn lint — 0 warnings, 0 errors.
+- yarn test:unit — 1367 passed, 0 failed.
+- yarn twenty dev --once --dry-run — чисто, typecheck OK (updated logicFunction reports — ожидаемо).
+
+СВЕРКА (правило 8): Kimai reporting «динамика/тренд» — помесячный ряд факт vs норма + util%. Не переусложнял (12 точек → без пагинации, фильтр только по отделу).
+
+**[follow-up Dev 1] UI тренда** — линия/столбцы факт vs норма + util% по месяцам. Бэкенд-контракт готов (секция timeseries в REPORTS_CONTRACT.md), фронт ничего не пересчитывает.
+
+НЕ коммитил, НЕ деплоил. Зона: reports-calc.ts / reports.logic.ts / REPORTS_CONTRACT.md + reports-calc.test.ts.
+
+— Dev 2

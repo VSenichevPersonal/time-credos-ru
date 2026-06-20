@@ -4,9 +4,11 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import { validDateParam } from './params-validate';
+import { computeDetail, detailToCsv } from './reports-detail';
 import {
   computeOlap,
   computeReports,
+  computeTimeseries,
   type OlapDimension,
   type OlapFilter,
   type OlapSort,
@@ -187,6 +189,28 @@ const run = async (event: RoutePayload) => {
     workTypes,
     assignments,
   };
+
+  // C4: тренд утилизации по месяцам. mode=timeseries (или groupBy=month) →
+  // массив точек [{month, fact, client, norm, util, under}] за период, опц. фильтр отдела.
+  if (params.mode === 'timeseries' || params.groupBy === 'month') {
+    return computeTimeseries(input, { from, to }, { departmentId: params.departmentId ?? null });
+  }
+
+  // reports MVP: groupBy=detail → лист отдельных записей (7 колонок) + опц. CSV.
+  // Фильтры deptId/projectId/employeeId сравниваются в памяти (не идут в REST-
+  // filter) → инъекции нет. format=csv → CSV-строка в ответе (content-type не
+  // поддержан песочницей; фронт делает Blob-download).
+  if (params.groupBy === 'detail') {
+    const rows = computeDetail(input, {
+      deptId: params.deptId ?? null,
+      projectId: params.projectId ?? null,
+      employeeId: params.employeeId ?? null,
+    });
+    if (params.format === 'csv') {
+      return { ok: true, format: 'csv', count: rows.length, csv: detailToCsv(rows) };
+    }
+    return { ok: true, groupBy: 'detail', period: { from, to }, count: rows.length, rows };
+  }
 
   // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.
   if (olap) {

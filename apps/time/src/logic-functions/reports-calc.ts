@@ -698,8 +698,8 @@ export type TimeseriesPoint = {
 };
 
 export type TimeseriesParams = {
-  // Опц. фильтр отдела: считать только записи/норму этого отдела (по его коду или id).
-  // null/undefined → весь воркспейс (все отделы).
+  // Опц. фильтр отдела: считать только записи/норму этого отдела (по его id,
+  // как в OLAP-фильтрах). null/undefined → весь воркспейс (все отделы).
   departmentId?: string | null;
 };
 
@@ -720,7 +720,6 @@ export const computeTimeseries = (
   const deptFilter = params.departmentId ?? null;
 
   const projById = new Map(projects.map((p) => [p.id, p]));
-  const deptById = new Map(departments.map((d) => [d.id, d]));
   const empById = new Map(employees.map((e) => [e.id, e]));
 
   const isClient = (projectId: string | null): boolean =>
