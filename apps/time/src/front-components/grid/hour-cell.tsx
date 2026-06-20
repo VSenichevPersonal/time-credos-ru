@@ -18,6 +18,7 @@ type Props = {
   onCommit: (hours: number) => void;
   onKey: (e: { key: string; shiftKey: boolean }) => void; // навигация (родитель)
   onSeedConsumed: () => void;
+  onFill?: () => void; // U5: заполнить будни строки значением этой ячейки
 };
 
 export const HourCell = ({
@@ -31,6 +32,7 @@ export const HourCell = ({
   onCommit,
   onKey,
   onSeedConsumed,
+  onFill,
 }: Props) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
