@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   BILLING_DOC_TYPE_LABELS,
   DEPARTMENT_LABELS,
+  DEPARTMENT_SHORT_LABELS,
   ENTRY_STATUS_LABELS,
   WEEKLY_NORM_HOURS,
   WORK_CATEGORY_LABELS,
   WORK_TYPE_GROUP_LABELS,
+  departmentLabel,
 } from 'src/constants/labels';
 import {
   BILLING_DOC_TYPE_OPTIONS,

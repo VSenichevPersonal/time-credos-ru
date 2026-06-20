@@ -3,8 +3,12 @@ import { Bar } from 'src/front-components/reports/bar';
 import { CategoryBar, CategoryChip, CategoryLegend } from 'src/front-components/reports/category-bar';
 import { Explainable, type ExplainPart } from 'src/front-components/shared/explainable';
 import { categoryMeta } from 'src/front-components/shared/category-meta';
+import { useSortable } from 'src/front-components/shared/use-sortable';
+import { SortHeader } from 'src/front-components/shared/sort-header';
 import { departmentLabel } from 'src/constants/labels';
 import type { GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
+
+type SortKey = 'name' | 'fact' | 'metric' | 'tail';
 
 // Таблица среза. Структура зависит от оси (DP-0003):
 //  • Проект (= одна категория) → ЧИП категории + бюджет «факт/план» + остаток.
@@ -55,6 +59,25 @@ type Props = { groupBy: GroupBy; rows: ReportRow[] };
 export const BreakdownTable = ({ groupBy, rows }: Props) => {
   const isProject = groupBy === 'project';
   const maxFact = Math.max(1, ...rows.map((r) => r.fact));
+  const { key: sortKey, dir, toggle, sort } = useSortable<SortKey>('fact');
+
+  // DP-0004: сортировка по выбранной колонке (имя/факт/метрика/хвост).
+  const sortValue = (r: ReportRow): number | string => {
+    const p = r as ProjectRow;
+    switch (sortKey) {
+      case 'name':
+        return rowName(groupBy, r).toLowerCase();
+      case 'metric':
+        return isProject ? p.plannedEffort ?? -1 : r.util ?? -1;
+      case 'tail':
+        return isProject
+          ? p.plannedEffort != null ? p.plannedEffort - r.fact : -1e9
+          : r.under ?? -1e9;
+      default:
+        return r.fact;
+    }
+  };
+  const sorted = sort(rows, sortValue);
 
   const present = new Set<string>();
   for (const r of rows) for (const c of r.byCategory ?? []) present.add(c.category);
@@ -85,15 +108,23 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
             zIndex: 1,
           }}
         >
-          <span style={cell()}>{isProject ? 'Проект' : groupBy === 'dept' ? 'Отдел' : 'Сотрудник'}</span>
+          <span style={cell()}>
+            <SortHeader label={isProject ? 'Проект' : groupBy === 'dept' ? 'Отдел' : 'Сотрудник'} active={sortKey === 'name'} dir={dir} onSort={() => toggle('name')} />
+          </span>
           <span style={cell()}>{isProject ? 'Бюджет' : 'Загрузка'}</span>
           <span style={cell()}>{isProject ? 'Категория' : 'Категории'}</span>
-          <span style={cell('right')}>Факт, ч</span>
-          <span style={cell('right')}>{isProject ? 'План, ч' : 'Утил.'}</span>
-          <span style={cell('right')}>{isProject ? 'Остаток' : 'Недогруз'}</span>
+          <span style={cell('right')}>
+            <SortHeader label="Факт, ч" align="right" active={sortKey === 'fact'} dir={dir} onSort={() => toggle('fact')} />
+          </span>
+          <span style={cell('right')}>
+            <SortHeader label={isProject ? 'План, ч' : 'Утил.'} align="right" active={sortKey === 'metric'} dir={dir} onSort={() => toggle('metric')} />
+          </span>
+          <span style={cell('right')}>
+            <SortHeader label={isProject ? 'Остаток' : 'Недогруз'} align="right" active={sortKey === 'tail'} dir={dir} onSort={() => toggle('tail')} />
+          </span>
         </div>
 
-        {rows.map((r, i) => {
+        {sorted.map((r, i) => {
           const p = r as ProjectRow;
           const rest = isProject && p.plannedEffort ? p.plannedEffort - r.fact : null;
           const under = underTone(r.under);

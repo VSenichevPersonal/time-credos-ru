@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1043 + 15 todo** (38 файлов, все зелёные) |
+| unit-тестов | **1096 + 15 todo** (41 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |

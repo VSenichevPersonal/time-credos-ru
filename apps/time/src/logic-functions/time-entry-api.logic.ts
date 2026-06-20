@@ -3,6 +3,7 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 
 import { TIME_ENTRY_API_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
+import { ENTRY_STATUS } from 'src/constants/approval';
 import { isIsoDate, isUuid } from './params-validate';
 
 // /s/time-entry — CRUD трудозатрат для front-компонента (песочница без доступа к БД).
@@ -131,6 +132,8 @@ const run = async (event: RoutePayload) => {
   const params = readParams(event);
   // Один POST-маршрут /s/time-entry; операция выбирается полем `op`.
   const op = params.op ?? 'list';
+  // CISO-006: синхронный UUID-guard до сетевого resolveEmployeeId — fail fast.
+  if (params.id && !isUuid(params.id)) return { ok: false, error: 'invalid id' };
   const employeeId = await resolveEmployeeId(params.workspaceMemberRef);
 
   // delete — удаление записи по id.
@@ -138,12 +141,17 @@ const run = async (event: RoutePayload) => {
     if (!params.id) return { ok: false, error: 'id required' };
     // CISO-006: id идёт в REST-путь — только UUID (защита от инъекции в path).
     if (!isUuid(params.id)) return { ok: false, error: 'invalid id' };
-    // Читаем projectId до удаления — после DELETE запись недоступна.
-    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null }> } }>(
+    // Читаем status + projectId до удаления (CISO-011 guard + rollup пересчёт).
+    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
       '/rest/credosTimeEntries',
       { filter: `id[eq]:${params.id}`, limit: '1' },
     );
-    const deletedProjectId = preRes.data?.credosTimeEntries?.[0]?.projectId ?? null;
+    const preEntry = preRes.data?.credosTimeEntries?.[0];
+    // CISO-011: согласованные записи нельзя удалять — целостность табеля/1С.
+    if (preEntry?.status === ENTRY_STATUS.APPROVED) {
+      return { ok: false, error: 'cannot_modify_approved' };
+    }
+    const deletedProjectId = preEntry?.projectId ?? null;
     await api.delete(`/rest/credosTimeEntries/${params.id}`);
     if (deletedProjectId && isUuid(deletedProjectId)) {
       await recalcProjectFactHours(deletedProjectId);
@@ -172,12 +180,17 @@ const run = async (event: RoutePayload) => {
     };
 
     if (params.id) {
-      // Читаем старый projectId (мог измениться при update) — оба пересчитываем.
-      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null }> } }>(
+      // Читаем status + старый projectId (CISO-011 guard + rollup пересчёт).
+      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
         '/rest/credosTimeEntries',
         { filter: `id[eq]:${params.id}`, limit: '1' },
       );
-      const prevProjectId = prevRes.data?.credosTimeEntries?.[0]?.projectId ?? null;
+      const prevEntry = prevRes.data?.credosTimeEntries?.[0];
+      // CISO-011: согласованные записи нельзя изменять — целостность табеля/1С.
+      if (prevEntry?.status === ENTRY_STATUS.APPROVED) {
+        return { ok: false, error: 'cannot_modify_approved' };
+      }
+      const prevProjectId = prevEntry?.projectId ?? null;
       const res = await api.patch<{ data: { updateCredosTimeEntry: TimeEntry } }>(
         `/rest/credosTimeEntries/${params.id}`,
         data,

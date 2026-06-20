@@ -7,7 +7,11 @@ import { KpiCards } from 'src/front-components/reports/kpi-cards';
 import { BreakdownTable } from 'src/front-components/reports/breakdown-table';
 import { usePeriod, type PeriodGran } from 'src/front-components/reports/use-period';
 import { useReports } from 'src/front-components/reports/use-reports';
-import type { GroupBy, ReportRow } from 'src/front-components/reports/report-types';
+import { FilterChip, type Option } from 'src/front-components/grid/filter-chip';
+import { WORK_CATEGORY_OPTIONS } from 'src/constants/select-options';
+import type { GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
+
+const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
 // Дашборд «Отчёты»: утилизация + загрузка/недогруз по периоду и срезу
 // (отдел/проект/человек). Данные — /s/reports. Светлая тема, тинт-нейтрали.
@@ -78,7 +82,21 @@ const pickRows = (
 export const ReportsDashboard = () => {
   const { period, gran, isCurrent, prev, next, setGran } = usePeriod();
   const [groupBy, setGroupBy] = useState<GroupBy>('dept');
+  const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
   const { loading, error, data } = useReports(period.from, period.to, groupBy);
+
+  // DP-0004 P1: фильтр по категории — осмыслен в срезе «Проекты» (проект = 1 категория).
+  const toggleCat = (v: string) =>
+    setCatFilter((prev) => {
+      const next = new Set(prev);
+      if (next.has(v)) next.delete(v);
+      else next.add(v);
+      return next;
+    });
+  const filterRows = (rows: ReportRow[]): ReportRow[] =>
+    groupBy === 'project' && catFilter.size > 0
+      ? rows.filter((r) => catFilter.has((r as ProjectRow).category ?? ''))
+      : rows;
 
   return (
     <div
@@ -115,6 +133,15 @@ export const ReportsDashboard = () => {
           ]}
           onChange={(g: PeriodGran) => setGran(g)}
         />
+        {groupBy === 'project' && (
+          <FilterChip
+            label="Категория"
+            options={CATEGORY_OPTS}
+            selected={catFilter}
+            onToggle={toggleCat}
+            onClear={() => setCatFilter(new Set())}
+          />
+        )}
         <span style={{ marginLeft: 'auto' }}>
           <Segmented
             ariaLabel="Срез группировки"
@@ -149,7 +176,7 @@ export const ReportsDashboard = () => {
               background: T.surface,
             }}
           >
-            <BreakdownTable groupBy={groupBy} rows={pickRows(groupBy, data)} />
+            <BreakdownTable groupBy={groupBy} rows={filterRows(pickRows(groupBy, data))} />
           </div>
         </div>
       )}
