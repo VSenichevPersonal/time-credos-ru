@@ -488,7 +488,6 @@ AiContextSchema (Модель контекста)
 
 AiPrompt (Запрос к ИИ)
   ├── привязан к AiContextSchema
-  ├── содержит system prompt + user prompt template
   └── привязан к типу сущности (Проект, Задача, Сделка)
 
 Agent (Агент)

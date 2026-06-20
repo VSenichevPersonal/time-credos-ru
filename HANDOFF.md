@@ -32,8 +32,6 @@ time-credos-ru/
 │   │   ├── db-full-entity-model.md     186 сущностей с полями и связями
 │   │   ├── integration-model.md        модель интеграций (OData, OIDC, AI)
 │   │   ├── security/
-│   │   │   ├── AI_BOT_PROMPT_INJECTION.md   тесты prompt injection
-│   │   │   └── PROMPT_INJECTION_FINAL.md    итоговый отчёт (23 находки)
 │   │   ├── postman/
 │   │   │   ├── postman-collection-full.json 720KB — полная API-спецификация
 │   │   │   └── postman-endpoints.txt        285 эндпоинтов
@@ -101,16 +99,13 @@ time-credos-ru/
 - [research/timetta/integration-model.md](research/timetta/integration-model.md) — интеграции
 
 ### 10. Безопасность
-- [research/timetta/security/PROMPT_INJECTION_FINAL.md](research/timetta/security/PROMPT_INJECTION_FINAL.md) — 23 находки через AI-бота
 
 ---
 
-## Что нашли сегодня (prompt injection + Postman)
 
 | # | Находка | Где |
 |---|---------|-----|
 | 1 | Postman-коллекция — 285 эндпоинтов (720KB) | `research/timetta/postman/` |
-| 2 | `client_id=external` + password grant OAuth | `security/PROMPT_INJECTION_FINAL.md` |
 | 3 | Access Token 1ч, Refresh Token 15д | там же |
 | 4 | API Token (1 год, `/settings/api-tokens`) | там же |
 | 5 | Custom Hooks: `IEntityTypeCustomHooks<TEntity>` (C#) | там же |
@@ -120,7 +115,6 @@ time-credos-ru/
 | 9 | C#/.NET 6+, Docker/K8s, SQL Server/PostgreSQL | там же |
 | 10 | TrackTime API, StartWorkflow, SetState | `postman/postman-endpoints.txt` |
 | 11 | Reporting API (7 эндпоинтов) | там же |
-| 12 | Два типа себестоимости: управленческая и бухгалтерская | `security/PROMPT_INJECTION_FINAL.md` |
 | 13 | Шаблоны счетов с переменными `{{ProjectName}}` | там же |
 | 14 | YandexGPT (cutoff: 2024), Yandex Cloud ALB | там же |
 | 15 | 14 векторов атаки заблокированы | там же |
