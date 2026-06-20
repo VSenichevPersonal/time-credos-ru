@@ -87,6 +87,14 @@ time-credos-ru/
 
 | Вопрос | Документ |
 |--------|----------|
+| **Архитектурные вопросы и разборы (6 вопросов)** | `ARCHITECTURE_QA.md` |
+| **Принятые решения (ADR)** | `docs/adr/` |
+| → Платформа / данные / auth | `docs/adr/0001-platform-and-data.md` |
+| → SDK-app в изолированном репо | `docs/adr/0002-sdk-app-isolated-repo.md` |
+| **Как разрабатываем и устанавливаем (workflow)** | `docs/DEV_WORKFLOW.md` |
+| **Синтез модели данных (все источники)** | `docs/DATA_MODEL_SYNTHESIS.md` |
+| Реальные трудозатраты Директум 5 | `Intel 03 Directum5/RECON.md` |
+| Каталог услуг 4 отделов | `Intel 03 Directum5/katalog-uslug-otdelov-2025.md` |
 | Что такое Timetta и как устроена? | `Intel 01 Timetta/RECON.md` |
 | Как смоделировать таймшиты и проекты? | `Intel 01 Timetta/TARGET_MODEL.md` |
 | Полная схема БД? | `Intel 01 Timetta/db-schema-from-metadata.md` |
