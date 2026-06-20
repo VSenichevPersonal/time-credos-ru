@@ -88,6 +88,9 @@ export const DeptRows = ({
               onSaveDeptPlan={onSaveDeptPlan}
               sharesByProject={sharesByProject}
               deptById={deptById}
+              metric={metric}
+              deptCells={cells}
+              currentDeptId={dept.id}
             />
           )}
         </div>

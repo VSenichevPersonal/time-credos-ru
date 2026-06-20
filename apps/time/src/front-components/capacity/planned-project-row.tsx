@@ -127,30 +127,79 @@ export const PlannedProjectRow = ({
           </div>
         ))}
       </div>
-      {open &&
-        breakdown.map((b) => (
-          <div key={b.departmentId ?? 'none'} style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+      {open && (
+        <>
+          {breakdown.map((b) => {
+            const isCurrent = currentDeptId != null && b.departmentId === currentDeptId;
+            return (
+              <div key={b.departmentId ?? 'none'} style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, background: isCurrent ? T.accentSoft : T.bg }}>
+                <div
+                  style={{
+                    width: nameWidth,
+                    minWidth: nameWidth,
+                    padding: '0 12px 0 44px',
+                    height: 28,
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRight: `1px solid ${T.border}`,
+                    background: isCurrent ? T.accentSoft : T.bg,
+                    fontSize: 11.5,
+                    color: isCurrent ? T.text : T.textFaint,
+                    fontWeight: isCurrent ? 600 : 400,
+                    position: 'sticky',
+                    left: 0,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={deptCrumb(b.departmentId, deptById)}
+                >
+                  {deptCrumb(b.departmentId, deptById)}{isCurrent ? ' · этот отдел' : ''}
+                </div>
+                {periods.map((p, i) => (
+                  <div
+                    key={p.key}
+                    style={{
+                      flex: 1,
+                      minWidth: 56,
+                      height: 28,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRight: `1px solid ${T.border}`,
+                      fontSize: 11,
+                      color: b.perPeriod[i] > 0 ? (isCurrent ? T.text : T.textMuted) : T.textFaint,
+                      fontWeight: isCurrent ? 600 : 400,
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    {cellNum(b.perPeriod[i])}
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+          {/* Σ проект: доли всех отделов сходятся к плану проекта (всегда в часах). */}
+          <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, background: T.bg }}>
             <div
               style={{
                 width: nameWidth,
                 minWidth: nameWidth,
                 padding: '0 12px 0 44px',
-                height: 28,
+                height: 26,
                 display: 'flex',
                 alignItems: 'center',
                 borderRight: `1px solid ${T.border}`,
                 background: T.bg,
-                fontSize: 11.5,
-                color: T.textFaint,
+                fontSize: 11,
+                fontWeight: 600,
+                color: T.textMuted,
                 position: 'sticky',
                 left: 0,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
               }}
-              title={deptCrumb(b.departmentId, deptById)}
+              title="Сумма долей всех отделов = плановые часы проекта"
             >
-              {deptCrumb(b.departmentId, deptById)}
+              Σ проект, ч
             </div>
             {periods.map((p, i) => (
               <div
@@ -158,21 +207,23 @@ export const PlannedProjectRow = ({
                 style={{
                   flex: 1,
                   minWidth: 56,
-                  height: 28,
+                  height: 26,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRight: `1px solid ${T.border}`,
                   fontSize: 11,
-                  color: b.perPeriod[i] > 0 ? T.textMuted : T.textFaint,
+                  fontWeight: 600,
+                  color: projTotal[i] > 0 ? T.textMuted : T.textFaint,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                {cellNum(b.perPeriod[i])}
+                {cellNum(projTotal[i])}
               </div>
             ))}
           </div>
-        ))}
+        </>
+      )}
     </>
   );
 };

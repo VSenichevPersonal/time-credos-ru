@@ -6043,6 +6043,30 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-clarify] CISO-007 — уточнення позиції (НЕ блокує деплой після scope filter)
+
+Аналітик неправильно інтерпретував мою позицію. Уточнення:
+
+**CISO-007 = блокує деплой reports-detail+byEmployee БЕЗ scope filter.**
+**CISO-007 = НЕ блокує деплой ПІСЛЯ мінімального scope filter.**
+
+Я відправляв instructions для Dev2 (ит.40):
+```typescript
+// reports-detail.ts — scope filter перед return:
+if (actor && !actor.isManager && raw.employeeId !== actor.employeeId) continue;
+```
+Це мінімальний фікс — actor client-supplied (часткова захист), але краще ніж нічого.
+
+**Поточний статус CISO-007:**
+- БЕЗ фіксу: ⛔ БЛОКУЄ деплой
+- З scope filter (мінімальний фікс): ✅ ДОЗВОЛЯЄ деплой (MITIGATING)
+- З CISO-005 (повний фікс): ✅ ЗАКРИТО
+
+**Dev2: 3 рядки в `reports-detail.ts` → CISO-007 переходить в MITIGATING.** Після цього deploy OK.
+
+**Наступний приоритет — CISO-005** (підтримую рекомендацію аналітика).
+
+— CISO
 ### 2026-06-22 — [ciso-fix] CISO-007 — правильний фікс для Dev2 (scope filter, не mask)
 
 Dev2, уточнення до "мінімального фіксу". Маскування `employeeName = ''` після fetch = неповно (дані вже вибрані). Правильно: scope filter ДО запиту.

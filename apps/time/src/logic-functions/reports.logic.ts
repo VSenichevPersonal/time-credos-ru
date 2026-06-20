@@ -3,7 +3,7 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 
 import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
-import { validDateParam } from './params-validate';
+import { isUuid, validDateParam } from './params-validate';
 import { computeDetail, detailToCsv } from './reports-detail';
 import {
   computeOlap,
@@ -141,6 +141,21 @@ const readOlap = (
   const limit = params.limit ? Number(params.limit) : undefined;
   const cursor = params.cursor ?? null;
   return { groupBy: gb as OlapDimension, filters, limit, cursor, sort };
+};
+
+// CISO-007/152-ФЗ: detail-отчёт отдаёт ФИО (employeeName) — нужен role-guard.
+// Резолв актора по workspaceMemberRef (зеркало approval.logic; SSOT-extract —
+// follow-up). CISO-006: workspaceMemberRef в filter → только UUID. Полная
+// серверная цепочка (identity без client-params) — после CISO-005.
+type Actor = { employeeId: string; isManager: boolean } | null;
+const resolveActor = async (workspaceMemberRef: string | undefined): Promise<Actor> => {
+  if (!workspaceMemberRef || !isUuid(workspaceMemberRef)) return null;
+  const res = await restGet<{ data: { credosTimeEmployees: Array<{ id: string; isManager: boolean | null }> } }>(
+    '/rest/credosTimeEmployees',
+    { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
+  );
+  const e = res.data?.credosTimeEmployees?.[0];
+  return e ? { employeeId: e.id, isManager: e.isManager === true } : null;
 };
 
 const run = async (event: RoutePayload) => {
