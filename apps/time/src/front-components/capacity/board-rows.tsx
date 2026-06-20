@@ -14,6 +14,7 @@ import type {
   EmployeeRef,
   LoadCell,
   Period,
+  ProjectPatch,
 } from 'src/front-components/capacity/types';
 
 type DeptProps = {
@@ -25,6 +26,8 @@ type DeptProps = {
   metric: CellMetric;
   expanded: Set<string>;
   onToggle: (id: string) => void;
+  planning?: boolean;
+  onSavePlan?: (id: string, patch: ProjectPatch) => Promise<boolean>;
 };
 
 // Срез «Отделы»: раскрываемые строки отделов с детализацией проектов.
@@ -37,6 +40,8 @@ export const DeptRows = ({
   metric,
   expanded,
   onToggle,
+  planning,
+  onSavePlan,
 }: DeptProps) => (
   <>
     {departments.map((dept) => {
@@ -61,6 +66,8 @@ export const DeptRows = ({
               unplanned={detail.unplanned}
               periods={periods}
               nameWidth={nameWidth}
+              planning={planning}
+              onSave={onSavePlan}
             />
           )}
         </div>

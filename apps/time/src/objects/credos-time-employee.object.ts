@@ -6,8 +6,11 @@ import {
 } from 'twenty-sdk/define';
 
 import {
+  CREDOS_TIME_ABSENCE_EMPLOYEE_FIELD_ID,
+  CREDOS_TIME_ABSENCE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_ABSENCES_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
@@ -124,6 +127,19 @@ export default defineObject({
         CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
         CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+      universalSettings: { relationType: RelationType.ONE_TO_MANY },
+    },
+    // Обратная сторона Absence.employee (ONE_TO_MANY) — отсутствия сотрудника (F-D).
+    {
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_ABSENCES_FIELD_ID,
+      name: 'absences',
+      type: FieldType.RELATION,
+      label: 'Отсутствия',
+      icon: 'IconBeach',
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_ABSENCE_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_ABSENCE_EMPLOYEE_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

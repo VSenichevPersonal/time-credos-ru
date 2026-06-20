@@ -32,3 +32,17 @@ describe('REST filter injection (CISO-006)', () => {
   it.todo('workspaceMemberRef с запятой/доп-условием отвергается (усиление CISO-005)');
   it.todo('params.ids: каждый id матчит UUID_RE перед filter id[eq]:${id}');
 });
+
+// CISO-007 (P2): /s/reports отдаёт byEmployee (ФИО+переработки 42 сотрудников)
+// любому аутентифицированному юзеру без role-guard. Подтверждено live QA-smoke
+// (byEmployee=42 строки, без isManager-проверки). reports.logic.ts run().
+describe('reports data disclosure (CISO-007)', () => {
+  it.todo('byEmployee пуст для не-менеджера (canSeeAll=actor.isManager)');
+  it.todo('byEmployee виден только руководителю; после CISO-005 — scope по отделу actor');
+  it.todo('from/to в reports.logic валидируются (DATE_RE) — те же filter-точки CISO-006');
+});
+
+// CISO-008 (P3): credosTimeAbsence.note — потенц. мед. ПДн (спецкатегория 152-ФЗ).
+describe('absence PII (CISO-008)', () => {
+  it.todo('absence.note: help/placeholder предупреждает не вводить диагноз/мед. сведения');
+});

@@ -56,6 +56,13 @@ export type LoadCell = {
   ratio: number | null; // load/capacity (null если ёмкость 0)
 };
 
+// Патч плана проекта (ввод руководителем). undefined-поля не трогаются.
+export type ProjectPatch = {
+  plannedEffort?: number | null;
+  startDate?: string | null; // YYYY-MM-DD
+  endDate?: string | null; // YYYY-MM-DD
+};
+
 // Вклад проекта в загрузку отдела за период (для детализации).
 export type ProjectLoad = {
   project: CapProject;

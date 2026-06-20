@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   fetchCalendar,
   fetchDepartments,
   fetchEmployees,
   fetchProjects,
+  resolveSelfIsManager,
 } from 'src/front-components/capacity/capacity-rest';
 import { buildPeriods } from 'src/front-components/capacity/calc-load';
 import type {
@@ -30,18 +31,21 @@ const horizonRange = (anchor: Date, g: Granularity): { from: string; to: string 
 type State = {
   loading: boolean;
   error: string | null;
+  isManager: boolean;
   departments: DeptRef[];
   employees: EmployeeRef[];
   projects: CapProject[];
   calendar: CalendarDay[];
 };
 
-// Загрузка данных доски + расчёт колонок горизонта.
+// Загрузка данных доски + расчёт колонок горизонта. reloadProjects() — точечный
+// рефетч проектов после правки плана (пересчёт загрузки на лету, без всей доски).
 export const useCapacity = (granularity: Granularity) => {
   const anchor = useMemo(() => new Date(), []);
   const [state, setState] = useState<State>({
     loading: true,
     error: null,
+    isManager: false,
     departments: [],
     employees: [],
     projects: [],
@@ -56,10 +60,19 @@ export const useCapacity = (granularity: Granularity) => {
       fetchEmployees(),
       fetchProjects(),
       fetchCalendar(range.from, range.to),
+      resolveSelfIsManager(null),
     ])
-      .then(([departments, employees, projects, calendar]) => {
+      .then(([departments, employees, projects, calendar, isManager]) => {
         if (!alive) return;
-        setState({ loading: false, error: null, departments, employees, projects, calendar });
+        setState({
+          loading: false,
+          error: null,
+          isManager,
+          departments,
+          employees,
+          projects,
+          calendar,
+        });
       })
       .catch((e: unknown) => {
         if (!alive) return;
@@ -71,10 +84,15 @@ export const useCapacity = (granularity: Granularity) => {
     };
   }, [anchor, granularity]);
 
+  const reloadProjects = useCallback(async () => {
+    const projects = await fetchProjects();
+    setState((s) => ({ ...s, projects }));
+  }, []);
+
   const periods: Period[] = useMemo(
     () => buildPeriods(anchor, state.calendar, granularity, HORIZON[granularity]),
     [anchor, state.calendar, granularity],
   );
 
-  return { ...state, periods, anchor };
+  return { ...state, periods, anchor, reloadProjects };
 };

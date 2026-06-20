@@ -33,6 +33,9 @@ export type RawDepartment = {
 };
 export type RawCalendarDay = { hours: number | null; dayType: string | null };
 
+// Разбивка часов по категории (R3-D2): доля категории внутри строки.
+export type CategoryShare = { category: string; hours: number; share: number | null };
+
 export type Row = {
   key: string;
   name: string;
@@ -41,6 +44,7 @@ export type Row = {
   norm: number | null;
   util: number | null;
   under: number | null;
+  byCategory: CategoryShare[];
 };
 
 export type ReportsInput = {
@@ -113,38 +117,60 @@ export const computeReports = (
     return e.projectId ? (projById.get(e.projectId)?.departmentId ?? null) : null;
   };
 
-  const accDept = new Map<string, { fact: number; client: number }>();
-  const accProject = new Map<string, { fact: number; client: number }>();
-  const accEmployee = new Map<string, { fact: number; client: number }>();
+  // Категория записи = категория её проекта (UPPER_CASE), иначе 'OTHER' (R3-D2).
+  const catOfEntry = (e: RawEntry): string =>
+    (e.projectId ? projById.get(e.projectId)?.category : null) ?? 'OTHER';
+
+  type Acc = { fact: number; client: number; cats: Map<string, number> };
+  const accDept = new Map<string, Acc>();
+  const accProject = new Map<string, Acc>();
+  const accEmployee = new Map<string, Acc>();
+  const totalCats = new Map<string, number>();
   let totalFact = 0;
   let totalClient = 0;
 
   const bump = (
-    map: Map<string, { fact: number; client: number }>,
+    map: Map<string, Acc>,
     key: string | null,
     hours: number,
     client: number,
+    cat: string,
   ): void => {
     if (!key) return;
-    const cur = map.get(key) ?? { fact: 0, client: 0 };
+    const cur = map.get(key) ?? { fact: 0, client: 0, cats: new Map<string, number>() };
     cur.fact += hours;
     cur.client += client;
+    cur.cats.set(cat, (cur.cats.get(cat) ?? 0) + hours);
     map.set(key, cur);
   };
+
+  // byCategory[] из карты категория→часы, доля = часы/факт (отсортировано по убыв.).
+  const buildCats = (cats: Map<string, number> | undefined, fact: number): CategoryShare[] =>
+    [...(cats?.entries() ?? [])]
+      .map(([category, hours]) => ({
+        category,
+        hours: Number(hours.toFixed(2)),
+        share: fact > 0 ? Number((hours / fact).toFixed(4)) : null,
+      }))
+      .sort((a, b) => b.hours - a.hours);
 
   for (const e of entries) {
     const hours = e.hours ?? 0;
     if (hours === 0) continue;
     const client = isClient(e.projectId) ? hours : 0;
+    const cat = catOfEntry(e);
     totalFact += hours;
     totalClient += client;
-    bump(accDept, deptOfEntry(e), hours, client);
-    bump(accProject, e.projectId, hours, client);
-    bump(accEmployee, e.employeeId, hours, client);
+    totalCats.set(cat, (totalCats.get(cat) ?? 0) + hours);
+    bump(accDept, deptOfEntry(e), hours, client, cat);
+    bump(accProject, e.projectId, hours, client, cat);
+    bump(accEmployee, e.employeeId, hours, client, cat);
   }
 
+  const EMPTY_ACC: Acc = { fact: 0, client: 0, cats: new Map<string, number>() };
+
   const byDept: Row[] = departments.map((d) => {
-    const a = accDept.get(d.id) ?? { fact: 0, client: 0 };
+    const a = accDept.get(d.id) ?? EMPTY_ACC;
     return finalize({
       key: d.id,
       name: d.code ?? d.id,
@@ -153,13 +179,14 @@ export const computeReports = (
       norm: Number(deptNorm(d).toFixed(2)),
       util: null,
       under: null,
+      byCategory: buildCats(a.cats, a.fact),
     });
   });
 
   const byProject: ProjectRow[] = projects
     .filter((p) => accProject.has(p.id))
     .map((p) => {
-      const a = accProject.get(p.id) ?? { fact: 0, client: 0 };
+      const a = accProject.get(p.id) ?? EMPTY_ACC;
       const planned = p.plannedEffort;
       return {
         ...finalize({
@@ -170,6 +197,7 @@ export const computeReports = (
           norm: null,
           util: null,
           under: null,
+          byCategory: buildCats(a.cats, a.fact),
         }),
         code: p.code,
         category: p.category,
@@ -182,7 +210,7 @@ export const computeReports = (
   const byEmployee: (Row & { dept: string | null })[] = employees
     .filter((e) => accEmployee.has(e.id))
     .map((e) => {
-      const a = accEmployee.get(e.id) ?? { fact: 0, client: 0 };
+      const a = accEmployee.get(e.id) ?? EMPTY_ACC;
       const d = e.departmentId ? deptById.get(e.departmentId) : undefined;
       return {
         ...finalize({
@@ -193,6 +221,7 @@ export const computeReports = (
           norm: Number(empNorm(e).toFixed(2)),
           util: null,
           under: null,
+          byCategory: buildCats(a.cats, a.fact),
         }),
         dept: d?.code ?? null,
       };
@@ -211,6 +240,7 @@ export const computeReports = (
       norm: Number(totalNorm.toFixed(2)),
       util: null,
       under: null,
+      byCategory: buildCats(totalCats, totalFact),
     }),
     byDept,
     byProject,

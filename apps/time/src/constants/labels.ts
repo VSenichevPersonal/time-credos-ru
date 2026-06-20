@@ -2,6 +2,7 @@
 // Коды (id) — латиницей; пользователь всегда видит русское.
 
 import {
+  type AbsenceType,
   type BillingDocType,
   type DepartmentCode,
   type EntryStatus,
@@ -67,6 +68,14 @@ export const BILLING_DOC_TYPE_LABELS: Record<BillingDocType, string> = {
   Order: 'Заказ',
   Payment: 'Оплата',
   Act: 'Акт',
+};
+
+// Тип отсутствия (F-D)
+export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
+  Vacation: 'Отпуск',
+  Sick: 'Больничный',
+  Unpaid: 'Без содержания',
+  Other: 'Иное',
 };
 
 // Норма часов в неделю на сотрудника (для планирования загрузки)

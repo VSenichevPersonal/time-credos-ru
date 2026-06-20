@@ -27,3 +27,6 @@ export type EntryStatus = 'Draft' | 'Submitted' | 'Approved' | 'Rejected';
 
 // Тип документа 1С (BillingLink) — синхронизация позже
 export type BillingDocType = 'Order' | 'Payment' | 'Act';
+
+// Тип отсутствия (F-D) — вычитается из ёмкости сотрудника при планировании
+export type AbsenceType = 'Vacation' | 'Sick' | 'Unpaid' | 'Other';

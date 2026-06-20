@@ -2,6 +2,7 @@
 // Значения (id) — латиницей из domain-types; ярлыки — русские из labels.ts.
 
 import {
+  ABSENCE_TYPE_LABELS,
   BILLING_DOC_TYPE_LABELS,
   DEPARTMENT_LABELS,
   ENTRY_STATUS_LABELS,
@@ -9,6 +10,7 @@ import {
   WORK_TYPE_GROUP_LABELS,
 } from 'src/constants/labels';
 import {
+  type AbsenceType,
   type BillingDocType,
   type DepartmentCode,
   type EntryStatus,
@@ -152,6 +154,26 @@ export const BILLING_DOC_TYPE_OPTIONS: SelectOption[] = buildOptions(
   BILLING_DOC_TYPE_LABELS,
   BILLING_DOC_TYPE_COLORS,
 );
+
+// Тип отсутствия (F-D). Значения UPPER_CASE, ярлыки русские.
+const ABSENCE_TYPE_ORDER: ReadonlyArray<AbsenceType> = [
+  'Vacation',
+  'Sick',
+  'Unpaid',
+  'Other',
+];
+const ABSENCE_TYPE_COLORS: Record<AbsenceType, TagColor> = {
+  Vacation: 'blue',
+  Sick: 'red',
+  Unpaid: 'gray',
+  Other: 'orange',
+};
+export const ABSENCE_TYPE_OPTIONS: SelectOption[] = buildOptions(
+  ABSENCE_TYPE_ORDER,
+  ABSENCE_TYPE_LABELS,
+  ABSENCE_TYPE_COLORS,
+);
+export const ABSENCE_TYPE_DEFAULT = "'VACATION'";
 
 // Тип дня производственного календаря РФ. Значения UPPER_CASE (требование SDK),
 // ярлыки русские. Используется объектом credosTimeWorkdayCalendar.

@@ -5,7 +5,10 @@ import type {
   CapProject,
   DeptRef,
   EmployeeRef,
+  ProjectPatch,
 } from 'src/front-components/capacity/types';
+
+export type { ProjectPatch };
 
 // Доступ к Core REST воркспейса из песочницы. Те же права, что у роли приложения.
 // Читаем отделы (ёмкость), проекты (загрузка) и производственный календарь.
@@ -84,6 +87,41 @@ export const fetchEmployees = async (): Promise<EmployeeRef[]> => {
     name: e.name,
     departmentId: e.departmentId ?? null,
   }));
+};
+
+type RawSelf = { id: string; isManager?: boolean | null };
+
+// Текущий сотрудник руководитель? Резолв по workspaceMemberRef (как в timesheet);
+// на dev маппинг ref ещё не сопоставлен — fallback на первого активного, чтобы
+// режим планирования был проверяем. Не падаем при пустом результате.
+export const resolveSelfIsManager = async (
+  workspaceMemberRef: string | null,
+): Promise<boolean> => {
+  const c = client();
+  if (workspaceMemberRef) {
+    const byRef = await c.get<ListResp<RawSelf>>('/rest/credosTimeEmployees', {
+      query: { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
+    });
+    const found = pickList(byRef, 'credosTimeEmployees')[0];
+    if (found) return found.isManager === true;
+  }
+  const any = await c.get<ListResp<RawSelf>>('/rest/credosTimeEmployees', {
+    query: { filter: 'active[eq]:true', limit: '1', orderBy: 'isManager[DescNullsLast]' },
+  });
+  return pickList(any, 'credosTimeEmployees')[0]?.isManager === true;
+};
+
+// Правка плана проекта руководителем. plannedEffort — FLOAT (часы), endDate/startDate
+// — DATE_TIME (нужен ISO с временем). undefined-поля не трогаем.
+const toIso = (date: string | null): string | null =>
+  date ? `${date}T10:00:00.000Z` : null;
+
+export const patchProject = async (id: string, patch: ProjectPatch): Promise<void> => {
+  const data: Record<string, unknown> = {};
+  if ('plannedEffort' in patch) data.plannedEffort = patch.plannedEffort;
+  if ('startDate' in patch) data.startDate = toIso(patch.startDate ?? null);
+  if ('endDate' in patch) data.endDate = toIso(patch.endDate ?? null);
+  await client().patch(`/rest/credosTimeProjects/${id}`, data);
 };
 
 type RawDay = { date: string; hours?: number | null };

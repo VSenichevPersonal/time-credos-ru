@@ -186,3 +186,43 @@ describe('computeReports — util семантика + группировки (Q
     expect(res.totals.fact).toBe(3);
   });
 });
+
+describe('computeReports — byCategory (R3-D2)', () => {
+  it('totals.byCategory: часы+доля по категории, Σ часов == fact', () => {
+    const res = computeReports(base(), PERIOD); // CLIENT 6 + INTERNAL 2 = 8
+    const cats = res.totals.byCategory;
+    const client = cats.find((c) => c.category === 'CLIENT');
+    const internal = cats.find((c) => c.category === 'INTERNAL');
+    expect(client?.hours).toBe(6);
+    expect(client?.share).toBe(0.75); // 6/8
+    expect(internal?.hours).toBe(2);
+    expect(internal?.share).toBe(0.25);
+    expect(cats.reduce((s, c) => s + c.hours, 0)).toBe(res.totals.fact);
+  });
+
+  it('byCategory отсортирован по убыванию часов', () => {
+    const res = computeReports(base(), PERIOD);
+    const h = res.totals.byCategory.map((c) => c.hours);
+    expect(h).toEqual([...h].sort((a, b) => b - a));
+  });
+
+  it('byDept и byEmployee несут свою byCategory', () => {
+    const res = computeReports(base(), PERIOD);
+    expect(res.byEmployee[0].byCategory.find((c) => c.category === 'CLIENT')?.hours).toBe(6);
+    expect(res.byDept.find((r) => r.key === 'd1')?.byCategory.length).toBe(2);
+  });
+
+  it('запись без проекта/категории → бакет OTHER', () => {
+    const inp = base();
+    inp.entries = [{ hours: 4, projectId: null, employeeId: 'e1' }];
+    const res = computeReports(inp, PERIOD);
+    expect(res.totals.byCategory).toEqual([{ category: 'OTHER', hours: 4, share: 1 }]);
+  });
+
+  it('пустой период → byCategory пуст', () => {
+    const inp = base();
+    inp.entries = [];
+    const res = computeReports(inp, PERIOD);
+    expect(res.totals.byCategory).toEqual([]);
+  });
+});

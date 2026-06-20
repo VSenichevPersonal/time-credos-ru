@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-06-20 — P-D2: ввод планов (право PATCH + гейт) + REQ-0004
+
+- **Право PATCH (п.1) ✅:** REST PATCH `plannedEffort`/`startDate`/`endDate` на `credosTimeProjects` работает. Эмпирически: PATCH тест-проекта ОВ-2026-011 (`041af26a…`) plannedEffort 184→999 + сдвиг дат → HTTP 200, поля приняты; вернул в исходное (184 / 2026-01-12 / 2026-12-18, HTTP 200). Право на уровне роли уже есть в манифесте (`default-role.ts`: `canUpdateAllObjectRecords:true` + per-object `canUpdateObjectRecords` на 8 объектов после [bug]#1) — **роль править не нужно.** NB: эмпирический тест шёл под admin API-ключом (`TWENTY_DEV_API_KEY`); `TWENTY_APP_ACCESS_TOKEN` в env нет — право app-токена подтверждается манифестом роли, не отдельным прогоном.
+- **Гейт правки плана (п.2):** «план правит только руководитель» — **на уровне данных в SDK доп. проверки нет** (роль app общая, REST под сервис-токеном, право на PATCH бинарное на объект). Текущий гейт — **чисто фронтовый** (Dev 1, по `isManager`), как approval до REQ-0001. Зафиксировано как **известное ограничение dev** (аналог approval-guard) в REQ-0004 «Часть A». Реальный per-field/owner-гейт — native field-RBAC (нужна роль «Сотрудник») либо logic-функция (нужен actor-резолв из REQ-0001). Для v1 фронтовый гейт принят достаточным (план — не SoD-операция, риск ниже approval).
+- **REQ-0004 (п.3):** заведён `REQ-0004-plan-allocation.md` (PROPOSED) — `credosTimePlanAllocation`. NB нумерации: arch назвал «REQ-0003», но REQ-0003 уже занят контрактом `/s/reports` → стабильная нумерация даёт REQ-0004. Содержит: гейт правки плана (Часть A, field-RBAC), модель allocation (по сотруднику — уточнение arch 22:55: resource allocation/прогноз занятости), расчёт загрузки (Σ allocations иначе fallback `plannedEffort` равномерно), грид ввода по неделям, права, почему v1 (правка plannedEffort+endDate) первый шаг, связь CAPACITY_PLANNING §7. Удалил транзитный дубль `REQ-0004-plan-allocation-granular.md` (создавал параллельно, слил лучшее в канонический файл). Реестр README — REQ-0004 уже внесён.
+- **Без деплоя, без коммита** (dry-run-зона). Роль не трогал → `dev --once --dry-run` для роли не требуется; lint не запускал (правки только в docs/, кода не менял).
+
+---
+
 ## 2026-06-20 — онбординг + структура зоны
 
 **Сделано:**
@@ -70,6 +79,18 @@
 - **reports-calc.ts:** вынес чистый расчёт из reports.logic в тестируемый модуль (паттерн «calc в .ts»). `computeReports()` без сети. reports.logic = fetch+пагинация+вызов.
 - **бюджет-агрегат F-A:** `byProject` += `plannedEffort` + `budgetUsed` (факт/план, null без плана) для виджета «Бюджет» Dev1.
 - **reports-calc.test.ts:** 15 unit (vitest.unit.config) — edge по запросу arch: праздники вне нормы, 0 ёмкость→norm0/under=-fact, пустой период→util=null, capacityFactor 0.8, запись без employeeId→через проект, Σ byDept==totals, бюджет план/факт. Всё зелёное. oxlint/tsc чисто.
+
+---
+
+## 2026-06-20 — ВОЛНА-3 F-D «Отсутствия» phase 1 (data-model)
+
+Новый объект `credosTimeAbsence` (отпуск/больничный → ёмкость). Files:
+- `objects/credos-time-absence.object.ts` — type(SELECT VACATION/SICK/UNPAID/OTHER) + startDate/endDate(DATE_TIME) + note(TEXT) + employee(MANY_TO_ONE, CASCADE).
+- `objects/credos-time-employee.object.ts` — reverse `absences` (ONE_TO_MANY).
+- `views/credos-time-absence.view.ts` + `navigation-menu-items/...` (pitfalls: object→view→nav).
+- `constants/`: universal-identifiers (9 UUID), domain-types (`AbsenceType`), labels (`ABSENCE_TYPE_LABELS`), select-options (`ABSENCE_TYPE_OPTIONS`).
+- oxlint 0, tsc 0, **525 unit зелёных** (schema-guard 249 + uuid-guard 147 валидируют новый объект). Не деплою (arch).
+- **Phase 2 (следом):** отсутствия вычитаются из нормы — contract для reports-calc (norm − absence-дни) + capacity-доска Dev1.
 
 ---
 

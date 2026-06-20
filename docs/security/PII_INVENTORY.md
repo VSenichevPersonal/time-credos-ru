@@ -17,6 +17,9 @@
 | `credosTimeEmployee` | `department` (rel) | организац. | нет | принадлежность отделу | да |
 | `credosTimeEntry` | `hours`, `date`, `project`, `status` | чувств. (HR/коммерч.) | нет (но трудозатраты конкретного лица) | учёт времени | привязка к employee → косвенно профилирует |
 | `credosTimeEntry` | `approvedBy` | идентификатор actor | косвенно | аудит согласования | да |
+| `credosTimeAbsence` | `type` (SELECT) | HR | нет (тип: VACATION/SICK/UNPAID/OTHER) | планирование ёмкости | нейтральный код |
+| `credosTimeAbsence` | `note` (TEXT) | ⚠️ потенц. MEDICAL | **условно** | примечание к типу | ⚠️ **Не вносить диагнозы** — см. [CISO-008](findings/CISO-008-absence-pii.md). Инструкция пользователям обязательна до релиза. |
+| `credosTimeAbsence` | `startDate` / `endDate` | HR | нет (период отсутствия) | расчёт ёмкости | в совокупности с сотрудником — косвенно |
 
 ## Где хранится
 

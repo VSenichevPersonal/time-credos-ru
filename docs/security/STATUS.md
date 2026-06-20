@@ -16,6 +16,8 @@
 | CISO-003 | P3 | manager.role без field-level прав | Dev 2 (отложено) |
 | CISO-004 | P2 | ADR-0003: общий Employee → PII видна продажам/каталогу | arch (до catalog) |
 | [CISO-006](findings/CISO-006-filter-injection.md) | **P2** | filter injection в logic-functions: client params → Twenty filter string без валидации; обход status-check в runSubmit | Dev 2 |
+| [CISO-007](findings/CISO-007-reports-data-disclosure.md) | **P2** | /s/reports: byEmployee (ФИО+hours+util всех 42 сотрудников) без role-guard — любой аутентиф. пользователь | Dev 2 |
+| [CISO-008](findings/CISO-008-absence-pii.md) | P3 | absence.note TEXT → потенциальные медицинские ПДн (больничный); нет field-level ограничений | arch/Dev 2 |
 
 ## Лог
 

@@ -309,3 +309,18 @@ export const REPORTS_PAGE_WIDGET_UNIVERSAL_IDENTIFIER =
 // Front-component вкладки «Бюджет» карточки проекта (план vs факт из /s/reports byProject).
 export const CREDOS_TIME_PROJECT_BUDGET_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
   '3e9489b0-49a8-49ca-bf13-f0c0a0558cce';
+
+// --- Wave 3 (F-D): Отсутствия (отпуск/больничный) — влияют на ёмкость capacity ---
+export const CREDOS_TIME_ABSENCE_OBJECT_UNIVERSAL_IDENTIFIER =
+  'c5df028c-cd7e-490b-8276-b0d2d39237ea';
+export const CREDOS_TIME_ABSENCE_TYPE_FIELD_ID = 'd8b77525-292d-481a-9fd8-d2f0ca1f40b8';
+export const CREDOS_TIME_ABSENCE_EMPLOYEE_FIELD_ID = '8b62f9ad-4b76-4b86-8086-ecc1db12cbee';
+export const CREDOS_TIME_ABSENCE_START_DATE_FIELD_ID = 'c7df6fc3-26a9-4e31-ab39-f4cd6c0ccc26';
+export const CREDOS_TIME_ABSENCE_END_DATE_FIELD_ID = '3fda69c2-67b7-4269-a974-1859f0a1aecd';
+export const CREDOS_TIME_ABSENCE_NOTE_FIELD_ID = 'e07f00d9-70de-496a-96ac-b56f27c79484';
+export const CREDOS_TIME_ABSENCE_VIEW_UNIVERSAL_IDENTIFIER =
+  '38e7dc8e-7410-412c-8c8b-3f37eee92748';
+export const CREDOS_TIME_ABSENCE_NAV_UNIVERSAL_IDENTIFIER =
+  'ba7945fb-3712-458e-a3c4-63e63988f778';
+// Обратная сторона Absence.employee на Employee (ONE_TO_MANY).
+export const CREDOS_TIME_EMPLOYEE_ABSENCES_FIELD_ID = 'f2e7b344-8634-4f5e-bccf-c3779af0694d';
