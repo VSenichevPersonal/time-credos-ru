@@ -91,6 +91,8 @@ time-credos-ru/
 | **Принятые решения (ADR)** | `docs/adr/` |
 | → Платформа / данные / auth | `docs/adr/0001-platform-and-data.md` |
 | → SDK-app в изолированном репо | `docs/adr/0002-sdk-app-isolated-repo.md` |
+| → Каталог услуг: отдельный app, общие данные | `docs/adr/0003-catalog-separate-app-shared-master-data.md` |
+| **Каталог услуг (SDK) — всё по теме** | `Catalog SDK/` |
 | **Как разрабатываем и устанавливаем (workflow)** | `docs/DEV_WORKFLOW.md` |
 | **Синтез модели данных (все источники)** | `docs/DATA_MODEL_SYNTHESIS.md` |
 | План сид-данных (реальные ОВ + мок) | `docs/SEED_DATA_PLAN.md` |
