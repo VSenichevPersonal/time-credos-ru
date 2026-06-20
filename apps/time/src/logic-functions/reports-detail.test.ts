@@ -46,8 +46,8 @@ const base = input({
 // ─── computeDetail ───────────────────────────────────────────────────────────
 
 describe('computeDetail', () => {
-  it('маппит все поля одной записи', () => {
-    const rows = computeDetail(base);
+  it('маппит все поля одной записи (revealNames=true)', () => {
+    const rows = computeDetail(base, {}, true);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       date: '2026-06-10',
@@ -58,6 +58,22 @@ describe('computeDetail', () => {
       hours: 8,
       status: 'DRAFT',
     });
+  });
+
+  // CISO-007 (152-ФЗ): по умолчанию (revealNames=false) ФИО НЕ отдаём — пустая строка.
+  it('CISO-007: по умолчанию employeeName пустой (ФИО не утекает)', () => {
+    const rows = computeDetail(base);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].employeeName).toBe('');
+    // остальные поля (не ПДн) на месте
+    expect(rows[0].date).toBe('2026-06-10');
+    expect(rows[0].projectName).toBe('PA-001 — Проект А');
+    expect(rows[0].hours).toBe(8);
+  });
+
+  it('CISO-007: CSV-экспорт без явного reveal не содержит ФИО', () => {
+    const csv = detailToCsv(computeDetail(base));
+    expect(csv).not.toContain('Иванов');
   });
 
   it('без фильтров возвращает все записи', () => {
@@ -74,7 +90,7 @@ describe('computeDetail', () => {
       entries: [entry({ employeeId: 'emp1' }), entry({ id: 'e2', employeeId: 'emp2' })],
       projects: [project], employees: [employee, other], departments: [dept], workTypes: [workType],
     });
-    const rows = computeDetail(i, { employeeId: 'emp1' });
+    const rows = computeDetail(i, { employeeId: 'emp1' }, true);
     expect(rows).toHaveLength(1);
     expect(rows[0].employeeName).toBe('Иванов Иван');
   });

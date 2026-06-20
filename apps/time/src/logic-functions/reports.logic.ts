@@ -3,7 +3,7 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 
 import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
-import { isUuid, validDateParam } from './params-validate';
+import { validDateParam } from './params-validate';
 import { computeDetail, detailToCsv } from './reports-detail';
 import {
   computeOlap,
@@ -143,19 +143,38 @@ const readOlap = (
   return { groupBy: gb as OlapDimension, filters, limit, cursor, sort };
 };
 
-// CISO-007/152-ФЗ: detail-отчёт отдаёт ФИО (employeeName) — нужен role-guard.
-// Резолв актора по workspaceMemberRef (зеркало approval.logic; SSOT-extract —
-// follow-up). CISO-006: workspaceMemberRef в filter → только UUID. Полная
-// серверная цепочка (identity без client-params) — после CISO-005.
-type Actor = { employeeId: string; isManager: boolean } | null;
-const resolveActor = async (workspaceMemberRef: string | undefined): Promise<Actor> => {
-  if (!workspaceMemberRef || !isUuid(workspaceMemberRef)) return null;
-  const res = await restGet<{ data: { credosTimeEmployees: Array<{ id: string; isManager: boolean | null }> } }>(
-    '/rest/credosTimeEmployees',
-    { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
-  );
-  const e = res.data?.credosTimeEmployees?.[0];
-  return e ? { employeeId: e.id, isManager: e.isManager === true } : null;
+// CISO-007 (152-ФЗ, минимизация ПДн): ФИО сотрудника — персональные данные.
+// /s/reports доступен любому аутентифицированному юзеру, а logic-function ходит под
+// сервис-токеном (per-user RBAC обходится на уровне функции). ФИО утекают в трёх
+// срезах: detail/CSV (employeeName), byEmployee[].name, OLAP employee (name/label).
+//
+// Server-actor по HTTP-роуту НЕДОСТИЖИМ: RoutePayload.userWorkspaceId НЕ маппится на
+// workspaceMember/employee через Core REST (A1_CURRENT_USER_RESEARCH §3). Роль из
+// client-supplied params.workspaceMemberRef — НЕ доверенный источник (A1 R2: клиент
+// может подставить чужой валидный UUID руководителя и пройти isManager-guard); к тому
+// же ref заполнен лишь у 1/43 → подход и небезопасен, и нерабочий.
+//
+// БЕЗОПАСНЫЙ ДЕФОЛТ: НЕ раскрывать ФИО ни в одном срезе (REVEAL=false). Ключи
+// (employeeId) сохраняем — «Мои часы» фильтрует свою строку по key и name не
+// использует (my-hours.tsx). TODO(CISO-005): когда появится доверенный
+// server-identity (userWorkspaceId→workspaceMember), резолвить актора и отдавать ФИО
+// руководителю со scope по его подчинённым (RBAC_MODEL: менеджер видит свою команду).
+const REVEAL_EMPLOYEE_NAMES = false;
+
+// byEmployee: затираем ФИО (name) до пустой строки, ключ (employeeId) сохраняем.
+const redactByEmployee = <T extends { name: string }>(rows: T[]): T[] =>
+  REVEAL_EMPLOYEE_NAMES ? rows : rows.map((r) => ({ ...r, name: '' }));
+
+// OLAP: ось/фильтр employee несёт ФИО в name/label — затираем (только dim employee).
+const redactOlap = (result: ReturnType<typeof computeOlap>): ReturnType<typeof computeOlap> => {
+  if (REVEAL_EMPLOYEE_NAMES) return result;
+  return {
+    ...result,
+    rows: result.groupBy === 'employee' ? result.rows.map((r) => ({ ...r, name: '' })) : result.rows,
+    appliedFilters: result.appliedFilters.map((f) =>
+      f.dim === 'employee' ? { ...f, label: '' } : f,
+    ),
+  };
 };
 
 const run = async (event: RoutePayload) => {
@@ -216,11 +235,18 @@ const run = async (event: RoutePayload) => {
   // filter) → инъекции нет. format=csv → CSV-строка в ответе (content-type не
   // поддержан песочницей; фронт делает Blob-download).
   if (params.groupBy === 'detail') {
-    const rows = computeDetail(input, {
-      deptId: params.deptId ?? null,
-      projectId: params.projectId ?? null,
-      employeeId: params.employeeId ?? null,
-    });
+    // CISO-007: ФИО (employeeName) затираем (revealNames=false) — server-actor
+    // недостижим, доверенной роли нет. Остальные поля (дата/проект/часы/статус)
+    // не ПДн. Фильтры deptId/projectId/employeeId работают для drill-down.
+    const rows = computeDetail(
+      input,
+      {
+        deptId: params.deptId ?? null,
+        projectId: params.projectId ?? null,
+        employeeId: params.employeeId ?? null,
+      },
+      REVEAL_EMPLOYEE_NAMES,
+    );
     if (params.format === 'csv') {
       return { ok: true, format: 'csv', count: rows.length, csv: detailToCsv(rows) };
     }
@@ -228,11 +254,17 @@ const run = async (event: RoutePayload) => {
   }
 
   // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.
+  // CISO-007: затираем ФИО в OLAP employee-срезе/фильтре.
   if (olap) {
-    return computeOlap(input, { from, to }, olap);
+    return redactOlap(computeOlap(input, { from, to }, olap));
   }
+  // CISO-007: затираем ФИО в byEmployee (раскрывал имена всех сотрудников).
   const result = computeReports(input, { from, to });
-  return { ...result, groupBy: params.groupBy ?? null };
+  return {
+    ...result,
+    byEmployee: redactByEmployee(result.byEmployee),
+    groupBy: params.groupBy ?? null,
+  };
 };
 
 // Обёртка: ошибки -> ok:false + диагностика (роут не падает 500).

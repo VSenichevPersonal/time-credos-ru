@@ -225,6 +225,68 @@ describe('reports.logic — restGetAll пагинация', () => {
   });
 });
 
+// CISO-007 (152-ФЗ): ФИО (ПДн) НЕ должны утекать любому аутентифицированному юзеру.
+// Server-actor по HTTP-роуту недостижим (A1 §3) → безопасный дефолт: ФИО затёрты.
+describe('reports.logic — CISO-007: ФИО не утекает', () => {
+  const PII = 'Сеничев';
+  // Один сотрудник с ФИО + одна его запись часов за период.
+  const withEmployee = () =>
+    ALL_PLURALS.map((p) => {
+      if (p === 'credosTimeEntries')
+        return {
+          data: {
+            credosTimeEntries: [
+              { id: 'e1', date: '2026-06-10', hours: 8, projectId: null, employeeId: 'emp1', workTypeId: null, tags: [] },
+            ],
+          },
+          pageInfo: { hasNextPage: false, endCursor: null },
+        };
+      if (p === 'credosTimeEmployees')
+        return {
+          data: {
+            credosTimeEmployees: [
+              { id: 'emp1', firstName: 'Василий', lastName: PII, departmentId: null, active: true, name: `${PII} Василий` },
+            ],
+          },
+          pageInfo: { hasNextPage: false, endCursor: null },
+        };
+      return emptyPage(p);
+    });
+
+  it('byEmployee: name затёрт, ключ (employeeId) сохранён', async () => {
+    vi.stubGlobal('fetch', mockFetch(withEmployee()));
+    const result = (await handler(event())) as { byEmployee: Array<{ key: string; name: string }> };
+    expect(result.byEmployee.length).toBeGreaterThan(0);
+    expect(result.byEmployee[0].key).toBe('emp1');
+    expect(result.byEmployee[0].name).toBe('');
+    expect(JSON.stringify(result)).not.toContain(PII);
+  });
+
+  it('groupBy=detail: employeeName пуст, ФИО нет в ответе', async () => {
+    vi.stubGlobal('fetch', mockFetch(withEmployee()));
+    const result = (await handler(event({ groupBy: 'detail' }))) as { rows: Array<{ employeeName: string }> };
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(result.rows[0].employeeName).toBe('');
+    expect(JSON.stringify(result)).not.toContain(PII);
+  });
+
+  it('format=csv: ФИО отсутствует в выгрузке', async () => {
+    vi.stubGlobal('fetch', mockFetch(withEmployee()));
+    const result = (await handler(event({ groupBy: 'detail', format: 'csv' }))) as { csv: string };
+    expect(result.csv).not.toContain(PII);
+  });
+
+  it('mode=olap groupBy=employee: ФИО в rows[].name затёрт', async () => {
+    vi.stubGlobal('fetch', mockFetch(withEmployee()));
+    const result = (await handler(event({ mode: 'olap', groupBy: 'employee' }))) as {
+      rows: Array<{ key: string; name: string }>;
+    };
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(result.rows[0].name).toBe('');
+    expect(JSON.stringify(result)).not.toContain(PII);
+  });
+});
+
 describe('reports.logic — ошибки fetch', () => {
   it('fetch бросает Error → ok:false + error message', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network error')));

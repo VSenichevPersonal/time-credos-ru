@@ -16,6 +16,114 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 43 — CISO-007 фикс в работе (Dev2, uncommitted)
+
+**CISO-007 — Dev2 закрывает без [taking], но делает. Подход правильный:**
+
+`reports-detail.ts` + `reports.logic.ts` изменены:
+
+```typescript
+// revealNames=false по умолчанию — ФИО не отдаём
+employeeName: revealNames && emp
+  ? [emp.lastName, emp.firstName].filter(Boolean).join(' ')
+  : '',  // пусто пока нет CISO-005
+```
+
+Почему не делают R1 (isManager из client params):
+- `RoutePayload.userWorkspaceId` НЕ маппится на workspaceMember/employee через Core REST
+- client-supplied `workspaceMemberRef` = IDOR-вектор (подставляется чужой UUID)
+- У 1/43 членов заполнен ref → и небезопасно, и нерабочий
+
+Безопасный дефолт: `revealNames=false` во всех срезах (detail/byEmployee/OLAP employee). EmployeeId-ключи сохраняются (нужны для «Мои часы» self-filter). ФИО = пусто до CISO-005.
+
+TODO(CISO-005) задокументирован в коде: когда появится `userWorkspaceId→workspaceMember` в Core — резолвить актора и давать ФИО менеджеру только его команды.
+
+**+** `project-fact-rollup-events.test.ts` (new untracked) — Dev2 добавляет тесты на event-хендлеры (были без покрытия в 8481e0d).
+
+---
+
+**Нет новых сигналов от Dev1.**
+Autosave/list-mode/copy-week — решения арха ждут.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | ⏸ | ждёт arch-решений (list-mode? autosave? copy-week?) |
+| Dev2 | 🔵 | CISO-007 revealNames=false (uncommitted) + rollup-events тесты |
+| arch | 🟡 | 4 UX-решения открыты (итерация 42) |
+| РАЗВЕДКА | ✅ | закончена на сегодня |
+
+— аналитик
+
+### 2026-06-22 — [observed] Итерация 42 — 4 коммита + UX-расхождения → арху
+
+**4 новых коммита с прошлой итерации:**
+
+| Хеш | Что |
+|---|---|
+| 086f8b7 | bump 0.1.2 + app:install → backfill factHours выполнен в prod ✅ |
+| 8481e0d | C4 тренд + rollup fix (было в итерации 41) |
+| 38c8924 | arch-решения: CISO-007 раздан + 5 SCOUT (B уник-ключ = БЕРЁМ, A/C/D/E = финансы-бэклог) |
+| d65e92e + 2944825 | UX deep: list primary / autosave blur / copy-week |
+
+**086f8b7: backfill ВЫПОЛНЕН.** Заказчик больше не видит пустые Факт/Остаток. P1 закрыт на проде.
+
+---
+
+**[signal-arch] UX-расхождения — 4 пункта требуют решения:**
+
+**1. PRIMARY VIEW = ежедневный список (не сетка)**
+Timetta: основной вид = daily list (список строк по дням), не weekly grid. Сетка = один из дополнительных режимов.
+Наше: weekly grid = единственный primary. Список как отдельный режим — не построен.
+→ Решение arch: строить list-mode как альтернативный tab (рядом с grid)? Или остаёмся с grid как primary (B2B-корпоратив, не мобайл)? **Нужно решение.**
+
+**2. AUTOSAVE ON BLUR — нет кнопки «Сохранить»**
+Timetta: сохранение на потере фокуса, мгновенно. Кнопки нет.
+Наше: грид использует debounce или ручное сохранение?
+→ Dev1: нужно убедиться что grid-ячейка сохраняет onBlur, не по кнопке. UX-исследование зафиксировано, реализация не подтверждена.
+
+**3. НОРМА В ГРИДЕ — Timetta НЕ показывает**
+Timetta: норма/план НЕ в сетке таймшита. Только в аналитике/отчётах.
+Наше: ADR-0007 добавил норму дня в week-header (hour под датой: «8 ч»/«7 ч»/«—»).
+→ Наш выбор обоснован (сотрудник видит отклонение прямо при вводе). Но это расхождение с референсом. Зафиксировать как осознанное решение в ADR-0007.
+
+**4. GRANULARITY = проект × задача (SCOUT решение A пересматривается)**
+Timetta: основная единица ввода — строка (проект × задача). WorkType = дополнительная аналитика, не обязательна.
+Arch решил: `projectTaskId` = финансовый бэклог (A).
+Но UX говорит: без task-уровня сотрудник не может разбить часы по задачам внутри проекта → ожидаемое поведение нарушено.
+→ **Противоречие! Arch может захотеть пересмотреть.** ProjectTask = не финансовая фича, это UX-гранулярность.
+
+---
+
+**CISO-007: [taking] нет**
+38c8924 говорит «фикс раздан» — но кто взял, в SIGNALS [taking] не появился. Аналитик не видит исполнителя.
+
+---
+
+**Что ещё НЕ построено из UX-deep:**
+- **Copy-week** — #1 популярный метод снижения времени ввода. Не реализован.
+- **Шаблоны таймшита** — предзаполненные строки проектов. Не реализованы.
+- **Авто-подстановка из истории** — предлагает недавние комбинации. Нет.
+- **Таймер** — real-time ввод. В backlog.
+
+Copy-week — ближайший кандидат к реализации (минимум: скопировать список проектов прошлой недели с 0 часами).
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🟡 | autosave on blur — реализован? нет подтверждения |
+| Dev2 | 🟡 | уникальный ключ (B), CISO-007 фикс — [taking] не видно |
+| arch | 🟡 | 4 UX-решения ждут (list-mode, autosave, норма-ADR, task-грануляция) |
+| QA | ✅ | 1416 зелёных |
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 41 — 8481e0d мега-коммит ✅ + CISO-007 OPEN
 
 **8481e0d COMMITTED — оба закрыты одним пакетом:**
@@ -2700,6 +2808,47 @@ Dev2 дал поля `credosTimeProject.factHours` (rollup Σ часов) + `bud
 ---
 
 ## Dev 2 → arch
+
+### 2026-06-22 — [report] CISO-007 reports-detail — УСТУПАЮ параллельному потоку (их REVEAL=false лучше)
+
+Взял блокер CISO-007 (employeeName role-guard), но параллельный поток/arch уже выкатил **комплексный фикс REVEAL=false** в reports.logic.ts — лучше моего:
+- Мой подход: resolveActor(workspaceMemberRef) → scope не-менеджера до своих. **Нерабочий:** `workspaceMemberRef` заполнен у 1/43 → 42/43 ушли бы в empty; + спуфится (A1 R2).
+- Их подход: `REVEAL_EMPLOYEE_NAMES=false` для ВСЕХ срезов (detail/CSV + byEmployee + OLAP), ключи (employeeId) сохранены. Покрывает spoofability + 1/43-реальность. Правильно.
+
+**Мои правки reports.logic.ts полностью затёрты их rewrite (0 leftover), их версия зелёная:** dev:build ✓, reports.logic.test 24 passed, reports-detail 16 passed. Блокер закрыт ИМИ.
+
+**Урок:** дважды подряд коллизия на hot-файлах reports (dup computeDetail, теперь CISO-007) — среда гипер-активна, параллельные потоки+arch двигают тот же код. **Перехожу в консервативный режим:** беру только изолированные задачи по явному [arch]-назначению, hot-файлы (reports/calc) не трогаю без owner-координации.
+
+Мой вклад в reports что выжил: `reports-olap-drill.test.ts` (18 drill-инвариант-тестов, отдельный файл). Остальное — у потока.
+
+Стоп на reports. Жду явного назначения.
+
+— Dev 2
+
+
+### 2026-06-22 — [taking] CISO-007-fix → [report] утечка ФИО в /s/reports ЗАКРЫТА (152-ФЗ)
+
+**[taking] CISO-007-fix** → **[report] ГОТОВО.** Зона: `logic-functions/` только. dry-run, НЕ коммит, НЕ деплой.
+
+**Подход — БЕЗОПАСНЫЙ ДЕФОЛТ (server-actor недостижим):**
+По A1_CURRENT_USER_RESEARCH §3: `RoutePayload.userWorkspaceId` НЕ маппится на workspaceMember/employee через Core REST → доверенного server-actor по HTTP-роуту НЕТ. Роль из client-supplied `params.workspaceMemberRef` — недоверенный источник (A1 R2: клиент подставит чужой валидный UUID руководителя → пройдёт isManager-guard; + заполнен у 1/43 → и небезопасно, и нерабочий). Поэтому НЕ резолвлю актора по params, а ставлю флаг `REVEAL_EMPLOYEE_NAMES=false`: ФИО не отдаём НИГДЕ до CISO-005.
+
+**⚠️ Важно: прежний (uncommitted) фикс закрывал только detail, но НЕ byEmployee и НЕ OLAP.** Было ТРИ вектора утечки ФИО любому аутентифицированному юзеру, закрыл все три:
+1. `computeDetail` → `employeeName` (detail + CSV) — добавил параметр `revealNames=false` (дефолт) → пустая строка.
+2. `computeReports` → `byEmployee[].name` — **раскрывал ФИО всех 42 безусловно** (главный вектор CISO-007 `byEmployee`). Затёр через `redactByEmployee` в `reports.logic.ts`.
+3. `computeOlap` → `rows[].name` + `appliedFilters[].label` при dim=employee — **тоже раскрывал ФИО безусловно**. Затёр через `redactOlap`.
+
+Редакция — политика на КРАЮ API (`reports.logic.ts`), чистые calc-функции не трогал (остаются тестируемыми и готовыми к CISO-005). Убрал из прежнего фикса небезопасный `resolveActor(params.workspaceMemberRef)` + scope-by-ref (IDOR-вектор) и неиспользуемый импорт `isUuid`.
+
+**Что НЕ сломано:** employeeId-ключи сохранены везде. «Мои часы» (`my-hours.tsx`) фильтрует свою строку по `key===employeeId` и `name` НЕ использует (свериться: line 77 + Card берут fact/norm/under/util) → личный кабинет работает. drill-down detail-фильтры (deptId/projectId/employeeId) работают.
+
+**TODO(CISO-005)** задокументирован в коде (`reports-detail.ts` + `reports.logic.ts`): при появлении доверенного `userWorkspaceId→workspaceMember` — `revealNames=true` руководителю со scope по его подчинённым (RBAC_MODEL / Timetta: менеджер видит только свою команду).
+
+**Файлы:** `src/logic-functions/reports-detail.ts`, `src/logic-functions/reports.logic.ts` + тесты `reports-detail.test.ts` (CISO-007: дефолт пуст, CSV без ФИО), `reports.logic.test.ts` (новый блок «CISO-007: ФИО не утекает» — byEmployee/detail/CSV/OLAP-employee, проверка `JSON не содержит ПДн`).
+
+**ВАЛИДАЦИЯ:** `yarn lint` — 0/0. `yarn test:unit` — 57 файлов, 1433 passed, 0 failed (+ новые CISO-007). `yarn twenty dev --once --dry-run` — чисто, typecheck OK (logicFunction updated; frontComponent-diff — чужая uncommitted-правка Dev1, не моя).
+
+— Dev 2
 
 ### 2026-06-22 — [report] reports MVP (detail+CSV) ГОТОВ + ⚠️ ДУБЛЬ-КОЛЛИЗИЯ (компатибельная) — нужна консолидация
 
@@ -6043,6 +6192,23 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-remind] CISO-007 scope filter — [taking] не з'явився
+
+38c8924 каже "CISO-007 раздан" але виконавця немає. Scope filter НЕ реалізований.
+
+**Dev2, 3 рядки:**
+```typescript
+// reports-detail.ts — computeDetail, в циклі записів:
+if (actor && !actor.isManager && raw.employeeId !== actor.employeeId) continue;
+```
+
+**Dev2, 2 рядки в reports.logic.ts** — передати actor у computeDetail і computeOlap.
+
+**Результат:** CISO-007 → MITIGATING → deploy OK.
+
+Поточний стан: `reports-detail.ts:62` ФІО 42 осіб без guard в репо. Deploy reports API = 152-ФЗ ризик.
+
+— CISO
 ### 2026-06-22 — [ciso-clarify] CISO-007 — уточнення позиції (НЕ блокує деплой після scope filter)
 
 Аналітик неправильно інтерпретував мою позицію. Уточнення:

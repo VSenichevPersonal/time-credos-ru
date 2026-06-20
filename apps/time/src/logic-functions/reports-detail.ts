@@ -29,9 +29,20 @@ export type DetailFilters = {
 
 // Отдел записи = отдел сотрудника (приоритет), fallback — отдел проекта.
 // Совпадает с deptOfEntry в reports-calc (факт идёт за человеком).
+//
+// CISO-007 (152-ФЗ, минимизация ПДн): employeeName=ФИО — персональные данные.
+// detail/CSV доступны любому аутентифицированному юзеру (logic-function ходит
+// под сервис-токеном, per-user RBAC обходится). Server-actor по HTTP-роуту
+// недостижим: RoutePayload.userWorkspaceId НЕ маппится на workspaceMember/employee
+// через Core REST (см. A1_CURRENT_USER_RESEARCH.md §3). Поэтому ФИО НЕ отдаём по
+// умолчанию (revealNames=false → пустая строка). TODO(CISO-005): когда появится
+// доверенный server-identity (userWorkspaceId→workspaceMember), резолвить актора и
+// отдавать ФИО руководителю с scope по его подчинённым (RBAC_MODEL: менеджер видит
+// только свою команду).
 export const computeDetail = (
   input: ReportsInput,
   filters: DetailFilters = {},
+  revealNames = false,
 ): DetailRow[] => {
   const projById = new Map(input.projects.map((p) => [p.id, p]));
   const empById = new Map(input.employees.map((e) => [e.id, e]));
@@ -59,7 +70,8 @@ export const computeDetail = (
 
     rows.push({
       date: raw.date ?? '',
-      employeeName: emp ? [emp.lastName, emp.firstName].filter(Boolean).join(' ') : '',
+      // CISO-007: ФИО только при revealNames (доверенный руководитель). Иначе пусто.
+      employeeName: revealNames && emp ? [emp.lastName, emp.firstName].filter(Boolean).join(' ') : '',
       deptName: dept?.code ?? '',
       projectName: proj ? (proj.code ? `${proj.code} — ${proj.name}` : proj.name ?? '') : '',
       workTypeName: wt?.name ?? '',
