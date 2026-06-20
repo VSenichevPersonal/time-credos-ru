@@ -38,6 +38,9 @@ export default defineObject({
   labelPlural: 'Проекты',
   description: 'Проект учёта трудозатрат',
   icon: 'IconFolder',
+  // Заголовок карточки = код проекта (вместо пустого авто-поля name).
+  labelIdentifierFieldMetadataUniversalIdentifier:
+    '1d862047-d899-450e-a565-95c028f9ce90',
   fields: [
     {
       universalIdentifier: '1d862047-d899-450e-a565-95c028f9ce90',

@@ -146,6 +146,35 @@ export const CREDOS_TIME_DEPARTMENT_NAV_UNIVERSAL_IDENTIFIER = '487b1d25-cba4-4c
 // Роль «Руководитель» (defineRole — доп. к defineApplicationRole).
 export const CREDOS_TIME_MANAGER_ROLE_UNIVERSAL_IDENTIFIER = '68211cf6-bc05-422a-b6e4-619d5edc5e51';
 
+// --- Аудит карточка↔вид: недостающие field-id скаляров (для колонок views) ---
+// Stage
+export const CREDOS_TIME_STAGE_CODE_FIELD_ID = '4eda4ffc-d036-4303-80b2-5242bce0a230';
+export const CREDOS_TIME_STAGE_STATUS_FIELD_ID = 'e977847f-c8f0-4861-a4c1-394439120092';
+export const CREDOS_TIME_STAGE_PLANNED_EFFORT_FIELD_ID = '5d03bd03-64f1-4e50-bda6-3341c9b2fab6';
+// BillingLink
+export const CREDOS_TIME_BILLING_LINK_DOC_TYPE_FIELD_ID = '18e4cb45-e0da-449f-93bf-6a17d2f2990e';
+export const CREDOS_TIME_BILLING_LINK_NUMBER_FIELD_ID = '13016dc3-ea4b-4bb5-a16c-6ad570f65590';
+export const CREDOS_TIME_BILLING_LINK_DATE_FIELD_ID = 'e64d1709-b946-4b7d-9ebb-9dc35336efc6';
+export const CREDOS_TIME_BILLING_LINK_AMOUNT_FIELD_ID = '39033db2-262f-4093-bb4e-f8e11d62e10f';
+
+// --- Аудит карточка↔вид: views/nav для Stage и BillingLink + RECORD_PAGE записи ---
+export const CREDOS_TIME_STAGE_VIEW_UNIVERSAL_IDENTIFIER =
+  '86f2e59f-156e-4b6f-ad13-e145cbdaedd6';
+export const CREDOS_TIME_STAGE_NAV_UNIVERSAL_IDENTIFIER =
+  'f58acaec-4f07-4af5-91fb-8141de1096cd';
+export const CREDOS_TIME_BILLING_LINK_VIEW_UNIVERSAL_IDENTIFIER =
+  '4e209a10-a49e-4738-b946-2851facdb687';
+export const CREDOS_TIME_BILLING_LINK_NAV_UNIVERSAL_IDENTIFIER =
+  'c4e0a767-96b0-477a-a47d-2a370c792174';
+
+// RECORD_PAGE карточки записи трудозатрат (FIELDS-виджет, привязанный к view).
+export const CREDOS_TIME_ENTRY_RECORD_PAGE_UNIVERSAL_IDENTIFIER =
+  '1700b11e-d20b-4876-acd8-95a8ab097b31';
+export const CREDOS_TIME_ENTRY_RECORD_PAGE_TAB_UNIVERSAL_IDENTIFIER =
+  '4691705a-0eef-435a-8aa7-f58a93ab4ddd';
+export const CREDOS_TIME_ENTRY_RECORD_PAGE_FIELDS_WIDGET_UNIVERSAL_IDENTIFIER =
+  '407ae943-4596-448c-8e64-7582f6f79444';
+
 // --- Wave 5 (GRID): недельная сетка трудозатрат ---
 // Front-компонент сетки (заменяет заглушку main-page как виджет «Трудозатраты»).
 export const WEEKLY_GRID_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =

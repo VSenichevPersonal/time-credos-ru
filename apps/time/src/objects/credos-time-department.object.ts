@@ -29,6 +29,8 @@ export default defineObject({
   labelPlural: 'Отделы',
   description: 'Производственное подразделение Кредо-С',
   icon: 'IconBuilding',
+  // labelIdentifier: ядро требует searchable (TEXT). У отдела TEXT-поля нет
+  // (code — SELECT), поэтому заголовок карточки остаётся авто-полем name.
   fields: [
     {
       universalIdentifier: '474dd507-0969-4a74-a981-2da5ede39fe0',

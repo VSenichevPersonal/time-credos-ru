@@ -25,6 +25,9 @@ export default defineObject({
   labelPlural: 'Работники',
   description: 'Профиль учёта трудозатрат (отдел, ёмкость) поверх WorkspaceMember',
   icon: 'IconUser',
+  // Заголовок карточки = фамилия (вместо пустого авто-поля name).
+  labelIdentifierFieldMetadataUniversalIdentifier:
+    'ca5f2e4e-bf80-4bd4-b049-219b7c464429',
   fields: [
     {
       universalIdentifier: 'a52484bf-afd2-4a01-ace3-7042a762dbfe',

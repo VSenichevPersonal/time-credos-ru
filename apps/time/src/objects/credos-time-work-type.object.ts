@@ -26,6 +26,8 @@ export default defineObject({
   labelPlural: 'Виды работ',
   description: 'Справочник видов работ (тип работ)',
   icon: 'IconListCheck',
+  // labelIdentifier: ядро требует searchable (TEXT). У вида работ TEXT-поля нет
+  // (group — SELECT), поэтому заголовок карточки остаётся авто-полем name.
   fields: [
     {
       universalIdentifier: '78e61c8f-d18c-48c3-9897-5cf3316aebe9',

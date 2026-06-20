@@ -15,6 +15,7 @@ import {
   CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
   CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID,
   CREDOS_TIME_ENTRY_APPROVED_BY_FIELD_ID,
+  CREDOS_TIME_ENTRY_DESCRIPTION_FIELD_ID,
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
@@ -38,6 +39,9 @@ export default defineObject({
   labelPlural: 'Записи трудозатрат',
   description: 'Запись учёта времени',
   icon: 'IconClock',
+  // Заголовок карточки = состав работ (вместо пустого авто-поля name).
+  labelIdentifierFieldMetadataUniversalIdentifier:
+    CREDOS_TIME_ENTRY_DESCRIPTION_FIELD_ID,
   fields: [
     {
       universalIdentifier: '359bdb1d-f6c5-4780-b560-5013858d2ec3',

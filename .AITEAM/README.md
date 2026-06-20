@@ -6,18 +6,22 @@ Single entry-point для перезапуска AI-команды в новой
 
 > Отличие от команды CredosCRM: там форк ядра Twenty (upstream-merge, красные зоны engine/auth/orm). Здесь — **SDK-приложение**: ядро не трогаем вовсе, работаем только в `apps/time/src/`. Вместо upstream-merge — bump `twenty-sdk`.
 
-## Состав команды
+## Состав команды — 6 ролей (совмещают функции)
 
 | Роль | Handoff | Scope | Пушит сам |
 |---|---|---|---|
-| **arch** (senior) | [handoffs/ARCH.md](handoffs/ARCH.md) | Архитектура, ADR (`docs/adr/`), review, коммит-gate, push, **bump twenty-sdk**, аудит `credosTime`-префиксов + UUID-стабильности, актуализация документации (`docs/`, README) | ✅ |
-| **Dev 1** (Front) | [handoffs/DEV1.md](handoffs/DEV1.md) | Frontend: `apps/time/src/front-components/`, `views/`, `page-layouts/`, `navigation-menu-items/`, i18n (русские ярлывки), timesheet-сетка | ❌ (через arch) |
-| **Dev 2** (Data) | [handoffs/DEV2.md](handoffs/DEV2.md) | Data/Logic: `apps/time/src/objects/`, `fields/`, `logic-functions/`, `roles/`, `constants/` (incl. `universal-identifiers.ts`). Модель трудозатрат (Директум5↔Kimai↔Timetta), сид | ❌ (через arch) |
-| **DevOps** | [handoffs/DEVOPS.md](handoffs/DEVOPS.md) | Railway «Twenty Credos Time» (Twenty 2.14), `yarn twenty` sync/install приложения, ENV, schema-sync, мониторы, runbook | ✅ (infra-only) |
-| **QA** | [handoffs/QA.md](handoffs/QA.md) | Vitest unit, `oxlint`, typecheck, smoke на dev-workspace | ✅ (tests only) |
-| **Domain Analyst** | [handoffs/DOMAIN_ANALYST.md](handoffs/DOMAIN_ANALYST.md) | Доменный эксперт Кредо-С: требования к учёту трудозатрат, реальные демо-данные (Директум5: 72 сотрудника, отделы, проекты), приёмка UX, сид-фикстуры | ✅ (docs/research only) |
-| **CISO** | [handoffs/CISO.md](handoffs/CISO.md) | Security governance, 152-ФЗ (PII сотрудников + трудозатраты), RBAC ролей приложения, risk register, posture внутреннего инструмента | ✅ (docs/security only) |
-| **Design** | [handoffs/DESIGN.md](handoffs/DESIGN.md) | Twenty UI: page-layouts SSOT, front-components карточек, timesheet-grid, бренд Кредо-С, темы | ✅ (DS/UI only) |
+| **arch** (senior) | [handoffs/ARCH.md](handoffs/ARCH.md) | Архитектура, ADR (`docs/adr/`), review, коммит-gate, push, **bump twenty-sdk**, аудит `credosTime`-префиксов + UUID-стабильности, актуализация документации | ✅ |
+| **Dev 1** (Front + UX) | [handoffs/DEV1.md](handoffs/DEV1.md) | Frontend + дизайн: `apps/time/src/{front-components,views,page-layouts,navigation-menu-items}/`, page-layouts SSOT, timesheet-grid, i18n, бренд/темы | ❌ (через arch) |
+| **Dev 2** (Data + Domain) | [handoffs/DEV2.md](handoffs/DEV2.md) | Data/Logic + домен: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель (Директум5↔Kimai↔Timetta), демо-данные/сид, доменные требования | ❌ (через arch) |
+| **DevOps** | [handoffs/DEVOPS.md](handoffs/DEVOPS.md) | Railway «Twenty Credos Time» (Twenty 2.14), `yarn twenty` sync/install, ENV, schema-sync, мониторы, runbook | ✅ (infra-only) |
+| **QA** | [handoffs/QA.md](handoffs/QA.md) | Vitest unit, `oxlint`, typecheck, smoke на dev-workspace, приёмка фич | ✅ (tests only) |
+| **CISO** | [handoffs/CISO.md](handoffs/CISO.md) | Security governance, 152-ФЗ (PII сотрудников + трудозатраты), RBAC ролей приложения, ADR review, risk register | ✅ (docs/security only) |
+
+## Совмещения (что куда ушло)
+
+- **Дизайн / UX / page-layouts SSOT** → **Dev 1** (фронтендер ведёт и реализацию, и визуал; использует skill `impeccable`).
+- **Доменная экспертиза / демо-данные / требования к учёту** → **Dev 2** (датник ближе всех к модели Директум5↔Kimai↔Timetta).
+- **Продуктовая роль** — не заводим, пока нет реальных пользователей с feedback. Требования формулирует Dev 2.
 
 ## 1 subagent (вызывается из любого чата)
 
@@ -25,13 +29,7 @@ Single entry-point для перезапуска AI-команды в новой
 |---|---|---|
 | **standards-auditor** | [handoffs/STANDARDS_AUDITOR.md](handoffs/STANDARDS_AUDITOR.md) | `Agent(subagent_type='standards-auditor', prompt='audit working tree \| files: ...')` |
 
-Проверяет соответствие [docs/standards/DEV_STANDARDS.md](../docs/standards/DEV_STANDARDS.md) (нейминг `credosTime`, лимиты размера, SSOT, UUID-стабильность). Не пишет в SIGNALS — caller интерпретирует pass/fail.
-
-## 1 роль stub (активация позже)
-
-| Роль | Handoff | Когда активировать |
-|---|---|---|
-| **Product** | [handoffs/PRODUCT.md](handoffs/PRODUCT.md) | Когда у Кредо-С появятся реальные пользователи (продажники/РП) с feedback по учёту времени |
+Проверяет [docs/standards/DEV_STANDARDS.md](../docs/standards/DEV_STANDARDS.md) (нейминг `credosTime`, лимиты размера, SSOT, UUID-стабильность). Не пишет в SIGNALS — caller интерпретирует pass/fail.
 
 ## Как перезапустить команду в новой сессии
 
@@ -55,14 +53,11 @@ Single entry-point для перезапуска AI-команды в новой
 ├── SIGNALS.md         ← живой канал (LIFO, новые сверху)
 └── handoffs/
     ├── ARCH.md            ← senior arch (review, ADR, коммит-gate, sdk-bump, docs)
-    ├── DEV1.md            ← frontend (front-components, views, layouts, nav, i18n)
-    ├── DEV2.md            ← data/logic (objects, fields, logic-functions, roles, UUID)
+    ├── DEV1.md            ← frontend + UX (компоненты, layouts SSOT, timesheet-grid, i18n)
+    ├── DEV2.md            ← data/logic + домен (objects, fields, logic, UUID, модель, сид)
     ├── DEVOPS.md          ← Railway, app sync/install, schema-sync, мониторы
-    ├── QA.md              ← vitest, oxlint, typecheck, smoke
-    ├── DOMAIN_ANALYST.md  ← доменный эксперт Кредо-С (требования, демо-данные, UX)
+    ├── QA.md              ← vitest, oxlint, typecheck, smoke, приёмка
     ├── CISO.md            ← security governance, 152-ФЗ, RBAC, risk register
-    ├── DESIGN.md          ← Twenty UI, page-layouts SSOT, timesheet-grid, бренд
-    ├── PRODUCT.md         ← продуктовый аналитик (stub)
     └── STANDARDS_AUDITOR.md ← subagent: аудит DEV_STANDARDS
 ```
 
@@ -85,4 +80,3 @@ Single entry-point для перезапуска AI-команды в новой
 - **Доступ:** Railway CLI токен в корневом `.env` (gitignored)
 - Среда — **dev/staging, не prod**. Активных пользователей нет — можно ломать и экспериментировать.
 </content>
-</invoke>

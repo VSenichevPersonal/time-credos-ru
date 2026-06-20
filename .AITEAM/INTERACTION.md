@@ -7,12 +7,10 @@
 ## 1. Базовые принципы
 
 1. **Файл-канал.** Вся коммуникация между ролями — через **SIGNALS.md**. Всё асинхронно.
-2. **Push-дисциплина.** Dev'ы код не пушат сами. **arch** собирает коммиты и пушит. DevOps — только infra-only. QA — только тесты. CISO/Domain Analyst/Design пушат только свои зоны (см. [ROLES.md](ROLES.md)).
+2. **Push-дисциплина.** Dev'ы код не пушат сами. **arch** собирает коммиты и пушит. DevOps — только infra-only. QA — только тесты. CISO пушит только security-зону (см. [ROLES.md](ROLES.md)).
 3. **Одна секция на роль** в SIGNALS.md:
-   - `## Dev 1 → arch` (Front), `## Dev 2 → arch` (Data)
-   - `## DevOps → arch`, `## QA → arch`
-   - `## Domain Analyst → arch`, `## CISO → arch`, `## Design → arch`
-   - `## Product → arch` (когда активируется)
+   - `## Dev 1 → arch` (Front + UX), `## Dev 2 → arch` (Data + Domain)
+   - `## DevOps → arch`, `## QA → arch`, `## CISO → arch`
    - `## → arch feedback` — **arch** отвечает всем.
 4. **Коммит-префикс = сигнал.** См. таблицу ниже.
 5. **Conventional commits (как в реальном git проекта):** `feat(time):`, `fix(time):`, `refactor(time):`, `chore(time):`, `docs(time):`, `docs(devops):`, `docs(research):`, `feat(catalog):`, `chore(time): bump twenty-sdk vX.Y.Z`.
@@ -24,7 +22,7 @@
 
 | Префикс | Смысл | Кто ставит | Приоритет |
 |---|---|---|---|
-| `[signal-arch]` | Архитектурный вопрос / запрос review | Dev 1/2, DevOps, QA, Design | нормальный |
+| `[signal-arch]` | Архитектурный вопрос / запрос review | Dev 1/2, DevOps, QA | нормальный |
 | `[blocker]` | Блокер — не могу продолжать без arch | Любой | высокий |
 | `[arch-ok]` | arch одобрил подход / план | arch | — |
 | `[arch-nak]` | arch отклонил / требует переделку | arch | — |
@@ -33,20 +31,18 @@
 | `[synced]` | `yarn twenty` app sync прошёл на dev-сервере | DevOps | — |
 | `[sdk-bumped]` | поднята версия twenty-sdk + ссылка на release Twenty | arch | — |
 | `[infra-ok]` / `[infra-nak]` | инфра-статус (Railway / env) | DevOps | — |
-| `[bug]` | новый баг, нужен triage arch → Dev | QA / Domain / CISO | нормальный |
+| `[bug]` | новый баг, нужен triage arch → Dev | QA / CISO | нормальный |
 | `[flaky]` | нестабильный тест | QA | низкий |
 | `[qa-ok]` / `[qa-nak]` | приёмка фичи/модуля пройдена/не пройдена | QA | — |
 | `[smoke-ok]` / `[smoke-nak]` | smoke на dev-workspace после sync | QA | — |
 | `[report]` | отчёт о закрытом модуле / dev-report | Dev 1/2 / arch | — |
 | `[observed]` | наблюдение без действия (для контекста) | любой | — |
+| `[requirement]` | новое доменное требование к учёту трудозатрат | Dev 2 (домен) | нормальный |
+| `[design-proposal]` | предложение изменения UI (page-layout / виджет / токен) | Dev 1 | нормальный |
 | `[signal-test]` | ping канала | arch | — |
-| `[dom-ok]` / `[dom-nak]` | приёмка фичи с доменной/Кредо-С перспективы | Domain Analyst | — |
-| `requirement` (внутри `[signal-arch]`) | новое требование к учёту трудозатрат | Domain Analyst | — |
 | `[ciso-finding] <P0-P3>` | security finding (P0 = freeze) | CISO | P0=блокер |
 | `[ciso-review ADR-NNNN approve\|concern\|block]` | ревью ADR на security-риски | CISO | `block` = arch stops |
 | `[ciso-policy]` | новая/обновлённая security policy | CISO | — |
-| `[design-proposal]` | предложение изменения UI (page-layout / виджет / токен) | Design | нормальный |
-| `[design-ok]` / `[design-nak]` | приёмка UI-волны с точки зрения DS | Design | — |
 
 Правило: **один коммит = один префикс**. Не `[signal-arch][bug][flaky]` в одной строке.
 
@@ -67,6 +63,8 @@ arch пишет [arch-ok] или [arch-nak] в feedback-секцию
 [arch-nak] → Dev исправляет, цикл повторяется
   ↓
 DevOps: yarn twenty app sync → workspace → [synced]/[deployed] <hash>
+  ↓
+QA: smoke → [qa-ok]
 ```
 
 ### 3.2 Блокер
@@ -113,9 +111,7 @@ arch review (нейминг credosTime, UUID-стабильность) → [arch
   ↓
 DevOps: yarn twenty app sync → проверить что схема накатилась без потери данных
   ↓
-DevOps [synced] <name> <hash>
-  ↓
-QA: smoke по затронутым объектам → [qa-ok]
+DevOps [synced] <name> <hash> → QA: smoke по объектам → [qa-ok]
 ```
 
 ### 3.5 Bump twenty-sdk (специфика SDK-app)
@@ -133,46 +129,47 @@ arch: yarn install; yarn lint; yarn test локально
   ↓
 arch [sdk-bumped] vX.Z + push + запись в docs/devops/
   ↓
-DevOps: app sync на dev-server → QA: полный smoke на workspace
+DevOps: app sync → QA: полный smoke на workspace
 ```
 
-### 3.6 Новое доменное требование (Domain Analyst)
+### 3.6 Доменное требование / UI-предложение
 
 ```
-Domain Analyst [signal-arch] requirement: напр. «недельная сетка как в Timetta»
+Dev 2 [requirement] (внутри [signal-arch]): напр. «недельная сетка как в Timetta»
+  ИЛИ Dev 1 [design-proposal]: новый layout / виджет / токен
   ↓ (ссылка на research/ + docs/data-model/)
-arch [arch-ok] подход + назначение Dev 1/Dev 2
+arch [arch-ok] подход + кто реализует
   ↓
-Dev реализует → arch батч → push → DevOps sync → Domain Analyst [dom-ok] приёмка
+Dev реализует → arch батч → push → DevOps sync → QA приёмка [qa-ok]
 ```
 
 ## 4. Матрица обязанностей (RACI короткая)
 
-| Задача | arch | Dev 1 | Dev 2 | DevOps | QA | Dom | CISO | Design |
-|---|---|---|---|---|---|---|---|---|
-| ADR (архитектура) | **R**/A | C | C | C | C | C | **C** (security) | C |
-| Bump twenty-sdk | **R**/A | C | C | C | C | — | — | — |
-| `credosTime`-префикс аудит | **R**/A | C | **R** | — | — | — | — | — |
-| UUID-стабильность | **R**/A | — | **R** | C | — | — | — | — |
-| dev-reports | **R**/A | **R** (свой scope) | **R** (свой scope) | **R** (свой scope) | **R** (свой scope) | C | **R** (свой scope) | **R** (свой scope) |
-| Security policy + 152-ФЗ | A | — | C | C | C | C | **R** | — |
-| Risk register | A | — | — | — | — | — | **R** | — |
-| RBAC ролей приложения | A | C | **R** | C | C | C (req) | **C** | — |
-| Objects / fields | A | C | **R** | C (sync) | C | C (req) | — | — |
-| Logic functions | A | — | **R** | — | C | — | — | — |
-| Front-components / views | A | **R** | — | — | C | C | C (DS) | **C** |
-| Page-layouts (SSOT, токены) | A | C | — | — | — | — | — | **R** |
-| Navigation menu / i18n | A | **R** | C | — | — | C | — | C |
-| Модель данных (синтез) | A | C | **R** | — | — | **R** (домен) | — | — |
-| Демо-данные (seed) | A | C | C | — | — | **R** | C (PII) | — |
-| App sync / install | A | C | C | **R** | C | — | — | — |
-| ENV + secrets (Railway) | A | — | — | **R** | — | — | C (policy) | — |
-| Tests (vitest) | A | C | C | — | **R** | — | — | C (DS) |
-| Smoke на workspace | A | — | — | C | **R** | C | — | — |
-| Lint / typecheck | A | C | C | — | **R** | — | — | — |
-| Приёмка UX (домен) | A | C | C | — | C | **R** | — | C |
-| Build/lint red on main | **R**/A | C | C | C | C | — | — | — |
-| Push main | **R** | — | — | infra-only | tests-only | docs-only | docs-only | DS-only |
+| Задача | arch | Dev 1 | Dev 2 | DevOps | QA | CISO |
+|---|---|---|---|---|---|---|
+| ADR (архитектура) | **R**/A | C | C | C | C | **C** (security) |
+| Bump twenty-sdk | **R**/A | C | C | C | C | — |
+| `credosTime`-префикс аудит | **R**/A | C | **R** | — | — | — |
+| UUID-стабильность | **R**/A | — | **R** | C | — | — |
+| dev-reports | **R**/A | **R** (свой scope) | **R** (свой scope) | **R** (свой scope) | **R** (свой scope) | **R** (свой scope) |
+| Security policy + 152-ФЗ | A | — | C | C | C | **R** |
+| Risk register | A | — | — | — | — | **R** |
+| RBAC ролей приложения | A | C | **R** | C | C | **C** |
+| Objects / fields | A | C | **R** | C (sync) | C | — |
+| Logic functions | A | — | **R** | — | C | — |
+| Модель данных + домен + требования | A | C | **R** | — | — | — |
+| Демо-данные (seed) | A | C | **R** | — | — | C (PII) |
+| Front-components / views | A | **R** | — | — | C | — |
+| Page-layouts (SSOT, токены, дизайн) | A | **R** | — | — | — | — |
+| Timesheet-grid UX | A | **R** | C (домен) | — | C | — |
+| Navigation menu / i18n | A | **R** | C | — | — | — |
+| App sync / install | A | C | C | **R** | C | — |
+| ENV + secrets (Railway) | A | — | — | **R** | — | C (policy) |
+| Tests (vitest) | A | C | C | — | **R** | — |
+| Smoke / приёмка на workspace | A | C | C | C | **R** | — |
+| Lint / typecheck | A | C | C | — | **R** | — |
+| Build/lint red on main | **R**/A | C | C | C | C | — |
+| Push main | **R** | — | — | infra-only | tests-only | docs-only |
 
 `R` — Responsible, `A` — Accountable, `C` — Consulted.
 
@@ -182,19 +179,17 @@ Dev реализует → arch батч → push → DevOps sync → Domain Ana
 2. **DevOps** пушит infra-only: `apps/time/package.json` (sdk-version), `.env.example`, `docs/devops/**`, `infra/**`, `apps/time/scripts/*`.
 3. **QA** пушит тесты: `**/*.test.ts`, `apps/time/vitest.config.ts`, `.oxlintrc.json`. Префикс `test(time): ...`.
 4. **CISO** пушит `docs/security/**` и `docs/**/CISO_*.md`. Префикс `docs(security): ...`.
-5. **Domain Analyst** пушит `docs/data-model/**`, `research/**`, сид-фикстуры. Префикс `docs(data-model): ...` / `chore(seeds): ...`.
-6. **Design** пушит `apps/time/src/{page-layouts,front-components}/**`, `docs/design/**`. Префикс `feat(time): ...` (UI) или `style(time): ...`.
-7. **Arch code** пушит всё остальное: `feat(time): ...`, `fix(time): ...`, `docs(time): ...`, `chore(time): bump twenty-sdk vX.Y.Z`.
-8. **Co-Authored-By:** обязательно `Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
-9. **Перед push:** `yarn lint` + `npx tsc --noEmit` (или `yarn twenty` type-check) + `yarn test` локально должны пройти. Упало — фиксить до чистого.
-10. **Никогда не push'ить:** `.env`, `node_modules`, креды, Railway-токены, `dist/`, `*.tsbuildinfo`.
-11. **Целевая ветка:** работаем в `main`. (Remote default — `master`; PR/merge политика — на усмотрение arch.)
+5. **Arch code** пушит всё остальное: `feat(time): ...`, `fix(time): ...`, `docs(time): ...`, `chore(time): bump twenty-sdk vX.Y.Z`. Демо-данные/research (от Dev 2) — `docs(data-model): ...` / `chore(seeds): ...`.
+6. **Co-Authored-By:** обязательно `Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
+7. **Перед push:** `yarn lint` + typecheck + `yarn test` локально чисто. Упало — фиксить.
+8. **Никогда не push'ить:** `.env`, `node_modules`, креды, Railway-токены, `dist/`, `*.tsbuildinfo`.
+9. **Целевая ветка:** работаем в `main`. (Remote default — `master`; PR/merge политика — на усмотрение arch.)
 
 ## 6. Мониторы (у arch + DevOps)
 
-- **Railway статус** — состояние сервисов проекта «Twenty Credos Time» (Twenty, Worker, Postgres).
+- **Railway статус** — сервисы проекта «Twenty Credos Time» (Twenty, Worker, Postgres).
 - **SIGNALS.md** — чтение последних записей перед каждым действием.
-- **Health dev** — `GET https://twenty-production-e5c5.up.railway.app` (healthz/up) периодически.
+- **Health dev** — `GET https://twenty-production-e5c5.up.railway.app` периодически.
 - **App sync статус** — после каждого `yarn twenty` sync: объекты/поля/layouts накатились?
 
 Детали — [docs/devops/PLAYBOOK.md](../docs/devops/PLAYBOOK.md).
@@ -213,8 +208,6 @@ Dev реализует → arch батч → push → DevOps sync → Domain Ana
 
 ## 8. Повторная сессия Claude Code
 
-Чек-лист для нового AI-агента в роли:
-
 1. `git pull origin main`
 2. Читаешь [apps/time/CLAUDE.md](../apps/time/CLAUDE.md) + свой handoff + [INTERACTION.md](INTERACTION.md) + [SIGNALS.md](SIGNALS.md).
 3. Смотришь последние `docs/**/dev-reports` / ADR — что закрыто.
@@ -227,7 +220,7 @@ Dev реализует → arch батч → push → DevOps sync → Domain Ana
 
 - ❌ Не обсуждать в коммит-сообщении то, что должно быть в SIGNALS. Сообщение коммита — короткое.
 - ❌ Не пушить без `[arch-ok]` (Dev 1/2) или без чистого lint/typecheck (все).
-- ❌ Не коммитить секреты (`.env`, Railway-токены).
+- ❌ Не коммитить секреты (`.env`, Railway-токены). Реальные ФИО/ИНН сотрудников — не в git (152-ФЗ, координировать с CISO).
 - ❌ Не трогать файлы другой роли без `[signal-arch]` запроса.
 - ❌ Не использовать `console.*` в продакшн-логике — следовать паттернам SDK/Twenty.
 - ❌ Не менять опубликованные `universalIdentifier` UUID (= потеря данных).

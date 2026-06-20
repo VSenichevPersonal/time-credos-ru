@@ -29,6 +29,9 @@ export default defineObject({
   labelPlural: 'Этапы',
   description: 'Этап проекта',
   icon: 'IconListTree',
+  // Заголовок карточки = код этапа (вместо пустого авто-поля name).
+  labelIdentifierFieldMetadataUniversalIdentifier:
+    '4eda4ffc-d036-4303-80b2-5242bce0a230',
   fields: [
     {
       universalIdentifier: '4eda4ffc-d036-4303-80b2-5242bce0a230',

@@ -23,6 +23,9 @@ export default defineObject({
   labelPlural: 'Связи с 1С',
   description: 'Связь проекта с финансовым документом 1С',
   icon: 'IconLink',
+  // Заголовок карточки = номер документа (вместо пустого авто-поля name).
+  labelIdentifierFieldMetadataUniversalIdentifier:
+    '13016dc3-ea4b-4bb5-a16c-6ad570f65590',
   fields: [
     {
       universalIdentifier: '101c85a2-bdea-488d-b5fd-54154c4b110f',

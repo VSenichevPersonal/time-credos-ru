@@ -9,6 +9,7 @@ import {
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
   CREDOS_TIME_ENTRY_STATUS_FIELD_ID,
+  CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 import { ENTRY_STATUS } from 'src/constants/approval';
 
@@ -52,23 +53,30 @@ export default defineView({
       size: 220,
     },
     {
+      universalIdentifier: '8734be17-76eb-4fb4-be6f-40345254a37f',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
+      position: 3,
+      isVisible: true,
+      size: 180,
+    },
+    {
       universalIdentifier: '606febd2-04b7-4482-b717-2bd497b5349d',
       fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
-      position: 3,
+      position: 4,
       isVisible: true,
       size: 200,
     },
     {
       universalIdentifier: '9fc0517d-f91d-4c36-8098-cf537770bd99',
       fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_STATUS_FIELD_ID,
-      position: 4,
+      position: 5,
       isVisible: true,
       size: 150,
     },
     {
       universalIdentifier: 'be9a4e7c-2d18-4f5a-9c3b-7e1d6a4c8e21',
       fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID,
-      position: 5,
+      position: 6,
       isVisible: true,
       size: 150,
     },

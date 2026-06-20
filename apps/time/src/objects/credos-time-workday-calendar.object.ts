@@ -25,6 +25,8 @@ export default defineObject({
   labelPlural: 'Произв. календарь',
   description: 'Производственный календарь РФ (рабочие/выходные/праздники)',
   icon: 'IconCalendarStats',
+  // labelIdentifier: ядро требует searchable (TEXT). У календаря дата — DATE_TIME
+  // (несовместимо), поэтому заголовок карточки остаётся авто-полем name.
   fields: [
     {
       universalIdentifier: CREDOS_TIME_WORKDAY_CALENDAR_DATE_FIELD_ID,
