@@ -6,6 +6,11 @@
  * Метрики см. reports.logic.ts. CLIENT и WORKDAY/SHORT — UPPER_CASE значения SELECT.
  */
 
+// CLIENT_CATEGORY — из SSOT select-options (тип-завязан на WorkCategory), не хардкод. [ssot-bug]#1
+import { CLIENT_CATEGORY } from 'src/constants/select-options';
+
+export { CLIENT_CATEGORY };
+
 export type RawEntry = {
   hours: number | null;
   projectId: string | null;
@@ -84,7 +89,6 @@ export type ReportsResult = {
   byEmployee: (Row & { dept: string | null })[];
 };
 
-export const CLIENT_CATEGORY = 'CLIENT';
 export const WORKDAY_TYPES = new Set(['WORKDAY', 'SHORT']);
 
 export const util = (client: number, fact: number): number | null =>

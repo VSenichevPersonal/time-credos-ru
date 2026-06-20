@@ -5,8 +5,8 @@
  * был виден, а согласование/планирование работали под текущим юзером.
  *
  * Что делает (идемпотентно):
- *   1. GET /rest/workspaceMembers → берёт vs@credos.ru (по userEmail), иначе —
- *      единственного активного workspaceMember.
+ *   1. GET /rest/workspaceMembers → берёт админа из env TWENTY_DEV_EMAIL (по userEmail),
+ *      иначе — единственного активного workspaceMember.
  *   2. GET /rest/credosTimeEmployees → ищет employee по workspaceMemberRef == wmId,
  *      иначе по email == userEmail. Если нет — СОЗДАЁТ employee (имя из WM).
  *   3. PATCH employee: workspaceMemberRef = wmId + isManager = true

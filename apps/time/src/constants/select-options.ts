@@ -99,6 +99,12 @@ export const WORK_CATEGORY_OPTIONS: SelectOption[] = buildOptions(
   WORK_CATEGORY_COLORS,
 );
 
+// Категория «на клиента» (UPPER_CASE на сервере) — SSOT для утилизации в /s/reports.
+// Тип-завязка: переименование WorkCategory сломает компиляцию здесь (а не тихо
+// обнулит утилизацию). [ssot-bug]#1.
+const CLIENT_WORK_CATEGORY: WorkCategory = 'Client';
+export const CLIENT_CATEGORY = toUpperSnake(CLIENT_WORK_CATEGORY); // 'CLIENT'
+
 const WORK_TYPE_GROUP_ORDER: ReadonlyArray<WorkTypeGroup> = [
   'production',
   'projectManagement',
