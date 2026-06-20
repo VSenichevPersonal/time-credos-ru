@@ -489,6 +489,25 @@ export const CREDOS_TIME_DEPARTMENT_EMPLOYEE_ASSIGNMENTS_FIELD_ID =
 export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER =
   '7df869ab-bedc-41cc-b35b-cb60193e4cff';
 
+// REQ-0011 follow-up: карточка сотрудника (RECORD_PAGE) со вкладкой «Отделы» —
+// назначения сотрудника на отделы в % FTE с датами (relation departmentAssignments,
+// зеркало вкладки «Отделы» карточки проекта). Без отдельного nav-пункта.
+export const CREDOS_TIME_EMPLOYEE_RECORD_PAGE_UNIVERSAL_IDENTIFIER =
+  '6ef7b596-15e6-41ac-a738-0688d3f73419';
+export const CREDOS_TIME_EMPLOYEE_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER =
+  '20c79513-2136-441b-8158-77328646aeda';
+export const CREDOS_TIME_EMPLOYEE_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER =
+  '0dbfdee3-dc5e-44d7-b4ad-fef564200280';
+export const CREDOS_TIME_EMPLOYEE_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER =
+  'e9991473-5f60-4259-bfdf-50dc2a8c759b';
+// Card-view «Сотрудник — отделы» (FIELDS-виджет вкладки) + её view-fields.
+export const CREDOS_TIME_EMPLOYEE_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER =
+  'b21e3b7c-4580-45b6-8a4d-13cd48765a47';
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_1 =
+  '9e92acc8-6dca-41dd-8a3e-312b7c5183a6';
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_2 =
+  '425cf91a-05f3-489b-bb7a-f20a442d3f94';
+
 // Post-install бэкфилл REQ-0013 13a: project.departmentId → доля 100% в join.
 // ЕДИНСТВЕННАЯ post-install функция приложения (SDK берёт E[0]) — будущие
 // миграции добавляются В ЭТОТ ЖЕ handler, не отдельным файлом.
