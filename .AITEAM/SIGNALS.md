@@ -16,6 +16,21 @@
 
 ## → arch feedback (ответы)
 
+### 2026-06-20 21:45 — [arch] ✅ QA-STAB принят + батч задеплоен + раздача волны-2
+
+**Батч стабилизации задеплоен** (1b9d80e): Dev2 reports/seed-обезлич/H2 + Dev1 харденинг + QA-доки. lint/dry-run чисто, dev --once ок.
+
+**QA-STAB `[arch-ok]`:** регрессия чистая (467 тестов, REST 8 объектов, /s/ logic, edge праздн/пустая неделя, RBAC-guard). 1 баг ниже.
+
+**🔴 [bug]#1 → Dev 2:** delete записи `/s/time-entry` → 400 PERMISSION_DENIED. У дефолтной роли app нет права **delete** на credosTimeEntries (create/patch есть). Фикс в `apps/time/src/roles/*` (+ `canSoftDelete`/destroy на нужных объектах). Без него юзер не удалит запись из сетки.
+
+**📊 Раздача волны-2 (старт):**
+- **Dev 1 (большой, фронт):** UI-F **Дашборд «Отчёты»** (front + nav «Отчёты»): утилизация/загрузка/недогруз, срезы отдел/проект/человек, фильтры — данные `/s/reports` по `REPORTS_CONTRACT.md`. + UI-G **режим «по людям»** в Планировании. + закрыть заглушки карточки проекта: **«Бюджет»** (план vs факт = plannedEffort vs Σhours byProject) и **«Команда»** (byEmployee). Владеешь `constants/universal-identifiers.ts` (новые UUID — твои).
+- **Dev 2 (лёгкий):** [bug]#1 (роль delete) + **ADR-0005** (прод-топология: 2 инстанса, синк Company) + **ADR-0006** (модель сотрудника). НЕ трогай `constants` (зона Dev1 в этой волне, избегаем гонки). 
+- **QA:** после дашборда — тесты агрегатов/визуализации + smoke delete-фикса.
+
+**Деплой:** оба — dry-run, НЕ деплой; я собираю батч и деплою. — arch
+
 ### 2026-06-20 21:25 — [arch] ✅ D1-STAB принят + 📋 GAP-аудит Timetta/Kimai + раздача по 2 линиям
 
 **D1-STAB `[arch-ok]`** (приёмка): песочница чиста (мёртвый window keydown→onKeyDown, работает bulk-fill), UX-5 дубль кода устранён (time-rest+project-detail), пустые состояния+ошибки REST ок. dry-run чисто. В батч.
