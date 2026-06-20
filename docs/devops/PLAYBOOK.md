@@ -112,3 +112,6 @@ Settings → AI → MCP в Twenty. Endpoint `/mcp`. Конфиг Claude Code (`s
 ## 11. Git
 - Conventional commits: `feat(time):`, `fix(time):`, `docs(devops):`. Описания — по-русски.
 - Ветка по умолчанию `main`; работаем инкрементально, коммит на атом.
+
+| `settingsCustomTab` не появляется в Settings (вкладка «Настройки» app = «Nothing to configure») | на Twenty 2.14 `settingsCustomTabFrontComponentUniversalIdentifier` не подхватывается даже после app:publish+install | вынести настройки отдельным nav-пунктом + page-layout в папке app (как Отчёты), не полагаться на settingsCustomTab |
+| application-config (settingsCustomTab/app-манифест) не применяется `dev --once` | dev sync применяет только metadata, не application-config | `app:publish --private` + `app:install`; для апдейта установленного — bump version в package.json |
