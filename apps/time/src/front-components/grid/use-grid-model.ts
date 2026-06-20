@@ -1,11 +1,17 @@
 import { useMemo } from 'react';
 
-import type { ApiEntry, Ref } from 'src/front-components/grid/types';
+import type {
+  ApiEntry,
+  ProjectRef,
+  WorkTypeRef,
+} from 'src/front-components/grid/types';
 import { makeRowKey } from 'src/front-components/grid/types';
 import type { WeekDay } from 'src/front-components/grid/use-week';
+import type { FilterState } from 'src/front-components/grid/use-filters';
+import { rowPasses } from 'src/front-components/grid/use-filters';
 
 // Агрегация плоских записей в модель сетки: строки (проект+вид работ) × 7 дней.
-// Ключ ячейки — (rowKey, dayIso); значение — часы (сумма, если дублей > 1).
+// Учитывает фильтры строк и пустые строки, добавленные пользователем.
 
 export type GridRowModel = {
   key: string;
@@ -14,7 +20,8 @@ export type GridRowModel = {
   projectName: string;
   workTypeName: string;
   hoursByDay: number[]; // длина 7
-  entryIdByDay: (string | null)[]; // id записи для upsert/delete
+  entryIdByDay: (string | null)[];
+  descByDay: (string | null)[];
   rowTotal: number;
 };
 
@@ -22,13 +29,14 @@ const dayIso = (date: string): string => date.slice(0, 10);
 
 export const useGridModel = (
   entries: ApiEntry[],
-  projects: Ref[],
-  workTypes: Ref[],
+  projects: ProjectRef[],
+  workTypes: WorkTypeRef[],
   days: WeekDay[],
   extraRowKeys: string[],
+  filters: FilterState,
 ) => {
   return useMemo(() => {
-    const projName = new Map(projects.map((p) => [p.id, p.name]));
+    const projMap = new Map(projects.map((p) => [p.id, p]));
     const wtName = new Map(workTypes.map((w) => [w.id, w.name]));
     const dayIndex = new Map(days.map((d, i) => [d.iso, i]));
 
@@ -37,14 +45,16 @@ export const useGridModel = (
       const key = makeRowKey(projectId, workTypeId);
       let row = rows.get(key);
       if (!row) {
+        const project = projMap.get(projectId);
         row = {
           key,
           projectId,
           workTypeId,
-          projectName: projName.get(projectId) ?? 'Проект',
+          projectName: project?.name ?? 'Проект',
           workTypeName: wtName.get(workTypeId) ?? 'Без вида работ',
           hoursByDay: Array(7).fill(0),
           entryIdByDay: Array(7).fill(null),
+          descByDay: Array(7).fill(null),
           rowTotal: 0,
         };
         rows.set(key, row);
@@ -55,16 +65,20 @@ export const useGridModel = (
     for (const e of entries) {
       const idx = dayIndex.get(dayIso(e.date));
       if (idx === undefined) continue;
-      const row = ensure(e.projectId ?? '', e.workTypeId ?? '');
+      const pid = e.projectId ?? '';
+      const wid = e.workTypeId ?? '';
+      if (!rowPasses(pid, wid, projMap, filters)) continue;
+      const row = ensure(pid, wid);
       row.hoursByDay[idx] += e.hours;
       row.entryIdByDay[idx] = e.id;
+      row.descByDay[idx] = e.description;
       row.rowTotal += e.hours;
     }
 
-    // Пустые строки, добавленные пользователем (ещё без записей).
     for (const key of extraRowKeys) {
       const [projectId, workTypeId] = key.split('|');
-      if (projectId && workTypeId) ensure(projectId, workTypeId);
+      if (projectId && workTypeId && rowPasses(projectId, workTypeId, projMap, filters))
+        ensure(projectId, workTypeId);
     }
 
     const rowList = Array.from(rows.values()).sort((a, b) =>
@@ -74,10 +88,9 @@ export const useGridModel = (
     );
 
     const dayTotals = Array(7).fill(0) as number[];
-    for (const row of rowList)
-      for (let i = 0; i < 7; i++) dayTotals[i] += row.hoursByDay[i];
+    for (const row of rowList) for (let i = 0; i < 7; i++) dayTotals[i] += row.hoursByDay[i];
     const weekTotal = dayTotals.reduce((s, n) => s + n, 0);
 
     return { rowList, dayTotals, weekTotal };
-  }, [entries, projects, workTypes, days, extraRowKeys]);
+  }, [entries, projects, workTypes, days, extraRowKeys, filters]);
 };

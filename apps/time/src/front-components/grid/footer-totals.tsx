@@ -1,27 +1,29 @@
 import { T } from 'src/front-components/grid/tokens';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import { WEEKLY_NORM_HOURS } from 'src/constants/labels';
+import { GRID_TEMPLATE } from 'src/front-components/grid/week-header';
+import {
+  DAILY_NORM_HOURS,
+  fmtTotal,
+  loadColor,
+  loadHint,
+  loadLevel,
+} from 'src/front-components/grid/format';
 
-// Подвал: «Итого» по дням, недельная сумма, строка плана (норма часов).
+// Подвал: «Итого за день» (незаполненные будни подсвечены) + недельный итог
+// vs норма (одна строка-индикатор, цвет: недобор/норма/переработка).
 
-type Props = {
-  days: WeekDay[];
-  dayTotals: number[]; // длина 7
-  weekTotal: number;
-};
-
-const fmt = (n: number): string => (n > 0 ? n.toFixed(2).replace(/\.?0+$/, '') : '—');
+type Props = { days: WeekDay[]; dayTotals: number[]; weekTotal: number };
 
 export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
-  const overNorm = weekTotal > WEEKLY_NORM_HOURS;
-  const weekColor = overNorm ? T.over : weekTotal === WEEKLY_NORM_HOURS ? T.ok : T.text;
+  const weekColor = loadColor(loadLevel(weekTotal, WEEKLY_NORM_HOURS));
 
   return (
     <div>
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1fr) repeat(7, 56px) 64px',
+          gridTemplateColumns: GRID_TEMPLATE,
           background: T.headerBg,
           borderTop: `1px solid ${T.borderStrong}`,
         }}
@@ -37,25 +39,35 @@ export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
         >
           Итого за день
         </div>
-        {days.map((day, i) => (
-          <div
-            key={day.iso}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              padding: '0 8px',
-              fontSize: 12,
-              fontWeight: 600,
-              fontVariantNumeric: 'tabular-nums',
-              color: dayTotals[i] > 0 ? T.text : T.textFaint,
-              background: day.isWeekend ? T.weekendBg : 'transparent',
-              borderRight: `1px solid ${T.border}`,
-            }}
-          >
-            {fmt(dayTotals[i])}
-          </div>
-        ))}
+        {days.map((day, i) => {
+          // Незаполненный будний день (ниже нормы) — мягкая подсветка «дыры».
+          const gap = !day.isWeekend && dayTotals[i] < DAILY_NORM_HOURS;
+          return (
+            <div
+              key={day.iso}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                padding: '0 8px',
+                fontSize: 12,
+                fontWeight: 600,
+                fontVariantNumeric: 'tabular-nums',
+                color: gap && dayTotals[i] > 0 ? T.warn : dayTotals[i] > 0 ? T.text : T.textFaint,
+                background: gap
+                  ? T.overSoft
+                  : day.isToday
+                    ? T.todayCol
+                    : day.isWeekend
+                      ? T.weekendBg
+                      : 'transparent',
+                borderRight: `1px solid ${T.border}`,
+              }}
+            >
+              {fmtTotal(dayTotals[i])}
+            </div>
+          );
+        })}
         <div
           style={{
             display: 'flex',
@@ -68,7 +80,7 @@ export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
             color: weekColor,
           }}
         >
-          {fmt(weekTotal)}
+          {fmtTotal(weekTotal)}
         </div>
       </div>
 
@@ -85,13 +97,7 @@ export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
         <span>План на неделю: {WEEKLY_NORM_HOURS} ч</span>
         <span style={{ color: T.textFaint }}>·</span>
         <span style={{ color: weekColor, fontWeight: 600 }}>
-          {weekTotal === 0
-            ? 'нет записей'
-            : overNorm
-              ? `переработка +${(weekTotal - WEEKLY_NORM_HOURS).toFixed(2).replace(/\.?0+$/, '')} ч`
-              : weekTotal === WEEKLY_NORM_HOURS
-                ? 'норма выполнена'
-                : `недобор ${(WEEKLY_NORM_HOURS - weekTotal).toFixed(2).replace(/\.?0+$/, '')} ч`}
+          {loadHint(weekTotal, WEEKLY_NORM_HOURS)}
         </span>
       </div>
     </div>

@@ -1,38 +1,43 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import type { Ref } from 'src/front-components/grid/types';
+import { Autocomplete } from 'src/front-components/grid/autocomplete';
+import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
 import { makeRowKey } from 'src/front-components/grid/types';
 import { T } from 'src/front-components/grid/tokens';
 
-// Панель добавления строки: выбор проекта + вида работ → новая пустая строка.
+// Быстрое добавление строки: автокомплит проекта (код/клиент) → вид работ.
+// Недавние проекты — вверху списка.
 
 type Props = {
-  projects: Ref[];
-  workTypes: Ref[];
+  projects: ProjectRef[];
+  workTypes: WorkTypeRef[];
+  recentProjectIds: string[];
   onAdd: (rowKey: string) => void;
 };
 
-const selectStyle = {
-  height: 28,
-  fontSize: 12,
-  padding: '0 8px',
-  border: `1px solid ${T.borderStrong}`,
-  borderRadius: 6,
-  background: T.surface,
-  color: T.text,
-  fontFamily: 'inherit',
-  maxWidth: 220,
-} as const;
+export const AddRow = ({ projects, workTypes, recentProjectIds, onAdd }: Props) => {
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [workTypeId, setWorkTypeId] = useState<string | null>(null);
 
-export const AddRow = ({ projects, workTypes, onAdd }: Props) => {
-  const [projectId, setProjectId] = useState('');
-  const [workTypeId, setWorkTypeId] = useState('');
+  const projectItems = useMemo(
+    () => projects.map((p) => ({ id: p.id, label: p.name })),
+    [projects],
+  );
+  // Виды работ ограничиваем отделом проекта (или глобальные), если проект выбран.
+  const workTypeItems = useMemo(() => {
+    const dep = projects.find((p) => p.id === projectId)?.departmentId ?? null;
+    const scoped = dep
+      ? workTypes.filter((w) => !w.departmentId || w.departmentId === dep)
+      : workTypes;
+    return scoped.map((w) => ({ id: w.id, label: w.name }));
+  }, [workTypes, projects, projectId]);
 
+  const ready = Boolean(projectId && workTypeId);
   const add = () => {
     if (!projectId || !workTypeId) return;
     onAdd(makeRowKey(projectId, workTypeId));
-    setProjectId('');
-    setWorkTypeId('');
+    setProjectId(null);
+    setWorkTypeId(null);
   };
 
   return (
@@ -43,50 +48,42 @@ export const AddRow = ({ projects, workTypes, onAdd }: Props) => {
         gap: 8,
         padding: '8px 12px',
         borderTop: `1px solid ${T.border}`,
-        background: T.bg,
+        background: T.panelBg,
       }}
     >
-      <select
+      <span style={{ fontSize: 12, color: T.textMuted, fontWeight: 600 }}>+ строка</span>
+      <Autocomplete
+        placeholder="Проект (код или клиент)…"
+        items={projectItems}
+        recentIds={recentProjectIds}
         value={projectId}
-        onChange={(e) => setProjectId(e.target.value)}
-        style={selectStyle}
-      >
-        <option value="">Проект…</option>
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <select
+        onChange={setProjectId}
+        width={260}
+      />
+      <Autocomplete
+        placeholder="Вид работ…"
+        items={workTypeItems}
         value={workTypeId}
-        onChange={(e) => setWorkTypeId(e.target.value)}
-        style={selectStyle}
-      >
-        <option value="">Вид работ…</option>
-        {workTypes.map((w) => (
-          <option key={w.id} value={w.id}>
-            {w.name}
-          </option>
-        ))}
-      </select>
+        onChange={setWorkTypeId}
+        width={200}
+      />
       <button
         onClick={add}
-        disabled={!projectId || !workTypeId}
+        disabled={!ready}
         style={{
-          height: 28,
+          height: 30,
           padding: '0 14px',
           fontSize: 12,
           fontWeight: 600,
           border: 'none',
-          borderRadius: 6,
-          background: projectId && workTypeId ? T.accent : T.border,
-          color: projectId && workTypeId ? '#ffffff' : T.textFaint,
-          cursor: projectId && workTypeId ? 'pointer' : 'default',
+          borderRadius: 7,
+          background: ready ? T.accent : T.border,
+          color: ready ? T.surface : T.textFaint,
+          cursor: ready ? 'pointer' : 'default',
           fontFamily: 'inherit',
         }}
       >
-        Добавить строку
+        Добавить
       </button>
     </div>
   );

@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { ApiEntry, Ref } from 'src/front-components/grid/types';
+import type {
+  ApiEntry,
+  EmployeeRef,
+  ProjectRef,
+  Ref,
+  WorkTypeRef,
+} from 'src/front-components/grid/types';
 import {
   deleteEntry,
+  fetchDepartments,
+  fetchEmployees,
   fetchEntries,
   fetchProjects,
   fetchWorkTypes,
@@ -10,8 +18,8 @@ import {
   upsertEntry,
 } from 'src/front-components/grid/time-rest';
 
-// Состояние недели: справочники + записи + employeeId. CRUD напрямую по Core REST
-// (логик-функции на dev-сервере отключены). Перезагрузка после каждой правки.
+// Состояние данных таймшита: справочники (грузятся раз) + записи периода.
+// CRUD напрямую по Core REST. Перезагрузка записей после правки.
 
 export type UpsertInput = {
   id?: string;
@@ -22,37 +30,54 @@ export type UpsertInput = {
   description?: string;
 };
 
-export const useGridData = (from: string, to: string) => {
+type Refs = {
+  projects: ProjectRef[];
+  workTypes: WorkTypeRef[];
+  departments: Ref[];
+  employees: EmployeeRef[];
+};
+
+const EMPTY_REFS: Refs = { projects: [], workTypes: [], departments: [], employees: [] };
+
+export const useGridData = (from: string, to: string, viewEmployeeId: string | null) => {
   const [entries, setEntries] = useState<ApiEntry[]>([]);
-  const [projects, setProjects] = useState<Ref[]>([]);
-  const [workTypes, setWorkTypes] = useState<Ref[]>([]);
+  const [refs, setRefs] = useState<Refs>(EMPTY_REFS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const employeeIdRef = useRef<string | null>(null);
+  const selfIdRef = useRef<string | null>(null);
+  const refsLoaded = useRef(false);
+
+  // Чей таймшит показываем: явно выбранный (руководитель) или свой.
+  const targetId = viewEmployeeId ?? selfIdRef.current;
+
+  const loadEntries = useCallback(async (employeeId: string | null) => {
+    const es = await fetchEntries(from, to, employeeId);
+    setEntries(es);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [from, to]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (employeeIdRef.current === null) {
-        employeeIdRef.current = await resolveEmployeeId(null);
+      if (!refsLoaded.current) {
+        selfIdRef.current = await resolveEmployeeId(null);
+        const [projects, workTypes, departments, employees] = await Promise.all([
+          fetchProjects(),
+          fetchWorkTypes(),
+          fetchDepartments(),
+          fetchEmployees(),
+        ]);
+        setRefs({ projects, workTypes, departments, employees });
+        refsLoaded.current = true;
       }
-      const [es, ps, wts] = await Promise.all([
-        fetchEntries(from, to, employeeIdRef.current),
-        projects.length ? Promise.resolve(projects) : fetchProjects(),
-        workTypes.length ? Promise.resolve(workTypes) : fetchWorkTypes(),
-      ]);
-      setEntries(es);
-      setProjects(ps);
-      setWorkTypes(wts);
+      await loadEntries(viewEmployeeId ?? selfIdRef.current);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка загрузки');
     } finally {
       setLoading(false);
     }
-    // projects/workTypes намеренно вне deps: грузятся один раз, дальше кэш.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [from, to]);
+  }, [loadEntries, viewEmployeeId]);
 
   useEffect(() => {
     void load();
@@ -60,32 +85,55 @@ export const useGridData = (from: string, to: string) => {
 
   const upsert = useCallback(
     async (input: UpsertInput) => {
-      const employeeId = employeeIdRef.current;
-      if (!employeeId) {
+      if (!targetId) {
         setError('Сотрудник не определён');
         return;
       }
       try {
-        await upsertEntry({ ...input, employeeId });
-        await load();
+        await upsertEntry({ ...input, employeeId: targetId });
+        await loadEntries(targetId);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка сохранения');
       }
     },
-    [load],
+    [loadEntries, targetId],
+  );
+
+  // Пакетная запись (копирование недели / bulk-fill) — один reload в конце.
+  const upsertMany = useCallback(
+    async (inputs: UpsertInput[]) => {
+      if (!targetId || inputs.length === 0) return;
+      try {
+        for (const input of inputs) await upsertEntry({ ...input, employeeId: targetId });
+        await loadEntries(targetId);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+      }
+    },
+    [loadEntries, targetId],
   );
 
   const remove = useCallback(
     async (id: string) => {
       try {
         await deleteEntry(id);
-        await load();
+        await loadEntries(targetId);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка удаления');
       }
     },
-    [load],
+    [loadEntries, targetId],
   );
 
-  return { entries, projects, workTypes, loading, error, reload: load, upsert, remove };
+  return {
+    entries,
+    ...refs,
+    selfEmployeeId: selfIdRef.current,
+    loading,
+    error,
+    reload: load,
+    upsert,
+    upsertMany,
+    remove,
+  };
 };

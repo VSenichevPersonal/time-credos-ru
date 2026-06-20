@@ -1,0 +1,95 @@
+import { useEffect } from 'react';
+
+import { GridRow } from 'src/front-components/grid/grid-row';
+import { WeekHeader } from 'src/front-components/grid/week-header';
+import { FooterTotals } from 'src/front-components/grid/footer-totals';
+import { AddRow } from 'src/front-components/grid/add-row';
+import { Center } from 'src/front-components/grid/center';
+import { useKeyboard } from 'src/front-components/grid/use-keyboard';
+import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
+import type { WeekDay } from 'src/front-components/grid/use-week';
+import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
+
+// Режим «Неделя»: строки (проект+вид работ) × Пн–Вс. Клавиатура-first.
+// Shift+Enter = bulk-fill введённого значения на все будни строки.
+
+type Props = {
+  days: WeekDay[];
+  rowList: GridRowModel[];
+  dayTotals: number[];
+  weekTotal: number;
+  projects: ProjectRef[];
+  workTypes: WorkTypeRef[];
+  recentProjectIds: string[];
+  loading: boolean;
+  onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
+  onBulkFill: (rowKey: string, hours: number) => void;
+  onAddRow: (rowKey: string) => void;
+};
+
+export const WeekGrid = ({
+  days,
+  rowList,
+  dayTotals,
+  weekTotal,
+  projects,
+  workTypes,
+  recentProjectIds,
+  loading,
+  onCellCommit,
+  onBulkFill,
+  onAddRow,
+}: Props) => {
+  const nav = useKeyboard(rowList.length, 7);
+
+  // Shift+Enter на активной ячейке: bulk-fill её значения на будни строки.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && e.shiftKey && nav.active) {
+        const row = rowList[nav.active.row];
+        const val = row?.hoursByDay[nav.active.col];
+        if (row && val && val > 0) {
+          e.preventDefault();
+          onBulkFill(row.key, val);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [nav.active, rowList, onBulkFill]);
+
+  return (
+    <>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <WeekHeader days={days} leftLabel="Проект / вид работ" />
+        {loading && rowList.length === 0 ? (
+          <Center>Загрузка…</Center>
+        ) : rowList.length === 0 ? (
+          <Center>Нет записей. Начните печатать код проекта или клиента ниже.</Center>
+        ) : (
+          rowList.map((row, i) => (
+            <GridRow
+              key={row.key}
+              rowIndex={i}
+              projectName={row.projectName}
+              workTypeName={row.workTypeName}
+              days={days}
+              hoursByDay={row.hoursByDay}
+              rowTotal={row.rowTotal}
+              alt={i % 2 === 1}
+              nav={nav}
+              onCellCommit={(dayIso, hours) => onCellCommit(row.key, dayIso, hours)}
+            />
+          ))
+        )}
+      </div>
+      <FooterTotals days={days} dayTotals={dayTotals} weekTotal={weekTotal} />
+      <AddRow
+        projects={projects}
+        workTypes={workTypes}
+        recentProjectIds={recentProjectIds}
+        onAdd={onAddRow}
+      />
+    </>
+  );
+};
