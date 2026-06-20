@@ -42,6 +42,7 @@ is_allowed() {
     infra/scripts/secret-scan.sh) return 0 ;;     # сам паттерн-файл
     .env.example) return 0 ;;                       # шаблон, значений нет
     docs/devops/PLAYBOOK.md|docs/devops/runbooks/*) return 0 ;; # примеры-инструкции
+    apps/time/vitest.config.ts) return 0 ;;         # демо-JWT тест-фикстуры workspace 20202020 (подтв. arch 00:20 #9, не живой секрет)
     *) return 1 ;;
   esac
 }
