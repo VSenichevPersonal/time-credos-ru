@@ -16,6 +16,81 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 39 — P1 rollup-fix + RBAC_MODEL + PLANNING_MODEL → арху
+
+**P1 backfill — НАКОНЕЦ ВЗЯТ. Dev2 строит event-триггеры:**
+
+2 новых untracked файла:
+- `project-fact-rollup-events.ts` — shared хендлеры `onEntryCreated/Updated/Deleted`
+- `project-fact-rollup-created.logic.ts` — SDK `defineLogicFunction` → `credosTimeEntry.created`
+
+Корень бага подтверждён в комментарии Dev2:
+> «/s/time-entry пересчитывает rollup, НО запись можно изменить МИМО него: CSV-импорт, прямой грид Twenty, REST. Триггеры на created/updated/deleted ловят ВСЕ пути → дрейфа нет by design. Пересчёт идемпотентен (полный Σ, не дельта)»
+
+Правильное решение. Backfill скрипта нет — но event-триггеры закроют дальнейший дрейф. Нужен ещё backfill для 42 СУЩЕСТВУЮЩИХ проектов (Σ entry.hours → patch), иначе старые данные останутся пустыми.
+
+→ Dev2: не забыть `post-install` backfill вместе с триггерами.
+
+---
+
+**[signal-arch] RBAC → 3 решения нужны:**
+
+**Из RBAC_MODEL.md (Timetta разведка, 9b844f5):**
+
+A. **`isManager` скоуп** — Timetta: менеджер видит ТОЛЬКО своих подчинённых («Моя команда», фильтр по subordinates). Текущий `approval.logic.ts`: isManager-guard есть, но скоуп — весь список или только своя команда? CISO-005: identity server-side, не params. Проверить: менеджер не должен видеть/согласовывать чужие команды.
+
+B. **Field-level security на ставки** — RateMatrix (cost/bill rate) скрыт от рядовых пользователей и сотрудника (он видит только часы, не свою ставку). Нужно: `Управление финансами` role-check перед выдачей RateMatrixLine в API. До запуска финансового модуля.
+
+C. **PM не согласует** — менеджер проекта не может approve таймшит (только если включён в воркфлоу). Batch-approve Dev1: нужно убедиться, что проверка approval-права = role «Управление командой» (direct manager), не «Управление проектами».
+
+---
+
+**[signal-arch] PLANNING_MODEL → DP-0005 подтверждён:**
+
+**Из PLANNING_MODEL.md (Timetta разведка, fba6b59):**
+
+1. **Единица аллокации = ЧАСЫ** (не %). DP-0005 `credosTimeAssignment` с `plannedHours` — правильно. Подтверждено референсом.
+
+2. **Soft/Hard booking** — Timetta enum `bookingType: soft | hard`. DP-0005 MVP мы упростили (убрали bookingType). MVP: только hard. Soft (пресейл/what-if) — следующая волна. Зафиксировать в ADR.
+
+3. **Перегрузка НЕ блокируется** — показывается конфликт (цвет). Capacity board уже делает это (красный при >capacity). Alignment с Timetta ✅.
+
+4. **Multi-dept project** = часы по отделам → `projectDeptShares` из assignments (DP-0005 derived) ✅ подтверждено референсом.
+
+5. **Capacity формула: FTE × Schedule × Calendar** — полностью совпадает с нашим `baseNorm × headcount × factor − absences`. Alignment ✅.
+
+---
+
+**Статус SCOUT_QUESTIONS (аналитик):**
+
+| Блок | Статус |
+|---|---|
+| Q1-6 Целостность | ✅ Done |
+| Q7-12 Связанность | 🔄 2/4, ждём LINK batch |
+| Q13-19 UX | ✅ Done |
+| Q20-28 RBAC | ✅ RBAC_MODEL.md |
+| Q29-41 Планирование | ✅ PLANNING_MODEL.md |
+
+Осталось: Q7-12 (связанность объектов — каскады, upsert-конфликты). Когда придёт LINK batch — дообработаю.
+
+---
+
+**weekly-grid.tsx (uncommitted)** — ADR-0007 интеграция week-header норм в основной грид. Продолжение прошлой итерации.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | weekly-grid ADR-0007 (uncommitted) |
+| Dev2 | 🟢 | P1 rollup event-триггеры (untracked, в работе) |
+| arch | 🔴 | RBAC: 3 решения (isManager-скоуп, field-security, PM-approve) |
+| arch | 🔴 | DP-0005 ADR: soft/hard booking — только hard в MVP, зафиксировать |
+| QA | ✅ | 1381 зелёных |
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 38 — 19917e2 + ADR-0007 в week-header + токены откат
 
 **19917e2 COMMITTED — reports-detail + audit + scout:**

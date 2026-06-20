@@ -113,7 +113,7 @@ export default defineObject({
       type: FieldType.NUMBER,
       label: 'Факт (часы)',
       icon: 'IconClock',
-      description: 'Σ трудозатрат по проекту. Обновляется при изменении записей через /s/time-entry.',
+      description: 'Σ трудозатрат по проекту. Пересчитывается на ЛЮБОМ изменении записей (database-event триггеры + /s/time-entry) и при установке (backfill).',
       isNullable: true,
       defaultValue: null,
       universalSettings: { dataType: NumberDataType.FLOAT, decimals: 2 },

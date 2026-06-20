@@ -1,10 +1,12 @@
 import { DAILY_NORM_HOURS, fmtHours } from 'src/front-components/grid/format';
 import type { WeekDay } from 'src/front-components/grid/use-week';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 
 // REQ-0015 §1: pre-submit чеклист пробелов недели. Клиентский расчёт по уже
-// загруженной неделе (без доп. запросов). Норма дня — DAILY_NORM_HOURS (8 ч),
-// рабочие дни — будни (!isWeekend); производственного календаря нет, выходные
-// берём из use-week. Не блокирует отправку — только предупреждает.
+// загруженной неделе (без доп. запросов). T2 SSOT: норма дня — из произв.
+// календаря (normFor); нерабочий день/праздник (норма 0) пробелом не считается.
+// Без normFor — деградация на DAILY_NORM_HOURS×будни (back-compat).
+// Не блокирует отправку — только предупреждает.
 // Сверка: Timetta pre-submit (подсветка незаполненных/недозаполненных дней).
 
 export type DayGap = {
@@ -24,21 +26,26 @@ export type WeekGaps = {
 
 // Чистый расчёт: пробелы по будням недели. dayTotals — итоги по 7 дням (из
 // useGridModel). Выходные игнорируем. Дни ровно/выше нормы пробелом не считаем.
-export const calcWeekGaps = (days: WeekDay[], dayTotals: number[]): WeekGaps => {
+export const calcWeekGaps = (
+  days: WeekDay[],
+  dayTotals: number[],
+  normFor?: NormForDay,
+): WeekGaps => {
   const gaps: DayGap[] = [];
   let emptyCount = 0;
   let underCount = 0;
   let missingHours = 0;
 
   days.forEach((d, i) => {
-    if (d.isWeekend) return;
+    const norm = normFor ? normFor(d.iso, d.isWeekend) : d.isWeekend ? 0 : DAILY_NORM_HOURS;
+    if (norm <= 0) return; // нерабочий день/праздник — не пробел
     const total = dayTotals[i] ?? 0;
-    if (total >= DAILY_NORM_HOURS) return;
+    if (total >= norm) return;
     const kind: DayGap['kind'] = total <= 0 ? 'empty' : 'under';
     if (kind === 'empty') emptyCount += 1;
     else underCount += 1;
-    missingHours += DAILY_NORM_HOURS - total;
-    gaps.push({ iso: d.iso, dayLabel: d.dayLabel, total, norm: DAILY_NORM_HOURS, kind });
+    missingHours += norm - total;
+    gaps.push({ iso: d.iso, dayLabel: d.dayLabel, total, norm, kind });
   });
 
   return { gaps, emptyCount, underCount, missingHours };

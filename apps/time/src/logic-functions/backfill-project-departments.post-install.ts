@@ -3,6 +3,8 @@ import type { InstallPayload } from 'twenty-sdk/define';
 
 import { BACKFILL_PROJECT_DEPARTMENTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
+import { computeProjectRollup } from './project-fact-rollup';
+
 // REQ-0013 13a — миграция/бэкфилл: каждый проект со старой жёсткой связью
 // project.departmentId получает одну долю credosTimeProjectDepartment на этот
 // отдел с plannedEffortShare = plannedEffort (доля 100%). Так смешанные данные
@@ -59,10 +61,66 @@ const restPost = async (path: string, body: unknown): Promise<void> => {
   if (!res.ok) throw new Error(`POST ${path} -> ${res.status} ${await res.text()}`);
 };
 
+const restPatch = async (path: string, body: unknown): Promise<void> => {
+  const res = await fetch(`${apiBase()}${path}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`PATCH ${path} -> ${res.status} ${await res.text()}`);
+};
+
 type RawProject = { id: string; departmentId: string | null; plannedEffort: number | null };
 type RawShare = { projectId: string | null; departmentId: string | null };
+type RawEntry = { projectId: string | null; hours: number | null };
 
-const handler = async (_payload: InstallPayload): Promise<{ ok: boolean; created: number; skipped: number; errors: number }> => {
+// Бэкфилл factHours/budgetRemaining (баг «пустые Факт/Остаток»): приводит хранимые
+// rollup-поля ВСЕХ проектов к Σ часов их записей (computeProjectRollup — тот же
+// SSOT, что в триггерах и /s/time-entry). Без него существующие проекты с дрейфом
+// (или без значения вовсе) останутся пустыми до первой новой мутации записи.
+// Идемпотентно: полный пересчёт из источника, повтор install/upgrade безопасен.
+const backfillProjectFactHours = async (
+  projects: RawProject[],
+): Promise<{ updated: number; errors: number }> => {
+  // Σ часов по проекту одним проходом всех записей (вместо запроса на проект).
+  const entries = await restGetAll<RawEntry>('credosTimeEntries', {});
+  const hoursByProject = new Map<string, number[]>();
+  for (const e of entries) {
+    if (!e.projectId) continue;
+    const arr = hoursByProject.get(e.projectId) ?? [];
+    arr.push(e.hours ?? 0);
+    hoursByProject.set(e.projectId, arr);
+  }
+  let updated = 0;
+  let errors = 0;
+  for (const p of projects) {
+    const hours = hoursByProject.get(p.id) ?? [];
+    const rollup = computeProjectRollup(
+      hours.map((h) => ({ hours: h })),
+      p.plannedEffort,
+    );
+    try {
+      await restPatch(`/rest/credosTimeProjects/${p.id}`, rollup);
+      updated += 1;
+    } catch (e) {
+      errors += 1;
+      // eslint-disable-next-line no-console
+      console.error('[backfill-fact-hours] проект %s: %s', p.id, e instanceof Error ? e.message : String(e));
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[backfill-fact-hours] готово: обновлено %d проектов, ошибок %d (записей всего %d)',
+    updated,
+    errors,
+    entries.length,
+  );
+  return { updated, errors };
+};
+
+const handler = async (
+  _payload: InstallPayload,
+): Promise<{ ok: boolean; created: number; skipped: number; errors: number; factHoursUpdated: number }> => {
   // Проекты (со старым departmentId) + уже существующие доли (для идемпотентности).
   const [projects, existingShares] = await Promise.all([
     restGetAll<RawProject>('credosTimeProjects', {}),
@@ -109,14 +167,24 @@ const handler = async (_payload: InstallPayload): Promise<{ ok: boolean; created
     errors,
     projects.length,
   );
-  return { ok: errors === 0, created, skipped, errors };
+
+  // Миграция 2: бэкфилл factHours/budgetRemaining (баг «пустые Факт/Остаток»).
+  const fact = await backfillProjectFactHours(projects);
+
+  return {
+    ok: errors === 0 && fact.errors === 0,
+    created,
+    skipped,
+    errors: errors + fact.errors,
+    factHoursUpdated: fact.updated,
+  };
 };
 
 export default definePostInstallLogicFunction({
   universalIdentifier: BACKFILL_PROJECT_DEPARTMENTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER,
   name: 'backfill-project-departments',
   description:
-    'REQ-0013 13a: бэкфилл project.departmentId → доля credosTimeProjectDepartment (100%), идемпотентно',
+    'Бэкфилл: (1) REQ-0013 13a project.departmentId → доля credosTimeProjectDepartment (100%); (2) factHours/budgetRemaining проектов = Σ часов записей. Идемпотентно.',
   timeoutSeconds: 60,
   // Существующий инстанс Credos уже установлен — без этого флага бэкфилл не
   // выполнится на апгрейде и старые проекты никогда не получат доли.

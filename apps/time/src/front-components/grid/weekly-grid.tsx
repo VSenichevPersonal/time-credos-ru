@@ -7,6 +7,7 @@ import { WeekGrid } from 'src/front-components/grid/week-grid';
 import { DayView } from 'src/front-components/grid/day-view';
 import { ProjectView } from 'src/front-components/grid/project-view';
 import { useWeek } from 'src/front-components/grid/use-week';
+import { useDailyNorm } from 'src/front-components/grid/use-daily-norm';
 import { useGridData } from 'src/front-components/grid/use-grid-data';
 import { useGridModel } from 'src/front-components/grid/use-grid-model';
 import { useFilters, filterProjects, filterWorkTypes } from 'src/front-components/grid/use-filters';
@@ -223,6 +224,7 @@ export const WeeklyGrid = () => {
           workTypes={visibleWorkTypes}
           recentProjectIds={recentProjectIds}
           lastWorkTypeByProject={lastWorkTypeByProject}
+          normFor={normFor}
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
           loading={data.loading}

@@ -74,7 +74,7 @@ export default defineView({
       size: 120,
     },
     {
-      // Факт — rollup Σ часов записей проекта (хранимое поле, пересчёт в /s/time-entry).
+      // Факт — rollup Σ часов записей проекта (хранимое, полный ЖЦ: триггеры+backfill).
       universalIdentifier: 'b1f4c2a7-3d56-4e89-9a0b-1c2d3e4f5a60',
       fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID,
       position: 7,

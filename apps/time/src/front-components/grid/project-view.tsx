@@ -10,6 +10,7 @@ import { useKeyboard } from 'src/front-components/grid/use-keyboard';
 import { makeRowKey } from 'src/front-components/grid/types';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
 
 // Режим «Проект»: один проект × неделя. Строки = виды работ, колонки = дни.
@@ -21,6 +22,7 @@ type Props = {
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
   lastWorkTypeByProject?: Record<string, string>; // W3-5: не используется (добавляем новый вид работ)
+  normFor: NormForDay;
   selectedProjectId: string | null;
   onSelectProject: (id: string | null) => void;
   loading: boolean;
@@ -34,6 +36,7 @@ export const ProjectView = ({
   projects,
   workTypes,
   recentProjectIds,
+  normFor,
   selectedProjectId,
   onSelectProject,
   loading,
@@ -81,7 +84,7 @@ export const ProjectView = ({
       ) : (
         <>
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            <WeekHeader days={days} leftLabel="Вид работ" />
+            <WeekHeader days={days} leftLabel="Вид работ" normFor={normFor} />
             {loading && rows.length === 0 ? (
               <Center>Загрузка…</Center>
             ) : rows.length === 0 ? (
@@ -104,7 +107,7 @@ export const ProjectView = ({
               ))
             )}
           </div>
-          <FooterTotals days={days} dayTotals={dayTotals} weekTotal={total} />
+          <FooterTotals days={days} dayTotals={dayTotals} weekTotal={total} normFor={normFor} />
           <AddWorkTypeRow
             workTypes={scopedWorkTypes}
             onAdd={(wid) => onAddRow(makeRowKey(selectedProjectId, wid))}

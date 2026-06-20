@@ -413,8 +413,9 @@ export const CREDOS_TIME_ENTRY_TAGS_FIELD_ID =
   '39113fed-1f5b-47f4-b357-5835994b9401';
 
 // --- factHours rollup + budgetRemaining (Факт/Остаток в index-view «Все проекты») ---
-// factHours = Σ credosTimeEntry.hours за всё время проекта (хранимое, пересчёт
-// в /s/time-entry на upsert/delete). budgetRemaining = plannedEffort − factHours.
+// factHours = Σ credosTimeEntry.hours за всё время проекта (хранимое, полный ЖЦ:
+// database-event триггеры created/updated/deleted + /s/time-entry + backfill).
+// budgetRemaining = plannedEffort − factHours.
 // Хранимые поля нужны для native index-view «Все проекты» (там только stored fields).
 export const CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID =
   'a3165791-e8ef-4883-b0c7-4fe88bebbda6';

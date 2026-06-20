@@ -14,9 +14,13 @@ import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
 import { Breadcrumbs } from 'src/front-components/shared/breadcrumbs';
 import { useDrill } from 'src/front-components/shared/use-drill';
+import { TrendView, type DeptOption } from 'src/front-components/reports/trend-view';
 import { departmentLabel } from 'src/constants/labels';
 
 const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
+
+// Верхний режим дашборда: сводка (срезы/период) или тренд (помесячная динамика).
+type View = 'summary' | 'trend';
 
 // Дашборд «Отчёты»: утилизация + загрузка/недогруз по периоду и срезу
 // (отдел/проект/человек). Данные — /s/reports. Светлая тема, тинт-нейтрали.
@@ -85,6 +89,7 @@ const pickRows = (
 };
 
 export const ReportsDashboard = () => {
+  const [view, setView] = useState<View>('summary');
   const { period, gran, isCurrent, prev, next, setGran } = usePeriod();
   const [groupBy, setGroupBy] = useState<GroupBy>('dept');
   const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
@@ -127,6 +132,13 @@ export const ReportsDashboard = () => {
   const onDrillDept = (r: ReportRow) =>
     drillInto({ dim: 'dept', value: r.name, label: `Отдел: ${departmentLabel(r.name, { short: true }) || r.name}` });
 
+  // Опции отдела для фильтра тренда: byDept[].key = id отдела, name = код.
+  // Тренд шлёт departmentId (id), пользователь видит русское название отдела.
+  const deptOptions: DeptOption[] = (data?.byDept ?? []).map((d) => ({
+    id: d.key,
+    label: departmentLabel(d.name, { short: true }) || d.name,
+  }));
+
   return (
     <div
       style={{
@@ -151,44 +163,59 @@ export const ReportsDashboard = () => {
         }}
       >
         <span style={{ fontSize: 15, fontWeight: 600 }}>Отчёты</span>
-        <PeriodNav label={period.label} isCurrent={isCurrent} onPrev={onPeriodChange(prev)} onNext={onPeriodChange(next)} />
         <Segmented
-          ariaLabel="Гранулярность периода"
-          value={gran}
+          ariaLabel="Режим отчёта"
+          value={view}
           segments={[
-            { value: 'month', label: 'Месяц' },
-            { value: 'quarter', label: 'Квартал' },
-            { value: 'year', label: 'Год' },
+            { value: 'summary', label: 'Сводка' },
+            { value: 'trend', label: 'Тренд' },
           ]}
-          onChange={(g: PeriodGran) => {
-            reset();
-            setGran(g);
-          }}
+          onChange={(v: View) => setView(v)}
         />
-        {groupBy === 'project' && (
-          <FilterChip
-            label="Категория"
-            options={CATEGORY_OPTS}
-            selected={catFilter}
-            onToggle={toggleCat}
-            onClear={() => setCatFilter(new Set())}
-          />
+        {view === 'summary' && (
+          <>
+            <PeriodNav label={period.label} isCurrent={isCurrent} onPrev={onPeriodChange(prev)} onNext={onPeriodChange(next)} />
+            <Segmented
+              ariaLabel="Гранулярность периода"
+              value={gran}
+              segments={[
+                { value: 'month', label: 'Месяц' },
+                { value: 'quarter', label: 'Квартал' },
+                { value: 'year', label: 'Год' },
+              ]}
+              onChange={(g: PeriodGran) => {
+                reset();
+                setGran(g);
+              }}
+            />
+            {groupBy === 'project' && (
+              <FilterChip
+                label="Категория"
+                options={CATEGORY_OPTS}
+                selected={catFilter}
+                onToggle={toggleCat}
+                onClear={() => setCatFilter(new Set())}
+              />
+            )}
+            <span style={{ marginLeft: 'auto' }}>
+              <Segmented
+                ariaLabel="Срез группировки"
+                value={groupBy}
+                segments={[
+                  { value: 'dept', label: 'Отдел' },
+                  { value: 'project', label: 'Проект' },
+                  { value: 'employee', label: 'Человек' },
+                ]}
+                onChange={(g: GroupBy) => switchGroupBy(g)}
+              />
+            </span>
+          </>
         )}
-        <span style={{ marginLeft: 'auto' }}>
-          <Segmented
-            ariaLabel="Срез группировки"
-            value={groupBy}
-            segments={[
-              { value: 'dept', label: 'Отдел' },
-              { value: 'project', label: 'Проект' },
-              { value: 'employee', label: 'Человек' },
-            ]}
-            onChange={(g: GroupBy) => switchGroupBy(g)}
-          />
-        </span>
       </div>
 
-      {error ? (
+      {view === 'trend' ? (
+        <TrendView deptOptions={deptOptions} />
+      ) : error ? (
         <ErrorState title="Не удалось загрузить отчёт" detail={error} onRetry={reload} />
       ) : loading || !data ? (
         <Center>Загрузка отчёта…</Center>
