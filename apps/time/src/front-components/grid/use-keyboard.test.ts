@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { clampCell, keyAction } from './use-keyboard';
+import { clampCell, firstEmptyCell, keyAction } from './use-keyboard';
 import type { Cell } from './use-keyboard';
 
 const cell = (row: number, col: number): Cell => ({ row, col });
@@ -130,5 +130,48 @@ describe('clampCell — граничные случаи', () => {
 
   it('сетка 1×1 → всегда (0,0)', () => {
     expect(clampCell(cell(0, 0), 1, 1, 1, 1)).toEqual({ row: 0, col: 0 });
+  });
+});
+
+// ─── firstEmptyCell (UC1: автофокус) ───────────────────────────────────────────
+
+describe('firstEmptyCell', () => {
+  it('первая нулевая ячейка слева-направо, построчно', () => {
+    expect(
+      firstEmptyCell([
+        [8, 8, 0, 0],
+        [0, 0, 0, 0],
+      ]),
+    ).toEqual({ row: 0, col: 2 });
+  });
+
+  it('пропускает заполненные строки целиком', () => {
+    expect(
+      firstEmptyCell([
+        [8, 8, 8],
+        [8, 0, 8],
+      ]),
+    ).toEqual({ row: 1, col: 1 });
+  });
+
+  it('пропускает заблокированные (locked) пустые ячейки', () => {
+    expect(
+      firstEmptyCell(
+        [[0, 0, 0]],
+        [[true, true, false]],
+      ),
+    ).toEqual({ row: 0, col: 2 });
+  });
+
+  it('все заполнены → null', () => {
+    expect(firstEmptyCell([[8, 8], [8, 8]])).toBeNull();
+  });
+
+  it('все пустые заблокированы → null', () => {
+    expect(firstEmptyCell([[0, 0]], [[true, true]])).toBeNull();
+  });
+
+  it('пустая сетка → null', () => {
+    expect(firstEmptyCell([])).toBeNull();
   });
 });

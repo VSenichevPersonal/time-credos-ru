@@ -100,6 +100,59 @@ describe('approval.logic — runSubmit', () => {
     );
     expect(result).toMatchObject({ ok: true, updated: 0 });
   });
+
+  const PROJ_UUID = 'aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa';
+  const DEPT_UUID = 'bbbbbbbb-2222-4bbb-8bbb-bbbbbbbbbbbb';
+  const ENTRY_UUID = 'cccccccc-3333-4ccc-8ccc-cccccccccccc';
+
+  it('submit: запись в approvalRequired=true проекте → PATCH вызван, updated:1', async () => {
+    const mockFn = mockFetch([
+      { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: true, departmentId: null }] } },
+      { data: { credosTimeDepartments: [] } },
+      { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'DRAFT', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      {}, // PATCH response (setStatus)
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    // PATCH должен был быть вызван
+    const calls = mockFn.mock.calls;
+    const patchCall = calls.find((c: unknown[]) =>
+      typeof c[0] === 'string' && c[0].includes(`/rest/credosTimeEntries/${ENTRY_UUID}`),
+    );
+    expect(patchCall).toBeTruthy();
+  });
+
+  it('submit: запись в approvalRequired=false проекте → не PATCH, updated:0', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch([
+        { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: false, departmentId: null }] } },
+        { data: { credosTimeDepartments: [] } },
+        { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'DRAFT', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      ]),
+    );
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 0 });
+  });
+
+  it('submit: approvalMap через отдел (project=null, dept=true) → updated:1', async () => {
+    const mockFn = mockFetch([
+      { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: null, departmentId: DEPT_UUID }] } },
+      { data: { credosTimeDepartments: [{ id: DEPT_UUID, approvalRequired: true }] } },
+      { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'DRAFT', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      {}, // PATCH
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
 });
 
 describe('approval.logic — runResolve: RBAC (CISO-002)', () => {

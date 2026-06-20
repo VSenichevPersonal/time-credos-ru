@@ -70,6 +70,38 @@ describe('parseHours', () => {
     expect(parseHours('')).toBe(0);
     expect(parseHours('   ')).toBe(0);
   });
+
+  // UC4: гибкий формат ввода — люди думают в ч:мин (сверка Timetta: выбор Decimal/HH:MM).
+  it('HH:MM → часы', () => {
+    expect(parseHours('1:30')).toBe(1.5);
+    expect(parseHours('0:45')).toBe(0.75);
+    expect(parseHours('8:00')).toBe(8);
+    expect(parseHours(':30')).toBe(0.5); // только минуты через двоеточие
+    expect(parseHours('2:')).toBe(2); // только часы через двоеточие
+  });
+  it('русские суффиксы ч/м → часы', () => {
+    expect(parseHours('1ч30м')).toBe(1.5);
+    expect(parseHours('1ч 30м')).toBe(1.5); // пробел между частями
+    expect(parseHours('1ч')).toBe(1);
+    expect(parseHours('30м')).toBe(0.5);
+    expect(parseHours('90м')).toBe(1.5); // минуты > 60 нормализуются
+  });
+  it('латинский h → часы', () => {
+    expect(parseHours('1h30')).toBe(1.5);
+    expect(parseHours('1h')).toBe(1);
+    expect(parseHours('1h30m')).toBe(1.5);
+  });
+  it('гибкие форматы тоже квантуются и проверяются на диапазон', () => {
+    expect(parseHours('1:08')).toBe(1.25); // 1.133.. → 1.25
+    expect(parseHours('25:00')).toBeNull(); // вне 0..24
+    expect(parseHours('23ч90м')).toBeNull(); // 23 + 1.5 = 24.5 ч → вне 0..24
+  });
+  it('мусорные суффиксы → null', () => {
+    expect(parseHours('1x')).toBeNull();
+    expect(parseHours('ч')).toBeNull();
+    expect(parseHours('м')).toBeNull();
+    expect(parseHours('1:2:3')).toBeNull();
+  });
 });
 
 describe('loadLevel', () => {

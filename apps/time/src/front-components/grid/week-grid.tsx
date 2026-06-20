@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { GridRow } from 'src/front-components/grid/grid-row';
 import { WeekHeader } from 'src/front-components/grid/week-header';
@@ -6,7 +6,7 @@ import { FooterTotals } from 'src/front-components/grid/footer-totals';
 import { AddRow } from 'src/front-components/grid/add-row';
 import type { Prefill } from 'src/front-components/grid/add-row';
 import { Center } from 'src/front-components/grid/center';
-import { useKeyboard } from 'src/front-components/grid/use-keyboard';
+import { firstEmptyCell, useKeyboard } from 'src/front-components/grid/use-keyboard';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
@@ -44,6 +44,24 @@ export const WeekGrid = ({
   onAddRow,
 }: Props) => {
   const nav = useKeyboard(rowList.length, 7);
+
+  // UC1: автофокус первой пустой редактируемой ячейки — быстрый старт ввода с
+  // клавиатуры (сверка Kimai QuickEntry). Один раз после загрузки строк, пока
+  // пользователь сам ничего не выбрал (nav.active === null). Песочница-safe:
+  // через nav.setActive (координаты), без host-DOM focus(). Если все ячейки
+  // заполнены/заблокированы — firstEmptyCell вернёт null, фокус не ставим.
+  const autofocusedRef = useRef(false);
+  useEffect(() => {
+    if (autofocusedRef.current || loading || rowList.length === 0 || nav.active) return;
+    const cell = firstEmptyCell(
+      rowList.map((r) => r.hoursByDay),
+      rowList.map((r) => r.lockedByDay),
+    );
+    if (cell) {
+      nav.setActive(cell);
+      autofocusedRef.current = true;
+    }
+  }, [loading, rowList, nav]);
 
   // W3-1: «Дублировать строку» → префилл проекта в форму добавления (AddRow).
   const [prefill, setPrefill] = useState<Prefill | null>(null);

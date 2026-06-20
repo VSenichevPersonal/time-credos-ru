@@ -164,6 +164,19 @@
 | I6 | `reporting.timetta.com/OData` (отдельный домен) | `GET reporting.timetta.com/OData/ResourcePlan` | W4-1 OLAP = отдельный aggregate endpoint, не inline | W4 ADR |
 | I7 | `TimeSheets/{id}/SetState` | POST action | подтверждает нашу модель: approve через action, не PATCH status | уже правильно |
 
+### Блок I2 — Round 2 intel (2026-06-22): P&L + Rate Matrix + Lifecycles
+
+| ID | Что | Детали | Применение | Когда |
+|---|---|---|---|---|
+| I8 | **P&L алгоритм** | Баланс=Выручка−Затраты; 4 представления (План/Оценка/Факт/Прогноз); затраты=проводки(таймшиты+субподряд); CCR как % годовых | REQ-0002 дизайн: не просто «ставка×часы», а lifecycle проводок + CCR | E1 бэклог |
+| I9 | **Rate Matrix best-match** | 7 аналитик: Role/Level/Grade/Competence/ResourcePool/Location/LegalEntity. Приоритет: полное совпадение→базовая ставка→стандартная проекта. Billing Rate + Cost Rate. | REQ-0002 E1: при проектировании ставок идти по Rate Matrix, не «поле на сотруднике». Для Кредо-С минимум: Role+LegalEntity | E1 бэклог |
+| I10 | **TimeSheet APPROVE lifecycle** | При APPROVE: проводки «Себестоимость труда» + «Себестоимость отсутствий» автоматически | Наш approve сейчас = только флаг. Future T3: lifecycle effects при approve (себестоимость) | W6+ |
+| I11 | **Project Lifecycle** | Черновик→Согласован→Архивирован(read-only)/Отменён(read-only) | D2 архивация: read-only после archive = правильный паттерн | W5 |
+| I12 | **Deal Lifecycle** | Новая→Квалификация→Переговоры→Выиграно/Проиграно (финальные read-only) | E2 (пресейл окупается?): связать Deal.result с hours пресейла | W5+ |
+| I13 | **WBS AI Agent** | `ai-wbs-agent-service.ai.svc.cluster.local/WBSAgent/Run` (mode: full/quick) | H2 (бенчмарк норм ИБ-работ) — AI планирование WBS как паттерн | H-блок |
+
+**ADR-совет (Rate Matrix):** когда придём к REQ-0002 P&L — зафиксировать в ADR: модель Rate Matrix (best-match, мин. 2 аналитики Role+LegalEntity) вместо простого поля ставки. Это позволит позже добавить Competence/Level без ломающего изменения схемы.
+
 ### Что НЕ берём (не наш домен сейчас)
 - **Invoices** — бэклог (G1 prerequisite)
 - **Accounting Entries/Periods** — E1 бэклог (ставки не вводим до RBAC)

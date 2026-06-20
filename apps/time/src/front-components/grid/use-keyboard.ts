@@ -39,6 +39,24 @@ export const clampCell = (
   };
 };
 
+// UC1: координаты первой пустой редактируемой ячейки (быстрый старт ввода).
+// Скан построчно слева-направо: первая ячейка с 0 ч и без блокировки (locked).
+// null — нет подходящей (все заполнены/заблокированы либо сетка пуста).
+// Песочница-safe: возвращает только координаты, фокус ставит nav.setActive
+// (host-DOM document.querySelector/focus недоступны в Remote DOM).
+export const firstEmptyCell = (
+  hoursByRow: number[][],
+  lockedByRow?: boolean[][],
+): Cell | null => {
+  for (let row = 0; row < hoursByRow.length; row++) {
+    const hours = hoursByRow[row];
+    for (let col = 0; col < hours.length; col++) {
+      if (hours[col] === 0 && !lockedByRow?.[row]?.[col]) return { row, col };
+    }
+  }
+  return null;
+};
+
 export type Nav = {
   active: Cell | null;
   isActive: (row: number, col: number) => boolean;
