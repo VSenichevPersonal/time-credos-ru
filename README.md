@@ -67,6 +67,7 @@ time-credos-ru/
 ### DevOps / инфраструктура
 | Документ | О чём |
 |---|---|
+| [docs/devops/PLAYBOOK.md](docs/devops/PLAYBOOK.md) | **рабочий регламент** (env, dev-loop, накат, прозвон, troubleshooting) |
 | [docs/devops/DEV_SERVER.md](docs/devops/DEV_SERVER.md) | dev-сервер Twenty 2.14 на Railway: пути, сервисы, CLI, подключение app |
 
 ### Стандарты разработки
