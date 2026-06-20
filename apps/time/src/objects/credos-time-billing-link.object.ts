@@ -8,17 +8,17 @@ import {
 
 import { BILLING_DOC_TYPE_OPTIONS } from 'src/constants/select-options';
 import {
-  TT_BILLING_LINK_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_BILLING_LINK_PROJECT_FIELD_ID,
-  TT_PROJECT_BILLING_LINKS_FIELD_ID,
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_BILLING_LINK_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_BILLING_LINK_PROJECT_FIELD_ID,
+  CREDOS_TIME_PROJECT_BILLING_LINKS_FIELD_ID,
+  CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Связь с 1С — junction проект↔документ 1С (M:N задел). Синхронизация позже.
 export default defineObject({
-  universalIdentifier: TT_BILLING_LINK_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttBillingLink',
-  namePlural: 'ttBillingLinks',
+  universalIdentifier: CREDOS_TIME_BILLING_LINK_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeBillingLink',
+  namePlural: 'credosTimeBillingLinks',
   labelSingular: 'Связь с 1С',
   labelPlural: 'Связи с 1С',
   description: 'Связь проекта с финансовым документом 1С',
@@ -79,15 +79,15 @@ export default defineObject({
     },
     // BillingLink.project -> Project.billingLinks (MANY_TO_ONE).
     {
-      universalIdentifier: TT_BILLING_LINK_PROJECT_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_BILLING_LINK_PROJECT_FIELD_ID,
       name: 'project',
       type: FieldType.RELATION,
       label: 'Проект',
       icon: 'IconFolder',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_PROJECT_BILLING_LINKS_FIELD_ID,
+        CREDOS_TIME_PROJECT_BILLING_LINKS_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.CASCADE,

@@ -5,23 +5,23 @@ import {
   RelationType,
 } from 'twenty-sdk/define';
 
-import { ACTIVITY_GROUP_OPTIONS } from 'src/constants/select-options';
+import { WORK_TYPE_GROUP_OPTIONS } from 'src/constants/select-options';
 import {
-  TT_ACTIVITY_DEPARTMENT_FIELD_ID,
-  TT_ACTIVITY_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_ACTIVITY_TIME_ENTRIES_FIELD_ID,
-  TT_DEPARTMENT_ACTIVITIES_FIELD_ID,
-  TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_TIME_ENTRY_ACTIVITY_FIELD_ID,
-  TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_WORK_TYPES_FIELD_ID,
+  CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
+  CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_WORK_TYPE_TIME_ENTRIES_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Вид работ — единый справочник с группировкой для аналитики.
 // department nullable: пустой = глобальный (кросс-отдельный) вид работ.
 export default defineObject({
-  universalIdentifier: TT_ACTIVITY_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttActivity',
-  namePlural: 'ttActivities',
+  universalIdentifier: CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeWorkType',
+  namePlural: 'credosTimeWorkTypes',
   labelSingular: 'Вид работ',
   labelPlural: 'Виды работ',
   description: 'Справочник видов работ (тип работ)',
@@ -33,7 +33,7 @@ export default defineObject({
       type: FieldType.SELECT,
       label: 'Группа',
       icon: 'IconCategory',
-      options: ACTIVITY_GROUP_OPTIONS,
+      options: WORK_TYPE_GROUP_OPTIONS,
     },
     {
       universalIdentifier: '67343191-444f-4599-886f-0ea441e6ebfd',
@@ -43,35 +43,35 @@ export default defineObject({
       icon: 'IconCoin',
       defaultValue: false,
     },
-    // Activity.department -> Department.activities (MANY_TO_ONE, nullable).
+    // WorkType.department -> Department.workTypes (MANY_TO_ONE, nullable).
     {
-      universalIdentifier: TT_ACTIVITY_DEPARTMENT_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,
       name: 'department',
       type: FieldType.RELATION,
       label: 'Отдел',
       icon: 'IconBuilding',
       isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_DEPARTMENT_ACTIVITIES_FIELD_ID,
+        CREDOS_TIME_DEPARTMENT_WORK_TYPES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
         joinColumnName: 'departmentId',
       },
     },
-    // Обратная сторона к TimeEntry.activity (ONE_TO_MANY).
+    // Обратная сторона к TimeEntry.workType (ONE_TO_MANY).
     {
-      universalIdentifier: TT_ACTIVITY_TIME_ENTRIES_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_WORK_TYPE_TIME_ENTRIES_FIELD_ID,
       name: 'timeEntries',
       type: FieldType.RELATION,
       label: 'Записи трудозатрат',
       icon: 'IconClock',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_TIME_ENTRY_ACTIVITY_FIELD_ID,
+        CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

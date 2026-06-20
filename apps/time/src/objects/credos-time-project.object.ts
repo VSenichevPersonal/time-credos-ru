@@ -14,23 +14,25 @@ import {
   WORK_CATEGORY_OPTIONS,
 } from 'src/constants/select-options';
 import {
-  TT_COMPANY_PROJECTS_FIELD_ID,
-  TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_DEPARTMENT_PROJECTS_FIELD_ID,
-  TT_EMPLOYEE_MANAGED_PROJECTS_FIELD_ID,
-  TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_PROJECT_COMPANY_FIELD_ID,
-  TT_PROJECT_DEPARTMENT_FIELD_ID,
-  TT_PROJECT_MANAGER_FIELD_ID,
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_COMPANY_PROJECTS_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_PROJECTS_FIELD_ID,
+  CREDOS_TIME_PROJECT_COMPANY_FIELD_ID,
+  CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
+  CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
+  CREDOS_TIME_WORKSPACE_MEMBER_MANAGED_PROJECTS_FIELD_ID,
+  CREDOS_TIME_WORKSPACE_MEMBER_OWNED_PROJECTS_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Проект — развитая сущность со своей идентичностью (code/name), жизненным
 // циклом, этапами. Клиент читается из стандартного Company CRM.
+// owner/manager — ссылки на стандартный WorkspaceMember (как в CRM).
 export default defineObject({
-  universalIdentifier: TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttProject',
-  namePlural: 'ttProjects',
+  universalIdentifier: CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeProject',
+  namePlural: 'credosTimeProjects',
   labelSingular: 'Проект',
   labelPlural: 'Проекты',
   description: 'Проект учёта трудозатрат',
@@ -89,7 +91,7 @@ export default defineObject({
     },
     {
       universalIdentifier: '4f202b64-a1cb-4e88-a917-06d9931ab489',
-      name: 'plannedHours',
+      name: 'plannedEffort',
       type: FieldType.NUMBER,
       label: 'Плановые часы',
       icon: 'IconClockHour4',
@@ -119,7 +121,7 @@ export default defineObject({
     },
     // Project.company -> стандартный Company (MANY_TO_ONE, nullable).
     {
-      universalIdentifier: TT_PROJECT_COMPANY_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_PROJECT_COMPANY_FIELD_ID,
       name: 'company',
       type: FieldType.RELATION,
       label: 'Клиент',
@@ -127,7 +129,8 @@ export default defineObject({
       isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
         STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.company.universalIdentifier,
-      relationTargetFieldMetadataUniversalIdentifier: TT_COMPANY_PROJECTS_FIELD_ID,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_COMPANY_PROJECTS_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
@@ -136,33 +139,51 @@ export default defineObject({
     },
     // Project.department -> Department.projects (MANY_TO_ONE).
     {
-      universalIdentifier: TT_PROJECT_DEPARTMENT_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
       name: 'department',
       type: FieldType.RELATION,
       label: 'Отдел',
       icon: 'IconBuilding',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_DEPARTMENT_PROJECTS_FIELD_ID,
+        CREDOS_TIME_DEPARTMENT_PROJECTS_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
         joinColumnName: 'departmentId',
       },
     },
-    // Project.manager -> Employee.managedProjects (MANY_TO_ONE, nullable).
+    // Project.owner -> стандартный WorkspaceMember (MANY_TO_ONE, nullable).
     {
-      universalIdentifier: TT_PROJECT_MANAGER_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
+      name: 'owner',
+      type: FieldType.RELATION,
+      label: 'Владелец',
+      icon: 'IconUserCircle',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.workspaceMember.universalIdentifier,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_WORKSPACE_MEMBER_OWNED_PROJECTS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'ownerId',
+      },
+    },
+    // Project.manager -> стандартный WorkspaceMember (MANY_TO_ONE, nullable).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
       name: 'manager',
       type: FieldType.RELATION,
       label: 'Руководитель проекта',
       icon: 'IconUserStar',
       isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+        STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.workspaceMember.universalIdentifier,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_EMPLOYEE_MANAGED_PROJECTS_FIELD_ID,
+        CREDOS_TIME_WORKSPACE_MEMBER_MANAGED_PROJECTS_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,

@@ -1,19 +1,19 @@
-// SELECT-опции для объектов tt* в формате SDK (value+label+position+color).
+// SELECT-опции для объектов credosTime* в формате SDK (value+label+position+color).
 // Значения (id) — латиницей из domain-types; ярлыки — русские из labels.ts.
 
 import {
-  ACTIVITY_GROUP_LABELS,
   BILLING_DOC_TYPE_LABELS,
   DEPARTMENT_LABELS,
   ENTRY_STATUS_LABELS,
   WORK_CATEGORY_LABELS,
+  WORK_TYPE_GROUP_LABELS,
 } from 'src/constants/labels';
 import {
-  type ActivityGroup,
   type BillingDocType,
   type DepartmentCode,
   type EntryStatus,
   type WorkCategory,
+  type WorkTypeGroup,
 } from 'src/constants/domain-types';
 
 // Цвета тегов SDK (TagColor) — фиксированные, чтобы пиклисты были читаемыми.
@@ -97,7 +97,7 @@ export const WORK_CATEGORY_OPTIONS: SelectOption[] = buildOptions(
   WORK_CATEGORY_COLORS,
 );
 
-const ACTIVITY_GROUP_ORDER: ReadonlyArray<ActivityGroup> = [
+const WORK_TYPE_GROUP_ORDER: ReadonlyArray<WorkTypeGroup> = [
   'production',
   'projectManagement',
   'presale',
@@ -105,7 +105,7 @@ const ACTIVITY_GROUP_ORDER: ReadonlyArray<ActivityGroup> = [
   'training',
   'internal',
 ];
-const ACTIVITY_GROUP_COLORS: Record<ActivityGroup, TagColor> = {
+const WORK_TYPE_GROUP_COLORS: Record<WorkTypeGroup, TagColor> = {
   production: 'green',
   projectManagement: 'blue',
   presale: 'orange',
@@ -113,10 +113,10 @@ const ACTIVITY_GROUP_COLORS: Record<ActivityGroup, TagColor> = {
   training: 'sky',
   internal: 'gray',
 };
-export const ACTIVITY_GROUP_OPTIONS: SelectOption[] = buildOptions(
-  ACTIVITY_GROUP_ORDER,
-  ACTIVITY_GROUP_LABELS,
-  ACTIVITY_GROUP_COLORS,
+export const WORK_TYPE_GROUP_OPTIONS: SelectOption[] = buildOptions(
+  WORK_TYPE_GROUP_ORDER,
+  WORK_TYPE_GROUP_LABELS,
+  WORK_TYPE_GROUP_COLORS,
 );
 
 const ENTRY_STATUS_ORDER: ReadonlyArray<EntryStatus> = [

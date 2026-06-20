@@ -1,22 +1,23 @@
 import { defineField, FieldType, RelationType } from 'twenty-sdk/define';
 
 import {
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_PROJECT_STAGES_FIELD_ID,
-  TT_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_STAGE_PROJECT_FIELD_ID,
+  CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_STAGES_FIELD_ID,
+  CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_STAGE_PROJECT_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Обратная сторона Stage.project: коллекция этапов проекта (ONE_TO_MANY).
 export default defineField({
-  universalIdentifier: TT_PROJECT_STAGES_FIELD_ID,
-  objectUniversalIdentifier: TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  universalIdentifier: CREDOS_TIME_PROJECT_STAGES_FIELD_ID,
+  objectUniversalIdentifier: CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   type: FieldType.RELATION,
   name: 'stages',
   label: 'Этапы',
   icon: 'IconListTree',
   relationTargetObjectMetadataUniversalIdentifier:
-    TT_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
-  relationTargetFieldMetadataUniversalIdentifier: TT_STAGE_PROJECT_FIELD_ID,
+    CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
+  relationTargetFieldMetadataUniversalIdentifier:
+    CREDOS_TIME_STAGE_PROJECT_FIELD_ID,
   universalSettings: { relationType: RelationType.ONE_TO_MANY },
 });

@@ -11,20 +11,20 @@ import {
   PROJECT_STATUS_OPTIONS,
 } from 'src/constants/select-options';
 import {
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_PROJECT_STAGES_FIELD_ID,
-  TT_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_STAGE_PROJECT_FIELD_ID,
-  TT_STAGE_TIME_ENTRIES_FIELD_ID,
-  TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_TIME_ENTRY_STAGE_FIELD_ID,
+  CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
+  CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_STAGES_FIELD_ID,
+  CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_STAGE_PROJECT_FIELD_ID,
+  CREDOS_TIME_STAGE_TIME_ENTRIES_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Этап — подуровень проекта. Трудозатраты можно списывать на этап.
 export default defineObject({
-  universalIdentifier: TT_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttStage',
-  namePlural: 'ttStages',
+  universalIdentifier: CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeStage',
+  namePlural: 'credosTimeStages',
   labelSingular: 'Этап',
   labelPlural: 'Этапы',
   description: 'Этап проекта',
@@ -66,7 +66,7 @@ export default defineObject({
     },
     {
       universalIdentifier: '5d03bd03-64f1-4e50-bda6-3341c9b2fab6',
-      name: 'plannedHours',
+      name: 'plannedEffort',
       type: FieldType.NUMBER,
       label: 'Плановые часы',
       icon: 'IconClockHour4',
@@ -76,14 +76,15 @@ export default defineObject({
     },
     // Stage.project -> Project.stages (MANY_TO_ONE).
     {
-      universalIdentifier: TT_STAGE_PROJECT_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_STAGE_PROJECT_FIELD_ID,
       name: 'project',
       type: FieldType.RELATION,
       label: 'Проект',
       icon: 'IconFolder',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-      relationTargetFieldMetadataUniversalIdentifier: TT_PROJECT_STAGES_FIELD_ID,
+        CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_STAGES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.CASCADE,
@@ -92,14 +93,15 @@ export default defineObject({
     },
     // Обратная сторона к TimeEntry.stage (ONE_TO_MANY).
     {
-      universalIdentifier: TT_STAGE_TIME_ENTRIES_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_STAGE_TIME_ENTRIES_FIELD_ID,
       name: 'timeEntries',
       type: FieldType.RELATION,
       label: 'Записи трудозатрат',
       icon: 'IconClock',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
-      relationTargetFieldMetadataUniversalIdentifier: TT_TIME_ENTRY_STAGE_FIELD_ID,
+        CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

@@ -7,24 +7,24 @@ import {
 
 import { DEPARTMENT_CODE_OPTIONS } from 'src/constants/select-options';
 import {
-  TT_DEPARTMENT_ACTIVITIES_FIELD_ID,
-  TT_DEPARTMENT_EMPLOYEES_FIELD_ID,
-  TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_DEPARTMENT_PROJECTS_FIELD_ID,
-  TT_ACTIVITY_DEPARTMENT_FIELD_ID,
-  TT_ACTIVITY_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_EMPLOYEE_DEPARTMENT_FIELD_ID,
-  TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_PROJECT_DEPARTMENT_FIELD_ID,
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_PROJECTS_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_WORK_TYPES_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Отдел — производственное подразделение (ОВ/ОИБ/ОПИБ/ТЦ/ОПР).
-// Владеет обратными (ONE_TO_MANY) сторонами связей с Employee/Project/Activity.
+// Владеет обратными (ONE_TO_MANY) сторонами связей с Employee/Project/WorkType.
 export default defineObject({
-  universalIdentifier: TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttDepartment',
-  namePlural: 'ttDepartments',
+  universalIdentifier: CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeDepartment',
+  namePlural: 'credosTimeDepartments',
   labelSingular: 'Отдел',
   labelPlural: 'Отделы',
   description: 'Производственное подразделение Кредо-С',
@@ -67,39 +67,39 @@ export default defineObject({
     },
     // Обратные стороны связей (ONE_TO_MANY).
     {
-      universalIdentifier: TT_DEPARTMENT_EMPLOYEES_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
       name: 'employees',
       type: FieldType.RELATION,
       label: 'Сотрудники',
       icon: 'IconUsers',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_EMPLOYEE_DEPARTMENT_FIELD_ID,
+        CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
     {
-      universalIdentifier: TT_DEPARTMENT_PROJECTS_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_PROJECTS_FIELD_ID,
       name: 'projects',
       type: FieldType.RELATION,
       label: 'Проекты',
       icon: 'IconFolder',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_PROJECT_DEPARTMENT_FIELD_ID,
+        CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
     {
-      universalIdentifier: TT_DEPARTMENT_ACTIVITIES_FIELD_ID,
-      name: 'activities',
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_WORK_TYPES_FIELD_ID,
+      name: 'workTypes',
       type: FieldType.RELATION,
       label: 'Виды работ',
       icon: 'IconListCheck',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_ACTIVITY_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_ACTIVITY_DEPARTMENT_FIELD_ID,
+        CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

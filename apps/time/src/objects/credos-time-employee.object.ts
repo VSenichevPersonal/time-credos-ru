@@ -6,27 +6,24 @@ import {
 } from 'twenty-sdk/define';
 
 import {
-  TT_DEPARTMENT_EMPLOYEES_FIELD_ID,
-  TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_EMPLOYEE_DEPARTMENT_FIELD_ID,
-  TT_EMPLOYEE_MANAGED_PROJECTS_FIELD_ID,
-  TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
-  TT_PROJECT_MANAGER_FIELD_ID,
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_TIME_ENTRY_EMPLOYEE_FIELD_ID,
-  TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
+  CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+  CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
-// Работник — сотрудник отдела, ведущий учёт времени.
-// Связан с workspaceMember CRM через workspaceMemberRef (id пользователя).
+// Работник — профиль учёта (отдел + ёмкость), которого нет у WorkspaceMember.
+// Идентичность пользователя — стандартный WorkspaceMember (workspaceMemberRef).
 export default defineObject({
-  universalIdentifier: TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttEmployee',
-  namePlural: 'ttEmployees',
+  universalIdentifier: CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeEmployee',
+  namePlural: 'credosTimeEmployees',
   labelSingular: 'Работник',
   labelPlural: 'Работники',
-  description: 'Сотрудник, ведущий учёт трудозатрат',
+  description: 'Профиль учёта трудозатрат (отдел, ёмкость) поверх WorkspaceMember',
   icon: 'IconUser',
   fields: [
     {
@@ -86,43 +83,32 @@ export default defineObject({
     },
     // Employee.department -> Department.employees (MANY_TO_ONE).
     {
-      universalIdentifier: TT_EMPLOYEE_DEPARTMENT_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
       name: 'department',
       type: FieldType.RELATION,
       label: 'Отдел',
       icon: 'IconBuilding',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_DEPARTMENT_EMPLOYEES_FIELD_ID,
+        CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
         joinColumnName: 'departmentId',
       },
     },
-    // Обратные стороны (ONE_TO_MANY).
+    // Обратная сторона к TimeEntry.employee (ONE_TO_MANY) — для отдела/аналитики.
     {
-      universalIdentifier: TT_EMPLOYEE_MANAGED_PROJECTS_FIELD_ID,
-      name: 'managedProjects',
-      type: FieldType.RELATION,
-      label: 'Проекты под управлением',
-      icon: 'IconFolder',
-      relationTargetObjectMetadataUniversalIdentifier:
-        TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-      relationTargetFieldMetadataUniversalIdentifier: TT_PROJECT_MANAGER_FIELD_ID,
-      universalSettings: { relationType: RelationType.ONE_TO_MANY },
-    },
-    {
-      universalIdentifier: TT_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
       name: 'timeEntries',
       type: FieldType.RELATION,
       label: 'Записи трудозатрат',
       icon: 'IconClock',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+        CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

@@ -11,27 +11,27 @@ import {
   ENTRY_STATUS_OPTIONS,
 } from 'src/constants/select-options';
 import {
-  TT_ACTIVITY_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_ACTIVITY_TIME_ENTRIES_FIELD_ID,
-  TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
-  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_PROJECT_TIME_ENTRIES_FIELD_ID,
-  TT_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_STAGE_TIME_ENTRIES_FIELD_ID,
-  TT_TIME_ENTRY_ACTIVITY_FIELD_ID,
-  TT_TIME_ENTRY_EMPLOYEE_FIELD_ID,
-  TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
-  TT_TIME_ENTRY_PROJECT_FIELD_ID,
-  TT_TIME_ENTRY_STAGE_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
+  CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+  CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
+  CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
+  CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
+  CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_TIME_ENTRIES_FIELD_ID,
+  CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_STAGE_TIME_ENTRIES_FIELD_ID,
+  CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_WORK_TYPE_TIME_ENTRIES_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Запись трудозатрат — атом учёта (1 строка = дата + часы + проект + работник).
-// hours — decimal (0.5/0.75/8). Связи stage/activity опциональны.
+// hours — decimal (0.5/0.75/8). Связи stage/workType опциональны.
 export default defineObject({
-  universalIdentifier: TT_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
-  nameSingular: 'ttTimeEntry',
-  namePlural: 'ttTimeEntries',
+  universalIdentifier: CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'credosTimeEntry',
+  namePlural: 'credosTimeEntries',
   labelSingular: 'Запись трудозатрат',
   labelPlural: 'Записи трудозатрат',
   description: 'Запись учёта времени',
@@ -81,15 +81,15 @@ export default defineObject({
     },
     // TimeEntry.employee -> Employee.timeEntries (MANY_TO_ONE).
     {
-      universalIdentifier: TT_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
       name: 'employee',
       type: FieldType.RELATION,
       label: 'Работник',
       icon: 'IconUser',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
+        CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.CASCADE,
@@ -98,15 +98,15 @@ export default defineObject({
     },
     // TimeEntry.project -> Project.timeEntries (MANY_TO_ONE).
     {
-      universalIdentifier: TT_TIME_ENTRY_PROJECT_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
       name: 'project',
       type: FieldType.RELATION,
       label: 'Проект',
       icon: 'IconFolder',
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_PROJECT_TIME_ENTRIES_FIELD_ID,
+        CREDOS_TIME_PROJECT_TIME_ENTRIES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.CASCADE,
@@ -115,38 +115,38 @@ export default defineObject({
     },
     // TimeEntry.stage -> Stage.timeEntries (MANY_TO_ONE, nullable).
     {
-      universalIdentifier: TT_TIME_ENTRY_STAGE_FIELD_ID,
+      universalIdentifier: CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
       name: 'stage',
       type: FieldType.RELATION,
       label: 'Этап',
       icon: 'IconListTree',
       isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_STAGE_TIME_ENTRIES_FIELD_ID,
+        CREDOS_TIME_STAGE_TIME_ENTRIES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
         joinColumnName: 'stageId',
       },
     },
-    // TimeEntry.activity -> Activity.timeEntries (MANY_TO_ONE, nullable).
+    // TimeEntry.workType -> WorkType.timeEntries (MANY_TO_ONE, nullable).
     {
-      universalIdentifier: TT_TIME_ENTRY_ACTIVITY_FIELD_ID,
-      name: 'activity',
+      universalIdentifier: CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
+      name: 'workType',
       type: FieldType.RELATION,
       label: 'Вид работ',
       icon: 'IconListCheck',
       isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
-        TT_ACTIVITY_OBJECT_UNIVERSAL_IDENTIFIER,
+        CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
-        TT_ACTIVITY_TIME_ENTRIES_FIELD_ID,
+        CREDOS_TIME_WORK_TYPE_TIME_ENTRIES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
-        joinColumnName: 'activityId',
+        joinColumnName: 'workTypeId',
       },
     },
   ],

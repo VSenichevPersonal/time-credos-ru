@@ -13,8 +13,8 @@ export type WorkCategory =
   | 'Infrastructure'
   | 'Training';
 
-// Группа вида работ (для аналитики, один справочник Activity)
-export type ActivityGroup =
+// Группа вида работ (для аналитики, один справочник credosTimeWorkType)
+export type WorkTypeGroup =
   | 'production'
   | 'projectManagement'
   | 'presale'

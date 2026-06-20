@@ -21,19 +21,20 @@
 
 > Примечание по enum: CRM-правило «string literals вместо enum». SDK же требует `FieldType` (enum из twenty-sdk) и свои типы (`NavigationMenuItemType`, `ViewKey`). Их используем как есть. Наши доменные значения (категории/статусы) — string-literal union + SSOT в `constants.ts`.
 
-## 2. Нейминг (КРИТИЧНО — во избежание коллизий в общем workspace)
+## 2. Нейминг (выравнивание с CRM — ADR-0004)
 
-Workspace общий с CRM. CRM использует префикс `credos` (`credosProject`, `credosTender`). Чтобы НЕ коллизировать с существующими объектами CRM, объекты time-app получают **свой короткий префикс** `tt` (timetracker).
+Workspace общий с CRM. CRM-конвенция (`CUSTOMIZATION_GUIDE §3.2`) требует префикс **`credos`** для всех custom-объектов. Поэтому модуль time использует префикс **`credosTime`**.
 
 | Тип | Конвенция | Пример |
 |---|---|---|
-| **Объект (nameSingular)** | `tt` + PascalCase-сущность (camelCase для SDK) | `ttDepartment`, `ttProject`, `ttStage`, `ttActivity`, `ttTimeEntry`, `ttEmployee`, `ttBillingLink` |
-| **Поле** | camelCase | `plannedHours`, `approvalRequired`, `categoryKey` |
-| **universalIdentifier** | стабильный UUID (не менять между деплоями) | константа в коде |
-| **Файлы** | kebab-case | `tt-time-entry.object.ts`, `weekly-grid.front.tsx` |
-| **i18n/ярлыки** | русские строки | label: «Запись трудозатрат» |
+| **Объект (nameSingular)** | `credosTime` + сущность (camelCase) | `credosTimeDepartment`, `credosTimeProject`, `credosTimeStage`, **`credosTimeWorkType`** (не Activity!), `credosTimeEntry`, `credosTimeEmployee`, `credosTimeBillingLink` |
+| **Поле** | camelCase, как в CRM | `hours`, `plannedEffort`, `actualEffort`, `startDate`/`endDate`, `budget`/`amount`, `owner`/`manager`, `company` |
+| **Личность/сотрудник** | ссылка на стандартный `WorkspaceMember` (owner/manager); `credosTimeEmployee` — только профиль (отдел+ёмкость) | — |
+| **universalIdentifier** | стабильный UUID v4 | константа в `universal-identifiers.ts` |
+| **Файлы** | kebab-case | `credos-time-entry.object.ts` |
+| **i18n/ярлыки** | русские (см. `L10N_GLOSSARY.md`) | «Запись трудозатрат», «Вид работ» |
 
-> Решение по префиксу `tt` — на подтверждение при планировании (альтернатива — `credosTime`). Главное: НЕ голый `Project`/`Activity` (коллизия с CRM/стандартными объектами).
+⚠️ Запреты: НЕ «Activity» (занято `credosActivity`), НЕ голый «Project» (есть `credosProject` в roadmap), НЕ дублировать личность сотрудника (есть `WorkspaceMember`).
 
 ## 3. Локализация
 - **Все labels и справочники — русские** (см. синтез §7a). Коды enum (FieldType, наши string-literal) — латиница, ярлык русский.

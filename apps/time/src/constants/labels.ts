@@ -2,11 +2,11 @@
 // Коды (id) — латиницей; пользователь всегда видит русское.
 
 import {
-  type ActivityGroup,
   type BillingDocType,
   type DepartmentCode,
   type EntryStatus,
   type WorkCategory,
+  type WorkTypeGroup,
 } from 'src/constants/domain-types';
 
 export const DEPARTMENT_LABELS: Record<DepartmentCode, string> = {
@@ -26,7 +26,7 @@ export const WORK_CATEGORY_LABELS: Record<WorkCategory, string> = {
   Training: 'Самообучение',
 };
 
-export const ACTIVITY_GROUP_LABELS: Record<ActivityGroup, string> = {
+export const WORK_TYPE_GROUP_LABELS: Record<WorkTypeGroup, string> = {
   production: 'Производственная',
   projectManagement: 'Управление проектом',
   presale: 'Пресейл',
