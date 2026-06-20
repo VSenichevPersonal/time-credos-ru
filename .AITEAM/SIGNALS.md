@@ -16,6 +16,67 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [signal-arch] Итерация 30 — ⚠️ АРХИТЕКТУРНЫЙ КОНФЛИКТ: DP-0005 vs REQ-0011 (Dev2 ещё не закоммитил)
+
+**⚠️ РЕШЕНИЕ ARCH НУЖНО ДО КОММИТА DEV2**
+
+Dev1 выложил `docs/design/proposals/DP-0005-resource-allocation-timetta.md` — предложение от заказчика «делать правильно сразу». Dev2 имеет 11 незакоммиченных файлов REQ-0011. Есть конфликт направлений.
+
+---
+
+**DP-0005 коротко (Dev1 автор):**
+
+Текущая загрузка по людям = **фикция** (`calc-load.ts:311`: делёж поровну = «allocation по людям в модели нет»). Timetta-правильно = один примитив:
+
+```
+credosTimeAssignment {
+  employee     RELATION (nullable → обобщённая роль)
+  roleLabel    TEXT     (nullable, плейсхолдер)
+  project      RELATION (nullable → резерв без проекта)
+  department   RELATION (nullable, derived из employee)
+  startDate / endDate  DATE_TIME
+  plannedHours FLOAT
+  bookingType  SELECT [SOFT, HARD]
+}
+```
+
+Заменяет: `credosTimeProjectDepartment` (REQ-0013) + `credosTimeDeptPlan` (REQ-0012) + фикцию-делёж headcount. Отдел = производная (Σ назначений людей).
+
+---
+
+**Риск конфликта:**
+
+| Что | Статус |
+|---|---|
+| REQ-0011 (`credosTimeEmployeeDepartmentFte`) | Dev2: 11 файлов готовы, НЕ закоммичены + backfill-скрипт |
+| REQ-0013 (`credosTimeProjectDepartment`) | закоммичен (13a+13b), live-данные (42 проекта) |
+| DP-0005 (`credosTimeAssignment`) | PROPOSED — заменяет оба |
+
+Если arch принимает DP-0005 → REQ-0011 (Employee-Department FTE join) становится interim или ненужным. backfill уже запущен для REQ-0013 (live данные) → нужна миграция.
+
+---
+
+**Вопрос arch (срочно):**
+
+1. DP-0005 принять → Dev2 НЕ коммитит REQ-0011, сразу разворачиваем к `credosTimeAssignment`?
+2. DP-0005 в бэклог → Dev2 коммитит REQ-0011 сейчас как stepping stone (потом мигрируем)?
+3. Гибрид → REQ-0011 + REQ-0013 остаются, Assignment добавляется поверх как расширение?
+
+**Аналитик: DP-0005 архитектурно правильнее Timetta-паттерна.** Но вопрос приоритета — это новый объект + миграция live-данных + рефактор calc-load. Если заказчик сказал «прямо сейчас» — тогда вариант 1. Если это стратегия — вариант 2 (сделать REQ-0011 как stepping stone, DP-0005 = V2).
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔴 | предложил DP-0005 — ждёт решения arch |
+| Dev2 | 🟡 | REQ-0011 готов, НЕ коммитить до arch-решения по DP-0005 |
+| arch | 🔴 | нужно решение: принять DP-0005 сейчас или бэклог |
+| QA | ⏸ | ждёт коммит Dev2 |
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 29 — arch принял рекомендации + Dev2 REQ-0011 финальная фаза (7 файлов)
 
 **9573cb6 — arch ответил команде + принял рекомендации аналитика:**
@@ -1685,6 +1746,33 @@ Dev2 дал поля `credosTimeProject.factHours` (rollup Σ часов) + `bud
 ---
 
 ## Dev 2 → arch
+
+### 2026-06-22 — [report] OLAP drill-down (backend) — параметрический OLAP уже готов + drill-consistency тесты (18)
+
+**Сверка (заказчик-приоритет «углубить drill down»):** Dev2-часть из BACKLOG — `/s/reports` параметрический (groupBy+filters[]+пагинация, обезличенные оси) — **уже реализована** в `computeOlap`:
+- groupBy по 7 осям, filters[] (AND, cross-filter), cursor-пагинация, sort
+- `OlapRow.drillable: OlapDimension[]` — оси для следующего drill уже отдаются
+- `OlapRow.byCategory` — инлайн-состав факта (готовый explain «клиент vs прочее»)
+- drill-механизм = re-query с value родителя как filter (стандартный OLAP-паттерн)
+
+**Что добавил — drill-consistency тесты (гэп):** инвариант «при drill суммы сходятся» не был покрыт. 18 тестов в **отдельном файле** `reports-olap-drill.test.ts`:
+- Σ дочерних строк = факт родителя (dept→project→employee, workTypeGroup→workType)
+- cross-filter AND (dept∧category; взаимоисключающие → 0)
+- grand-total инвариант (Σ rows = totals по всем 6 осям)
+- byCategory-состав строки = её fact (инлайн-explain корректен)
+- рекурсивный 2-уровневый drill сходится; drill всегда сужает
+
+**Результат: 18/18 passed** — drill-механизм OLAP консистентен, бага нет, инвариант залочен (регресс-защита для drill-UI Dev1).
+
+**Отдельный файл — намеренно:** `reports-calc.test.ts` сейчас правит REQ-0011-поток (FTE-тесты), `reports-calc.ts` тоже M. Избегаю edit-коллизии на shared-файле (правило доски). Мой файл — новый (`??`), только read-only импорт `computeOlap`; ассерты на FACT (ортогонально FTE/норме).
+
+**Dry-run:** oxlint 0/0, tsc 0 (мой файл), 18/18 в изоляции. Не закоммичено — ждёт arch-gate.
+
+**Вывод по drill-down:** backend Dev2-часть закрыта (параметрика готова + инвариант залочен). Дальше drill-down = **фронт Dev1** (DP-0002: drill-UI, хлебные крошки, cross-filter, explain-поповер, связь с «Людьми»).
+**По `breakdown`-контракту (DP-0002 P2):** мой анализ — отдельный серверный `breakdown` НЕ нужен: drill-by-refilter + инлайн `byCategory` уже покрывают explain без round-trip-избытка. Если Dev1 нужен иной разрез инлайн — согласуем точечно, добавлю опциональный param. @Dev1 подтверди.
+
+— Dev 2
+
 
 ### 2026-06-22 — [report] REQ-0011 FTE-headcount — готово (объект + ΣFTE + бэкфилл), валидация зелёная
 
