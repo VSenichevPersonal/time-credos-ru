@@ -334,3 +334,50 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
     expect(result).toMatchObject({ ok: true, updated: 2, skippedOwn: 0 });
   });
 });
+
+describe('approval.logic — rejectComment (UX-gap, op=reject хранит причину)', () => {
+  const REF = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const ID = '00000000-0000-4000-8000-000000000001';
+  const manager = {
+    data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF }] },
+  };
+  const submittedOther = {
+    data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] },
+  };
+  const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+
+  // Body PATCH-запроса (setStatus) из записанных вызовов fetch.
+  const patchBody = (mockFn: ReturnType<typeof mockFetch>): Record<string, unknown> => {
+    const call = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    if (!call) throw new Error('PATCH-вызов не найден');
+    return JSON.parse((call[1] as { body: string }).body);
+  };
+
+  it('reject с comment → PATCH status=REJECTED + rejectComment сохранён', async () => {
+    const mockFn = mockFetch([manager, submittedOther, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event({ op: 'reject', ids: ID, workspaceMemberRef: REF, comment: 'Уточните состав работ по проекту' }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('REJECTED');
+    expect(body.rejectComment).toBe('Уточните состав работ по проекту');
+  });
+
+  it('reject без comment → rejectComment=null (backend не требует, min-длину валидирует UI)', async () => {
+    const mockFn = mockFetch([manager, submittedOther, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'reject', ids: ID, workspaceMemberRef: REF }));
+    expect(patchBody(mockFn).rejectComment).toBeNull();
+  });
+
+  it('approve → rejectComment очищается (null), даже если comment передан (запись «ожила»)', async () => {
+    const mockFn = mockFetch([manager, submittedOther, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'approve', ids: ID, workspaceMemberRef: REF, comment: 'игнор' }));
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('APPROVED');
+    expect(body.rejectComment).toBeNull();
+  });
+});

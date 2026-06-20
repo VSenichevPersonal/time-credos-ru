@@ -22,6 +22,9 @@ export type RawEntry = {
   // выше. Чтобы не ломать одно-ключевой OLAP-движок, полноценная ось «тег» —
   // follow-up; здесь только переносим данные в расчёт.
   tags?: string[] | null;
+  // C4 timeseries: дата записи (ISO). Нужна для помесячного бакетирования факта.
+  // Опц. — старые срезы (computeReports/computeOlap) её не используют.
+  date?: string | null;
 };
 // Справочник видов работ — для осей workType/workTypeGroup (W4-1).
 export type RawWorkType = { id: string; name: string | null; group: string | null };
@@ -668,5 +671,180 @@ export const computeOlap = (
     rows: page,
     pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + limit) : null },
     availableDims,
+  };
+};
+
+// ===========================================================================
+// C4 (Kimai reporting): «Тренд утилизации по месяцам» — динамика факт/норма/
+// утилизация/недогруз ПО МЕСЯЦАМ за период (напр. янв–дек), опц. разрез по отделу.
+// Аддитивно: те же формулы, что в computeReports (календарь, отсутствия, FTE-
+// headcount), но разложенные по месяцам. 12 точек → пагинация не нужна.
+//
+// ИНВАРИАНТ: Σ по месяцам fact == годовой fact, Σ по месяцам norm == годовая
+// norm (тот же набор рабочих дней/отсутствий, просто сгруппированный по месяцам).
+// ===========================================================================
+
+// YYYY-MM из ISO-строки/даты (бакет месяца). null если даты нет.
+const monthKey = (iso: string | null | undefined): string | null =>
+  iso ? iso.slice(0, 7) : null;
+
+export type TimeseriesPoint = {
+  month: string; // 'YYYY-MM'
+  fact: number; // Σ часов записей месяца (после опц. фильтра отдела)
+  client: number; // Σ клиентских часов месяца
+  norm: number; // нормо-часы месяца (рабочие дни месяца × headcount/FTE × factor − отсутствия)
+  util: number | null; // client / fact, null если fact == 0
+  under: number; // norm − fact (>0 недогруз, <0 перегруз)
+};
+
+export type TimeseriesParams = {
+  // Опц. фильтр отдела: считать только записи/норму этого отдела (по его коду или id).
+  // null/undefined → весь воркспейс (все отделы).
+  departmentId?: string | null;
+};
+
+export type TimeseriesResult = {
+  ok: true;
+  period: { from: string; to: string };
+  departmentId: string | null;
+  months: TimeseriesPoint[];
+};
+
+export const computeTimeseries = (
+  input: ReportsInput,
+  period: { from: string; to: string },
+  params: TimeseriesParams = {},
+): TimeseriesResult => {
+  const { entries, projects, employees, departments, calendar } = input;
+  const absences = input.absences ?? [];
+  const deptFilter = params.departmentId ?? null;
+
+  const projById = new Map(projects.map((p) => [p.id, p]));
+  const deptById = new Map(departments.map((d) => [d.id, d]));
+  const empById = new Map(employees.map((e) => [e.id, e]));
+
+  const isClient = (projectId: string | null): boolean =>
+    !!projectId && projById.get(projectId)?.category === CLIENT_CATEGORY;
+  const deptOfEntry = (e: RawEntry): string | null => {
+    const fromEmp = e.employeeId ? empById.get(e.employeeId)?.departmentId : null;
+    if (fromEmp) return fromEmp;
+    return e.projectId ? (projById.get(e.projectId)?.departmentId ?? null) : null;
+  };
+
+  // Отделы, попадающие в норму: при фильтре — только он, иначе все.
+  const normDepartments = deptFilter
+    ? departments.filter((d) => d.id === deptFilter)
+    : departments;
+  // Сотрудники, чьи отсутствия вычитаются: при фильтре — только отдела фильтра.
+  const normEmployees = deptFilter
+    ? employees.filter((e) => e.departmentId === deptFilter)
+    : employees;
+
+  // REQ-0011: численность по FTE (как в computeReports). headcount по периоду
+  // отчёта целиком — он постоянен в пределах периода (назначение активно/нет).
+  const fteHeadcount = fteHeadcountByDept(
+    input.assignments,
+    employees,
+    period.from,
+    period.to,
+  );
+  const headcountByDept = fteHeadcount ?? new Map<string, number>();
+  if (!fteHeadcount)
+    for (const e of employees)
+      if (e.departmentId)
+        headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+
+  const pFrom = dayKey(period.from);
+  const pTo = dayKey(period.to);
+
+  // Рабочие дни календаря с датами → группируем часы по месяцу (для нормы) и
+  // строим карту день→часы (для пересечения с отсутствиями).
+  const workdays = calendar.filter((d) => WORKDAY_TYPES.has(d.dayType ?? ''));
+  const baseNormByMonth = new Map<string, number>();
+  const hoursByDay = new Map<string, number>();
+  for (const d of workdays) {
+    const day = dayKey(d.date);
+    const m = monthKey(d.date);
+    const h = d.hours ?? 0;
+    if (m) baseNormByMonth.set(m, (baseNormByMonth.get(m) ?? 0) + h);
+    if (day) hoursByDay.set(day, (hoursByDay.get(day) ?? 0) + h);
+  }
+
+  // Часы отсутствий по (отдел, месяц) — вычитаются из нормы месяца этого отдела.
+  // Только сотрудники, попадающие в norm-набор (учёт фильтра отдела).
+  const normEmpIds = new Set(normEmployees.map((e) => e.id));
+  const absHoursByDeptMonth = new Map<string, number>(); // ключ `${deptId}|${YYYY-MM}`
+  for (const a of absences) {
+    if (!a.employeeId || !normEmpIds.has(a.employeeId)) continue;
+    const dept = empById.get(a.employeeId)?.departmentId;
+    if (!dept) continue;
+    const start = dayKey(a.startDate);
+    const end = dayKey(a.endDate) ?? start;
+    if (!start) continue;
+    for (const [day, h] of hoursByDay) {
+      if (day < start || (end && day > end)) continue;
+      if (pFrom && day < pFrom) continue;
+      if (pTo && day > pTo) continue;
+      const m = day.slice(0, 7);
+      const k = `${dept}|${m}`;
+      absHoursByDeptMonth.set(k, (absHoursByDeptMonth.get(k) ?? 0) + h);
+    }
+  }
+
+  // Норма месяца = Σ по norm-отделам: baseNorm(месяц) × headcount × factor −
+  // отсутствия(отдел, месяц). Не ниже 0 на каждый отдел (как в computeReports).
+  const normOfMonth = (month: string): number => {
+    const base = baseNormByMonth.get(month) ?? 0;
+    let sum = 0;
+    for (const d of normDepartments) {
+      const headcount = headcountByDept.get(d.id) ?? 0;
+      const gross = base * headcount * (d.capacityFactor ?? 1);
+      const abs = absHoursByDeptMonth.get(`${d.id}|${month}`) ?? 0;
+      sum += Math.max(0, gross - abs);
+    }
+    return sum;
+  };
+
+  // Накопление факта/клиента по месяцам (после опц. фильтра отдела).
+  type Acc = { fact: number; client: number };
+  const accByMonth = new Map<string, Acc>();
+  for (const e of entries) {
+    const hours = e.hours ?? 0;
+    if (hours === 0) continue;
+    if (deptFilter && deptOfEntry(e) !== deptFilter) continue;
+    // Факт раскладывается по месяцу даты записи (credosTimeEntry.date). Запись без
+    // date в бакеты не попадает (нечего сопоставить) → безопасная деградация.
+    const m = monthKey(e.date);
+    if (!m) continue;
+    const cur = accByMonth.get(m) ?? { fact: 0, client: 0 };
+    cur.fact += hours;
+    cur.client += isClient(e.projectId) ? hours : 0;
+    accByMonth.set(m, cur);
+  }
+
+  // Множество месяцев = все месяцы с фактом ∪ все месяцы рабочего календаря
+  // (норма есть даже в месяце без записей — для тренда недогруза).
+  const monthsSet = new Set<string>([...accByMonth.keys(), ...baseNormByMonth.keys()]);
+  const months = [...monthsSet].sort();
+
+  const points: TimeseriesPoint[] = months.map((month) => {
+    const a = accByMonth.get(month) ?? { fact: 0, client: 0 };
+    const norm = Number(normOfMonth(month).toFixed(2));
+    const fact = Number(a.fact.toFixed(2));
+    return {
+      month,
+      fact,
+      client: Number(a.client.toFixed(2)),
+      norm,
+      util: util(a.client, a.fact),
+      under: Number((norm - fact).toFixed(2)),
+    };
+  });
+
+  return {
+    ok: true,
+    period,
+    departmentId: deptFilter,
+    months: points,
   };
 };

@@ -16,6 +16,163 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 34 — d35d92e + C4 тренд по месяцам + use-drill тесты
+
+**d35d92e COMMITTED — Round 10 инсайты сразу в код:**
+- Фильтры 10 измерений + период (неделя/месяц/квартал/год) + нет scheduled — задокументировано
+- `calc-load.test.ts` +19 строк
+- `project-detail.tsx` -146 строк (крупный рефактор — убрана часть логики, вынесена)
+
+---
+
+**Dev2 — C4 timeseries (uncommitted, reports-calc.ts):**
+
+Добавлена помесячная агрегация: `monthKey(iso)` → YYYY-MM бакет. Новый тип:
+```typescript
+type TimeseriesPoint = { month: string; fact: number; norm: number; utilization: number; ... }
+```
+Инвариант: `Σ по месяцам fact == годовой fact` (тот же набор дней/отсутствий, только сгруппированный). 12 точек за год → пагинация не нужна. Поле `date?: string | null` добавлено к записи (нужно для бакетирования).
+
+Это «Тренд утилизации по месяцам» (Round 10 + Kimai C4-паттерн). Прямой ответ на запрос заказчика «углубить отчёты».
+
+---
+
+**Dev1 — use-drill.ts правки + новые тесты (uncommitted):**
+- `shared/use-drill.ts` — MODIFIED (улучшения после первой версии)
+- `shared/use-drill.test.ts` — NEW UNTRACKED (тесты DrillState: into/goTo/reset)
+
+Хорошо: DrillState теперь покрыт тестами до подключения к UI.
+
+---
+
+**approval.logic.test.ts — MODIFIED** (Dev2 тестирует reject-comment, uncommitted).
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | use-drill тесты + breadcrumbs → подключение к UI |
+| Dev2 | 🔵 | C4 timeseries (reports-calc) + approval reject-comment тесты |
+| arch | ✅ | d35d92e в репо, Round 10 вшит |
+| QA | 🔵 | qa coverage обновляется |
+
+**Аналитик:**
+
+C4 timeseries — это готовый ответ на «план vs факт по месяцам». Следующий шаг: фронт-компонент линейного графика (или bar-chart) с 12 точками. Dev1 после drill-UI. Из Round 10 ещё не закрыты: таймер UX, reject flow (что происходит с записью после REJECT). Эти два — единственное что осталось спрашивать у Timetta.
+
+— аналитик
+
+### 2026-06-22 — [signal-arch] Аналитик → Arch: отчёты финал — что брать в работу (без over-engineering)
+
+**Разведка отчётов закрыта. Из 9 шаблонов Timetta — берём 5 MVP, остальное бэклог.**
+
+---
+
+**ВЗЯТЬ В РАБОТУ (Dev2 сервер + Dev1 фронт):**
+
+**1. `/s/reports` параметрический (Dev2) — уже намечен, теперь знаем контракт:**
+```
+GET /s/reports?groupBy=dept|employee|project|workType|detail
+              &from=YYYY-MM-DD&to=YYYY-MM-DD
+              &deptId=&projectId=&employeeId=   // фильтры drill-down
+```
+5 шаблонов = 5 значений groupBy. Один эндпоинт.
+
+**2. Detail-уровень — 7 колонок MVP (из 40+ в Timetta):**
+```
+date | employeeName | deptName | projectName | workTypeName | hours | status
+```
+Добавить по запросу: supervisor, legalEntity, billCode. Не класть всё 40+ сразу.
+
+**3. Drill-down фронт (Dev1) — уже строит:** use-drill + breadcrumbs в 9bd4356. Осталось: подключить к 5 groupBy + роутинг `/reports/:groupBy/:dimId`.
+
+**4. Export CSV (Dev1) — дёшево:**
+```
+<a href={csvUrl} download>Скачать CSV</a>
+```
+`csvUrl` = тот же `/s/reports` но `?format=csv`. Dev2 добавляет content-type. 2 строки бэк + 1 строка фронт.
+
+---
+
+**НЕ ДЕЛАТЬ СЕЙЧАС:**
+- Dashboard-конструктор — Timetta есть, у нас бэклог (крупно)
+- Cross-filter между виджетами — у Timetta НЕТ, у нас тоже не нужно
+- Scheduled reports (авто-рассылка) — у Timetta НЕТ
+- Excel с иерархией — V2, сейчас CSV достаточно
+- «Рентабельность проектов» шаблон — ждёт REQ-0017 G1 (акты)
+
+---
+
+**Приоритет:** Dev2 сервер (`groupBy` + `detail` + `csv`) → Dev1 роутинг drill-down + export кнопка. Breadcrumbs уже готовы.
+
+— аналитик
+
+### 2026-06-22 — [observed] Итерация 33 — 9bd4356 батч-коммит + approval.logic reject-comment + отчёты закрыты
+
+**9bd4356 — большой батч-коммит:**
+- board-rows.tsx / capacity-board.tsx — sharesByProject wiring (Dev2→Dev1 запрос выполнен!)
+- calc-assignment.test.ts 147 строк — закоммичен ✅
+- **planned-project-row.tsx 154 строк** — НОВЫЙ компонент (DP-0005: строка проекта с assignments)
+- **project-detail.tsx +202 строк** — крупный апдейт карточки проекта (coverage? drill?)
+- universal-identifiers.ts +3 UUID
+- SIGNALS + 369 строк
+
+---
+
+**approval.logic.ts (uncommitted) — Dev2 реализует reject-comment из сигнала аналитика:**
+```typescript
+comment: string | null = null,           // новый параметр
+data.rejectComment = status === REJECTED ? comment ?? null : null;  // хранится при REJECT, сбрасывается при approve
+await setStatus(id, status, actorId, comment);  // проброс через стек
+```
+Backend decoupled: сервер принимает и хранит `rejectComment`, UI-валидацию (min-длина) делает Dev1 отдельно. Правильный паттерн. ✅
+
+---
+
+**Отчёты — картина ЗАКРЫТА (Round 9 финал):**
+
+9 уникальных шаблонов (18 = языковые варианты):
+| # | Шаблон | Связь с нашим |
+|---|---|---|
+| 1 | Часы проектов по месяцам | OLAP byProject |
+| 2 | Часы сотрудников по месяцам | OLAP byEmployee |
+| 3 | Показатели сотрудников за месяц | OLAP byEmployee detail |
+| 4 | Список проектов в работе | фильтр проектов |
+| 5 | Задачи проектов | WBS (у нас нет пока) |
+| 6 | Ресурсный план | DP-0005 assignments! |
+| 7 | **Рентабельность проектов** | **REQ-0002 / REQ-0017 P&L!** |
+| 8 | Утилизация сотрудников по месяцам | byEmployee + норма |
+| 9 | Список заявок на отсутствия | absences |
+
+**Ключевые «НЕТ» (упрощают нам жизнь):**
+- Cross-filter между виджетами → НЕТ (не делаем)
+- Scheduled auto-delivery → НЕТ (не делаем)
+
+**Дашборд-конструктор** — есть в Timetta. У нас нет. Это крупная отдельная фича (бэклог).
+
+**Detail 40+ колонок** — для нашего MVP нужен минимум-стандарт:
+- Дата, Сотрудник, Отдел, Проект, WorkType, Часы, Статус
+- Дополнительно: Supervisor, LegalEntity, BillCode — по запросу
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | project-detail обновлён (uncommitted), breadcrumbs/use-drill в 9bd4356 |
+| Dev2 | 🔵 | approval.logic.ts reject-comment (uncommitted) |
+| arch | ✅ | 9bd4356 закоммичен |
+| QA | ⏸ | ждёт коммиты |
+
+**Аналитик:**
+
+«Рентабельность проектов» = шаблон №7 у Timetta = подтверждает REQ-0002/REQ-0017 как ОЛАП-шаблон, а не отдельная страница. P&L-отчёт = один из 9 шаблонов drill-down системы. Это упрощает дизайн G1: акт → данные → P&L-шаблон в reports, не отдельный экран.
+
+— аналитик
+
 ### 2026-06-22 — [signal-arch] Аналитик → Dev1: UX-хинт — прогресс-бар покрытия при создании назначения
 
 Dev1, Dev2 добавил `projectPlanCoverage` в `calc-assignment.ts` — это функция, которая считает насколько проект покрыт assignments.
@@ -2014,6 +2171,27 @@ Dev2 дал поля `credosTimeProject.factHours` (rollup Σ часов) + `bud
 ---
 
 ## Dev 2 → arch
+
+### 2026-06-22 — [report] reject-comment (backend) ГОТОВО + хендофф Dev1
+
+Из сигнала «REJECT без комментария». Backend Dev2-часть закрыта (поле+логика уже в HEAD, тесты в working tree):
+
+**Сделано:**
+- Поле `credosTimeEntry.rejectComment` (TEXT, nullable, «Причина отклонения») + UUID в SSOT — **в HEAD**.
+- `approval.logic.ts`: `op=reject` сохраняет `params.comment` в `rejectComment` каждой записи батча; `approve`/повторный `submit` очищают (null) — запись «ожила» — **в HEAD**.
+- 3 теста (`approval.logic.test.ts`): reject с comment → PATCH status=REJECTED+rejectComment; reject без comment → null; approve → rejectComment очищен. **22 passed**.
+
+**Dry-run:** oxlint 0 (мой код), dev:build ✓ (поле в схеме, иконка валидна), 22/22 approval.
+
+**Контракт для @Dev1 (UI-часть п.1+3):**
+- Отклонение: слать `POST /s/approval { op:'reject', ids, workspaceMemberRef, comment }`. Поле `comment` — причина.
+- **min-10-символов required = валидация UI** (backend хранит опционально, не ломает reject без comment — decoupled rollout). Когда модалка в проде — могу добавить server-required-guard.
+- Показ сотруднику: `entry.rejectComment` рядом со статусом «Отклонено» (approval-bar / бейдж недели).
+
+**Замечание (не моё, @REQ-0011-поток):** `reports-calc.ts:723` — `deptById` declared but never used (oxlint warning, остался от FTE-правки). Почистить в вашем заходе.
+
+— Dev 2
+
 
 ### 2026-06-22 — [taking] reject-comment (backend) — поле rejectComment + approval.logic
 

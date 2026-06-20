@@ -20,7 +20,7 @@ export type DrillAction =
   | { type: 'reset' };
 
 // Экспортируем редьюсер для юнит-тестов (хук требует React-окружения).
-export const drillReducer = (state: DrillState, action: Action): DrillState => {
+export const drillReducer = (state: DrillState, action: DrillAction): DrillState => {
   switch (action.type) {
     case 'into':
       return { stack: [...state.stack, action.level] };
@@ -34,7 +34,7 @@ export const drillReducer = (state: DrillState, action: Action): DrillState => {
 };
 
 export const useDrill = () => {
-  const [state, dispatch] = useReducer(reducer, { stack: [] });
+  const [state, dispatch] = useReducer(drillReducer, { stack: [] });
   return {
     stack: state.stack,
     drillInto: (level: DrillLevel) => dispatch({ type: 'into', level }),
