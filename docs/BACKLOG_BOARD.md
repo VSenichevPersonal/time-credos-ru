@@ -86,6 +86,22 @@
 
 ---
 
+
+## 🧹 КОНСОЛИДАЦИЯ/РЕФАКТОР (CONSOLIDATION_PLAN.md — пауза на новьё, наведение порядка)
+
+| ID | Что | Усилие | Риск | Зона |
+|---|---|---|---|---|
+| R1 | shared/tokens — единая палитра (убрать дубли hex/инлайн #fff) | S | низкий | Dev1 |
+| Y2 | shared/date.ts — mondayOf/dateToIso/DAY_MS (дубли use-week/calc-load/actions) | S | низкий | Dev1/Dev2 |
+| G1/G2 | Чистка мёртвого: resolveSelfIsManager(@deprecated), lastWorkTypeByProject(project-view) | S | низкий | Dev1/Dev2 |
+| R2-4 | shared/ui — PeriodNav + Segmented + MetricCard (дубли ×3/95%/90%) | S/M | низкий | Dev1 |
+| Y3 | shared/rest-client — boilerplate 38% в 11 rest-файлов (после R1/Y2) | M | сред | Dev1/Dev2 |
+| Y1 🔴 | **ADR: норма часов — один источник** (T2: фронт DAILY_NORM=8 ≠ сервер календарь → сетка≠дашборд в праздники) | — ADR | — | arch+Dev2 |
+| N1 | Зафиксировать конвенцию нейминга fields/ (не переименовывать) | S | — | arch |
+
+**Порядок (низкий риск вперёд):** R1 → Y2 → G1/G2 → R2-4 → Y3. Y1(T2) — через ADR отдельно.
+**НЕ трогать:** error-boundary-пара, capacity/period-header, серверный resolveActor, DataTable-абстракция (переусложнение).
+
 ## 🔁 РЕГУЛЯРНО (все роли + arch, каждую волну — правило заказчика 2026-06-21)
 
 **Сверка с референсами и лучшими практиками — постоянная задача, не разовая.**
