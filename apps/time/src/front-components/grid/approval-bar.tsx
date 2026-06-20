@@ -1,6 +1,7 @@
 import { T } from 'src/front-components/grid/tokens';
 import { ENTRY_STATUS_LABELS } from 'src/constants/labels';
 import type { PeriodStatus } from 'src/front-components/grid/use-approval';
+import { gapsSummary, type WeekGaps } from 'src/front-components/grid/gaps';
 
 // Инлайн-полоса согласования периода (в подвале сетки). Без модалок: бейдж
 // статуса + кнопки. Цвета из токенов: нейтральный/янтарный/зелёный/терракот.
@@ -14,6 +15,7 @@ type Props = {
   draftCount: number;
   submittedCount: number;
   busy: boolean;
+  weekGaps?: WeekGaps; // REQ-0015 §1: чеклист пробелов недели перед отправкой
   onSubmit: () => void;
   onApprove: () => void;
   onReject: () => void;
@@ -76,23 +78,35 @@ export const ApprovalBar = ({
   draftCount,
   submittedCount,
   busy,
+  weekGaps,
   onSubmit,
   onApprove,
   onReject,
 }: Props) => {
   if (status === 'none') return null;
 
+  // REQ-0015 §1: предупреждение о пробелах показываем сотруднику, когда есть что
+  // отправлять (canSubmit) и неделя заполнена не до нормы. Не блокирует отправку.
+  const gapText = !isManager && canSubmit && weekGaps ? gapsSummary(weekGaps) : '';
+
   return (
     <div
       style={{
         display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '7px 12px',
+        flexDirection: 'column',
         borderTop: `1px solid ${T.border}`,
         background: T.panelBg,
       }}
     >
+      {gapText && <GapsNotice text={gapText} />}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '7px 12px',
+        }}
+      >
       <Badge status={status} />
 
       {/* Сотрудник: отправить черновики на согласование (инлайн). */}
@@ -153,6 +167,30 @@ export const ApprovalBar = ({
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 };
+
+// REQ-0015 §1: инлайн-чеклист пробелов недели (без модалок). Янтарный тон —
+// мягкое предупреждение, не ошибка: отправка не блокируется.
+const GapsNotice = ({ text }: { text: string }) => (
+  <div
+    role="status"
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 7,
+      padding: '6px 12px',
+      fontSize: 12,
+      color: T.warn,
+      background: T.overSoft,
+      borderBottom: `1px solid ${T.border}`,
+    }}
+  >
+    <span aria-hidden style={{ fontWeight: 700 }}>!</span>
+    <span>
+      Не вся неделя заполнена по норме: {text}. Проверьте перед отправкой.
+    </span>
+  </div>
+);

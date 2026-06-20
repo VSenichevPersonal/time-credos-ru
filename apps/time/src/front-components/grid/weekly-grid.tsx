@@ -10,6 +10,7 @@ import { useWeek } from 'src/front-components/grid/use-week';
 import { useGridData } from 'src/front-components/grid/use-grid-data';
 import { useGridModel } from 'src/front-components/grid/use-grid-model';
 import { useFilters, filterProjects, filterWorkTypes } from 'src/front-components/grid/use-filters';
+import { calcWeekGaps } from 'src/front-components/grid/gaps';
 import { useTimesheetActions } from 'src/front-components/grid/use-timesheet-actions';
 import { useApproval } from 'src/front-components/grid/use-approval';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
@@ -95,6 +96,10 @@ export const WeeklyGrid = () => {
     return map;
   }, [data.entries]);
 
+  // REQ-0015 §1: пробелы недели (пустые/недозаполненные будни) для pre-submit
+  // предупреждения в подвале. Клиентский расчёт по загруженной неделе.
+  const weekGaps = useMemo(() => calcWeekGaps(week.days, dayTotals), [week.days, dayTotals]);
+
   const addRow = (key: string) =>
     setExtraRowKeys((prev) => [...new Set([...prev, key])]);
 
@@ -143,6 +148,14 @@ export const WeeklyGrid = () => {
                 const { rowKeys, inputs } = actions.copyPreviousWeekWithHours();
                 setExtraRowKeys((prev) => [...new Set([...prev, ...rowKeys])]);
                 void data.upsertMany(inputs);
+              }
+            : undefined
+        }
+        onFillStandardWeek={
+          mode === 'week' && rowList.length > 0
+            ? () => {
+                const inputs = actions.fillStandardWeek();
+                if (inputs.length > 0) void data.upsertMany(inputs);
               }
             : undefined
         }
@@ -228,6 +241,7 @@ export const WeeklyGrid = () => {
         draftCount={approval.draftCount}
         submittedCount={approval.submittedCount}
         busy={approval.busy}
+        weekGaps={weekGaps}
         onSubmit={approval.submit}
         onApprove={approval.approve}
         onReject={approval.reject}

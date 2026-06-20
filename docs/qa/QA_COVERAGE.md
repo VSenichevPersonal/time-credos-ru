@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1207 + 15 todo** (46 файл, все зелёные) |
+| unit-тестов | **1215 + 15 todo** (47 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -63,6 +63,7 @@
 | `front-components/grid/use-grid-model.ts` | **[bug-fix]** `FilterState.status` (W3-3): NO_FILTERS обновлён + 6 тестов фильтрации по статусу согласования | ✅ 17 тестов | `front-components/grid/use-grid-model.test.ts` |
 | `default-role.ts` + `roles/manager.role.ts` | **security-guard** CISO-002/[bug]#1: canDestroy=false, canSoftDelete=true (8 и 7 объектов), уникальные UUIDs, canBeAssignedToApiKeys=false | ✅ 19 тестов | `__tests__/role-guard.test.ts` |
 | `logic-functions/reports-calc.ts` | **+computeOlap W4-1**: groupBy×5 осей, фильтры, норма (dept/emp/null для factCutting), сортировка, пагинация, availableDims, dimLabel | ✅ +28 тестов | `logic-functions/reports-calc.test.ts` |
+| `logic-functions/backfill-project-departments.post-install.ts` | REQ-0013 13a: идемпотентность + skip(no-dept) + created + POST body + partial errors | ✅ 8 тестов | `logic-functions/backfill-project-departments.test.ts` |
 | `front-components/my-time/period-status.ts` | `aggregateStatus` (vacuous-truth фикс) + `summarizeWeeks` (round2, weekBoundaries) | ✅ 10 тестов | `front-components/my-time/period-status.test.ts` |
 | `front-components/my-time/use-my-hours.ts` | `buildProjectHours` — sum/sort/fallback/null/round2 | ✅ 7 тестов (incl. round2 guard) | `front-components/my-time/use-my-hours.test.ts` |
 | `front-components/my-time/status-meta.ts` | `statusMeta` — метка/тон 4 статусов + fallback + SSOT-guard | ✅ 6 тестов | `front-components/my-time/status-meta.test.ts` |

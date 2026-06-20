@@ -23,6 +23,7 @@ type Props = {
   alt: boolean;
   nav: Nav;
   onCellCommit: (dayIso: string, hours: number) => void;
+  onFill?: (value: number) => void; // U5: заполнить будни строки значением ячейки
   onDuplicate?: () => void; // W3-1: дублировать строку (тот же проект, новый вид работ)
 };
 
@@ -39,6 +40,7 @@ export const GridRow = ({
   alt,
   nav,
   onCellCommit,
+  onFill,
   onDuplicate,
 }: Props) => (
   <div
@@ -104,6 +106,7 @@ export const GridRow = ({
         seed={nav.isActive(rowIndex, i) ? nav.editSeed : null}
         onActivate={() => nav.setActive({ row: rowIndex, col: i })}
         onCommit={(h) => onCellCommit(day.iso, h)}
+        onFill={onFill ? () => onFill(hoursByDay[i]) : undefined}
         onKey={(e) => nav.handleKey(e)}
         onSeedConsumed={nav.consumeSeed}
       />

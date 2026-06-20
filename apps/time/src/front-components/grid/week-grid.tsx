@@ -107,6 +107,7 @@ export const WeekGrid = ({
               alt={i % 2 === 1}
               nav={nav}
               onCellCommit={(dayIso, hours) => onCellCommit(row.key, dayIso, hours)}
+              onFill={(v) => onBulkFill(row.key, v)}
               onDuplicate={() => duplicateRow(row.projectId)}
             />
           ))

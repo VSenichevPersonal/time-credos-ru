@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { calcCopyWithHours } from './use-timesheet-actions';
+import { calcCopyWithHours, calcFillStandardWeek } from './use-timesheet-actions';
 import type { WeekDay } from './use-week';
 import type { ApiEntry } from './types';
+import type { GridRowModel } from './use-grid-model';
 
 // Вспомогательные фабрики
 

@@ -129,6 +129,7 @@ export const HourCell = ({
       onMouseDown={onActivate}
       style={{
         ...base,
+        position: 'relative',
         cursor: locked ? 'default' : 'text',
         background: value > 0 ? cellFill(value) : bg,
         color: locked ? T.textMuted : over12 ? T.warn : value > 0 ? T.text : T.textFaint,
@@ -138,6 +139,31 @@ export const HourCell = ({
       }}
     >
       {value > 0 ? fmtHours(value) : '·'}
+      {active && !locked && value > 0 && onFill && (
+        <button
+          type="button"
+          title="Заполнить будни строки этим значением"
+          aria-label="Заполнить будни значением"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onFill();
+          }}
+          style={{
+            position: 'absolute',
+            right: 1,
+            bottom: 1,
+            width: 10,
+            height: 10,
+            padding: 0,
+            border: 'none',
+            borderRadius: 2,
+            background: T.accent,
+            cursor: 'pointer',
+            lineHeight: 0,
+          }}
+        />
+      )}
     </div>
   );
 };

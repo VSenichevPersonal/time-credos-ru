@@ -152,6 +152,55 @@ describe('REST filter injection (CISO-006)', () => {
   });
 });
 
+// CISO-011: целостность табеля/1С — нельзя удалять или изменять согласованные записи.
+describe('integrity guard (CISO-011)', () => {
+  const VALID_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('op=delete, запись со статусом APPROVED → cannot_modify_approved (нет DELETE-запроса)', async () => {
+    const mockFn = mockFetch([
+      emptyEmployees, // resolveEmployeeId DEV-fallback
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'APPROVED', projectId: null }] } }, // pre-read
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'delete', id: VALID_ID }));
+    expect(result).toMatchObject({ ok: false, error: 'cannot_modify_approved' });
+    // DELETE-запрос не должен был отправиться
+    const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deletes).toHaveLength(0);
+  });
+
+  it('op=upsert (patch), запись со статусом APPROVED → cannot_modify_approved (нет PATCH-запроса)', async () => {
+    const mockFn = mockFetch([
+      emptyEmployees, // resolveEmployeeId DEV-fallback
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'APPROVED', projectId: null }] } }, // pre-read
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', id: VALID_ID, hours: '4', date: '2026-06-01' }));
+    expect(result).toMatchObject({ ok: false, error: 'cannot_modify_approved' });
+    const patches = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    expect(patches).toHaveLength(0);
+  });
+
+  it('op=delete, запись со статусом SUBMITTED → можно удалять (guard не срабатывает)', async () => {
+    const mockFn = mockFetch([
+      emptyEmployees,
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'SUBMITTED', projectId: null }] } }, // pre-read
+      {}, // DELETE response
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'delete', id: VALID_ID }));
+    expect(result).not.toMatchObject({ error: 'cannot_modify_approved' });
+    const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deletes).toHaveLength(1);
+  });
+});
+
 // CISO-007 (P2): /s/reports отдаёт byEmployee (ФИО+переработки 42 сотрудников)
 // любому аутентифицированному юзеру без role-guard. Подтверждено live QA-smoke
 // (byEmployee=42 строки, без isManager-проверки). reports.logic.ts run().

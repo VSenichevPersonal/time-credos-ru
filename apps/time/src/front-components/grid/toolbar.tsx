@@ -20,6 +20,7 @@ type Props = {
   onToday: () => void;
   onCopyWeek?: () => void;
   onCopyWeekHours?: () => void;
+  onFillStandardWeek?: () => void;
   copyDisabled?: boolean;
 };
 
@@ -48,6 +49,7 @@ export const Toolbar = ({
   onToday,
   onCopyWeek,
   onCopyWeekHours,
+  onFillStandardWeek,
   copyDisabled,
 }: Props) => {
   const [help, setHelp] = useState(false);
@@ -86,6 +88,16 @@ export const Toolbar = ({
             title="Перенести строки и часы прошлой недели на те же дни (заполненные ячейки и выходные не трогаются)"
           >
             …с часами
+          </button>
+        )}
+        {onFillStandardWeek && (
+          <button
+            onClick={onFillStandardWeek}
+            disabled={copyDisabled}
+            style={actionBtn(copyDisabled)}
+            title="Проставить 8 ч в будни всех строк недели (заполненные ячейки и выходные не трогаются)"
+          >
+            Заполнить 8×5
           </button>
         )}
         <button

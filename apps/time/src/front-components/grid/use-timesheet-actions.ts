@@ -5,6 +5,7 @@ import type { ApiEntry } from 'src/front-components/grid/types';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { UpsertInput } from 'src/front-components/grid/use-grid-data';
+import { DAILY_NORM_HOURS } from 'src/front-components/grid/format';
 
 // Действия записи: правка ячейки, bulk-fill по строке, копирование прошлой недели.
 
@@ -57,6 +58,33 @@ export const calcCopyWithHours = (
     });
   }
   return { rowKeys: Array.from(rowKeys), inputs };
+};
+
+// REQ-0015 §2: шаблон «8×5». Чистая calc — для каждой строки сетки проставить
+// DAILY_NORM_HOURS (8 ч) в будни, где ячейка ещё пуста. Выходные и уже
+// заполненные ячейки не трогаем (как bulkFill, но по всем строкам недели).
+// Сверка: Timetta schedule-fill (заполнить таймшит нормой). Возвращает inputs
+// для одного пакетного upsertMany.
+export const calcFillStandardWeek = (
+  rowList: GridRowModel[],
+  days: WeekDay[],
+): UpsertInput[] => {
+  const inputs: UpsertInput[] = [];
+  for (const row of rowList) {
+    days.forEach((d, i) => {
+      if (d.isWeekend) return;
+      if (row.hoursByDay[i] > 0) return; // не перетираем заполненное
+      if (row.lockedByDay[i]) return; // согласованную ячейку не трогаем
+      inputs.push({
+        id: undefined,
+        date: d.iso,
+        hours: DAILY_NORM_HOURS,
+        projectId: row.projectId,
+        workTypeId: row.workTypeId,
+      });
+    });
+  }
+  return inputs;
 };
 
 export const useTimesheetActions = ({
@@ -152,5 +180,19 @@ export const useTimesheetActions = ({
     [days, entries],
   );
 
-  return { commitCell, commitDescription, bulkFill, copyPreviousWeek, copyPreviousWeekWithHours };
+  // REQ-0015 §2: «Заполнить неделю 8×5» — проставить норму в пустые будни всех
+  // строк недели. Без записи часов (нет строк) делать нечего.
+  const fillStandardWeek = useCallback(
+    () => calcFillStandardWeek(rowList, days),
+    [rowList, days],
+  );
+
+  return {
+    commitCell,
+    commitDescription,
+    bulkFill,
+    copyPreviousWeek,
+    copyPreviousWeekWithHours,
+    fillStandardWeek,
+  };
 };
