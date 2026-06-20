@@ -16,6 +16,13 @@ type Props = {
 
 const isoToDate = (iso: string | null): string => (iso ? String(iso).slice(0, 10) : '');
 
+// DD.MM из ISO — короткая подпись даты начала (интервал распределения плана).
+const shortDate = (iso: string | null): string => {
+  if (!iso) return '';
+  const s = String(iso).slice(0, 10);
+  return `${s.slice(8, 10)}.${s.slice(5, 7)}`;
+};
+
 // Число часов: запятая→точка, отрицательные/нечисло отбрасываем (null = очистить).
 const parseEffort = (raw: string): number | null | undefined => {
   const s = raw.trim().replace(',', '.');
@@ -135,12 +142,20 @@ export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave }: Prop
             style={{ ...inputStyle, width: 64, textAlign: 'right' }}
           />
         </label>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontSize: 11, color: T.textFaint }}>срок</span>
+        <label
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+          title="Плановые часы распределяются равномерно от даты начала проекта до этой даты завершения"
+        >
+          {project.startDate && (
+            <span style={{ fontSize: 11, color: T.textFaint, whiteSpace: 'nowrap' }}>
+              с {shortDate(project.startDate)} ·
+            </span>
+          )}
+          <span style={{ fontSize: 11, color: T.textFaint, whiteSpace: 'nowrap' }}>завершить к</span>
           <input
             type="date"
             value={end}
-            aria-label={`Срок (дата окончания): ${project.name}`}
+            aria-label={`Дата завершения проекта: ${project.name}`}
             onChange={(e) => setEnd(e.target.value)}
             onBlur={commitEnd}
             onKeyDown={(e) => onKey(e, commitEnd)}

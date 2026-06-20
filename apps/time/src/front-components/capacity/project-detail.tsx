@@ -4,9 +4,11 @@ import { ProjectPlanRow } from 'src/front-components/capacity/project-plan-row';
 import { PlannedProjectRow } from 'src/front-components/capacity/planned-project-row';
 import type {
   CapProject,
+  CellMetric,
   DeptPlan,
   DeptPlanLoad,
   DeptRef,
+  LoadCell,
   Period,
   ProjectDeptShare,
   ProjectLoad,
@@ -30,6 +32,12 @@ type Props = {
   // Drill 3-й уровень: проект → доли по отделам (мульти-отдел REQ-0013 13b).
   sharesByProject?: Map<string, ProjectDeptShare[]>;
   deptById?: Map<string, DeptRef>;
+  // Метрика и ёмкость отдела — чтобы детализация следовала переключателю
+  // (Загрузка % = доля от ёмкости), а не показывала всегда часы. currentDeptId —
+  // какой отдел сейчас раскрыт (подсветка его доли в мульти-отдел breakdown).
+  metric?: CellMetric;
+  deptCells?: LoadCell[];
+  currentDeptId?: string;
 };
 
 // План отдела без проекта → форма проекта (те же поля plannedEffort/start/end).
@@ -57,7 +65,7 @@ const PlanningList = ({
   onSaveDeptPlan?: Props['onSaveDeptPlan'];
 }) => {
   const projects = [...planned.map((pl) => pl.project), ...unplanned];
-  const fieldsWidth = Math.max(280, periods.length * 56);
+  const fieldsWidth = Math.max(360, periods.length * 56);
   if (projects.length === 0 && deptPlans.length === 0) {
     return (
       <div style={{ padding: '6px 12px 6px 28px', fontSize: 11.5, color: T.textFaint, background: T.rowAlt }}>
@@ -107,6 +115,9 @@ export const ProjectDetail = ({
   onSaveDeptPlan,
   sharesByProject,
   deptById,
+  metric = 'plan',
+  deptCells,
+  currentDeptId,
 }: Props) => {
   if (planning && onSave) {
     return (
@@ -132,6 +143,9 @@ export const ProjectDetail = ({
           nameWidth={nameWidth}
           sharesByProject={sharesByProject}
           deptById={deptById}
+          metric={metric}
+          deptCells={deptCells}
+          currentDeptId={currentDeptId}
         />
       ))}
 

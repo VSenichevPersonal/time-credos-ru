@@ -5,7 +5,9 @@ import { projectDeptShareLoads } from 'src/front-components/capacity/calc-load';
 import { departmentLabel } from 'src/constants/labels';
 import type {
   CapProject,
+  CellMetric,
   DeptRef,
+  LoadCell,
   Period,
   ProjectDeptShare,
   ProjectLoad,
@@ -19,6 +21,14 @@ import type {
 const title = (p: CapProject): string => p.name; // UX-5: name уже «КОД · Клиент · Название»
 const cellNum = (v: number): string => (v > 0 ? String(Math.round(v)) : '');
 
+// Значение ячейки проекта в выбранной метрике: Загрузка % = доля от ёмкости
+// отдела; иначе — плановые часы (План ч / Свободно ч на уровне проекта = его
+// вклад в часах). Breakdown по отделам всегда в часах (это разбивка доли).
+const projectCell = (v: number, capacity: number | undefined, metric: CellMetric): string => {
+  if (metric === 'pct') return capacity && capacity > 0 && v > 0 ? `${Math.round((v / capacity) * 100)}%` : '';
+  return cellNum(v);
+};
+
 const deptCrumb = (id: string | null, deptById?: Map<string, DeptRef>): string => {
   const dept = id ? deptById?.get(id) : undefined;
   const code = dept?.code ?? null;
@@ -31,13 +41,27 @@ type Props = {
   nameWidth: number;
   sharesByProject?: Map<string, ProjectDeptShare[]>;
   deptById?: Map<string, DeptRef>;
+  metric?: CellMetric;
+  deptCells?: LoadCell[]; // ёмкость отдела по периодам (для метрики «Загрузка %»)
+  currentDeptId?: string; // раскрытый отдел — подсветить его долю в breakdown
 };
 
-export const PlannedProjectRow = ({ load, periods, nameWidth, sharesByProject, deptById }: Props) => {
+export const PlannedProjectRow = ({
+  load,
+  periods,
+  nameWidth,
+  sharesByProject,
+  deptById,
+  metric = 'plan',
+  deptCells,
+  currentDeptId,
+}: Props) => {
   const { project, perPeriod } = load;
   const [open, setOpen] = useState(false);
   const breakdown = projectDeptShareLoads(project, periods, sharesByProject);
   const drillable = breakdown.length > 1; // ≥2 отдела — есть что детализировать
+  // Σ проект по периодам (для строки-итога мульти-отдел: видно, что доли сходятся).
+  const projTotal = periods.map((_, i) => breakdown.reduce((s, b) => s + b.perPeriod[i], 0));
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -99,7 +123,7 @@ export const PlannedProjectRow = ({ load, periods, nameWidth, sharesByProject, d
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {cellNum(perPeriod[i])}
+            {projectCell(perPeriod[i], deptCells?.[i]?.capacity, metric)}
           </div>
         ))}
       </div>
