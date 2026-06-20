@@ -16,6 +16,58 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 41 — 8481e0d мега-коммит ✅ + CISO-007 OPEN
+
+**8481e0d COMMITTED — оба закрыты одним пакетом:**
+
+| | Автор | Что |
+|---|---|---|
+| ✅ C4 тренд UI | Dev1 | trend-view + trend-chart (SVG, парные столбцы + линия util%) + trend-rest + use-trend + month-label + тесты |
+| ✅ P1 factHours | Dev2 | project-fact-rollup.ts (SSOT) + 3 event-триггера (created/updated/deleted) + backfill migration 2 + тесты |
+| ✅ ADR-0007 | Dev1 | weekly-grid.tsx — норма дня из календаря (2 строки) |
+
+**1416 passed, lint 0, dry-run clean.** +35 тестов (Dev1: month-label+5, chart-util+5, trend-rest+11; Dev2: rollup +13, +1 другой).
+
+Dev1 trend: SVG без canvas-libs (sandbox-safe), tabular-nums, impeccable restrained-палитра, ErrorState+ErrorBoundary, фильтр отдела = чипы.
+
+Dev2 rollup: limit=2000 дыра закрыта (курсор-пагинация), `updatedFields:['hours','projectId']` — лишних триггеров нет, approval.logic проверен (не затрагивает Σ).
+
+---
+
+**⛔ CISO-007 OPEN P1 — НЕ исправлено**
+
+8481e0d только зафиксировал эскалацию (P2→P1) в RISK_REGISTER. Фикс отсутствует:
+- `reports-detail.ts:62` — `employeeName` без role-guard — в репо с 19917e2
+- `groupBy=employee` OLAP — ФИО 42 сотрудников любому auth-пользователю
+- CSV export — тоже без guard
+
+Решение ждёт CISO-005 (server-side actor). Промежуточный вариант: для detail mode + byEmployee — scope filter `actor.employeeId` или пустой `employeeName` для !isManager. Но CISO сказал «не делать R1/R3 до CISO-005» → значит блокирует деплой с этими endpoint-ами.
+
+---
+
+**package.json uncommitted (M)** — diff HEAD пустой (whitespace/автоформат), не блокирует.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | ✅ | C4 тренд UI закоммичен; свободен |
+| Dev2 | ✅ | P1 rollup закоммичен; свободен |
+| CISO | 🔴 | CISO-007 OPEN P1 — блокирует deploy reports-detail+byEmployee |
+| arch | 🟡 | 5 решений из 41/41 SCOUT (итерация 39) + CISO-005 приоритет |
+| QA | ✅ | 1416 зелёных |
+
+**Аналитик — следующий приоритет:**
+
+Команда свободна. Логичный следующий шаг от арха:
+1. CISO-005 (server-side actor) — разблокирует CISO-007 + всю RBAC-цепочку
+2. Arch-решения из SCOUT (5 решений: projectTaskId в ActLine, дубли ключ, авто-проводки при approve, P&L MVP скоуп, rowVersion)
+3. CONSOLIDATION_PLAN Волна 1 (G1/G2/N1 — мёртвый код, S-усилие)
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 40 — ⛔ CISO-007 P1 + P1-factHours ЗАКРЫТ + trend UI
 
 **⛔ CISO-007 CRITICAL — ФИО сотрудников без role-guard (BLOCKER)**
@@ -3052,6 +3104,18 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch] CISO-007 фикс раздан (СРОЧНО) + решения по 5 SCOUT-вопросам
+
+**🔴 CISO-007 P1:** раздал Dev2 срочный фикс (ФИО не отдавать в detail/by-employee/CSV без actor/isManager; server-actor если достижим из userWorkspaceId, иначе пустой employeeName до CISO-005). Личный «Мои часы» (свои данные) не ломать. **До фикса — НЕ деплоить detail-API дальше.**
+
+**Решения по 41/41 SCOUT (аналитику спасибо):**
+- **A. ActLine.projectTaskId:** MVP — акт РУЧНОЙ (сумма=оценка×ставка, не из часов), БЕЗ projectTaskId-трассировки. Принять как MVP-ограничение. Поле projectTaskId в TimeEntry — добавим в REQ-0017 (акты) если понадобится drill акт→строки. Не сейчас.
+- **B. Дубли → БЕРЁМ Вариант 1:** `UNIQUE(employeeId, projectId, workTypeId, date)` + upsert-семантика. Защищает factHours от двойного счёта (корень бага). Импорт CSV — upsert по ключу. → Dev2, после CISO-007 (целостность, фикс дрейфа в корне). [signal-arch берётся]
+- **C. Авто-проводки при approve:** MVP-gap, ОТЛОЖИТЬ до REQ-0002 (E1 в бэклоге). Зафиксировать known-gap в ADR-0002/REQ-0002.
+- **D/E. P&L MVP / себестоимость:** бэклог (E1, решение заказчика — пока нет ставок). REQ-0002.
+
+Финансы (A/C/D/E) — бэклог за E1; целостность (B) — берём сейчас. Все 41 SCOUT в репо (integrity spec 37170c9). — arch
+
 ### 2026-06-22 — [arch] ОТВЕТ ВСЕМ + триаж аналитика Round 7/8 (I26-I30)
 
 **Аналитику спасибо — взял в план (правило: читать→в план):**
@@ -5979,6 +6043,42 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-fix] CISO-007 — правильний фікс для Dev2 (scope filter, не mask)
+
+Dev2, уточнення до "мінімального фіксу". Маскування `employeeName = ''` після fetch = неповно (дані вже вибрані). Правильно: scope filter ДО запиту.
+
+**`reports-detail.ts` — scope filter перед поверненням рядків:**
+```typescript
+// reports-detail.ts — в computeDetail, після resolveActor:
+export const computeDetail = (
+  input: ReportInput,
+  period: { from: string; to: string },
+  filters: DetailFilters,
+  actor: { employeeId: string; isManager: boolean } | null,
+): DetailResult => {
+  // ...
+  for (const raw of input.entries) {
+    // CISO-007: якщо не менеджер → тільки власні рядки
+    if (actor && !actor.isManager && raw.employeeId !== actor.employeeId) continue;
+    // ... решта логіки
+  }
+```
+
+**`reports.logic.ts` — передати actor в computeDetail:**
+```typescript
+// Поки CISO-005 open → actor з client-supplied workspaceMemberRef (часткова захист):
+const actor = await resolveActor(params.workspaceMemberRef);
+// ...
+if (params.mode === 'detail') {
+  return computeDetail(input, { from, to }, detailFilters, actor);
+}
+```
+
+**Результат:** !isManager бачить тільки свої рядки. ФІО колег не потрапляє в response навіть у маскованому вигляді. CSV export теж.
+
+**Після CISO-005:** actor резолвиться з `event.userWorkspaceId` (не params) → справжній server-side guard.
+
+— CISO
 ### 2026-06-22 — [ciso-note] 41/41 SCOUT — CISO коментар на 5 arch-рішень
 
 **B. Unique key `(employeeId, projectId, workTypeId, date)`:**
