@@ -109,3 +109,36 @@ POST   /odata/ActsOfAcceptance(id)/SetState (с доп. свойствами)
 GET    /odata/Comments                   — комментарии
 POST   /odata/Comments                   — добавить комментарий
 ```
+
+---
+
+## Act → Invoice (процесс)
+
+- **НЕ автоматический.** Только ручное создание.
+- Триггеры: меню Финансы → Счета, вкладка Выручка проекта, карточка Акта → «Создать счёт»
+- Акт — источник данных для Счёта (агрегирует согласованные часы)
+- После признания Акта → менеджер создаёт Счёт на его основе
+
+## FinancialAccount (План счетов)
+
+- 68 полей (60 кастомных), 23 связи
+- Ключевые: code, name, description, typeId → FinancialAccountType, isSystem, includedInBalance
+- **Иерархический** (parent reference → дерево)
+- Типы: Выручка, Себестоимость, Затраты, Прочее
+- Статьи **не хранят баланс** — это аналитика для проводок
+- Баланс вычисляется динамически из AccountingEntry
+- Валюта на статью (мультивалютность)
+- isActive для софт-удаления
+
+## ResourcePool (из $metadata)
+
+- 12 полей: managerId, leadResourcePoolId (self-ref → иерархия!), isDefault
+- leadResourcePoolId позволяет строить дерево пулов
+- 5 связей: manager → User, leadResourcePool → self, coManagers, createdBy, modifiedBy
+
+## BookingEntry (из $metadata)
+
+- 19 полей: from/to (dates), type (BookingType enum: soft/hard), bookedHours, requiredHours, requiredSchedulePercent, planningMethod
+- resourceId, projectId, resourceRequestId
+- detailEntries → BookingDetailEntry[]
+- changeEntries → ResourceRequestChangeEntry[]

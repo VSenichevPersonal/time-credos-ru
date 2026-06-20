@@ -169,7 +169,7 @@
 | ID | Что | Детали | Применение | Когда |
 |---|---|---|---|---|
 | I8 | **P&L алгоритм** | Баланс=Выручка−Затраты; 4 представления (План/Оценка/Факт/Прогноз); затраты=проводки(таймшиты+субподряд); CCR как % годовых | REQ-0002 дизайн: не просто «ставка×часы», а lifecycle проводок + CCR | E1 бэклог |
-| I9 | **Rate Matrix best-match** | 7 аналитик: Role/Level/Grade/Competence/ResourcePool/Location/LegalEntity. Приоритет: полное совпадение→базовая ставка→стандартная проекта. Billing Rate + Cost Rate. | REQ-0002 E1: при проектировании ставок идти по Rate Matrix, не «поле на сотруднике». Для Кредо-С минимум: Role+LegalEntity | E1 бэклог |
+| I9 | **Rate Matrix best-match** | 7 аналитик: Role/Level/Grade/Competence/ResourcePool/Location/LegalEntity. **WorkType ∉ Rate Matrix** (подтверждено Round 6 — WorkType = категория отчётности, не финансовая аналитика). Приоритет: полное совпадение→базовая ставка→стандартная проекта. Billing Rate + Cost Rate. | REQ-0002 E1: ставка зависит от **Role** сотрудника на проекте, НЕ от WorkType записи. WorkType в ADR-E1 не использовать как аналитику ставки. Для Кредо-С минимум: Role+LegalEntity | E1 бэклог |
 | I10 | **TimeSheet APPROVE lifecycle** | При APPROVE: проводки «Себестоимость труда» + «Себестоимость отсутствий» автоматически | Наш approve сейчас = только флаг. Future T3: lifecycle effects при approve (себестоимость) | W6+ |
 | I11 | **Project Lifecycle** | Черновик→Согласован→Архивирован(read-only)/Отменён(read-only) | D2 архивация: read-only после archive = правильный паттерн | W5 |
 | I12 | **Deal Lifecycle** | Новая→Квалификация→Переговоры→Выиграно/Проиграно (финальные read-only) | E2 (пресейл окупается?): связать Deal.result с hours пресейла | W5+ |
@@ -187,6 +187,26 @@
 
 ### Auth-паттерн (для будущей интеграции Директум5)
 `client_id=external` + password grant → Access Token 1ч / Refresh 15д / API Token 1год (`/settings/api-tokens`). Когда понадобится pull из Директум5 или push в 1С.
+
+### Блок I3 — Round 4 + Round 5 intel (2026-06-22)
+
+| ID | Что | Детали | Применение | Когда |
+|---|---|---|---|---|
+| I14 | **AI-бот архитектура Timetta** | Модель: **qwen3-235b** (Alibaba/Qwen, НЕ YandexGPT). Инфра: Yandex Cloud ALB. 3 режима: «без источников» / «с справкой/Wiki» / «с сущностями Timetta». System prompt защищён через инфра-прокси ([END OF FIXED MESSAGE]+UUID). Уязвимость: temp=0.0 + эмоциональный фрейм = экстракция prompt | Дизайн-референс для будущего AI-ассистента Кредо-С: 3-режимная архитектура, защита на инфра-уровне, НЕ только на промпт-уровне | H-блок |
+| I15 | **Project финансовые поля** ($metadata Round 5) | `billingMode` (T&M/фикс/NTE), `corporateTaxRate`, `billingDeferment`, `collectionDeferment`, `billingAccumulationPeriod`, `isAccrueCapitalCharge`. + флаги: `allowTimeEntry` (запрет записей), `skipManagerApprove` (проект-уровень approval skip), `isAutoPlanning`. 3 даты: `startDate` / `plannedStartWorkDate` / `estimatedStartWorkDate` | REQ-0002 P&L: `billingMode`+`corporateTaxRate`+`billingDeferment` — параметры проекта влияют на P&L. REQ-0016 (бэклог): `allowTimeEntry`+`skipManagerApprove`. D2 архивация: `allowTimeEntry`=false при архиве | E1/REQ-0002 |
+| I16 | **ActOfAcceptance дата-модель** (Round 5) | **Act агрегирует НЕСКОЛЬКО таймшитов** (не 1:1!). Lifecycle 5 состояний: Черновик→На согласовании→Согласовано→Признан/Отменён. Header: project, client, period, totalAmount, `amountBC` (базовая валюта), currency. Lines (ActLine): act, entry/role, hours, rate, amount, `exchangeRate`, `accountId` (финансовая статья). 74 поля + 23 связи | **G1 «Акты»**: модель `credosTimeAct` (header) + `credosTimeActLine` (строки). Акт = документ за месяц/этап, агрегирует N недель. Lifecycle переиспользует наш approval-паттерн. `accountId` → связь с P&L (I8). `amountBC` → мультивалюта с первого дня | G1 W6+ |
+| I17 | **ProjectVersion / Baseline** (Round 5) | `sourceProjectId` — snapshot проекта. Baseline = publish-момент (план заморожен при согласовании). Использован и для клонирования проектов (`sourceProjectId` в копии) | D3 (audit-log/версионирование): паттерн «заморозить план при согласовании бюджета». При P&L: baseline = точка сравнения план/факт | D3 W7+ |
+
+**ADR-совет (G1):** ActOfAcceptance не является простой распечаткой таймшита — это агрегированный финансовый документ. `credosTimeAct` нужен отдельный объект, не вычисляемый из entries. Lifecycle = 5 состояний (как approval, не как timesheet). `ActLine.accountId` — статья затрат для P&L bridge (I8+I16 связка).
+
+### Блок I4 — Round 6 подтверждения (2026-06-22)
+
+| ID | Что | Детали | Применение | Когда |
+|---|---|---|---|---|
+| I18 | **WorkType ∉ Rate Matrix** | WorkType = категория работ для отчётности/классификации. Ставка определяется только по **Role** сотрудника. WorkType не является аналитикой Rate Matrix | Скорректировать ADR-E1: WorkType не участвует в выборе ставки. Наш `workTypeId` — отчётная метка, не тариф | E1 бэклог |
+| I19 | **Lazy creation таймшитов** | Таймшит создаётся при ПЕРВОМ открытии периода (не крон-джобом, не заранее). Аналог: lazy initialization | UC-auto: при открытии недельного grid — проверить/создать таймшит для периода. Дёшево, без фоновых задач. Dev2 зона (logic-function) | W-next |
+| I20 | **Непрерывность timeline — спец-периоды** | Разрывы в таймшит-timeline (нет активности N недель) закрываются специальными периодами (тип: closure/absence-period). Обеспечивает целостность отчётного периода | G1: акт за месяц может содержать «пустые» недели — учесть при агрегации ActLines. Разрыв ≠ ошибка. При подсчёте часов за период пропущенные недели = 0ч, не null | G1 W6+ |
+| I21 | **Авто-согласование: НЕТ** | Только ручной воркфлоу. `skipManagerApprove` = флаг «пропустить шаг согласования» на проекте, НЕ «авто-апрув» | Наш approval flow правильный. `skipManagerApprove` (I15/REQ-0016) = пропуск конкретного шага, статус не меняется автоматически | REQ-0016 |
 
 ---
 
