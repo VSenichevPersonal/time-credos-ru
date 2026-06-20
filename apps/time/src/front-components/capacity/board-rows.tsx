@@ -31,6 +31,7 @@ type DeptProps = {
   onToggle: (id: string) => void;
   planning?: boolean;
   onSavePlan?: (id: string, patch: ProjectPatch) => Promise<boolean>;
+  onSaveDeptPlan?: (id: string, patch: ProjectPatch) => Promise<boolean>;
 };
 
 // Срез «Отделы»: раскрываемые строки отделов с детализацией проектов.
@@ -46,6 +47,7 @@ export const DeptRows = ({
   onToggle,
   planning,
   onSavePlan,
+  onSaveDeptPlan,
 }: DeptProps) => (
   <>
     {departments.map((dept) => {
@@ -75,6 +77,7 @@ export const DeptRows = ({
               nameWidth={nameWidth}
               planning={planning}
               onSave={onSavePlan}
+              onSaveDeptPlan={onSaveDeptPlan}
             />
           )}
         </div>

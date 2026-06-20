@@ -4,13 +4,18 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import {
+  computeOlap,
   computeReports,
+  type OlapDimension,
+  type OlapFilter,
+  type OlapSort,
   type RawAbsence,
   type RawCalendarDay,
   type RawDepartment,
   type RawEmployee,
   type RawEntry,
   type RawProject,
+  type RawWorkType,
 } from './reports-calc';
 
 /**
@@ -102,12 +107,45 @@ const readParams = (event: RoutePayload): Record<string, string> => {
   return out;
 };
 
+// OLAP-параметры из body (массивы/объекты — НЕ через readParams, тот стрингифицирует).
+const OLAP_DIMS = new Set([
+  'dept',
+  'employee',
+  'project',
+  'workType',
+  'category',
+  'stage',
+  'workTypeGroup',
+]);
+const readOlap = (
+  event: RoutePayload,
+  params: Record<string, string>,
+): { groupBy: OlapDimension; filters: OlapFilter[]; limit?: number; cursor?: string | null; sort?: OlapSort } | null => {
+  // OLAP — ТОЛЬКО по явному mode=olap. Легаси-дашборд шлёт groupBy=dept|project|
+  // employee (все ∈ OLAP_DIMS) для 3-срезового ответа — без этого флага он попадал
+  // бы в computeOlap и получал ответ без byDept/byProject/byEmployee → крэш rows.map.
+  if (params.mode !== 'olap') return null;
+  const gb = params.groupBy;
+  if (!gb || !OLAP_DIMS.has(gb)) return null; // нет/невалиден groupBy → старый 3-срезовый режим
+  const body = (event.body ?? {}) as Record<string, unknown>;
+  const rawFilters = Array.isArray(body.filters) ? body.filters : [];
+  const filters: OlapFilter[] = rawFilters
+    .filter((f): f is { dim: string; value: string } => !!f && typeof f === 'object')
+    .filter((f) => OLAP_DIMS.has((f as { dim?: string }).dim ?? '') && (f as { value?: unknown }).value != null)
+    .map((f) => ({ dim: f.dim as OlapDimension, value: String((f as { value: unknown }).value) }));
+  const sort = (body.sort && typeof body.sort === 'object' ? body.sort : undefined) as OlapSort | undefined;
+  const limit = params.limit ? Number(params.limit) : undefined;
+  const cursor = params.cursor ?? null;
+  return { groupBy: gb as OlapDimension, filters, limit, cursor, sort };
+};
+
 const run = async (event: RoutePayload) => {
   const params = readParams(event);
   const from = params.from ?? '1970-01-01T00:00:00.000Z';
   const to = params.to ?? '2999-12-31T23:59:59.999Z';
+  const olap = readOlap(event, params);
 
-  const [entries, projects, employees, departments, calendar, absences] = await Promise.all([
+  const [entries, projects, employees, departments, calendar, absences, workTypes] = await Promise.all([
     restGetAll<RawEntry>('credosTimeEntries', { filter: `date[gte]:${from},date[lte]:${to}` }),
     restGetAll<RawProject>('credosTimeProjects', {}),
     restGetAll<RawEmployee>('credosTimeEmployees', { filter: 'active[eq]:true' }),
@@ -120,12 +158,17 @@ const run = async (event: RoutePayload) => {
     restGetAll<RawAbsence>('credosTimeAbsences', {
       filter: `startDate[lte]:${to},endDate[gte]:${from}`,
     }),
+    // W4-1 OLAP: справочник видов работ (оси workType/workTypeGroup).
+    restGetAll<RawWorkType>('credosTimeWorkTypes', {}),
   ]);
 
-  const result = computeReports(
-    { entries, projects, employees, departments, calendar, absences },
-    { from, to },
-  );
+  const input = { entries, projects, employees, departments, calendar, absences, workTypes };
+
+  // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.
+  if (olap) {
+    return computeOlap(input, { from, to }, olap);
+  }
+  const result = computeReports(input, { from, to });
   return { ...result, groupBy: params.groupBy ?? null };
 };
 

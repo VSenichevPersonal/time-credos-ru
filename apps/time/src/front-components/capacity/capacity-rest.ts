@@ -1,6 +1,7 @@
 import { RestApiClient } from 'twenty-client-sdk/rest';
 
 import type {
+  Absence,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -196,6 +197,16 @@ export const patchProject = async (id: string, patch: ProjectPatch): Promise<voi
   await client().patch(`/rest/credosTimeProjects/${id}`, data);
 };
 
+// REQ-0012: правка плановой загрузки отдела без проекта (credosTimeDeptPlan).
+// Поля те же, что у проекта (plannedEffort/start/end) — переиспользуем ProjectPatch.
+export const patchDeptPlan = async (id: string, patch: ProjectPatch): Promise<void> => {
+  const data: Record<string, unknown> = {};
+  if ('plannedEffort' in patch) data.plannedEffort = patch.plannedEffort;
+  if ('startDate' in patch) data.startDate = toIso(patch.startDate ?? null);
+  if ('endDate' in patch) data.endDate = toIso(patch.endDate ?? null);
+  await client().patch(`/rest/credosTimeDeptPlans/${id}`, data);
+};
+
 type RawDay = { date: string; hours?: number | null };
 
 // Дни производственного календаря в диапазоне горизонта.
@@ -216,5 +227,32 @@ export const fetchCalendar = async (
   return pickList(resp, 'credosTimeWorkdayCalendars').map((d) => ({
     date: String(d.date).slice(0, 10),
     hours: d.hours ?? 0,
+  }));
+};
+
+type RawAbsence = {
+  employeeId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+// W3-1: отсутствия (отпуск/больничный/...) сотрудников, пересекающие горизонт
+// доски [from, to]. Пересечение: endDate >= from И startDate <= to (DATE_TIME →
+// сравнение строкой ISO работает по дню). Уменьшают ёмкость на доске (calc-load).
+export const fetchAbsences = async (
+  from: string,
+  to: string,
+): Promise<Absence[]> => {
+  const resp = await client().get<ListResp<RawAbsence>>('/rest/credosTimeAbsences', {
+    query: {
+      filter: `endDate[gte]:${from},startDate[lte]:${to}`,
+      limit: '400',
+      orderBy: 'startDate[AscNullsFirst]',
+    },
+  });
+  return pickList(resp, 'credosTimeAbsences').map((a) => ({
+    employeeId: a.employeeId ?? null,
+    startDate: a.startDate ?? null,
+    endDate: a.endDate ?? null,
   }));
 };

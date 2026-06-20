@@ -24,6 +24,7 @@ type Props = {
   projects: ProjectRef[];
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
+  lastWorkTypeByProject?: Record<string, string>;
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onAddRow: (rowKey: string) => void;
@@ -36,6 +37,7 @@ export const DayView = ({
   projects,
   workTypes,
   recentProjectIds,
+  lastWorkTypeByProject,
   loading,
   onCellCommit,
   onAddRow,
@@ -105,6 +107,7 @@ export const DayView = ({
         projects={projects}
         workTypes={workTypes}
         recentProjectIds={recentProjectIds}
+        lastWorkTypeByProject={lastWorkTypeByProject}
         onAdd={onAddRow}
       />
     </>

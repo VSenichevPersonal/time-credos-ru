@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  absenceHoursByEmpInPeriod,
+  absenceHoursInPeriod,
+  buildAbsenceCtx,
+  buildHoursByDay,
   buildPeriods,
   deptCapacity,
   deptLoadCells,
@@ -13,6 +17,7 @@ import {
   summaryCells,
 } from 'src/front-components/capacity/calc-load';
 import type {
+  Absence,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -69,6 +74,14 @@ const deptPlan = (over: Partial<DeptPlan> = {}): DeptPlan => ({
   plannedEffort: 100,
   startDate: '2026-01-01',
   endDate: '2026-01-10',
+  ...over,
+});
+
+// W3-1: отсутствие сотрудника (раскид по рабочим дням ∩ периода).
+const absence = (over: Partial<Absence> = {}): Absence => ({
+  employeeId: 'e1',
+  startDate: '2026-01-12',
+  endDate: '2026-01-14',
   ...over,
 });
 
@@ -363,5 +376,180 @@ describe('deptPlanLoads (REQ-0012)', () => {
     const loads = deptPlanLoads(dept(), [small, big, other, future], periods);
     expect(loads.map((x) => x.plan.id)).toEqual(['big', 'small']);
     expect(loads[0].total).toBeGreaterThan(loads[1].total);
+  });
+});
+
+// =============================================================================
+// W3-1: вычет отсутствий из ёмкости доски.
+// Календарь фикстуры: будни 12-25 янв по 8ч. Неделя 2026-01-12..18 = 5 рабочих
+// дней (пн-пт 12-16) = 40ч. Отсутствие 12-14 (пн-ср) = 3 дня × 8ч = 24ч.
+// =============================================================================
+
+const week1 = period('w', utc(2026, 0, 12), utc(2026, 0, 18), 40);
+
+describe('buildHoursByDay', () => {
+  it('строит карту рабочих часов по дням, выходные = 0', () => {
+    const m = buildHoursByDay(calendar);
+    expect(m.get('2026-01-12')).toBe(8); // пн
+    expect(m.get('2026-01-17')).toBe(0); // сб
+    expect(m.get('2026-01-18')).toBe(0); // вс
+  });
+});
+
+describe('absenceHoursInPeriod', () => {
+  const hoursByDay = buildHoursByDay(calendar);
+
+  it('Σ рабочих часов дней пересечения отсутствия и периода', () => {
+    // 12-14 (пн-ср) внутри недели → 3 × 8 = 24
+    expect(absenceHoursInPeriod(absence(), hoursByDay, week1)).toBe(24);
+  });
+
+  it('одиночный день: endDate отсутствует → берётся startDate', () => {
+    expect(
+      absenceHoursInPeriod(absence({ startDate: '2026-01-12', endDate: null }), hoursByDay, week1),
+    ).toBe(8);
+  });
+
+  it('выходные внутри отсутствия не вычитаются (часы дня = 0)', () => {
+    // 16-19 = пт(8) + сб(0) + вс(0) + пн(вне недели) → в week1 попадают пт+сб+вс = 8
+    expect(
+      absenceHoursInPeriod(absence({ startDate: '2026-01-16', endDate: '2026-01-19' }), hoursByDay, week1),
+    ).toBe(8);
+  });
+
+  it('0 без startDate и при end < start', () => {
+    expect(absenceHoursInPeriod(absence({ startDate: null }), hoursByDay, week1)).toBe(0);
+    expect(
+      absenceHoursInPeriod(absence({ startDate: '2026-01-14', endDate: '2026-01-12' }), hoursByDay, week1),
+    ).toBe(0);
+  });
+
+  it('0 при отсутствии пересечения с периодом', () => {
+    const far = period('w', utc(2026, 5, 1), utc(2026, 5, 7), 40);
+    expect(absenceHoursInPeriod(absence(), hoursByDay, far)).toBe(0);
+  });
+
+  it('ISO с временем (DATE_TIME) обрезается до дня', () => {
+    expect(
+      absenceHoursInPeriod(
+        absence({ startDate: '2026-01-12T10:00:00.000Z', endDate: '2026-01-14T10:00:00.000Z' }),
+        hoursByDay,
+        week1,
+      ),
+    ).toBe(24);
+  });
+});
+
+describe('absenceHoursByEmpInPeriod', () => {
+  const hoursByDay = buildHoursByDay(calendar);
+
+  it('суммирует часы по employeeId, игнорирует null', () => {
+    const m = absenceHoursByEmpInPeriod(
+      [absence({ employeeId: 'e1' }), absence({ employeeId: 'e2', startDate: '2026-01-12', endDate: '2026-01-12' }), absence({ employeeId: null })],
+      hoursByDay,
+      week1,
+    );
+    expect(m.get('e1')).toBe(24);
+    expect(m.get('e2')).toBe(8);
+    expect(m.has('null')).toBe(false);
+  });
+
+  it('несколько отсутствий одного сотрудника складываются', () => {
+    const m = absenceHoursByEmpInPeriod(
+      [
+        absence({ employeeId: 'e1', startDate: '2026-01-12', endDate: '2026-01-12' }),
+        absence({ employeeId: 'e1', startDate: '2026-01-14', endDate: '2026-01-14' }),
+      ],
+      hoursByDay,
+      week1,
+    );
+    expect(m.get('e1')).toBe(16);
+  });
+});
+
+describe('deptCapacity с отсутствиями (W3-1)', () => {
+  const emps: EmployeeRef[] = [
+    { id: 'e1', name: 'Иванов', departmentId: 'd1' },
+    { id: 'e2', name: 'Петров', departmentId: 'd1' },
+    { id: 'e3', name: 'Чужой', departmentId: 'other' },
+  ];
+
+  it('без ctx — прежняя формула (workHours × headcount × factor)', () => {
+    expect(deptCapacity(dept(), week1)).toBe(160); // 40 × 5 × 0.8
+  });
+
+  it('вычитает часы отсутствий сотрудников отдела', () => {
+    const ctx = buildAbsenceCtx([absence({ employeeId: 'e1' })], emps, calendar);
+    // 160 − 24 = 136
+    expect(deptCapacity(dept(), week1, ctx)).toBe(136);
+  });
+
+  it('отсутствие сотрудника чужого отдела не влияет', () => {
+    const ctx = buildAbsenceCtx([absence({ employeeId: 'e3' })], emps, calendar);
+    expect(deptCapacity(dept(), week1, ctx)).toBe(160);
+  });
+
+  it('не опускает ёмкость ниже 0 при переучёте отсутствий', () => {
+    const ctx = buildAbsenceCtx(
+      [absence({ employeeId: 'e1', startDate: '2026-01-12', endDate: '2026-01-25' })],
+      emps,
+      calendar,
+    );
+    // ёмкость маленького отдела (headcount 1, factor 1) меньше часов отсутствия
+    const tiny = dept({ headcount: 1, capacityFactor: 1 });
+    expect(deptCapacity(tiny, week1, ctx)).toBe(0);
+  });
+});
+
+describe('deptLoadCells с отсутствиями (W3-1)', () => {
+  const periods = [week1];
+  const emps: EmployeeRef[] = [
+    { id: 'e1', name: 'Иванов', departmentId: 'd1' },
+    { id: 'e2', name: 'Петров', departmentId: 'd1' },
+  ];
+
+  it('свободно = ёмкость(с вычетом отсутствий) − план', () => {
+    const ctx = buildAbsenceCtx([absence({ employeeId: 'e1' })], emps, calendar);
+    // проект 2026-01-01..01-10 не пересекает неделю 12-18 → load 0
+    // ёмкость 160 − 24 = 136 → free 136
+    const [c] = deptLoadCells(dept(), [], periods, [], ctx);
+    expect(c.capacity).toBe(136);
+    expect(c.load).toBe(0);
+    expect(c.free).toBe(136);
+    expect(c.ratio).toBe(0);
+  });
+
+  it('без ctx — ёмкость без вычета (обратная совместимость UI)', () => {
+    const [c] = deptLoadCells(dept(), [], periods, []);
+    expect(c.capacity).toBe(160);
+  });
+});
+
+describe('employeeLoadCells с отсутствиями (W3-1)', () => {
+  const periods = [week1];
+  const emp: EmployeeRef = { id: 'e1', name: 'Иванов', departmentId: 'd1' };
+
+  it('личная ёмкость уменьшается на отсутствия именно этого сотрудника', () => {
+    const ctx = buildAbsenceCtx([absence({ employeeId: 'e1' })], [emp], calendar);
+    // базовая личная ёмкость = 40 × 0.8 = 32; вычет 24 → 8
+    const [c] = employeeLoadCells(emp, dept(), [], periods, [], ctx);
+    expect(c.capacity).toBe(8);
+  });
+
+  it('отсутствие другого сотрудника не влияет на личную ёмкость', () => {
+    const other: EmployeeRef = { id: 'e2', name: 'Петров', departmentId: 'd1' };
+    const ctx = buildAbsenceCtx([absence({ employeeId: 'e2' })], [emp, other], calendar);
+    const [c] = employeeLoadCells(emp, dept(), [], periods, [], ctx);
+    expect(c.capacity).toBe(32);
+  });
+
+  it('личная ёмкость не ниже 0', () => {
+    const ctx = buildAbsenceCtx(
+      [absence({ employeeId: 'e1', startDate: '2026-01-12', endDate: '2026-01-25' })],
+      [emp],
+      calendar,
+    );
+    const [c] = employeeLoadCells(emp, dept(), [], periods, [], ctx);
+    expect(c.capacity).toBe(0);
   });
 });

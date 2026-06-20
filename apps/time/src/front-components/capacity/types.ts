@@ -46,6 +46,15 @@ export type DeptPlan = {
   endDate: string | null; // ISO
 };
 
+// W3-1: отсутствие сотрудника (отпуск/больничный/...). Период [startDate,
+// endDate] (по дню, включительно) уменьшает ёмкость сотрудника/отдела на доске —
+// вычитаются рабочие часы календаря, попавшие в пересечение с периодом колонки.
+export type Absence = {
+  employeeId: string | null;
+  startDate: string | null; // ISO
+  endDate: string | null; // ISO
+};
+
 // День производственного календаря (для ёмкости недели).
 export type CalendarDay = {
   date: string; // YYYY-MM-DD

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Autocomplete } from 'src/front-components/grid/autocomplete';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
@@ -8,11 +8,17 @@ import { T } from 'src/front-components/grid/tokens';
 // Быстрое добавление строки: автокомплит проекта (код/клиент) → вид работ.
 // Недавние проекты — вверху списка.
 
+// W3-1 «Дублировать строку» (Kimai Duplicate): сигнал-префилл проекта из строки.
+// nonce меняется при каждом клике «Дублировать» (даже по тому же проекту), чтобы
+// useEffect перезапускался и форма подставляла проект для повторного ввода.
+export type Prefill = { projectId: string; nonce: number };
+
 type Props = {
   projects: ProjectRef[];
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
   lastWorkTypeByProject?: Record<string, string>; // проект → последний вид работ (W3-5)
+  prefill?: Prefill | null; // W3-1: предзаполнить проект (по кнопке «Дублировать»)
   onAdd: (rowKey: string) => void;
 };
 
@@ -21,6 +27,7 @@ export const AddRow = ({
   workTypes,
   recentProjectIds,
   lastWorkTypeByProject,
+  prefill,
   onAdd,
 }: Props) => {
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -31,6 +38,13 @@ export const AddRow = ({
     setProjectId(id);
     setWorkTypeId(id ? lastWorkTypeByProject?.[id] ?? null : null);
   };
+
+  // W3-1: по сигналу «Дублировать строку» подставляем проект (вид работ выбирает
+  // пользователь — часы вводятся заново). nonce в deps → срабатывает и повторно.
+  useEffect(() => {
+    if (prefill) selectProject(prefill.projectId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill?.nonce]);
 
   const projectItems = useMemo(
     () => projects.map((p) => ({ id: p.id, label: p.name })),

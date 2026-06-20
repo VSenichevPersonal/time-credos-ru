@@ -20,6 +20,7 @@ type Props = {
   projects: ProjectRef[];
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
+  lastWorkTypeByProject?: Record<string, string>; // W3-5: не используется (добавляем новый вид работ)
   selectedProjectId: string | null;
   onSelectProject: (id: string | null) => void;
   loading: boolean;

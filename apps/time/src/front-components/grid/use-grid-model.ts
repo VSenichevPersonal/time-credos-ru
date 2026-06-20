@@ -70,6 +70,8 @@ export const calcGridModel = (
     const pid = e.projectId ?? '';
     const wid = e.workTypeId ?? '';
     if (!rowPasses(pid, wid, projMap, filters)) continue;
+    // W3-3: фильтр по статусу согласования (на уровне записи).
+    if (filters.status.size > 0 && !filters.status.has(e.status ?? '')) continue;
     const row = ensure(pid, wid);
     row.hoursByDay[idx] += e.hours;
     row.entryIdByDay[idx] = e.id;

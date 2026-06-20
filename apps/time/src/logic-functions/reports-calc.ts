@@ -329,3 +329,275 @@ export const computeReports = (
     byEmployee,
   };
 };
+
+// ===========================================================================
+// W4-1 OLAP: параметрический /s/reports (groupBy + filters[] + курсор).
+// Аддитивно к computeReports (старый 3-срезовый ответ сохранён для совместимости).
+// ===========================================================================
+
+export type OlapDimension =
+  | 'dept'
+  | 'employee'
+  | 'project'
+  | 'workType'
+  | 'category'
+  | 'stage'
+  | 'workTypeGroup';
+
+export const OLAP_DIMENSIONS: OlapDimension[] = [
+  'dept',
+  'employee',
+  'project',
+  'workType',
+  'category',
+  'stage',
+  'workTypeGroup',
+];
+
+// Измерения, фильтр по которым РЕЖЕТ факт (норма периода остаётся целой → under
+// становится бессмысленным). При активном таком фильтре норму не считаем (null).
+const FACT_CUTTING_DIMS = new Set<OlapDimension>([
+  'project',
+  'workType',
+  'category',
+  'stage',
+  'workTypeGroup',
+]);
+
+export type OlapFilter = { dim: OlapDimension; value: string };
+export type OlapSort = { by: 'fact' | 'util' | 'under' | 'name'; dir: 'asc' | 'desc' };
+export type OlapParams = {
+  groupBy: OlapDimension;
+  filters?: OlapFilter[];
+  limit?: number;
+  cursor?: string | null;
+  sort?: OlapSort;
+};
+
+export type OlapRow = Row & { drillable: OlapDimension[] };
+export type OlapResult = {
+  ok: true;
+  period: { from: string; to: string };
+  groupBy: OlapDimension;
+  appliedFilters: { dim: OlapDimension; value: string; label: string }[];
+  totals: Row;
+  rows: OlapRow[];
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  availableDims: OlapDimension[];
+};
+
+export const computeOlap = (
+  input: ReportsInput,
+  period: { from: string; to: string },
+  params: OlapParams,
+): OlapResult => {
+  const { entries, projects, employees, departments, calendar } = input;
+  const absences = input.absences ?? [];
+  const workTypes = input.workTypes ?? [];
+  const groupBy = params.groupBy;
+  const filters = params.filters ?? [];
+  const limit = Math.max(1, Math.min(params.limit ?? 100, 1000));
+  const offset = params.cursor ? Math.max(0, parseInt(params.cursor, 10) || 0) : 0;
+
+  const projById = new Map(projects.map((p) => [p.id, p]));
+  const deptById = new Map(departments.map((d) => [d.id, d]));
+  const empById = new Map(employees.map((e) => [e.id, e]));
+  const wtById = new Map(workTypes.map((w) => [w.id, w]));
+
+  const empName = (e: RawEmployee): string =>
+    [e.lastName, e.firstName].filter(Boolean).join(' ') || e.id;
+  const deptOfEntry = (e: RawEntry): string | null => {
+    const fromEmp = e.employeeId ? empById.get(e.employeeId)?.departmentId : null;
+    if (fromEmp) return fromEmp;
+    return e.projectId ? (projById.get(e.projectId)?.departmentId ?? null) : null;
+  };
+  const catOfEntry = (e: RawEntry): string =>
+    (e.projectId ? projById.get(e.projectId)?.category : null) ?? 'OTHER';
+  const isClient = (projectId: string | null): boolean =>
+    !!projectId && projById.get(projectId)?.category === CLIENT_CATEGORY;
+
+  // Значение измерения для записи (для группировки и фильтрации).
+  const dimValue = (e: RawEntry, dim: OlapDimension): string | null => {
+    switch (dim) {
+      case 'dept':
+        return deptOfEntry(e);
+      case 'employee':
+        return e.employeeId ?? null;
+      case 'project':
+        return e.projectId ?? null;
+      case 'workType':
+        return e.workTypeId ?? null;
+      case 'category':
+        return catOfEntry(e);
+      case 'stage':
+        return e.stageId ?? null;
+      case 'workTypeGroup':
+        return (e.workTypeId ? wtById.get(e.workTypeId)?.group : null) ?? null;
+      default:
+        return null;
+    }
+  };
+
+  // Человекочитаемое имя ключа измерения.
+  const dimLabel = (dim: OlapDimension, key: string): string => {
+    switch (dim) {
+      case 'dept':
+        return deptById.get(key)?.code ?? key;
+      case 'employee': {
+        const e = empById.get(key);
+        return e ? empName(e) : key;
+      }
+      case 'project': {
+        const p = projById.get(key);
+        return p?.name ?? p?.code ?? key;
+      }
+      case 'workType':
+        return wtById.get(key)?.name ?? key;
+      case 'category':
+      case 'workTypeGroup':
+        return key; // UPPER_CASE-код; UI маппит в русский ярлык
+      case 'stage':
+        return key; // имя этапа резолвит UI (справочник этапов не в этом контракте)
+      default:
+        return key;
+    }
+  };
+
+  const matchesFilters = (e: RawEntry): boolean =>
+    filters.every((f) => dimValue(e, f.dim) === f.value);
+
+  // --- Норма (только для groupBy dept/employee и без факт-режущих фильтров) ---
+  const factCutting = filters.some((f) => FACT_CUTTING_DIMS.has(f.dim));
+  const normApplies = (groupBy === 'dept' || groupBy === 'employee') && !factCutting;
+
+  const workdayCal = calendar.filter((d) => WORKDAY_TYPES.has(d.dayType ?? ''));
+  const baseNorm = workdayCal.reduce((s, d) => s + (d.hours ?? 0), 0);
+  const hoursByDay = new Map<string, number>();
+  for (const d of workdayCal) {
+    const k = dayKey(d.date);
+    if (k) hoursByDay.set(k, (hoursByDay.get(k) ?? 0) + (d.hours ?? 0));
+  }
+  const pFrom = dayKey(period.from);
+  const pTo = dayKey(period.to);
+  const absByEmp = new Map<string, number>();
+  for (const a of absences) {
+    if (!a.employeeId) continue;
+    const start = dayKey(a.startDate);
+    const end = dayKey(a.endDate) ?? start;
+    if (!start) continue;
+    let sum = 0;
+    for (const [day, h] of hoursByDay) {
+      if (day < start || (end && day > end)) continue;
+      if (pFrom && day < pFrom) continue;
+      if (pTo && day > pTo) continue;
+      sum += h;
+    }
+    if (sum > 0) absByEmp.set(a.employeeId, (absByEmp.get(a.employeeId) ?? 0) + sum);
+  }
+  const headcountByDept = new Map<string, number>();
+  for (const e of employees)
+    if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+  const absByDept = new Map<string, number>();
+  for (const e of employees) {
+    const h = absByEmp.get(e.id) ?? 0;
+    if (h > 0 && e.departmentId) absByDept.set(e.departmentId, (absByDept.get(e.departmentId) ?? 0) + h);
+  }
+  const normOfKey = (key: string): number | null => {
+    if (!normApplies) return null;
+    if (groupBy === 'employee') {
+      const e = empById.get(key);
+      if (!e) return null;
+      const d = e.departmentId ? deptById.get(e.departmentId) : undefined;
+      return Math.max(0, baseNorm * (d?.capacityFactor ?? 1) - (absByEmp.get(key) ?? 0));
+    }
+    // dept
+    const d = deptById.get(key);
+    if (!d) return null;
+    return Math.max(0, baseNorm * (headcountByDept.get(key) ?? 0) * (d.capacityFactor ?? 1) - (absByDept.get(key) ?? 0));
+  };
+
+  // --- Один проход: фильтр → накопление по ключу groupBy ---
+  type Acc = { fact: number; client: number; cats: Map<string, number> };
+  const acc = new Map<string, Acc>();
+  const totalCats = new Map<string, number>();
+  let totalFact = 0;
+  let totalClient = 0;
+  for (const e of entries) {
+    const hours = e.hours ?? 0;
+    if (hours === 0) continue;
+    if (!matchesFilters(e)) continue;
+    const key = dimValue(e, groupBy);
+    if (!key) continue;
+    const client = isClient(e.projectId) ? hours : 0;
+    const cat = catOfEntry(e);
+    totalFact += hours;
+    totalClient += client;
+    totalCats.set(cat, (totalCats.get(cat) ?? 0) + hours);
+    const cur = acc.get(key) ?? { fact: 0, client: 0, cats: new Map<string, number>() };
+    cur.fact += hours;
+    cur.client += client;
+    cur.cats.set(cat, (cur.cats.get(cat) ?? 0) + hours);
+    acc.set(key, cur);
+  }
+
+  const buildCats = (cats: Map<string, number>, fact: number): CategoryShare[] =>
+    [...cats.entries()]
+      .map(([category, hours]) => ({
+        category,
+        hours: Number(hours.toFixed(2)),
+        share: fact > 0 ? Number((hours / fact).toFixed(4)) : null,
+      }))
+      .sort((a, b) => b.hours - a.hours);
+
+  // Доступные оси drill = все, кроме groupBy и уже зафильтрованных.
+  const usedDims = new Set<OlapDimension>([groupBy, ...filters.map((f) => f.dim)]);
+  const availableDims = OLAP_DIMENSIONS.filter((d) => !usedDims.has(d));
+
+  let rows: OlapRow[] = [...acc.entries()].map(([key, a]) => ({
+    ...finalize({
+      key,
+      name: dimLabel(groupBy, key),
+      fact: a.fact,
+      client: a.client,
+      norm: normOfKey(key),
+      util: null,
+      under: null,
+      byCategory: buildCats(a.cats, a.fact),
+    }),
+    drillable: availableDims,
+  }));
+
+  // Сортировка (дефолт: факт убыв.).
+  const sortBy = params.sort?.by ?? 'fact';
+  const dir = params.sort?.dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    if (sortBy === 'name') return dir * a.name.localeCompare(b.name);
+    const av = (a[sortBy] ?? 0) as number;
+    const bv = (b[sortBy] ?? 0) as number;
+    return dir * (av - bv);
+  });
+
+  const total = rows.length;
+  const page = rows.slice(offset, offset + limit);
+  const hasNextPage = offset + limit < total;
+
+  return {
+    ok: true,
+    period,
+    groupBy,
+    appliedFilters: filters.map((f) => ({ dim: f.dim, value: f.value, label: dimLabel(f.dim, f.value) })),
+    totals: finalize({
+      key: 'total',
+      name: 'Итого',
+      fact: totalFact,
+      client: totalClient,
+      norm: null, // итог-норма по срезу неоднозначна при фильтрах — UI берёт из rows при необходимости
+      util: null,
+      under: null,
+      byCategory: buildCats(totalCats, totalFact),
+    }),
+    rows: page,
+    pageInfo: { hasNextPage, endCursor: hasNextPage ? String(offset + limit) : null },
+    availableDims,
+  };
+};

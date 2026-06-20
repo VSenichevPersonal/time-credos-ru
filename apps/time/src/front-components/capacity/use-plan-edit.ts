@@ -1,33 +1,56 @@
 import { useCallback, useState } from 'react';
 
-import { patchProject, type ProjectPatch } from 'src/front-components/capacity/capacity-rest';
+import {
+  patchDeptPlan,
+  patchProject,
+  type ProjectPatch,
+} from 'src/front-components/capacity/capacity-rest';
 import { useSaveStatus, type SaveStatus } from 'src/front-components/grid/use-save-status';
 
-// Сохранение плана проекта руководителем: PATCH credosTimeProject → рефетч
-// проектов (пересчёт загрузки на лету). Статус — общий индикатор «сохранение/
-// сохранено/ошибка»; ошибки REST не роняют доску, а пишутся в error.
-export const usePlanEdit = (reloadProjects: () => Promise<void>) => {
+// Сохранение плана руководителем: PATCH → рефетч (пересчёт загрузки на лету).
+// `save` — план проекта (credosTimeProject); `saveDeptPlan` — план без проекта
+// (credosTimeDeptPlan, REQ-0012). Статус — общий индикатор; ошибки REST не роняют
+// доску, пишутся в error.
+export const usePlanEdit = (
+  reloadProjects: () => Promise<void>,
+  reloadDeptPlans: () => Promise<void>,
+) => {
   const { status, track } = useSaveStatus();
   const [error, setError] = useState<string | null>(null);
 
-  const save = useCallback(
-    async (projectId: string, patch: ProjectPatch): Promise<boolean> => {
+  const run = useCallback(
+    async (op: () => Promise<void>): Promise<boolean> => {
       setError(null);
       try {
-        await track(async () => {
-          await patchProject(projectId, patch);
-          await reloadProjects();
-        });
+        await track(op);
         return true;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Не удалось сохранить план');
         return false;
       }
     },
-    [reloadProjects, track],
+    [track],
   );
 
-  return { save, status, error };
+  const save = useCallback(
+    (projectId: string, patch: ProjectPatch) =>
+      run(async () => {
+        await patchProject(projectId, patch);
+        await reloadProjects();
+      }),
+    [run, reloadProjects],
+  );
+
+  const saveDeptPlan = useCallback(
+    (planId: string, patch: ProjectPatch) =>
+      run(async () => {
+        await patchDeptPlan(planId, patch);
+        await reloadDeptPlans();
+      }),
+    [run, reloadDeptPlans],
+  );
+
+  return { save, saveDeptPlan, status, error };
 };
 
 export type { SaveStatus };

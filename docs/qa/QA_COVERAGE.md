@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **866 + 19 todo** (33 файлов, все зелёные) |
+| unit-тестов | **931 + 19 todo** (35 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -56,6 +56,9 @@
 | `logic-functions/approval.logic.ts` | RBAC runSubmit/runResolve + SoD (CISO-002) | ✅ covered | `logic-functions/approval.logic.test.ts` |
 | `logic-functions/time-entry-api.logic.ts` | security-регресс CISO-005/006/007/008 | 🟦 todo-спека | `logic-functions/time-entry-api.logic.test.ts` |
 | `front-components/grid/use-week.ts` | `mondayOf`/`toIso` — дата-логика (UTC Пн, переходы месяц/год) | ✅ 10 тестов | `front-components/grid/use-week.test.ts` |
+| `front-components/grid/use-keyboard.ts` | `keyAction` (стрелки/Tab/Enter/цифры/Delete) + `clampCell` (границы сетки) | ✅ 28 тестов | `front-components/grid/use-keyboard.test.ts` |
+| `front-components/capacity/calc-load.ts` | W3-1: `buildHoursByDay`/`absenceHoursInPeriod`/`absenceHoursByEmpInPeriod` + вычет из `deptCapacity`/`employeeLoadCells` | ✅ +20 тестов (Dev2) | `front-components/capacity/calc-load.test.ts` |
+| `front-components/grid/use-approval.ts` | `calcApprovalByProject` (резолв флага проект+отдел) + `calcPeriodStatus` (приоритет REJECTED>SUBMITTED>APPROVED>DRAFT) | ✅ 17 тестов | `front-components/grid/use-approval.test.ts` |
 | **UI-экраны (timesheet/capacity/настройки/календарь)** | **browser-smoke** | **⬜ QA-1** | `reports/QA_SMOKE_CHECKLIST.md` |
 
 Легенда: ✅ covered · 🟦 todo-спека · 🔴 gap · 🟡 предложено · ⚪ низкий приоритет.

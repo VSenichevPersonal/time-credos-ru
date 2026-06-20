@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
+  fetchAbsences,
   fetchCalendar,
   fetchDepartments,
   fetchDeptPlans,
@@ -8,8 +9,10 @@ import {
   fetchProjects,
   resolveSelfIsManager,
 } from 'src/front-components/capacity/capacity-rest';
-import { buildPeriods } from 'src/front-components/capacity/calc-load';
+import { buildAbsenceCtx, buildPeriods } from 'src/front-components/capacity/calc-load';
+import type { AbsenceCtx } from 'src/front-components/capacity/calc-load';
 import type {
+  Absence,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -39,6 +42,7 @@ type State = {
   projects: CapProject[];
   deptPlans: DeptPlan[];
   calendar: CalendarDay[];
+  absences: Absence[]; // W3-1: отсутствия для вычета из ёмкости доски
 };
 
 // Загрузка данных доски + расчёт колонок горизонта. reloadProjects() — точечный
@@ -54,6 +58,7 @@ export const useCapacity = (granularity: Granularity) => {
     projects: [],
     deptPlans: [],
     calendar: [],
+    absences: [],
   });
 
   useEffect(() => {
@@ -65,9 +70,10 @@ export const useCapacity = (granularity: Granularity) => {
       fetchProjects(),
       fetchDeptPlans(),
       fetchCalendar(range.from, range.to),
+      fetchAbsences(range.from, range.to),
       resolveSelfIsManager(null),
     ])
-      .then(([departments, employees, projects, deptPlans, calendar, isManagerInWorkspace]) => {
+      .then(([departments, employees, projects, deptPlans, calendar, absences, isManagerInWorkspace]) => {
         if (!alive) return;
         // TODO(rbac): RBAC-гейт «Планировать» отложен в RBAC-волну. В песочнице
         // front-component текущего пользователя надёжно получить нельзя (токен =
@@ -83,6 +89,7 @@ export const useCapacity = (granularity: Granularity) => {
           projects,
           deptPlans,
           calendar,
+          absences,
         });
       })
       .catch((e: unknown) => {
@@ -100,10 +107,23 @@ export const useCapacity = (granularity: Granularity) => {
     setState((s) => ({ ...s, projects }));
   }, []);
 
+  // REQ-0012: точечный рефетч плановых загрузок отдела (после правки в планировании).
+  const reloadDeptPlans = useCallback(async () => {
+    const deptPlans = await fetchDeptPlans();
+    setState((s) => ({ ...s, deptPlans }));
+  }, []);
+
   const periods: Period[] = useMemo(
     () => buildPeriods(anchor, state.calendar, granularity, HORIZON[granularity]),
     [anchor, state.calendar, granularity],
   );
 
-  return { ...state, periods, anchor, reloadProjects };
+  // W3-1: контекст вычета отсутствий из ёмкости — собирается один раз, передаётся
+  // в deptLoadCells/employeeLoadCells на доске (UI). Без него ёмкость = прежняя.
+  const absenceCtx: AbsenceCtx = useMemo(
+    () => buildAbsenceCtx(state.absences, state.employees, state.calendar),
+    [state.absences, state.employees, state.calendar],
+  );
+
+  return { ...state, periods, absenceCtx, anchor, reloadProjects, reloadDeptPlans };
 };

@@ -6,6 +6,39 @@ import { useCallback, useRef, useState } from 'react';
 
 export type Cell = { row: number; col: number };
 
+export type KeyAction =
+  | { type: 'move'; dRow: number; dCol: number }
+  | { type: 'edit'; seed: string }
+  | { type: 'none' };
+
+// Чистая функция: какое действие соответствует клавише.
+export const keyAction = (e: { key: string; shiftKey: boolean }): KeyAction => {
+  const k = e.key;
+  if (k === 'ArrowUp') return { type: 'move', dRow: -1, dCol: 0 };
+  if (k === 'ArrowDown' || k === 'Enter') return { type: 'move', dRow: 1, dCol: 0 };
+  if (k === 'ArrowLeft') return { type: 'move', dRow: 0, dCol: -1 };
+  if (k === 'ArrowRight') return { type: 'move', dRow: 0, dCol: 1 };
+  if (k === 'Tab') return { type: 'move', dRow: 0, dCol: e.shiftKey ? -1 : 1 };
+  if (/^[0-9.,]$/.test(k)) return { type: 'edit', seed: k };
+  if (k === 'Delete' || k === 'Backspace') return { type: 'edit', seed: '0' };
+  return { type: 'none' };
+};
+
+// Чистая функция: применить сдвиг (dRow, dCol) к ячейке в сетке rows×cols.
+export const clampCell = (
+  prev: Cell | null,
+  dRow: number,
+  dCol: number,
+  rows: number,
+  cols: number,
+): Cell | null => {
+  if (!prev || rows === 0 || cols === 0) return prev;
+  return {
+    row: Math.max(0, Math.min(rows - 1, prev.row + dRow)),
+    col: Math.max(0, Math.min(cols - 1, prev.col + dCol)),
+  };
+};
+
 export type Nav = {
   active: Cell | null;
   isActive: (row: number, col: number) => boolean;
@@ -28,34 +61,15 @@ export const useKeyboard = (rows: number, cols: number): Nav => {
   }, []);
 
   const move = useCallback((dRow: number, dCol: number) => {
-    setActiveState((prev) => {
-      const { rows: r, cols: c } = dims.current;
-      if (!prev || r === 0 || c === 0) return prev;
-      const row = Math.max(0, Math.min(r - 1, prev.row + dRow));
-      const col = Math.max(0, Math.min(c - 1, prev.col + dCol));
-      return { row, col };
-    });
+    setActiveState((prev) => clampCell(prev, dRow, dCol, dims.current.rows, dims.current.cols));
     setEditSeed(null);
   }, []);
 
   const handleKey = useCallback(
     (e: { key: string; shiftKey: boolean }): 'moved' | 'edit' | null => {
-      const k = e.key;
-      if (k === 'ArrowUp') return move(-1, 0), 'moved';
-      if (k === 'ArrowDown' || k === 'Enter') return move(1, 0), 'moved';
-      if (k === 'ArrowLeft') return move(0, -1), 'moved';
-      if (k === 'ArrowRight') return move(0, 1), 'moved';
-      if (k === 'Tab') return move(0, e.shiftKey ? -1 : 1), 'moved';
-      // Печать цифры/разделителя → вход в редактирование с этим символом.
-      if (/^[0-9.,]$/.test(k)) {
-        setEditSeed(k);
-        return 'edit';
-      }
-      // Очистка ячейки.
-      if (k === 'Delete' || k === 'Backspace') {
-        setEditSeed('0');
-        return 'edit';
-      }
+      const action = keyAction(e);
+      if (action.type === 'move') return move(action.dRow, action.dCol), 'moved';
+      if (action.type === 'edit') { setEditSeed(action.seed); return 'edit'; }
       return null;
     },
     [move],

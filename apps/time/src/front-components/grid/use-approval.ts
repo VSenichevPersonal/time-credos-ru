@@ -22,6 +22,30 @@ type Args = {
   reload: () => Promise<void>;
 };
 
+// Чистая функция: карта projectId → требуется ли согласование.
+export const calcApprovalByProject = (
+  projects: ProjectRef[],
+  departments: DepartmentRef[],
+): Map<string, boolean> => {
+  const deptApproval = new Map(departments.map((d) => [d.id, d.approvalRequired]));
+  const map = new Map<string, boolean>();
+  for (const p of projects) {
+    const dept = p.departmentId ? deptApproval.get(p.departmentId) ?? null : null;
+    map.set(p.id, isApprovalRequired(p.approvalRequired, dept));
+  }
+  return map;
+};
+
+// Чистая функция: агрегированный статус периода.
+// Приоритет: REJECTED > SUBMITTED > APPROVED > DRAFT > none.
+export const calcPeriodStatus = (tracked: ApiEntry[]): PeriodStatus => {
+  if (tracked.length === 0) return 'none';
+  if (tracked.some((e) => e.status === ENTRY_STATUS.REJECTED)) return 'REJECTED';
+  if (tracked.some((e) => e.status === ENTRY_STATUS.SUBMITTED)) return 'SUBMITTED';
+  if (tracked.every((e) => e.status === ENTRY_STATUS.APPROVED)) return 'APPROVED';
+  return 'DRAFT';
+};
+
 export const useApproval = ({
   entries,
   projects,
@@ -33,16 +57,10 @@ export const useApproval = ({
 }: Args) => {
   const [busy, setBusy] = useState(false);
 
-  // Карта projectId → требуется ли согласование (резолв проект+отдел).
-  const approvalByProject = useMemo(() => {
-    const deptApproval = new Map(departments.map((d) => [d.id, d.approvalRequired]));
-    const map = new Map<string, boolean>();
-    for (const p of projects) {
-      const dept = p.departmentId ? deptApproval.get(p.departmentId) ?? null : null;
-      map.set(p.id, isApprovalRequired(p.approvalRequired, dept));
-    }
-    return map;
-  }, [projects, departments]);
+  const approvalByProject = useMemo(
+    () => calcApprovalByProject(projects, departments),
+    [projects, departments],
+  );
 
   // Записи периода, по проектам которых требуется согласование.
   const tracked = useMemo(
@@ -62,14 +80,7 @@ export const useApproval = ({
     [tracked],
   );
 
-  // Агрегированный статус периода для бейджа.
-  const periodStatus: PeriodStatus = useMemo(() => {
-    if (!required) return 'none';
-    if (tracked.some((e) => e.status === ENTRY_STATUS.REJECTED)) return 'REJECTED';
-    if (submittedIds.length > 0) return 'SUBMITTED';
-    if (tracked.every((e) => e.status === ENTRY_STATUS.APPROVED)) return 'APPROVED';
-    return 'DRAFT';
-  }, [required, tracked, submittedIds]);
+  const periodStatus: PeriodStatus = useMemo(() => calcPeriodStatus(tracked), [tracked]);
 
   const wrap = useCallback(
     async (fn: () => Promise<void>) => {

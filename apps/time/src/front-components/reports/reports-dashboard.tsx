@@ -68,9 +68,11 @@ const pickRows = (
   data: ReturnType<typeof useReports>['data'],
 ): ReportRow[] => {
   if (!data) return [];
-  if (groupBy === 'project') return data.byProject;
-  if (groupBy === 'employee') return data.byEmployee;
-  return data.byDept;
+  // `?? []` — защита от ответа без 3-срезовых массивов (напр. OLAP-форма):
+  // BreakdownTable делает rows.map, undefined уронил бы виджет.
+  if (groupBy === 'project') return data.byProject ?? [];
+  if (groupBy === 'employee') return data.byEmployee ?? [];
+  return data.byDept ?? [];
 };
 
 export const ReportsDashboard = () => {

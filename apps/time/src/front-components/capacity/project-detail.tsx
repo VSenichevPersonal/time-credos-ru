@@ -3,6 +3,7 @@ import { DeptPlanRow } from 'src/front-components/capacity/dept-plan-row';
 import { ProjectPlanRow } from 'src/front-components/capacity/project-plan-row';
 import type {
   CapProject,
+  DeptPlan,
   DeptPlanLoad,
   Period,
   ProjectLoad,
@@ -22,6 +23,7 @@ type Props = {
   nameWidth: number;
   planning?: boolean;
   onSave?: (id: string, patch: ProjectPatch) => Promise<boolean>;
+  onSaveDeptPlan?: (id: string, patch: ProjectPatch) => Promise<boolean>; // REQ-0012
 };
 
 // UX-5: name уже содержит «КОД · Клиент · Название» — показываем как есть.
@@ -29,17 +31,33 @@ const title = (p: CapProject): string => p.name;
 
 const cellNum = (v: number): string => (v > 0 ? String(Math.round(v)) : '');
 
-// Режим планирования: единый список редактируемых строк (план + без плана).
+// План отдела без проекта → форма проекта (те же поля plannedEffort/start/end).
+const planAsProject = (p: DeptPlan): CapProject => ({
+  id: p.id,
+  code: null,
+  name: p.label || 'Без проекта',
+  departmentId: p.departmentId,
+  plannedEffort: p.plannedEffort,
+  startDate: p.startDate,
+  endDate: p.endDate,
+});
+
+// Режим планирования: редактируемые строки проектов + (REQ-0012) планы без проекта.
 const PlanningList = ({
   planned,
   unplanned,
+  deptPlans,
   nameWidth,
   periods,
   onSave,
-}: Required<Pick<Props, 'planned' | 'unplanned' | 'nameWidth' | 'periods' | 'onSave'>>) => {
+  onSaveDeptPlan,
+}: Required<Pick<Props, 'planned' | 'unplanned' | 'nameWidth' | 'periods' | 'onSave'>> & {
+  deptPlans: DeptPlanLoad[];
+  onSaveDeptPlan?: Props['onSaveDeptPlan'];
+}) => {
   const projects = [...planned.map((pl) => pl.project), ...unplanned];
   const fieldsWidth = Math.max(280, periods.length * 56);
-  if (projects.length === 0) {
+  if (projects.length === 0 && deptPlans.length === 0) {
     return (
       <div style={{ padding: '6px 12px 6px 28px', fontSize: 11.5, color: T.textFaint, background: T.rowAlt }}>
         Нет проектов отдела для планирования
@@ -57,6 +75,22 @@ const PlanningList = ({
           onSave={onSave}
         />
       ))}
+      {deptPlans.length > 0 && onSaveDeptPlan && (
+        <>
+          <div style={{ padding: '6px 12px 4px 28px', fontSize: 11, fontWeight: 600, color: T.textMuted, background: T.rowAlt }}>
+            Без проекта (резерв / бронь)
+          </div>
+          {deptPlans.map((load) => (
+            <ProjectPlanRow
+              key={load.plan.id}
+              project={planAsProject(load.plan)}
+              nameWidth={nameWidth}
+              fieldsWidth={fieldsWidth}
+              onSave={onSaveDeptPlan}
+            />
+          ))}
+        </>
+      )}
     </div>
   );
 };
@@ -69,15 +103,18 @@ export const ProjectDetail = ({
   nameWidth,
   planning,
   onSave,
+  onSaveDeptPlan,
 }: Props) => {
   if (planning && onSave) {
     return (
       <PlanningList
         planned={planned}
         unplanned={unplanned}
+        deptPlans={deptPlans}
         nameWidth={nameWidth}
         periods={periods}
         onSave={onSave}
+        onSaveDeptPlan={onSaveDeptPlan}
       />
     );
   }

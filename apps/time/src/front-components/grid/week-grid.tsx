@@ -1,7 +1,10 @@
+import { useState } from 'react';
+
 import { GridRow } from 'src/front-components/grid/grid-row';
 import { WeekHeader } from 'src/front-components/grid/week-header';
 import { FooterTotals } from 'src/front-components/grid/footer-totals';
 import { AddRow } from 'src/front-components/grid/add-row';
+import type { Prefill } from 'src/front-components/grid/add-row';
 import { Center } from 'src/front-components/grid/center';
 import { useKeyboard } from 'src/front-components/grid/use-keyboard';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
@@ -19,6 +22,7 @@ type Props = {
   projects: ProjectRef[];
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
+  lastWorkTypeByProject?: Record<string, string>;
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
@@ -33,12 +37,18 @@ export const WeekGrid = ({
   projects,
   workTypes,
   recentProjectIds,
+  lastWorkTypeByProject,
   loading,
   onCellCommit,
   onBulkFill,
   onAddRow,
 }: Props) => {
   const nav = useKeyboard(rowList.length, 7);
+
+  // W3-1: «Дублировать строку» → префилл проекта в форму добавления (AddRow).
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
+  const duplicateRow = (projectId: string) =>
+    setPrefill({ projectId, nonce: Date.now() });
 
   // Shift+Enter на активной ячейке: bulk-fill её значения на будни строки.
   // Слушаем onKeyDown на контейнере (React-событие), а НЕ window.addEventListener:
@@ -77,6 +87,7 @@ export const WeekGrid = ({
               alt={i % 2 === 1}
               nav={nav}
               onCellCommit={(dayIso, hours) => onCellCommit(row.key, dayIso, hours)}
+              onDuplicate={() => duplicateRow(row.projectId)}
             />
           ))
         )}
@@ -86,6 +97,8 @@ export const WeekGrid = ({
         projects={projects}
         workTypes={workTypes}
         recentProjectIds={recentProjectIds}
+        lastWorkTypeByProject={lastWorkTypeByProject}
+        prefill={prefill}
         onAdd={onAddRow}
       />
     </>

@@ -1,4 +1,5 @@
 import type {
+  Absence,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -80,9 +81,104 @@ export const buildPeriods = (
   return periods;
 };
 
-// Ёмкость отдела за период = рабочие часы периода × headcount × коэффициент.
-export const deptCapacity = (dept: DeptRef, period: Period): number =>
-  period.workHours * dept.headcount * dept.capacityFactor;
+// ===========================================================================
+// W3-1: вычет отсутствий из ёмкости доски.
+// Образец логики — reports-calc.ts (норма /s/reports вычитает рабочие часы
+// отсутствий по дате). На доске нет dayType: рабочие часы дня берём из календаря
+// напрямую (выходные/праздники в нём = 0 → не вычитаются). Сверка с Timetta:
+// доступная ёмкость уменьшается на отпуска/больничные.
+// ===========================================================================
+
+// Карта YYYY-MM-DD → рабочих часов дня (из календаря). Дни вне диапазона
+// календаря/выходные отсутствуют или равны 0 → вычет по ним = 0 (деградация).
+export const buildHoursByDay = (calendar: CalendarDay[]): Map<string, number> => {
+  const m = new Map<string, number>();
+  for (const c of calendar) m.set(c.date, (m.get(c.date) ?? 0) + (c.hours ?? 0));
+  return m;
+};
+
+// Часы ОДНОГО отсутствия, попадающие в колонку: Σ рабочих часов календаря по
+// дням пересечения [startDate, endDate] отсутствия и [from, to] периода.
+export const absenceHoursInPeriod = (
+  absence: Absence,
+  hoursByDay: Map<string, number>,
+  period: Period,
+): number => {
+  const start = absence.startDate ? absence.startDate.slice(0, 10) : null;
+  if (!start) return 0;
+  const end = (absence.endDate ? absence.endDate.slice(0, 10) : null) ?? start;
+  if (end < start) return 0;
+  const lo = dateKey(period.from);
+  const hi = dateKey(period.to);
+  let sum = 0;
+  for (const [day, h] of hoursByDay) {
+    if (day < start || day > end) continue;
+    if (day < lo || day > hi) continue;
+    sum += h;
+  }
+  return sum;
+};
+
+// Карта employeeId → часы его отсутствий, попавшие в период (по всем отсутствиям).
+export const absenceHoursByEmpInPeriod = (
+  absences: Absence[],
+  hoursByDay: Map<string, number>,
+  period: Period,
+): Map<string, number> => {
+  const out = new Map<string, number>();
+  for (const a of absences) {
+    if (!a.employeeId) continue;
+    const h = absenceHoursInPeriod(a, hoursByDay, period);
+    if (h > 0) out.set(a.employeeId, (out.get(a.employeeId) ?? 0) + h);
+  }
+  return out;
+};
+
+// Контекст вычета отсутствий, собираемый в UI один раз на загрузку доски.
+// employees нужны, чтобы агрегировать часы отсутствий по отделу (employeeId →
+// departmentId). Опционален во всех расчётах — без него поведение прежнее.
+export type AbsenceCtx = {
+  absences: Absence[];
+  employees: EmployeeRef[];
+  hoursByDay: Map<string, number>;
+};
+
+export const buildAbsenceCtx = (
+  absences: Absence[],
+  employees: EmployeeRef[],
+  calendar: CalendarDay[],
+): AbsenceCtx => ({
+  absences,
+  employees,
+  hoursByDay: buildHoursByDay(calendar),
+});
+
+// Часы отсутствий отдела за период = Σ часов отсутствий его сотрудников.
+const deptAbsenceHours = (
+  dept: DeptRef,
+  ctx: AbsenceCtx | undefined,
+  period: Period,
+): number => {
+  if (!ctx) return 0;
+  const byEmp = absenceHoursByEmpInPeriod(ctx.absences, ctx.hoursByDay, period);
+  let sum = 0;
+  for (const e of ctx.employees) {
+    if (e.departmentId === dept.id) sum += byEmp.get(e.id) ?? 0;
+  }
+  return sum;
+};
+
+// Ёмкость отдела за период = рабочие часы периода × headcount × коэффициент,
+// уменьшенная на часы отсутствий сотрудников отдела (не ниже 0). Без ctx —
+// прежняя формула (обратная совместимость UI до проводки отсутствий).
+export const deptCapacity = (
+  dept: DeptRef,
+  period: Period,
+  ctx?: AbsenceCtx,
+): number => {
+  const base = period.workHours * dept.headcount * dept.capacityFactor;
+  return Math.max(0, base - deptAbsenceHours(dept, ctx, period));
+};
 
 // Раскид плановых часов РАВНОМЕРНО по календарным дням диапазона [startDate,
 // endDate], пересечённым с колонкой периода. Общая логика для проектов и плановых
@@ -133,9 +229,10 @@ export const deptLoadCells = (
   projects: CapProject[],
   periods: Period[],
   deptPlans: DeptPlan[] = [],
+  ctx?: AbsenceCtx,
 ): LoadCell[] =>
   periods.map((period) => {
-    const capacity = deptCapacity(dept, period);
+    const capacity = deptCapacity(dept, period, ctx);
     let load = 0;
     for (const p of projects) {
       if (p.departmentId === dept.id) load += projectHoursInPeriod(p, period);
@@ -156,11 +253,18 @@ export const employeeLoadCells = (
   projects: CapProject[],
   periods: Period[],
   deptPlans: DeptPlan[] = [],
+  ctx?: AbsenceCtx,
 ): LoadCell[] => {
   const factor = dept?.capacityFactor ?? 0.8;
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
   return periods.map((period) => {
-    const capacity = period.workHours * factor;
+    // W3-1: личная ёмкость уменьшается на часы отсутствий ЭТОГО сотрудника
+    // (не ниже 0). Без ctx — прежняя формула.
+    const baseCapacity = period.workHours * factor;
+    const absHours = ctx
+      ? absenceHoursByEmpInPeriod(ctx.absences, ctx.hoursByDay, period).get(employee.id) ?? 0
+      : 0;
+    const capacity = Math.max(0, baseCapacity - absHours);
     let deptLoad = 0;
     if (dept) {
       for (const p of projects) {

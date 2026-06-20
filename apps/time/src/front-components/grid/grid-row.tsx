@@ -20,6 +20,7 @@ type Props = {
   alt: boolean;
   nav: Nav;
   onCellCommit: (dayIso: string, hours: number) => void;
+  onDuplicate?: () => void; // W3-1: дублировать строку (тот же проект, новый вид работ)
 };
 
 export const GridRow = ({
@@ -33,6 +34,7 @@ export const GridRow = ({
   alt,
   nav,
   onCellCommit,
+  onDuplicate,
 }: Props) => (
   <div
     style={{
@@ -64,10 +66,12 @@ export const GridRow = ({
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            flex: 1,
           }}
         >
           {projectName}
         </div>
+        {onDuplicate && <DuplicateButton onClick={onDuplicate} />}
       </div>
       <div
         title={workTypeName}
@@ -113,4 +117,34 @@ export const GridRow = ({
       {fmtTotal(rowTotal)}
     </div>
   </div>
+);
+
+// W3-1 (Kimai Duplicate): иконка «⧉» — дублировать строку. Подставляет тот же
+// проект в форму добавления ниже, вид работ и часы вводятся заново.
+const DuplicateButton = ({ onClick }: { onClick: () => void }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    title="Дублировать строку: тот же проект, выберите вид работ"
+    aria-label="Дублировать строку"
+    style={{
+      flexShrink: 0,
+      width: 22,
+      height: 22,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 0,
+      border: 'none',
+      borderRadius: 6,
+      background: 'transparent',
+      color: T.textMuted,
+      cursor: 'pointer',
+      fontSize: 13,
+      lineHeight: 1,
+      fontFamily: 'inherit',
+    }}
+  >
+    ⧉
+  </button>
 );

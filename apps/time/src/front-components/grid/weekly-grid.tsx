@@ -77,6 +77,20 @@ export const WeeklyGrid = () => {
     return seen.slice(0, 5);
   }, [rowList]);
 
+  // W3-5: проект → последний использованный вид работ (по самой свежей записи).
+  const lastWorkTypeByProject = useMemo(() => {
+    const latest: Record<string, { date: string; wt: string }> = {};
+    for (const e of data.entries) {
+      if (!e.projectId || !e.workTypeId) continue;
+      const d = e.date.slice(0, 10);
+      const cur = latest[e.projectId];
+      if (!cur || d >= cur.date) latest[e.projectId] = { date: d, wt: e.workTypeId };
+    }
+    const map: Record<string, string> = {};
+    for (const pid of Object.keys(latest)) map[pid] = latest[pid].wt;
+    return map;
+  }, [data.entries]);
+
   const addRow = (key: string) =>
     setExtraRowKeys((prev) => [...new Set([...prev, key])]);
 
@@ -147,6 +161,7 @@ export const WeeklyGrid = () => {
           projects={visibleProjects}
           workTypes={visibleWorkTypes}
           recentProjectIds={recentProjectIds}
+          lastWorkTypeByProject={lastWorkTypeByProject}
           loading={data.loading}
           onCellCommit={actions.commitCell}
           onBulkFill={actions.bulkFill}
@@ -162,6 +177,7 @@ export const WeeklyGrid = () => {
           projects={visibleProjects}
           workTypes={visibleWorkTypes}
           recentProjectIds={recentProjectIds}
+          lastWorkTypeByProject={lastWorkTypeByProject}
           loading={data.loading}
           onCellCommit={actions.commitCell}
           onAddRow={addRow}
@@ -175,6 +191,7 @@ export const WeeklyGrid = () => {
           projects={visibleProjects}
           workTypes={visibleWorkTypes}
           recentProjectIds={recentProjectIds}
+          lastWorkTypeByProject={lastWorkTypeByProject}
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
           loading={data.loading}

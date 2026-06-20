@@ -25,9 +25,12 @@ export const CapacityBoard = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
 
-  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, reloadProjects } =
+  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, reloadProjects, reloadDeptPlans } =
     useCapacity(granularity);
-  const { save, status: saveStatus, error: saveError } = usePlanEdit(reloadProjects);
+  const { save, saveDeptPlan, status: saveStatus, error: saveError } = usePlanEdit(
+    reloadProjects,
+    reloadDeptPlans,
+  );
 
   // Режим планирования живёт только в срезе «Отделы» (детализация по проектам).
   const effectiveAxis: CapAxis = planning ? 'dept' : axis;
@@ -123,6 +126,7 @@ export const CapacityBoard = () => {
                 onToggle={toggle}
                 planning={planning}
                 onSavePlan={save}
+                onSaveDeptPlan={saveDeptPlan}
               />
             ) : employees.length === 0 ? (
               <Center>Нет сотрудников для среза «по людям»</Center>

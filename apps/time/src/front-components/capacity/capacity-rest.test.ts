@@ -6,7 +6,7 @@ vi.mock('twenty-client-sdk/rest', () => ({
   RestApiClient: vi.fn().mockImplementation(() => ({ get: mockGet })),
 }));
 
-import { resolveSelfIsManager } from './capacity-rest';
+import { fetchAbsences, resolveSelfIsManager } from './capacity-rest';
 
 // Формат ответа capacity-rest: { data: { credosTimeEmployees: [...] } }
 const empResp = (employees: object[]) => ({
@@ -76,5 +76,38 @@ describe('resolveSelfIsManager — без workspaceMemberRef (null)', () => {
   it('null fallback → пустой список → false (нет руководителей)', async () => {
     mockGet.mockResolvedValueOnce(empResp([]));
     expect(await resolveSelfIsManager(null)).toBe(false);
+  });
+});
+
+describe('fetchAbsences — W3-1', () => {
+  const absResp = (absences: object[]) => ({
+    data: { credosTimeAbsences: absences },
+  });
+
+  it('фильтрует пересечением с горизонтом (endDate>=from, startDate<=to) и мапит поля', async () => {
+    mockGet.mockResolvedValueOnce(
+      absResp([
+        { employeeId: 'e1', startDate: '2026-06-01T10:00:00.000Z', endDate: '2026-06-10T10:00:00.000Z' },
+        { employeeId: null, startDate: null, endDate: null },
+      ]),
+    );
+    const result = await fetchAbsences('2026-06-01', '2026-09-30');
+    expect(result).toEqual([
+      { employeeId: 'e1', startDate: '2026-06-01T10:00:00.000Z', endDate: '2026-06-10T10:00:00.000Z' },
+      { employeeId: null, startDate: null, endDate: null },
+    ]);
+    expect(mockGet).toHaveBeenCalledWith(
+      '/rest/credosTimeAbsences',
+      expect.objectContaining({
+        query: expect.objectContaining({
+          filter: 'endDate[gte]:2026-06-01,startDate[lte]:2026-09-30',
+        }),
+      }),
+    );
+  });
+
+  it('пустой ответ → []', async () => {
+    mockGet.mockResolvedValueOnce(absResp([]));
+    expect(await fetchAbsences('2026-06-01', '2026-09-30')).toEqual([]);
   });
 });
