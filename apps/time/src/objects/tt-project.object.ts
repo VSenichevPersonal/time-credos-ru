@@ -1,0 +1,175 @@
+import {
+  defineObject,
+  FieldType,
+  NumberDataType,
+  OnDeleteAction,
+  RelationType,
+  STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS,
+} from 'twenty-sdk/define';
+
+import {
+  PROJECT_CATEGORY_DEFAULT,
+  PROJECT_STATUS_DEFAULT,
+  PROJECT_STATUS_OPTIONS,
+  WORK_CATEGORY_OPTIONS,
+} from 'src/constants/select-options';
+import {
+  TT_COMPANY_PROJECTS_FIELD_ID,
+  TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  TT_DEPARTMENT_PROJECTS_FIELD_ID,
+  TT_EMPLOYEE_MANAGED_PROJECTS_FIELD_ID,
+  TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+  TT_PROJECT_COMPANY_FIELD_ID,
+  TT_PROJECT_DEPARTMENT_FIELD_ID,
+  TT_PROJECT_MANAGER_FIELD_ID,
+  TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+} from 'src/constants/universal-identifiers';
+
+// Проект — развитая сущность со своей идентичностью (code/name), жизненным
+// циклом, этапами. Клиент читается из стандартного Company CRM.
+export default defineObject({
+  universalIdentifier: TT_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+  nameSingular: 'ttProject',
+  namePlural: 'ttProjects',
+  labelSingular: 'Проект',
+  labelPlural: 'Проекты',
+  description: 'Проект учёта трудозатрат',
+  icon: 'IconFolder',
+  fields: [
+    {
+      universalIdentifier: '1d862047-d899-450e-a565-95c028f9ce90',
+      name: 'code',
+      type: FieldType.TEXT,
+      label: 'Код проекта',
+      icon: 'IconHash',
+    },
+    {
+      universalIdentifier: '9630aaf0-7371-4d07-8754-bc1bc94887a0',
+      name: 'category',
+      type: FieldType.SELECT,
+      label: 'Категория работ',
+      icon: 'IconCategory',
+      defaultValue: PROJECT_CATEGORY_DEFAULT,
+      options: WORK_CATEGORY_OPTIONS,
+    },
+    {
+      universalIdentifier: 'bca013ca-1fef-44ce-b56a-8603618ef1c4',
+      name: 'billable',
+      type: FieldType.BOOLEAN,
+      label: 'Биллируемый',
+      icon: 'IconCoin',
+      defaultValue: true,
+    },
+    {
+      universalIdentifier: '8098049a-872d-4c33-8f27-f05d15a53cc1',
+      name: 'status',
+      type: FieldType.SELECT,
+      label: 'Статус',
+      icon: 'IconProgress',
+      defaultValue: PROJECT_STATUS_DEFAULT,
+      options: PROJECT_STATUS_OPTIONS,
+    },
+    {
+      universalIdentifier: '3f9b3e3d-0d24-4b30-953e-5cce9eb66c77',
+      name: 'startDate',
+      type: FieldType.DATE_TIME,
+      label: 'Дата начала',
+      icon: 'IconCalendar',
+      isNullable: true,
+      defaultValue: null,
+    },
+    {
+      universalIdentifier: 'e8e46a47-b290-4350-972a-66025062005c',
+      name: 'endDate',
+      type: FieldType.DATE_TIME,
+      label: 'Дата окончания',
+      icon: 'IconCalendar',
+      isNullable: true,
+      defaultValue: null,
+    },
+    {
+      universalIdentifier: '4f202b64-a1cb-4e88-a917-06d9931ab489',
+      name: 'plannedHours',
+      type: FieldType.NUMBER,
+      label: 'Плановые часы',
+      icon: 'IconClockHour4',
+      isNullable: true,
+      defaultValue: null,
+      universalSettings: { dataType: NumberDataType.FLOAT, decimals: 2 },
+    },
+    {
+      universalIdentifier: 'a4434ce3-f3eb-4bb7-a937-ccae805971a3',
+      name: 'approvalRequired',
+      type: FieldType.BOOLEAN,
+      label: 'Требуется согласование',
+      icon: 'IconChecks',
+      description: 'Пусто = наследует настройку отдела',
+      isNullable: true,
+      defaultValue: null,
+    },
+    {
+      universalIdentifier: 'e52a6c2f-0cc4-4601-8aa8-239d01bc8774',
+      name: 'serviceRef',
+      type: FieldType.TEXT,
+      label: 'Типовая услуга (каталог)',
+      icon: 'IconBriefcase',
+      description: 'Задел под каталог услуг (фаза 2)',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // Project.company -> стандартный Company (MANY_TO_ONE, nullable).
+    {
+      universalIdentifier: TT_PROJECT_COMPANY_FIELD_ID,
+      name: 'company',
+      type: FieldType.RELATION,
+      label: 'Клиент',
+      icon: 'IconBuildingSkyscraper',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.company.universalIdentifier,
+      relationTargetFieldMetadataUniversalIdentifier: TT_COMPANY_PROJECTS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'companyId',
+      },
+    },
+    // Project.department -> Department.projects (MANY_TO_ONE).
+    {
+      universalIdentifier: TT_PROJECT_DEPARTMENT_FIELD_ID,
+      name: 'department',
+      type: FieldType.RELATION,
+      label: 'Отдел',
+      icon: 'IconBuilding',
+      relationTargetObjectMetadataUniversalIdentifier:
+        TT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        TT_DEPARTMENT_PROJECTS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'departmentId',
+      },
+    },
+    // Project.manager -> Employee.managedProjects (MANY_TO_ONE, nullable).
+    {
+      universalIdentifier: TT_PROJECT_MANAGER_FIELD_ID,
+      name: 'manager',
+      type: FieldType.RELATION,
+      label: 'Руководитель проекта',
+      icon: 'IconUserStar',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        TT_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        TT_EMPLOYEE_MANAGED_PROJECTS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'managerId',
+      },
+    },
+    // Обратные стороны (ONE_TO_MANY) вынесены в src/fields/ для лимита размера:
+    // project-stages, project-time-entries, project-billing-links.
+  ],
+});
