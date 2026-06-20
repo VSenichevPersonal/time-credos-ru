@@ -4,10 +4,14 @@ import {
   APP_DESCRIPTION,
   APP_DISPLAY_NAME,
   APPLICATION_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_SETTINGS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 export default defineApplication({
   universalIdentifier: APPLICATION_UNIVERSAL_IDENTIFIER,
   displayName: APP_DISPLAY_NAME,
   description: APP_DESCRIPTION,
+  // Подраздел Settings → «Настройки Time Credos» (S1-D1).
+  settingsCustomTabFrontComponentUniversalIdentifier:
+    CREDOS_TIME_SETTINGS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
 });

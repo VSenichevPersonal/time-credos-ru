@@ -259,7 +259,14 @@ async function run() {
   const byStatus = {};
   for (const s of after) byStatus[s.status] = (byStatus[s.status] || 0) + 1;
   console.log(`  по статусам: ${JSON.stringify(byStatus)}`);
-  console.log('\nГотово.');
+
+  // Инвариант: этап обязан быть привязан к существующему проекту (нет orphan).
+  // Совпадает с моделью credosTimeStage.project (isNullable:false, CASCADE).
+  if (badProj > 0) {
+    console.error(`\nОШИБКА ИНВАРИАНТА: ${badProj} этап(ов) без валидного projectId (orphan). Сид невалиден.`);
+    process.exit(1);
+  }
+  console.log('\nГотово. Orphan-этапов нет ✅');
 }
 
 run().catch((e) => {

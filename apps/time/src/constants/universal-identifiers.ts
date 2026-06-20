@@ -324,3 +324,19 @@ export const CREDOS_TIME_ABSENCE_NAV_UNIVERSAL_IDENTIFIER =
   'ba7945fb-3712-458e-a3c4-63e63988f778';
 // Обратная сторона Absence.employee на Employee (ONE_TO_MANY).
 export const CREDOS_TIME_EMPLOYEE_ABSENCES_FIELD_ID = 'f2e7b344-8634-4f5e-bccf-c3779af0694d';
+
+// --- S1 (SETTINGS): подраздел Settings «Настройки Time Credos» (front-компонент, Dev1) ---
+export const CREDOS_TIME_SETTINGS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  'f1a2b3c4-5d6e-4f70-8a91-b2c3d4e5f6a7';
+
+// --- CAL-D1 (CALENDAR): помесячный производственный календарь (front + страница, Dev1) ---
+export const CALENDAR_MONTHLY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  '0b1c2d3e-4f50-4617-8829-9a0b1c2d3e4f';
+export const CALENDAR_MONTHLY_NAV_UNIVERSAL_IDENTIFIER =
+  '1c2d3e4f-5061-4728-9930-ab1c2d3e4f50';
+export const CALENDAR_MONTHLY_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER =
+  '2d3e4f50-6172-4839-8a41-bc2d3e4f5061';
+export const CALENDAR_MONTHLY_PAGE_LAYOUT_TAB_UNIVERSAL_IDENTIFIER =
+  '3e4f5061-7283-494a-9b52-cd3e4f506172';
+export const CALENDAR_MONTHLY_PAGE_WIDGET_UNIVERSAL_IDENTIFIER =
+  '4f506172-8394-4a5b-8c63-de4f50617283';

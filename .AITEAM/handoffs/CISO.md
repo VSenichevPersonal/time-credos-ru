@@ -12,10 +12,28 @@
 ## Контекст рисков (специфика проекта)
 
 - **Внутренний инструмент**, 15-20 пользователей, dev-среда — внешней поверхности атаки мало. Главный риск — **PII и конфиденциальность трудозатрат**.
-- **152-ФЗ:** персональные данные сотрудников (ФИО, отдел, профиль `credosTimeEmployee`, ссылки на `WorkspaceMember`). Трудозатраты = чувствительная HR/коммерческая инфа.
+- **152-ФЗ:** персональные данные сотрудников (ФИО, отдел, профиль `credosTimeEmployee`, ссылки на `WorkspaceMember`). Трудозатраты = чувствительная HR/коммерческая инфа. **Прод-гейт: хостинг в РФ-контуре** (152-ФЗ ст. 18.5, сейчас Railway = блокер).
 - **Auth/RBAC через платформу** (ADR-0001: central IdP). Приложение определяет свои **роли** (`apps/time/src/roles/`) — кто видит/правит трудозатраты, кто согласует (approval).
 - **Общий workspace** с CRM и app catalog → разграничение доступа к общим мастер-данным (Department/Employee).
 - **Секреты:** Railway-токены/`APP_SECRET` — только в `.env`/Railway, не в git. Аудит что не утекли.
+- **Logic-functions** работают под `TWENTY_APP_ACCESS_TOKEN` (широкий сервис-токен) → сами авторизуют вызывающего. Нет server-side маппинга `userWorkspaceId→workspaceMember` (CISO-005, P1 блокер).
+
+## Текущий posture (актуально на 2026-06-20)
+
+**🟡 LOW-MEDIUM.** Posture: 2× P1 + 3× P2 + 2× P3. ADR-0001..0006 ревьюированы.
+
+| ID | Sev | Статус | Суть |
+|---|---|---|---|
+| CISO-001 | P1 | MITIGATING | ПДн-дампы сняты с git ✅; seed-real.mjs + история — Dev2/arch |
+| CISO-002 | P2 | OPEN | approval без авторизации actor (зависит от CISO-005) |
+| CISO-003 | P3 | ACCEPTED (dev) | manager.role без field-level прав |
+| CISO-004 | P2 | OPEN | ADR-0003: Employee PII видна catalog/Sales |
+| CISO-005 | P1 | OPEN | time-entry-api: client-supplied identity → impersonation |
+| CISO-006 | P2 | OPEN | filter injection в 3 logic-functions |
+| CISO-007 | P2 | OPEN | /s/reports: byEmployee без role-guard |
+| CISO-008 | P3 | OPEN | absence.note → потенц. медПДн |
+
+**Ключевой блокер:** CISO-005 (нет server-side identity) блокирует полноценный fix CISO-002/006/007.
 
 ## Зона ответственности
 

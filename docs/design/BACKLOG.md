@@ -31,6 +31,7 @@
 | UI-D | Цвет-кодинг проектов (grid-часть; capacity/reports — второй фронт) | 🟡 | TODO |
 | QA-CALC | Вынести pure-calc из `use-week`/`use-grid-model` в `grid/week-calc.ts` (под unit QA) | 🟡 | TODO (arch-ok, волна-3) |
 | currentStage | Дефолт «текущий этап» (ACTIVE / дата в [start,end]) в гриде | 🟡 | TODO (research, ждёт раздачу arch; бэк `currentStage()` — Dev 2) |
+| DP-0002 | **Объяснимые числа (click-to-explain / drilldown)** — по каждой цифре в Отчётах И Планировании клик → формула + состав. Спека [DP-0002](proposals/DP-0002-explainable-numbers-drilldown.md). Кросс-зона: P0 shared `<Explainable>` (я) → P1 reports/capacity (второй фронт) + grid-тоталы (я). | 🔴 | PROPOSED (ждёт раздачу arch) |
 | FE-3 | Карточка проекта «Трудозатраты»: проверить инлайн-таблицу в UI, стилизация | 🟢 | TODO (верифицировать) |
 | FE-4 | Ревизия вкладок карточек на табличный вью | 🟢 | TODO |
 

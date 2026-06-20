@@ -31,7 +31,18 @@ export type RawDepartment = {
   capacityFactor: number | null;
   headcount: number | null;
 };
-export type RawCalendarDay = { hours: number | null; dayType: string | null };
+// date нужен для пересечения дней календаря с периодом отсутствия (F-D phase2).
+// Если date == null — день учитывается в базовой норме, но НЕ может быть вычтен
+// отсутствием (нечего сопоставить по дате) → деградация безопасная.
+export type RawCalendarDay = { hours: number | null; dayType: string | null; date?: string | null };
+
+// Отсутствие сотрудника (отпуск/больничный/...). Период [startDate, endDate]
+// (включительно по дню) вычитает рабочие часы календаря из НОРМЫ сотрудника/отдела.
+export type RawAbsence = {
+  employeeId: string | null;
+  startDate: string | null;
+  endDate: string | null;
+};
 
 // Разбивка часов по категории (R3-D2): доля категории внутри строки.
 export type CategoryShare = { category: string; hours: number; share: number | null };
@@ -53,6 +64,7 @@ export type ReportsInput = {
   employees: RawEmployee[];
   departments: RawDepartment[];
   calendar: RawCalendarDay[];
+  absences?: RawAbsence[]; // F-D phase2: вычет рабочих часов отсутствий из нормы.
 };
 
 // Строка проекта + бюджет (F-A: план vs факт). budgetUsed = fact/plannedEffort.
@@ -85,28 +97,76 @@ export const finalize = (row: Row): Row => ({
   under: row.norm == null ? null : Number((row.norm - row.fact).toFixed(2)),
 });
 
+// Только день (YYYY-MM-DD) из ISO-строки/даты — для пересечения дней.
+const dayKey = (iso: string | null | undefined): string | null =>
+  iso ? iso.slice(0, 10) : null;
+
 export const computeReports = (
   input: ReportsInput,
   period: { from: string; to: string },
 ): ReportsResult => {
   const { entries, projects, employees, departments, calendar } = input;
+  const absences = input.absences ?? [];
 
-  // Базовая норма периода = Σ часов рабочих дней (WORKDAY|SHORT) производств. календаря.
-  const baseNorm = calendar
-    .filter((d) => WORKDAY_TYPES.has(d.dayType ?? ''))
-    .reduce((s, d) => s + (d.hours ?? 0), 0);
+  // Рабочие дни календаря (WORKDAY|SHORT). hoursByDay — для вычета отсутствий по дате.
+  const workdays = calendar.filter((d) => WORKDAY_TYPES.has(d.dayType ?? ''));
+  // Базовая норма периода = Σ часов рабочих дней производств. календаря.
+  const baseNorm = workdays.reduce((s, d) => s + (d.hours ?? 0), 0);
+  // Карта рабочий-день(YYYY-MM-DD) → часы дня (для пересечения с отсутствиями).
+  const hoursByDay = new Map<string, number>();
+  for (const d of workdays) {
+    const k = dayKey(d.date);
+    if (k) hoursByDay.set(k, (hoursByDay.get(k) ?? 0) + (d.hours ?? 0));
+  }
 
   const projById = new Map(projects.map((p) => [p.id, p]));
   const deptById = new Map(departments.map((d) => [d.id, d]));
   const empById = new Map(employees.map((e) => [e.id, e]));
 
+  // Часы отсутствий сотрудника = Σ часов рабочих дней календаря, попадающих в
+  // период любого его отсутствия [startDate, endDate] (по дню, включительно).
+  // Период отчёта уже ограничен (календарь грузится только за [from, to]) →
+  // пересечение с периодом обеспечивается составом hoursByDay. Дни вне рабочих
+  // (выходные/праздники) в hoursByDay отсутствуют → автоматически 0.
+  const periodFrom = dayKey(period.from);
+  const periodTo = dayKey(period.to);
+  const absenceHoursByEmp = new Map<string, number>();
+  for (const a of absences) {
+    if (!a.employeeId) continue;
+    const start = dayKey(a.startDate);
+    const end = dayKey(a.endDate) ?? start;
+    if (!start) continue;
+    let sum = 0;
+    for (const [day, h] of hoursByDay) {
+      if (day < start) continue;
+      if (end && day > end) continue;
+      if (periodFrom && day < periodFrom) continue;
+      if (periodTo && day > periodTo) continue;
+      sum += h;
+    }
+    if (sum > 0) absenceHoursByEmp.set(a.employeeId, (absenceHoursByEmp.get(a.employeeId) ?? 0) + sum);
+  }
+  // Часы отсутствий отдела = Σ по его сотрудникам.
+  const absenceHoursByDept = new Map<string, number>();
+  for (const e of employees) {
+    const h = absenceHoursByEmp.get(e.id) ?? 0;
+    if (h > 0 && e.departmentId)
+      absenceHoursByDept.set(e.departmentId, (absenceHoursByDept.get(e.departmentId) ?? 0) + h);
+  }
+
   const empName = (e: RawEmployee): string =>
     [e.lastName, e.firstName].filter(Boolean).join(' ') || e.id;
-  const deptNorm = (d: RawDepartment): number =>
-    baseNorm * (d.headcount ?? 0) * (d.capacityFactor ?? 1);
+  // Норма отдела = база × headcount × factor − часы отсутствий сотрудников отдела.
+  // Вычет не опускает норму ниже 0 (защита от переучёта отсутствий).
+  const deptNorm = (d: RawDepartment): number => {
+    const base = baseNorm * (d.headcount ?? 0) * (d.capacityFactor ?? 1);
+    return Math.max(0, base - (absenceHoursByDept.get(d.id) ?? 0));
+  };
+  // Личная норма = база × factor отдела − часы отсутствий сотрудника (не ниже 0).
   const empNorm = (e: RawEmployee): number => {
     const d = e.departmentId ? deptById.get(e.departmentId) : undefined;
-    return baseNorm * (d?.capacityFactor ?? 1);
+    const base = baseNorm * (d?.capacityFactor ?? 1);
+    return Math.max(0, base - (absenceHoursByEmp.get(e.id) ?? 0));
   };
 
   const isClient = (projectId: string | null): boolean =>

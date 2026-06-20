@@ -7,13 +7,15 @@ import {
   utilTone,
 } from 'src/front-components/reports/report-tokens';
 import { Bar } from 'src/front-components/reports/bar';
+import { CategoryBar, CategoryLegend } from 'src/front-components/reports/category-bar';
 import { departmentLabel } from 'src/constants/labels';
 import type { GroupBy, ReportRow } from 'src/front-components/reports/report-types';
 
-// Таблица среза (отдел/проект/человек): имя · бар загрузки · факт · утил · недогруз.
+// Таблица среза (отдел/проект/человек): имя · бар загрузки · структура категорий ·
+// факт · утил · недогруз. Категории — мини stacked-bar долей (byCategory) + легенда.
 // Для проектов нормы нет → бар = факт относительно макс. факта строк (визуальный масштаб).
 
-const COLS = '1fr 120px 72px 64px 84px';
+const COLS = '1fr 110px 132px 72px 64px 84px';
 
 const cell = (align: 'left' | 'right' = 'left') =>
   ({
@@ -43,6 +45,10 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
   // Масштаб бара: для отдела/человека — норма строки; для проекта — макс факт.
   const maxFact = Math.max(1, ...rows.map((r) => r.fact));
 
+  // Категории, встреченные в срезе (для легенды) — только если есть разбивка.
+  const present = new Set<string>();
+  for (const r of rows) for (const c of r.byCategory ?? []) present.add(c.category);
+
   if (rows.length === 0) {
     return (
       <div style={{ padding: 24, fontSize: 13, color: T.textMuted, textAlign: 'center' }}>
@@ -52,30 +58,32 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
   }
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: COLS,
-          height: 32,
-          position: 'sticky',
-          top: 0,
-          background: T.headerBg,
-          borderBottom: `1px solid ${T.borderStrong}`,
-          fontSize: 11.5,
-          fontWeight: 600,
-          color: T.textMuted,
-          zIndex: 1,
-        }}
-      >
-        <span style={cell()}>
-          {groupBy === 'dept' ? 'Отдел' : groupBy === 'project' ? 'Проект' : 'Сотрудник'}
-        </span>
-        <span style={cell()}>Загрузка</span>
-        <span style={cell('right')}>Факт, ч</span>
-        <span style={cell('right')}>Утил.</span>
-        <span style={cell('right')}>Недогруз</span>
-      </div>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: COLS,
+            height: 32,
+            position: 'sticky',
+            top: 0,
+            background: T.headerBg,
+            borderBottom: `1px solid ${T.borderStrong}`,
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: T.textMuted,
+            zIndex: 1,
+          }}
+        >
+          <span style={cell()}>
+            {groupBy === 'dept' ? 'Отдел' : groupBy === 'project' ? 'Проект' : 'Сотрудник'}
+          </span>
+          <span style={cell()}>Загрузка</span>
+          <span style={cell()}>Категории</span>
+          <span style={cell('right')}>Факт, ч</span>
+          <span style={cell('right')}>Утил.</span>
+          <span style={cell('right')}>Недогруз</span>
+        </div>
 
       {rows.map((r, i) => {
         const under = underTone(r.under);
@@ -98,6 +106,9 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
             <span style={cell()}>
               <Bar value={r.fact} max={barMax} />
             </span>
+            <span style={cell()}>
+              <CategoryBar parts={r.byCategory ?? []} />
+            </span>
             <span style={{ ...cell('right'), fontWeight: 600 }}>{fmtHrs(r.fact)}</span>
             <span style={{ ...cell('right'), color: utilTone(r.util) }}>{fmtUtil(r.util)}</span>
             <span
@@ -113,7 +124,9 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
             </span>
           </div>
         );
-      })}
+        })}
+      </div>
+      <CategoryLegend present={present} />
     </div>
   );
 };

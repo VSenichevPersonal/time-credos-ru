@@ -38,12 +38,12 @@ describe('util', () => {
 
 describe('finalize', () => {
   it('under = norm - fact', () => {
-    const r = finalize({ key: 'k', name: 'n', fact: 8, client: 6, norm: 15, util: null, under: null });
+    const r = finalize({ key: 'k', name: 'n', fact: 8, client: 6, norm: 15, util: null, under: null, byCategory: [] });
     expect(r.under).toBe(7);
     expect(r.util).toBe(0.75);
   });
   it('norm=null -> under=null', () => {
-    const r = finalize({ key: 'k', name: 'n', fact: 8, client: 6, norm: null, util: null, under: null });
+    const r = finalize({ key: 'k', name: 'n', fact: 8, client: 6, norm: null, util: null, under: null, byCategory: [] });
     expect(r.under).toBeNull();
   });
 });
@@ -184,6 +184,103 @@ describe('computeReports — util семантика + группировки (Q
     ];
     const res = computeReports(inp, PERIOD);
     expect(res.totals.fact).toBe(3);
+  });
+});
+
+// F-D phase2: отсутствия вычитают рабочие часы из нормы сотрудника/отдела.
+describe('computeReports — отсутствия→норма (F-D)', () => {
+  // Календарь с ДАТАМИ: 3 рабочих дня по 8ч = база 24ч.
+  const withDatedCalendar = (): ReportsInput => {
+    const inp = base();
+    inp.calendar = [
+      { hours: 8, dayType: 'WORKDAY', date: '2026-03-02T00:00:00.000Z' },
+      { hours: 8, dayType: 'WORKDAY', date: '2026-03-03T00:00:00.000Z' },
+      { hours: 8, dayType: 'WORKDAY', date: '2026-03-04T00:00:00.000Z' },
+      { hours: 0, dayType: 'WEEKEND', date: '2026-03-07T00:00:00.000Z' },
+    ];
+    return inp;
+  };
+
+  it('без отсутствий норма не меняется (обратная совместимость)', () => {
+    const res = computeReports(withDatedCalendar(), PERIOD);
+    expect(res.byEmployee[0].norm).toBe(24); // 3×8, без вычета
+    expect(res.byDept[0].norm).toBe(24);
+  });
+
+  it('отсутствие 2 рабочих дня вычитает 16ч из личной нормы и нормы отдела', () => {
+    const inp = withDatedCalendar();
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2026-03-02T00:00:00.000Z', endDate: '2026-03-03T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byEmployee[0].norm).toBe(8); // 24 − 16 (2 раб. дня)
+    expect(res.byDept[0].norm).toBe(8); // отдел = Σ по сотрудникам отдела
+    expect(res.byEmployee[0].under).toBe(0); // норма 8 − факт 8 = 0
+  });
+
+  it('выходной в периоде отсутствия не вычитается', () => {
+    const inp = withDatedCalendar();
+    // вт–сб: вычитает только раб. дни 03-03,03-04; выходной 03-07 = 0
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2026-03-03T00:00:00.000Z', endDate: '2026-03-07T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byEmployee[0].norm).toBe(8); // 24 − 16 (03-03 + 03-04)
+  });
+
+  it('отсутствие вне отчётного периода не вычитается', () => {
+    const inp = withDatedCalendar();
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2025-01-01T00:00:00.000Z', endDate: '2025-01-10T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD); // PERIOD = 2026 H1
+    expect(res.byEmployee[0].norm).toBe(24);
+  });
+
+  it('SHORT-день вычитается своими часами (7ч)', () => {
+    const inp = withDatedCalendar();
+    inp.calendar = [
+      { hours: 8, dayType: 'WORKDAY', date: '2026-03-02T00:00:00.000Z' },
+      { hours: 7, dayType: 'SHORT', date: '2026-03-03T00:00:00.000Z' },
+    ];
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2026-03-03T00:00:00.000Z', endDate: '2026-03-03T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byEmployee[0].norm).toBe(8); // база 15 − 7 (SHORT)
+  });
+
+  it('норма не уходит ниже 0 при отсутствии длиннее периода', () => {
+    const inp = withDatedCalendar();
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2026-01-01T00:00:00.000Z', endDate: '2026-12-31T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byEmployee[0].norm).toBe(0); // все раб. дни вычтены, не отрицательно
+  });
+
+  it('отсутствие другого сотрудника не трогает чужую норму', () => {
+    const inp = withDatedCalendar();
+    inp.employees = [
+      { id: 'e1', firstName: 'И', lastName: 'И', departmentId: 'd1' },
+      { id: 'e2', firstName: 'П', lastName: 'П', departmentId: 'd1' },
+    ];
+    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 1, headcount: 2 }];
+    inp.absences = [
+      { employeeId: 'e2', startDate: '2026-03-02T00:00:00.000Z', endDate: '2026-03-03T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byEmployee.find((e) => e.key === 'e1')?.norm).toBe(24); // e1 без отсутствия
+    expect(res.byDept[0].norm).toBe(32); // база 24×2=48 − 16 = 32
+  });
+
+  it('календарь без date — отсутствие нечего вычесть (безопасная деградация)', () => {
+    const inp = base(); // calendar без поля date
+    inp.absences = [
+      { employeeId: 'e1', startDate: '2026-03-02T00:00:00.000Z', endDate: '2026-03-03T23:59:59.000Z' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byEmployee[0].norm).toBe(15); // база 8+7, ничего не вычтено (нет дат)
   });
 });
 

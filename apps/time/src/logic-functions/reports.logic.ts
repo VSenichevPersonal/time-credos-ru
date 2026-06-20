@@ -5,6 +5,7 @@ import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/unive
 
 import {
   computeReports,
+  type RawAbsence,
   type RawCalendarDay,
   type RawDepartment,
   type RawEmployee,
@@ -104,7 +105,7 @@ const run = async (event: RoutePayload) => {
   const from = params.from ?? '1970-01-01T00:00:00.000Z';
   const to = params.to ?? '2999-12-31T23:59:59.999Z';
 
-  const [entries, projects, employees, departments, calendar] = await Promise.all([
+  const [entries, projects, employees, departments, calendar, absences] = await Promise.all([
     restGetAll<RawEntry>('credosTimeEntries', { filter: `date[gte]:${from},date[lte]:${to}` }),
     restGetAll<RawProject>('credosTimeProjects', {}),
     restGetAll<RawEmployee>('credosTimeEmployees', { filter: 'active[eq]:true' }),
@@ -112,10 +113,15 @@ const run = async (event: RoutePayload) => {
     restGetAll<RawCalendarDay>('credosTimeWorkdayCalendars', {
       filter: `date[gte]:${from},date[lte]:${to}`,
     }),
+    // F-D phase2: отсутствия, пересекающие период (startDate <= to AND endDate >= from).
+    // Вычитают рабочие часы своих дней из НОРМЫ сотрудника/отдела (см. reports-calc).
+    restGetAll<RawAbsence>('credosTimeAbsences', {
+      filter: `startDate[lte]:${to},endDate[gte]:${from}`,
+    }),
   ]);
 
   const result = computeReports(
-    { entries, projects, employees, departments, calendar },
+    { entries, projects, employees, departments, calendar, absences },
     { from, to },
   );
   return { ...result, groupBy: params.groupBy ?? null };

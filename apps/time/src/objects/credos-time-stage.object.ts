@@ -78,12 +78,16 @@ export default defineObject({
       universalSettings: { dataType: NumberDataType.FLOAT, decimals: 2 },
     },
     // Stage.project -> Project.stages (MANY_TO_ONE).
+    // ОБЯЗАТЕЛЬНАЯ связь: этап не существует без проекта (нет orphan-этапов).
+    // isNullable:false — нельзя создать/оставить этап без проекта; CASCADE — при
+    // удалении проекта его этапы удаляются.
     {
       universalIdentifier: CREDOS_TIME_STAGE_PROJECT_FIELD_ID,
       name: 'project',
       type: FieldType.RELATION,
       label: 'Проект',
       icon: 'IconFolder',
+      isNullable: false,
       relationTargetObjectMetadataUniversalIdentifier:
         CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:

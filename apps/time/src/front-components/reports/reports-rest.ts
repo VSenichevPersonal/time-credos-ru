@@ -18,7 +18,7 @@ const EMPTY = (
   ok: false,
   period: { from, to },
   groupBy: null,
-  totals: { key: 'total', name: '', fact: 0, client: 0, norm: null, util: null, under: null },
+  totals: { key: 'total', name: '', fact: 0, client: 0, norm: null, util: null, under: null, byCategory: [] },
   byDept: [],
   byProject: [],
   byEmployee: [],
