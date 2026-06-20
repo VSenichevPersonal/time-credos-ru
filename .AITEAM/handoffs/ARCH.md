@@ -46,6 +46,12 @@
 2. **Структура проекта — соблюдать и улучшать.** Код только в `apps/time/src/<тип>/`. Доки → `docs/<тема>/` (adr/architecture/data-model/standards/devops/security/requirements/domain/qa/catalog). Research → `research/`. Команда → `.AITEAM/`. Новый артефакт — в правильную папку, не в корень. Изменения структуры — в этот handoff + ADR.
 3. **Находки/грабли → в плейбуки/мануалы, не теряем в SIGNALS.** Технические → `docs/devops/PLAYBOOK.md §9`; код → `docs/standards/`; домен → `docs/data-model/`|`docs/domain/`. После волны — актуализировать `docs/STATUS.md`.
 4. **Безопасность/ПДн.** Перед пушем скан: токены (`eyJ`, `RAILWAY_TOKEN=`), ПДн (`@credos.ru`, ФИО). Секреты/ПДн в git недопустимы. Прод-gate 152-ФЗ (локализация РФ, ЛНА) — `docs/security/PII_152FZ_REVIEW.md`.
+5. **ПРИЁМКА по 4 осям — каждую фичу команды перед `[arch-ok]`/деплоем.** Не только код, но соответствие:
+   - **(а) ТЗ/требования:** `docs/requirements/REQ-*`, `docs/data-model/{DATA_MODEL_SYNTHESIS,TIMESHEET_UX_SPEC,CAPACITY_PLANNING,SEED_DATA_PLAN}.md`. Фича делает ровно то, что в спеке? (Пример: capacity-доска должна отвечать «когда отдел освободится» — DP-0001.)
+   - **(б) Лучшие практики:** `docs/standards/DEV_STANDARDS.md` + impeccable (UI). Нейминг/SSOT/размеры/русский UI/UX-законы.
+   - **(в) Входные данные (реальность):** модель/UX бьётся с реальными данными Кредо-С (Директум5 34k, Битрикс 72 чел, каталог услуг)? `docs/data-model/{DATA_INTEGRITY_AUDIT,SOURCE_TRACEABILITY}.md`. Decimal-часы, 5 отделов, категории, плоский журнал.
+   - **(г) Референсы Timetta/Kimai:** `research/timetta-kimai-timesheet-views.md`. Берём лучшее (копир-неделя, Recent, недельная сетка Timetta, мульти-режим Kimai), не изобретаем хуже. При новой UX-фиче — свериться, что в референсах сделано не лучше.
+   Несоответствие любой оси → `[arch-nak]` с указанием оси и дока. UX-фичи проверяю ещё и в браузере (MCP-сессия).
 
 ## Сигналы, которые ставишь
 
