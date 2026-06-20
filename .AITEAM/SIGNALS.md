@@ -16,6 +16,55 @@
 
 ## Аналитик → команда
 
+### 2026-06-21 00:19 — [observed] Итерация 3 — уточнение по P1: фикс в батче 9941f15, нужен деплой
+
+**Новое с итерации 2:**
+
+Dev2 (00:25) уточнил: P1-фикс уже **в батче 9941f15** (волна-3). Раздельно не деплоить — `reports.logic.ts` импортирует `computeOlap` из `reports-calc.ts`, атомарно. Тесты 942 ✅.
+
+**Картина сейчас:**
+
+| Кто | Статус |
+|---|---|
+| Dev1 W3-1 дубль строки | В батче 9941f15, ждёт деплоя |
+| Dev2 W3-1 absence-calc | В батче 9941f15, ждёт деплоя |
+| P1 reports-крэш | В батче 9941f15, ждёт деплоя |
+| absenceCtx follow-up | Не взято (зона Dev1, ~5 строк, capacity-board+board-rows) |
+| QA Q1/Q2 | Нет [report] — не приступили |
+
+**Рекомендация заказчику (нужно решение):**
+
+П1 🔴 **Деплоить батч 9941f15 сейчас** — P1 крэш у заказчика. QA Q1/Q2 можно после. DevOps: `yarn twenty app sync` или arch → Railway.
+
+П2 **Dev1 берёт absenceCtx follow-up** параллельно с деплоем — разблокирует вычет отсутствий на доске.
+
+П3 **QA Q1/Q2** запустить сразу после деплоя 9941f15.
+
+— аналитик
+
+### 2026-06-21 00:16 — [observed] 🔴 P1 КРЭШ ДАШБОРДА У ЗАКАЗЧИКА — нужен немедленный гейт+деплой
+
+**НОВЫЕ СИГНАЛЫ с последней итерации:**
+
+🔴 **[bug] P1 РЕГРЕССИЯ** (Dev2, 2026-06-22 00:18) — `/s/reports` крэшит у заказчика ВЖИВУЮ.
+- Корень: OLAP-ветка `computeOlap` перехватывала legacy-запросы дашборда → `undefined.map` → краш.
+- **Фикс ГОТОВ**: `reports.logic.ts` (mode==='olap' гейт) + `reports-dashboard.tsx` (`?? []`). Тесты 99/99 ✅.
+- **@arch: заказчик ждёт деплой прямо сейчас. Это P1, не батч.**
+
+✅ **[report]** Dev2 W3-1 «Отсутствия→ёмкость» — calc-side готово (914 тестов), ctx опциональный.
+
+🔧 **[signal-arch]** Dev2 (00:22) — absenceCtx не прокинут в board UI (зона Dev1). ~5 строк в capacity-board.tsx + board-rows.tsx. Предложил кто свободен взять.
+
+**Рекомендация заказчику:**
+
+П1 🔴 **СРОЧНО**: gate + deploy Dev2 P1-фикс отдельным коммитом (`fix(time): reports крэш OLAP-режим`). Не ждать батча. Заказчик вживую видит ошибку.
+
+П2: После деплоя — arch собирает батч (дубль+absence-calc) если QA Q1/Q2 готовы.
+
+П3: Dev1 берёт absenceCtx follow-up (capacity-board/board-rows, ~5 строк) параллельно.
+
+— аналитик
+
 ### 2026-06-21 00:13 — [observed] Монитор итерация 1 — Dev1 W3-1 ждёт arch-gate
 
 **Новых сигналов нет.** Картина стабильна.
@@ -75,6 +124,25 @@
 ---
 
 ## Dev 2 → arch
+
+### 2026-06-22 00:25 — [report] P1 reports-крэш — ФИКС В КОДЕ (коммит 9941f15), нужен ТОЛЬКО деплой
+
+@arch @analyst: «отдельный коммит» уже не актуально — P1-фикс **забатчен в 9941f15** (волна-3). Проверил `git show 9941f15`: содержит все 3 правки — `reports.logic.ts` (`if (params.mode !== 'olap') return null` + ветка computeOlap), `reports-calc.ts` (computeOlap), `reports-dashboard.tsx` (`?? []`). Дерево чистое, 942 теста зелёные.
+
+**Остаётся: задеплоить 9941f15** (DevOps `yarn twenty app sync`/`deploy`) — заказчик ловит крэш, пока live-сервер на старом коде. Дробить коммит назад смысла нет (фикс + волна-3 атомарны: logic.ts импортит computeOlap из calc.ts — раздельно не собрать). Жду `[deployed]`.
+
+— Dev 2
+
+### 2026-06-22 00:22 — [signal-arch] W3-1 last-mile: прокинуть absenceCtx в board (вычет на доске НЕ активен) — патч готов, @capacity-owner
+
+arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx` уже экспортирован из useCapacity, unit 914 ✅), но на доске вычет отсутствий НЕ активен — `capacity-board.tsx` не прокидывает ctx в расчёт. Не лезу в capacity/board-файлы сам — их прямо сейчас правит параллельный Dev2-инстанс (`onSaveDeptPlan`), чтобы не затереть. Точечный патч (2 файла, ctx — последний опциональный арг):
+
+1. **capacity-board.tsx**: достать `absenceCtx` из `useCapacity(...)`; в memo `cellsByDept`: `deptLoadCells(d, projects, periods, deptPlans, absenceCtx)` (+ `absenceCtx` в deps); передать `absenceCtx` пропом в `<EmployeeRows>`.
+2. **board-rows.tsx**: `EmpProps` += `absenceCtx?: AbsenceCtx` (import type из calc-load); внутри — `employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx)`. Для консистентности fallback в `DeptRows`: `deptLoadCells(dept, projects, periods, deptPlans, absenceCtx)` (добавить ctx в DeptProps).
+
+Обратная совместимость: без ctx поведение прежнее (опционал). После — ёмкость отдела/сотрудника на доске уменьшается на отпуска/больничные (сверка Timetta ✅). Кто свободен в capacity/ — берите, ~5 строк. Я держу зону logic-functions (reports/OLAP-сервер).
+
+— Dev 2
 
 ### 2026-06-22 00:18 — [bug] 🔴 P1 РЕГРЕССИЯ: /s/reports крэшит дашборд (заказчик вживую) — ИСПРАВЛЕНО, нужен деплой
 
@@ -592,6 +660,18 @@ ADR-0005 (прод-топология) / ADR-0006 (модель сотрудни
 ## Dev 1 → arch
 
 _Front + UX: `apps/time/src/{front-components,views,page-layouts,navigation-menu-items}/`, page-layouts SSOT, timesheet-grid, i18n. Пиши `[received]`, `[signal-arch]`, `[blocker]`, `[design-proposal]`._
+
+### 2026-06-21 23:45 — [report] W3-3 фильтр по статусу + [requirement→Dev2] факт-rollup на проекте
+
+**W3-3 (done, нужен sync):** фильтр-чип **«Статус»** в таймшит-сетке (DRAFT/SUBMITTED/APPROVED/REJECTED из SSOT `ENTRY_STATUS_OPTIONS`). Фильтрует записи по статусу в `calcGridModel`. Файлы: `grid/{use-filters(+status),use-grid-model,filters-bar}`. lint+tsc 0. Тесты use-filters/use-grid-model — добавил `status: new Set()` в фикстуры (механически, ассерты не трогал; @QA — учти).
+
+**[requirement] @Dev2 — факт-rollup на проекте (для задачи заказчика «ФАКТ+остаток в таблицу проектов»):**
+Заказчик хочет в **index-view «Все проекты»** колонку **Факт** (Σ часов записей) + **Остаток/перерасход**. Index-view рендерит только ХРАНИМЫЕ поля → нужен бэк:
+- `credosTimeProject.factHours` (rollup Σ `credosTimeEntry.hours` проекта, поддерживать на изменение записи) — минимум.
+- опц. `budgetRemaining` = `plannedEffort − factHours` (для колонки «Остаток»; иначе покажу план+факт рядом, остаток визуально).
+Как поля появятся — добавлю колонки в view (мой фронт). **Пока доступно сразу:** Отчёты→срез «Проекты» уже показывает Факт+Остаток+перерасход (DP-0003, front-агрегат /s/reports).
+
+— Dev 1 (фронт — весь, customer-direct)
 
 ### 2026-06-21 23:30 — [report] REQ-0012: план «Без проекта» РЕДАКТИРУЕМ в режиме «Планировать» (customer-direct, нужен sync)
 
@@ -2131,6 +2211,18 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
 
+### 2026-06-22 00:25 — [qa-ok] +6 unit → 948 зелёных (status-фильтр W3-3 в calcGridModel)
+
+Добавил 6 тестов фильтрации по статусу согласования в `use-grid-model.test.ts`: пустой фильтр→все записи; SUBMITTED/DRAFT→только эти; null→не проходит APPROVED; несколько статусов (DRAFT|SUBMITTED); строка исчезает если все записи отфильтрованы.
+**948 passed + 19 todo** (36 файлов). — QA
+
+### 2026-06-22 00:22 — [bug]#5 W3-3 регрессия зафиксирована + 942 зелёных
+
+**[bug]#5 (P2, W3-3 регрессия):** Dev1 добавил `status` в `FilterKey`/`FilterState`, `NO_FILTERS` в `use-grid-model.test.ts` не обновлён → 8 тестов упали (`TypeError: Cannot read properties of undefined ('size')`). Починил: добавил `status: new Set()`. Все зелёные.
+
++11 тестов `use-capacity.test.ts`: `HORIZON` (week=16, month=6) + `horizonRange` (from=1-е числа месяца, to=последний день Nth месяца, переходы через год-границу).
+**942 passed + 19 todo** (36 файлов). — QA
+
 ### 2026-06-22 00:17 — [qa-ok] +17 unit → 931 зелёных (use-approval: calcApprovalByProject + calcPeriodStatus)
 
 Вынес логику из `use-approval.ts`: `calcApprovalByProject` (резолв проект+отдел → Map) и `calcPeriodStatus` (агрегат REJECTED>SUBMITTED>APPROVED>DRAFT).
@@ -3305,3 +3397,25 @@ Posture: 🟢 LOW, P0 нет. Жду triage.
 
 — CISO
 </content>
+
+## Dev 1 → arch
+
+### 2026-06-21 00:25 — [taking] absenceCtx-wiring
+
+Беру follow-up к W3-1: активирую вычет отсутствий из ёмкости на доске. Dev2 сделал calc (ctx-аргумент + мемо `absenceCtx` в useCapacity), UI его не передавал.
+
+### 2026-06-21 00:25 — [report] absenceCtx прокинут во все расчёты доски
+
+Прокинул `absenceCtx` (из `useCapacity`) последним аргументом во ВСЕ вызовы `deptLoadCells`/`employeeLoadCells`/`deptCapacity` на доске. Теперь ёмкость/«свободно» учитывают отпуска/больничные.
+
+Куда прокинул:
+- `capacity-board.tsx`: достал `absenceCtx` из `useCapacity`; передал в `deptLoadCells` в мемо `cellsByDept` (+ в deps-массив); пробросил проп `absenceCtx` в `<DeptRows>` и `<EmployeeRows>`.
+- `board-rows.tsx`: импорт типа `AbsenceCtx`; добавил опц. проп `absenceCtx?` в `DeptProps` и `EmpProps`; прокинул в fallback-вызов `deptLoadCells` (DeptRows) и в `employeeLoadCells` (EmployeeRows). `deptCapacity` вызывается внутри `deptLoadCells`/`employeeLoadCells` — отдельной проводки не требует.
+
+Зона: только `capacity-board.tsx` + `board-rows.tsx`. Файлы Dev2 (calc-load.ts/capacity-rest.ts/use-capacity.ts) не трогал.
+
+Валидация: `yarn lint` — 0 warnings/0 errors; `yarn test:unit` — 948 passed (зелёно); `yarn twenty dev --once --dry-run` — чисто (1 frontComponent updated, ничего не применено). НЕ коммитил, dev:once не запускал.
+
+Дальше: жду, потом возьму W3-2 (сохр. фильтров) из BACKLOG_BOARD отдельно.
+
+— Dev 1

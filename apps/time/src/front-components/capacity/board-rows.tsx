@@ -8,6 +8,7 @@ import {
   employeeLoadCells,
   firstFreePeriod,
 } from 'src/front-components/capacity/calc-load';
+import type { AbsenceCtx } from 'src/front-components/capacity/calc-load';
 import type {
   CapProject,
   CellMetric,
@@ -25,6 +26,7 @@ type DeptProps = {
   projects: CapProject[];
   deptPlans: DeptPlan[];
   periods: Period[];
+  absenceCtx?: AbsenceCtx;
   nameWidth: number;
   metric: CellMetric;
   expanded: Set<string>;
@@ -41,6 +43,7 @@ export const DeptRows = ({
   projects,
   deptPlans,
   periods,
+  absenceCtx,
   nameWidth,
   metric,
   expanded,
@@ -52,7 +55,7 @@ export const DeptRows = ({
   <>
     {departments.map((dept) => {
       // REQ-0012: ячейки отдела учитывают план без проекта (deptPlans).
-      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans);
+      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx);
       const isOpen = expanded.has(dept.id);
       const detail = isOpen ? deptProjectLoads(dept, projects, periods) : null;
       const planRows = isOpen ? deptPlanLoads(dept, deptPlans, periods) : null;
@@ -92,6 +95,7 @@ type EmpProps = {
   projects: CapProject[];
   deptPlans: DeptPlan[];
   periods: Period[];
+  absenceCtx?: AbsenceCtx;
   nameWidth: number;
   metric: CellMetric;
 };
@@ -105,6 +109,7 @@ export const EmployeeRows = ({
   projects,
   deptPlans,
   periods,
+  absenceCtx,
   nameWidth,
   metric,
 }: EmpProps) => {
@@ -117,7 +122,7 @@ export const EmployeeRows = ({
     <>
       {sorted.map((emp) => {
         const dept = emp.departmentId ? deptById.get(emp.departmentId) : undefined;
-        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans);
+        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx);
         return (
           <EmployeeRow
             key={emp.id}
