@@ -16,6 +16,30 @@
 
 ## Аналитик → команда
 
+### 2026-06-21 00:31 — [observed] Итерация 5 — движение: QA+25, CISO-006 закрыт, Dev1 взял absenceCtx, нов. CISO-флаг
+
+**Новое:**
+- ✅ **QA** `[qa-ok]` (00:38) — +25 unit → **1023 зелёных** (capacity-rest полное покрытие). Q1/Q2 фактически закрыты тестами.
+- ✅ **Dev2** `[report]` (00:27) — **CISO-006** (filter-injection в reports.logic.ts) ЗАКРЫТ. CISO-007 R1 заблокирован CISO-005 — фейк-guard не ставит (правильно).
+- 🔵 **Dev1** `[taking]` (00:25) — взял **absenceCtx-wiring** (follow-up, который я рекомендовал). Вычет отсутствий на доске будет активен.
+- 🟡 **CISO** `[ciso-policy]` — нов. флаг: `computeOlap` без isManager-guard. **Не активен** (mode='olap' никто не шлёт), но guard нужен ДО W4-1 frontend. Спека: `OLAP_PII_SECURITY.md`.
+- 🔵 **Dev2** `[taking]` (05:15) — W4-1 OLAP /s/reports параметрический.
+
+**Связка-предупреждение (для arch):** Dev2 начал **W4-1 OLAP frontend-контракт**, а CISO требует isManager-guard в computeOlap **до** подключения OLAP-фронта. → guard должен войти в ту же W4-1 пачку, не отдельной волной. Иначе OLAP по людям утечёт ПДн (CISO-007).
+
+**Картина:**
+| Поток | Статус |
+|---|---|
+| Батч 9941f15 (P1+дубль+absence) | ждёт `[deployed]` |
+| QA | 1023 теста ✅ |
+| CISO-006 | закрыт |
+| absenceCtx-wiring | Dev1 в работе |
+| W4-1 OLAP | Dev2 в работе + CISO-guard обязателен в той же пачке |
+
+**Рекомендация:** деплой 9941f15 → затем W4-1 OLAP с встроенным CISO-007 guard (не разносить).
+
+— аналитик
+
 ### 2026-06-21 00:22 — [observed] Итерация 4 — без изменений, ждём деплой 9941f15
 
 Новых `[report]`/`[signal-arch]`/`[blocker]` нет. Топ-сигналы те же:
@@ -207,6 +231,19 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-21 06:45 — [arch] ОТВЕТЫ всем + приёмки + [bug] EntryTag + REQ-0014/0015 (личный кабинет)
+
+**Приёмки (зелёное, задеплоено):** дубль строки (9941f15), absence→ёмкость на доске (9f1124f), теги-бэк 6 меток без billable (1ab2956, сервер подтвердил 6 опций). Спасибо Dev1/Dev2.
+
+**🔴 [bug] EntryTag casing (блокер чипов тегов):** union в domain-types = PascalCase (`Overtime`), но buildOptions/сервер = UPPER_SNAKE (`OVERTIME`) → `ENTRY_TAG_LABELS[value]` не находит ярлык (чипы будут пустые). QA SSOT-тест поймал — `[smoke-ok]` тесту, баг реальный. **Dev 2 (зона constants):** приведи EntryTag к UPPER_SNAKE везде (union/ENTRY_TAG_LABELS/ENTRY_TAG_ORDER/ENTRY_TAG_COLORS ключи) → OVERTIME/URGENT/REMOTE/ON_SITE/REWORK/RESEARCH, как WorkCategory. Тогда lookup и SSOT-тест зелёные. Dev1 чипы (tag-meta.ts) — после фикса. Работу Dev1 (tag-chips) в дереве держу до зелёного.
+
+**📥 НОВОЕ от заказчика — крупная дыра (42 чел «слепые»):**
+- **REQ-0014 Личный кабинет** 🔴: welcome-экран + «Мои часы» (личный отчёт) + «Мои периоды» (история недель+статусы). БЛОКЕР: «кто я» в песочнице. **Research первым:** есть ли в front-component Twenty доступ к текущему юзеру (хук/контекст) — если да, разблокирует без CISO-005.
+- **REQ-0015 UX ввода** 🟡 (без блокера, делаем): pre-submit валидация (пробелы/недобор), шаблон «8×5», кнопка-заливка по дням (drag не делаем — песочница). Сверка Timetta/Kimai ✓.
+
+**Очередь обновлена (доска):** EntryTag-fix → tags-chips → REQ-0015 (pre-submit/8×5/fill) → REQ-0014 (после research current-user). REQ-0013 мульти-отдел research у Dev2 идёт.
+— arch
 
 ### 2026-06-21 05:55 — [arch] Dev1 дубль + Dev2 absence-calc приняты в код; жду QA → батч. + follow-up Dev1
 
@@ -2262,6 +2299,11 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
 
+### 2026-06-22 00:38 — [qa-ok] +25 unit → 1023 зелёных (capacity-rest полное покрытие)
+
+`capacity-rest.test.ts` расширён (+25): `fetchDepartments` (маппинг, headcount из активных сотрудников, capacityFactor дефолт 0.8), `fetchProjects` (поля/nulls/limit=300), `fetchDeptPlans` REQ-0012 (label дефолт ''), `fetchEmployees` (filter active=true), `fetchCalendar` (date slice, hours=0 дефолт, filter), `patchProject`/`patchDeptPlan` (toIso DATE_TIME, null pass-through). Также добавлен `mockPatch` в мок RestApiClient.
+**1023 passed + 19 todo** (38 файлов). — QA
+
 ### 2026-06-22 00:34 — [qa-ok] +28 unit → 998 зелёных (computeOlap W4-1)
 
 `computeOlap` не был покрыт — добавлен полный тест-сьют (+28): groupBy по 5 осям (project/employee/dept/workType/workTypeGroup), totals, фильтры (category/employee + appliedFilters.label), норма (dept=headcount×baseNorm, employee=baseNorm, null при factCutting-dim), сортировка (fact↓ дефолт, name asc, fact asc), пагинация (limit/cursor/hasNextPage), availableDims+drillable, dimLabel (Фамилия Имя, dept.code, project.name), entry без employeeId → не попадает в groupBy=employee.
@@ -3529,5 +3571,43 @@ Posture: 🟢 LOW, P0 нет. Жду triage.
 Валидация: `yarn lint` — 0 warnings/0 errors; `yarn test:unit` — 948 passed (зелёно); `yarn twenty dev --once --dry-run` — чисто (1 frontComponent updated, ничего не применено). НЕ коммитил, dev:once не запускал.
 
 Дальше: жду, потом возьму W3-2 (сохр. фильтров) из BACKLOG_BOARD отдельно.
+
+— Dev 1
+
+### 2026-06-21 00:40 — [taking] tags-chips
+
+Беру follow-up W3-2: показать теги записи чипами в таймшит-сетке (SSOT из ENTRY_TAG_OPTIONS/LABELS). Бэк готов (поле `tags` MULTI_SELECT на credosTimeEntry). Зона: front-components/grid/ + shared/ (новый tag-meta по образцу category-meta). Если время — фильтр «Тег» в filters-bar.
+
+— Dev 1
+
+## Dev 2 → arch
+
+### 2026-06-21 — [taking] REQ-0013-research
+
+Беру research REQ-0013 (проекты с несколькими отделами). RESEARCH-режим: только READ + research-док, код objects/logic НЕ трогаю. Читаю модель project→department, calc-load.ts, reports-calc.ts, DATA_MODEL/CAPACITY доки, Timetta-референс.
+
+— Dev 2
+
+### 2026-06-21 — [report] REQ-0013-research готов: рекомендую **Вариант A** (join с долями), поэтапно 13a→13b
+
+Док: `docs/data-model/REQ-0013_RESEARCH.md`.
+
+**Рекомендация: Вариант A** — join-объект `credosTimeProjectDepartment` (project × department × `plannedEffortShare` в ЧАСАХ). Вариант B (MANY_TO_MANY без долей) **отклоняю**: ломает capacity (план либо ×N перегруз, либо неверный делёж /N). В SDK M:N всё равно = join-таблица → «простота» B иллюзорна.
+
+**Часы, не %:** раскид `plannedHoursInPeriod` уже работает с часами (логика не меняется, меняется источник числа); проект может быть без `plannedEffort` (% не от чего считать).
+
+**Главное наблюдение (сужает скоуп):** в отчётах факт уже идёт за отделом СОТРУДНИКА (`deptOfEntry`, проект — лишь fallback). Значит REQ-0013 бьёт по **capacity/ПЛАНУ** (`calc-load.ts`), а `reports-calc.ts` правок в минимуме почти не требует. Центр тяжести и риск — доска.
+
+**Миграция безопасна/обратима:** бэкфилл `departmentId` → 1 join-запись (доля 100% `plannedEffort`); `departmentId` НЕ удаляем (→ «основной отдел» + fallback в расчётах). Смешанные данные работают. Guard идемпотентности по (project, department).
+
+**Влияние:** `calc-load.ts` — заменить `p.departmentId === dept.id` на обход долей (раскид-функция та же); `capacity-rest/use-capacity` — +выборка долей; UI Dev1 — вкладка «Отделы» в карточке + проект в нескольких строках доски (согласовать тип `CapProject`).
+
+**Связи:** REQ-0011 (FTE) — тот же паттерн join ×department, делать единым стилем (REQ-0013 первее). REQ-0012 (deptPlan) — не конфликтует (ещё одно слагаемое загрузки). REQ-0004 (allocation по людям) — REQ-0013 = средний слой каскада fallback (люди → отделы → целый план).
+
+**Оценка:** ~7-9 под-задач, 2 под-волны (13a модель+миграция+capacity = главная ценность, самодостаточна; 13b карточка+сид+отчёты). Поэтапно — ДА. Риски: 🔴 регрессия capacity (митигация: fallback + unit-тесты долей), 🟡 двойной учёт плана при наличии и долей и `plannedEffort` (правило: есть доли → игнорим целый), 🟡 валидация Σ долей (показывать расхождение, не блокировать).
+
+Сверка Timetta (правило 8): команда проекта из разных подразделений, часы по участникам/отделам — мульти-отдел норма PSA. Вариант A = упрощённая (отдел-уровень) проекция Timetta-ресурсного плана. Код не менял, не коммитил.
+
+— Dev 2
 
 — Dev 1
