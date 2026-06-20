@@ -18,20 +18,37 @@ const orderOf = (code: string): number => {
   return i === -1 ? 999 : i;
 };
 
+// Сегмент стека: код категории, ширина в % (по share), цвет, ярлык (для tooltip).
+// Чистая функция — маппинг byCategory→сегменты тестируется без DOM (см. .test.ts).
+export type CategorySegment = { category: string; widthPct: number; color: string; label: string };
+
+export const toSegments = (parts: CategoryShare[]): CategorySegment[] =>
+  [...(parts ?? [])]
+    .sort((a, b) => orderOf(a.category) - orderOf(b.category))
+    .map((p) => {
+      const m = categoryMeta(p.category);
+      return {
+        category: p.category,
+        widthPct: p.share === null ? 0 : Math.max(0, p.share * 100),
+        color: m.solid,
+        label: m.label,
+      };
+    })
+    .filter((s) => s.widthPct > 0);
+
 type Props = {
   parts: CategoryShare[];
   height?: number;
 };
 
 export const CategoryBar = ({ parts, height = 8 }: Props) => {
-  if (!parts || parts.length === 0) {
+  const segments = toSegments(parts);
+  if (segments.length === 0) {
     return <span style={{ color: T.textFaint, fontSize: 11 }}>—</span>;
   }
 
-  // Стабильный порядок сегментов по справочнику (цвета не прыгают между строк).
-  const ordered = [...parts].sort((a, b) => orderOf(a.category) - orderOf(b.category));
-
-  const tip = ordered
+  const tip = [...(parts ?? [])]
+    .sort((a, b) => orderOf(a.category) - orderOf(b.category))
     .map((p) => `${categoryMeta(p.category).label} — ${fmtHrs(p.hours)} ч · ${pct(p.share)}%`)
     .join('\n');
 
@@ -48,16 +65,12 @@ export const CategoryBar = ({ parts, height = 8 }: Props) => {
         cursor: 'default',
       }}
     >
-      {ordered.map((p) => {
-        const w = p.share === null ? 0 : Math.max(0, p.share * 100);
-        if (w <= 0) return null;
-        return (
-          <span
-            key={p.category}
-            style={{ width: `${w}%`, height: '100%', background: categoryMeta(p.category).solid }}
-          />
-        );
-      })}
+      {segments.map((s) => (
+        <span
+          key={s.category}
+          style={{ width: `${s.widthPct}%`, height: '100%', background: s.color }}
+        />
+      ))}
     </span>
   );
 };

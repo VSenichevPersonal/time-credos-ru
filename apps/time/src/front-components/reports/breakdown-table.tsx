@@ -121,7 +121,7 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
                 {isProject ? (
                   <CategoryChip category={p.category} />
                 ) : (
-                  <Explainable title="Категории" parts={explainParts(r)}>
+                  <Explainable title="Категории" parts={explainParts(r)} block>
                     <CategoryBar parts={r.byCategory ?? []} />
                   </Explainable>
                 )}

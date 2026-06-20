@@ -22,7 +22,8 @@ if (!BASE || !KEY) {
   process.exit(1);
 }
 
-const ADMIN_EMAIL = 'vs@credos.ru'; // приоритетный админ-юзер
+// Приоритетный админ-юзер — из env (ПДн не хардкодим, CISO-001). Фоллбэк синтетический.
+const ADMIN_EMAIL = process.env.TWENTY_DEV_EMAIL || 'admin@example.test';
 
 const H = { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -82,7 +83,7 @@ const nameOfWm = (wm) => ({
 async function run() {
   console.log(`Сервер: ${BASE}`);
 
-  // 1. workspaceMember: приоритет vs@credos.ru, иначе единственный.
+  // 1. workspaceMember: приоритет ADMIN_EMAIL (env), иначе единственный.
   const members = await getAll('workspaceMembers');
   console.log(`workspaceMembers: ${members.length}`);
   if (members.length === 0) {

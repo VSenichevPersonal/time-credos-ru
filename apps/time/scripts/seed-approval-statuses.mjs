@@ -42,7 +42,7 @@ const APPROVED_N = 26; // ~20-30 -> согласовано
 const REJECTED_N = 8; // ~5-10  -> отклонено
 // остаток окна -> DRAFT (не размечаем сверх)
 
-// approvedBy = workspaceMemberId руководителя (vs@credos.ru)
+// approvedBy = workspaceMemberId руководителя (админ из env TWENTY_DEV_EMAIL)
 const APPROVER_WS_MEMBER_ID = '4674db8c-291a-4a46-9781-43145400527c';
 // approvedAt: детерминированная дата согласования (день после конца окна)
 const APPROVED_AT = '2026-06-20T09:00:00.000Z';

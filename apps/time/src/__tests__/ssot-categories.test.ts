@@ -6,17 +6,15 @@
  *     tag-color-hex.ts → category-meta.ts → [UI компоненты]
  *
  * Тест проверяет: каждое звено цепочки синхронно.
- * Нарушение: category-bar.tsx пока НЕ использует categoryMeta() (мёртвый SSOT).
- * Fix: заменить CATS/ORDER в category-bar.tsx на categoryMeta/CATEGORY_ORDER из category-meta.ts.
+ * Добавление категории в WORK_CATEGORY_OPTIONS → §1-3 покроют автоматически.
  */
 
 import { describe, expect, it } from 'vitest';
 
-import { WORK_CATEGORY_OPTIONS } from 'src/constants/select-options';
+import { CLIENT_CATEGORY, WORK_CATEGORY_OPTIONS } from 'src/constants/select-options';
 import { WORK_CATEGORY_LABELS } from 'src/constants/labels';
 import { categoryMeta, CATEGORY_ORDER } from 'src/front-components/shared/category-meta';
 import { TAG_COLOR_HEX } from 'src/front-components/shared/tag-color-hex';
-import { CLIENT_CATEGORY } from 'src/logic-functions/reports-calc';
 
 // Коды категорий как они приходят из БД (SDK UPPER_SNAKE).
 const CODES: string[] = WORK_CATEGORY_OPTIONS.map((o) => o.value);
@@ -115,30 +113,23 @@ describe('SSOT: category-meta (фасад для UI) динамически по
 
 describe('SSOT: CLIENT_CATEGORY (инвариант утилизации)', () => {
   it('CLIENT_CATEGORY есть в WORK_CATEGORY_OPTIONS (не устарел)', () => {
+    // [ssot-bug]#1 CLOSED (Dev 2): CLIENT_CATEGORY = toUpperSnake(WorkCategory 'Client')
+    // из constants/select-options.ts. Типовая завязка → переименование WorkCategory = compile error.
     expect(CODES).toContain(CLIENT_CATEGORY);
   });
 
   it('CLIENT_CATEGORY = "CLIENT" — UPPER_SNAKE от WorkCategory "Client"', () => {
-    // При переименовании в domain-types: 'Client' → другое — тест упадёт здесь.
-    // Это сигнал: обновить CLIENT_CATEGORY в reports-calc.ts.
+    // При переименовании 'Client' в domain-types: toUpperSnake() изменится → тест упадёт.
     expect(CLIENT_CATEGORY).toBe('CLIENT');
   });
-
-  it.todo(
-    '[ssot-bug]#1 (P1): CLIENT_CATEGORY хардкод — ' +
-    'переименование "Client" в domain-types/select-options → isClient()=false → утилизация=0. ' +
-    'Fix: вынести константу в constants/select-options.ts, импортировать в reports-calc.',
-  );
 });
 
-// ─── 5. Нарушение: category-bar.tsx не использует category-meta ───────────
+// ─── 5. category-bar.tsx → SSOT (закрыто Dev 1 DP-0003) ──────────────────
 
-describe('SSOT: category-bar.tsx — архитектурное нарушение (todo)', () => {
+describe('SSOT: category-bar.tsx — ЗАКРЫТО (DP-0003, Dev 1)', () => {
   it.todo(
-    '[ssot-bug]#2 (P2): category-bar.tsx имеет хардкод CATS+ORDER вместо categoryMeta/CATEGORY_ORDER. ' +
-    'category-meta.ts создан как SSOT-фасад, но НЕ ПОДКЛЮЧЁН (мёртвый код). ' +
-    'Добавление новой категории в domain-types → бар покажет серой fallback. ' +
-    'Fix (Dev 1): заменить CATS[code] на categoryMeta(code), ORDER на CATEGORY_ORDER из category-meta.ts.',
+    '[ssot-bug]#2 CLOSED (DP-0003): category-bar.tsx переписан на categoryMeta/CATEGORY_ORDER. ' +
+    'Хардкод CATS+ORDER удалён. Закрыто Dev 1 в батче DP-0003. Тест-guard §3 выше достаточен.',
   );
 
   it.todo(

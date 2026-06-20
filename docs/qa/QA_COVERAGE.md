@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **671 + 21 todo** (17 файлов, все зелёные) |
+| unit-тестов | **679 + 19 todo** (18 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -45,15 +45,24 @@
 
 Легенда: ✅ covered · 🟦 todo-спека · 🔴 gap · 🟡 предложено · ⚪ низкий приоритет.
 
+## SSOT-статус (обновлено 2026-06-21)
+
+| # | Severity | Описание | Статус |
+|---|---|---|---|
+| [ssot-bug]#1 | P1 | `CLIENT_CATEGORY` хардкод в reports-calc → тихое обнуление утилизации | ✅ CLOSED Dev 2: типовая завязка через `WorkCategory` |
+| [ssot-bug]#2 | P2 | `category-bar.tsx` не использует `categoryMeta()` | ✅ CLOSED Dev 1 (DP-0003): 0 хардкода |
+| [ssot-bug]#4 | P3 | `'OTHER'` нет в `WORK_CATEGORY_OPTIONS` | ⚠️ graceful в category-meta, low prio |
+
 ## Открытые баги
 
 | # | Severity | Описание | Файл | Статус |
 |---|---|---|---|---|
-| [bug]#1 | P1 | `op:delete` → 400 PERMISSION_DENIED (нужен `canDestroyObjectRecords` в default-role) | `roles/default-role.ts` | ❌ ждёт arch |
+| [bug]#1 | P1 | `op:delete` → 400 PERMISSION_DENIED (нужен `canDestroyObjectRecords` в default-role) | `roles/default-role.ts` | ❌ ждёт [synced] |
 | [bug]#2 | P3 | `calc-month.ts`: NaN month-index проходит guard (crash вместо skip) | `front-components/calendar/calc-month.ts:19` | ⚠️ задокументирован `it.todo` |
+| [bug]#3 | P2 | `resolveSelfIsManager` fallback: `orderBy=boolean` не работает в Twenty REST | `capacity/capacity-rest.ts` | ✅ CLOSED Dev 1: `filter=isManager[eq]:true` |
 
 ## Очередь (next)
-1. 🔴 **[bug]#1** → пере-валидация после `canDestroyObjectRecords` fix (ждёт `[synced]`)
+1. 🔴 **[bug]#1** → пере-валидация после `canDestroyObjectRecords` (arch `[synced]`)
 2. 🔴 **QA-1 browser-smoke** (`QA_SMOKE_CHECKLIST.md`) — ждёт --isolated в chrome-devtools-mcp
 3. 🔴 **CISO-005/006/007** → конвертировать `it.todo` в реальные тесты после Dev 2 фикса
 4. 🟡 grid: вынести чистую логику из `use-week` → покрыть тоталы/дни (arch arch-ok #10)

@@ -21,14 +21,15 @@ type Props = {
   parts?: ExplainPart[]; // состав
   up?: boolean; // открывать поповер вверх (у нижней кромки виджета)
   align?: 'left' | 'right';
+  block?: boolean; // тянуть на всю ширину ячейки (для inline-баров: stacked-bar категорий)
 };
 
-export const Explainable = ({ children, title, formula, parts, up, align = 'left' }: Props) => {
+export const Explainable = ({ children, title, formula, parts, up, align = 'left', block }: Props) => {
   const [open, setOpen] = useState(false);
 
   return (
     <span
-      style={{ position: 'relative', display: 'inline-flex' }}
+      style={{ position: 'relative', display: block ? 'flex' : 'inline-flex', width: block ? '100%' : undefined }}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
@@ -43,9 +44,9 @@ export const Explainable = ({ children, title, formula, parts, up, align = 'left
           font: 'inherit',
           color: 'inherit',
           cursor: 'help',
-          textDecoration: 'underline dotted',
-          textUnderlineOffset: 2,
-          textDecorationColor: T.textFaint,
+          ...(block
+            ? { width: '100%', display: 'flex', alignItems: 'center' }
+            : { textDecoration: 'underline dotted', textUnderlineOffset: 2, textDecorationColor: T.textFaint }),
         }}
       >
         {children}
