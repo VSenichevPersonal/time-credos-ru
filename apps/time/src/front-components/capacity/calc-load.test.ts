@@ -6,6 +6,7 @@ import {
   buildAbsenceCtx,
   buildHoursByDay,
   buildPeriods,
+  buildSharesByProject,
   deptCapacity,
   deptLoadCells,
   deptPlanHoursInPeriod,
@@ -14,6 +15,7 @@ import {
   employeeLoadCells,
   firstFreePeriod,
   projectHoursInPeriod,
+  projectShareHoursInPeriod,
   summaryCells,
 } from 'src/front-components/capacity/calc-load';
 import type {
@@ -25,6 +27,7 @@ import type {
   EmployeeRef,
   LoadCell,
   Period,
+  ProjectDeptShare,
 } from 'src/front-components/capacity/types';
 
 // LoadCell-фикстура: ratio и free выводятся из capacity/load (как в calc-load).
@@ -551,5 +554,106 @@ describe('employeeLoadCells с отсутствиями (W3-1)', () => {
     );
     const [c] = employeeLoadCells(emp, dept(), [], periods, [], ctx);
     expect(c.capacity).toBe(0);
+  });
+});
+
+// ===========================================================================
+// REQ-0013 13b: загрузка по долям отделов (credosTimeProjectDepartment).
+// ===========================================================================
+describe('доли отделов в проектах (REQ-0013 13b)', () => {
+  // Период целиком накрывает проект 2026-01-01..01-10 → раскид = весь эффорт.
+  const wk = period('w', utc(2026, 0, 1), utc(2026, 0, 31), 160);
+  // Проект на 100ч, период проекта 2026-01-01..01-10.
+  const proj = (over: Partial<CapProject> = {}): CapProject =>
+    project({ id: 'pA', plannedEffort: 100, startDate: '2026-01-01', endDate: '2026-01-10', ...over });
+  const share = (over: Partial<ProjectDeptShare> = {}): ProjectDeptShare => ({
+    projectId: 'pA',
+    departmentId: 'd1',
+    plannedEffortShare: 100,
+    ...over,
+  });
+
+  it('projectShareHoursInPeriod раскидывает долю по датам проекта', () => {
+    // доля 60ч, период проекта 10 дней, колонка накрывает весь проект → 60ч
+    const h = projectShareHoursInPeriod(proj(), share({ plannedEffortShare: 60 }), wk);
+    expect(h).toBeCloseTo(60, 6);
+  });
+
+  it('buildSharesByProject группирует по projectId, отбрасывает без projectId', () => {
+    const m = buildSharesByProject([
+      share({ departmentId: 'd1' }),
+      share({ departmentId: 'd2' }),
+      share({ projectId: null }),
+    ]);
+    expect(m.get('pA')).toHaveLength(2);
+    expect(m.size).toBe(1);
+  });
+
+  it('загрузка отдела = его доля (не весь plannedEffort)', () => {
+    const projects = [proj()];
+    const sbp = buildSharesByProject([
+      share({ departmentId: 'd1', plannedEffortShare: 60 }),
+      share({ departmentId: 'd2', plannedEffortShare: 40 }),
+    ]);
+    const d1 = dept({ id: 'd1' });
+    const [c] = deptLoadCells(d1, projects, [wk], [], undefined, sbp);
+    expect(c.load).toBeCloseTo(60, 6); // только доля d1, не 100
+  });
+
+  it('проект на 2 отдела: Σ загрузок отделов = plannedEffort', () => {
+    const projects = [proj()];
+    const sbp = buildSharesByProject([
+      share({ departmentId: 'd1', plannedEffortShare: 60 }),
+      share({ departmentId: 'd2', plannedEffortShare: 40 }),
+    ]);
+    const [c1] = deptLoadCells(dept({ id: 'd1' }), projects, [wk], [], undefined, sbp);
+    const [c2] = deptLoadCells(dept({ id: 'd2' }), projects, [wk], [], undefined, sbp);
+    expect(c1.load + c2.load).toBeCloseTo(100, 6); // = plannedEffort
+  });
+
+  it('fallback: у проекта НЕТ долей → старое поведение (весь plannedEffort на departmentId)', () => {
+    const projects = [proj({ departmentId: 'd1' })];
+    const emptySbp = buildSharesByProject([]);
+    const [c1] = deptLoadCells(dept({ id: 'd1' }), projects, [wk], [], undefined, emptySbp);
+    expect(c1.load).toBeCloseTo(100, 6); // весь plannedEffort
+    const [c2] = deptLoadCells(dept({ id: 'd2' }), projects, [wk], [], undefined, emptySbp);
+    expect(c2.load).toBe(0); // чужой отдел — 0
+  });
+
+  it('fallback при undefined sharesByProject (обратная совместимость вызовов UI)', () => {
+    const projects = [proj({ departmentId: 'd1' })];
+    const [c1] = deptLoadCells(dept({ id: 'd1' }), projects, [wk]);
+    expect(c1.load).toBeCloseTo(100, 6);
+  });
+
+  it('employeeLoadCells: доля отдела делится поровну по людям', () => {
+    const projects = [proj()];
+    const sbp = buildSharesByProject([share({ departmentId: 'd1', plannedEffortShare: 60 })]);
+    const emp: EmployeeRef = { id: 'e1', name: 'И', departmentId: 'd1' };
+    // headcount=5 → доля сотрудника = 60/5 = 12
+    const [c] = employeeLoadCells(emp, dept({ id: 'd1', headcount: 5 }), projects, [wk], [], undefined, sbp);
+    expect(c.load).toBeCloseTo(12, 6);
+  });
+
+  it('deptProjectLoads: вклад проекта = часы доли отдела', () => {
+    const projects = [proj()];
+    const sbp = buildSharesByProject([
+      share({ departmentId: 'd1', plannedEffortShare: 60 }),
+      share({ departmentId: 'd2', plannedEffortShare: 40 }),
+    ]);
+    const { planned } = deptProjectLoads(dept({ id: 'd1' }), projects, [wk], sbp);
+    expect(planned).toHaveLength(1);
+    expect(planned[0].total).toBeCloseTo(60, 6);
+    // отдел d2 видит свою долю
+    const { planned: p2 } = deptProjectLoads(dept({ id: 'd2' }), projects, [wk], sbp);
+    expect(p2[0].total).toBeCloseTo(40, 6);
+  });
+
+  it('deptProjectLoads fallback: проект без долей виден только родному отделу', () => {
+    const projects = [proj({ departmentId: 'd1' })];
+    const { planned } = deptProjectLoads(dept({ id: 'd1' }), projects, [wk]);
+    expect(planned[0].total).toBeCloseTo(100, 6);
+    const { planned: p2 } = deptProjectLoads(dept({ id: 'd2' }), projects, [wk]);
+    expect(p2).toHaveLength(0);
   });
 });

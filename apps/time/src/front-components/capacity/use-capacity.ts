@@ -141,5 +141,23 @@ export const useCapacity = (granularity: Granularity) => {
     [state.absences, state.employees, state.calendar],
   );
 
-  return { ...state, isManager, periods, absenceCtx, anchor, reload, reloadProjects, reloadDeptPlans };
+  // REQ-0013 13b: карта projectId → доли отделов, передаётся в deptLoadCells/
+  // employeeLoadCells/deptProjectLoads. Пусто → расчёт fallback на plannedEffort.
+  const sharesByProject = useMemo(
+    () => buildSharesByProject(state.shares),
+    [state.shares],
+  );
+
+  return {
+    ...state,
+    isManager,
+    periods,
+    absenceCtx,
+    sharesByProject,
+    anchor,
+    reload,
+    reloadProjects,
+    reloadDeptPlans,
+    reloadShares,
+  };
 };

@@ -13,6 +13,7 @@ import {
   fetchDeptPlans,
   fetchDepartments,
   fetchEmployees,
+  fetchProjectDeptShares,
   fetchProjects,
   patchDeptPlan,
   patchProject,
@@ -199,6 +200,35 @@ describe('fetchDeptPlans — REQ-0012', () => {
   it('пустой ответ → []', async () => {
     mockGet.mockResolvedValueOnce(listOf('credosTimeDeptPlans', []));
     expect(await fetchDeptPlans()).toEqual([]);
+  });
+});
+
+// ─── fetchProjectDeptShares — REQ-0013 13b ──────────────────────────────────────
+
+describe('fetchProjectDeptShares — REQ-0013 13b', () => {
+  it('маппит projectId/departmentId/plannedEffortShare (null если нет)', async () => {
+    mockGet.mockResolvedValueOnce(listOf('credosTimeProjectDepartments', [
+      { projectId: 'p1', departmentId: 'd1', plannedEffortShare: 60 },
+      { projectId: 'p1', departmentId: 'd2', plannedEffortShare: 40 },
+      { projectId: null, departmentId: null, plannedEffortShare: null },
+    ]));
+    const result = await fetchProjectDeptShares();
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ projectId: 'p1', departmentId: 'd1', plannedEffortShare: 60 });
+    expect(result[2]).toEqual({ projectId: null, departmentId: null, plannedEffortShare: null });
+  });
+
+  it('запрашивает /credosTimeProjectDepartments с limit=300', async () => {
+    mockGet.mockResolvedValueOnce(listOf('credosTimeProjectDepartments', []));
+    await fetchProjectDeptShares();
+    expect(mockGet).toHaveBeenCalledWith('/rest/credosTimeProjectDepartments',
+      expect.objectContaining({ query: expect.objectContaining({ limit: '300' }) }),
+    );
+  });
+
+  it('пустой ответ → []', async () => {
+    mockGet.mockResolvedValueOnce(listOf('credosTimeProjectDepartments', []));
+    expect(await fetchProjectDeptShares()).toEqual([]);
   });
 });
 
