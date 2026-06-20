@@ -17,7 +17,8 @@
 - **`front-components/grid/use-week.ts`** — дата-логика недели. 🟡 в хуке — нужен вынос (Dev 1).
 
 ### P1 — серверная бизнес-логика (unit с моком fetch / integration)
-- **`logic-functions/approval.logic.ts`** — `runSubmit`/`runResolve`/`buildApprovalMap`. Guard'ы статуса, separation of duties (CISO-002). 🔴 gap — после роли «Руководитель» (RBAC-волна).
+- **`logic-functions/approval.logic.ts`** — `runSubmit`/`runResolve`/`buildApprovalMap`. Guard'ы статуса, separation of duties (CISO-002). ✅ покрыто (12 тестов с vi.stubGlobal fetch).
+- **`front-components/grid/use-filters.ts`** — `filterProjects`/`filterWorkTypes`/`rowPasses`/`filterEmployees`. UX-корректность мультифильтров. ✅ покрыто (31 тест).
 - **`logic-functions/time-entry-api.logic.ts`** — CISO-005/006/007 security. 🟦 todo-спека (16 тестов, конвертируются после Dev 2 фикса).
 
 ### P2 — схема и приёмка (integration + smoke)

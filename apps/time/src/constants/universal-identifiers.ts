@@ -329,6 +329,18 @@ export const CREDOS_TIME_EMPLOYEE_ABSENCES_FIELD_ID = 'f2e7b344-8634-4f5e-bccf-c
 export const CREDOS_TIME_SETTINGS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
   'f1a2b3c4-5d6e-4f70-8a91-b2c3d4e5f6a7';
 
+// --- S2 (SETTINGS NAV, Dev1): пункт «Настройки» в сайдбаре «Трудозатраты» ---
+// settingsCustomTab на 2.14 не рендерится сервером, поэтому тот же settings
+// front-component выносим отдельной STANDALONE_PAGE-страницей (паттерн «Отчёты»).
+export const CREDOS_TIME_SETTINGS_NAV_UNIVERSAL_IDENTIFIER =
+  '1ea58d56-2e27-40b7-b3eb-4e6104a99fab';
+export const CREDOS_TIME_SETTINGS_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER =
+  '87a2dfd2-e4b7-4f36-8d1b-224c8d2f086b';
+export const CREDOS_TIME_SETTINGS_PAGE_LAYOUT_TAB_UNIVERSAL_IDENTIFIER =
+  'd006e254-3cff-4c0a-8ad3-9c14fbe69c41';
+export const CREDOS_TIME_SETTINGS_PAGE_WIDGET_UNIVERSAL_IDENTIFIER =
+  '3ba5bd61-6d6e-4b9d-87a5-db57614acf65';
+
 // --- CAL-D1 (CALENDAR): помесячный производственный календарь (front + страница, Dev1) ---
 export const CALENDAR_MONTHLY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
   '0b1c2d3e-4f50-4617-8829-9a0b1c2d3e4f';

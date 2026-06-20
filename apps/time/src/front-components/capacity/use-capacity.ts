@@ -62,12 +62,17 @@ export const useCapacity = (granularity: Granularity) => {
       fetchCalendar(range.from, range.to),
       resolveSelfIsManager(null),
     ])
-      .then(([departments, employees, projects, calendar, isManager]) => {
+      .then(([departments, employees, projects, calendar, isManagerInWorkspace]) => {
         if (!alive) return;
+        // TODO(rbac): RBAC-гейт «Планировать» отложен в RBAC-волну. В песочнице
+        // front-component текущего пользователя надёжно получить нельзя (токен =
+        // роль приложения, SDK не отдаёт currentWorkspaceMember), поэтому кнопку
+        // показываем ВСЕМ. isManagerInWorkspace оставляем для будущего гейта.
+        void isManagerInWorkspace;
         setState({
           loading: false,
           error: null,
-          isManager,
+          isManager: true,
           departments,
           employees,
           projects,

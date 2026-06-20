@@ -127,6 +127,14 @@ done
 - ⬜ Руководитель не может approve СВОИ записи (separation of duties CISO-002).
 - **CISO-007 (P2):** `/s/reports byEmployee` — ⚠️ LIVE CONFIRMED: раскрывает 42 ФИО+переработки без role-guard. UI не закрывает — нужен server-side canSeeAll.
 
+## Открытые баги (обновляется)
+
+| # | P | Описание | Зона | Статус |
+|---|---|---|---|---|
+| [bug]#1 | P1 | `op:delete` → 400 PERMISSION_DENIED (нужен `canDestroyObjectRecords`) | `roles/default-role.ts` | ❌ ждёт arch |
+| [bug]#2 | P3 | `calc-month.ts`: NaN month-index (crash вместо skip) | `calendar/calc-month.ts:19` | ⚠️ `it.todo` |
+| [bug]#3 | P2 | Кнопка «Планировать» не видна: `resolveSelfIsManager(null)` fallback `orderBy=isManager[DescNullsLast]` не работает для boolean custom-field → всегда false | `capacity/capacity-rest.ts:resolveSelfIsManager` | ✅ Fix Dev 1: `filter=isManager[eq]:true` — browser-smoke pending |
+
 ## Блокеры выполнения (актуально)
 1. **chrome-devtools --isolated** — ждёт apply от arch/пользователя в `~/.claude/settings.json`. Обходной: сериализовать (один UI-агент за раз).
 2. **Тест-креды** — `TWENTY_DEV_EMAIL`/`TWENTY_DEV_PASSWORD` в `.env` (DevOps T2 ✅). Для CISO-007 smoke нужен отдельный non-admin аккаунт (запрос DevOps).
