@@ -16,6 +16,20 @@
 
 ## → arch feedback (ответы)
 
+### 2026-06-20 23:20 — [arch] ⚙️ НОВОЕ: подраздел «Настройки Time Credos» в Settings (очередь)
+
+Заказчик: вынести конфигурацию модуля в **Settings → «Настройки Time Credos»** (подраздел). SDK поддерживает `settingsCustomTab` через `defineApplication.settingsCustomTabFrontComponentUniversalIdentifier` → front-component в настройках workspace. См. research/twenty-sdk/fresh/config/application.md.
+
+**Задача S1 (очередь, после ввода планов v1):**
+- **Dev 1 (S1-D1):** front-component «Настройки Time Credos» + регистрация как `settingsCustomTab` в application-config. Секции:
+  - **Отделы:** согласование вкл/выкл (`approvalRequired`), коэффициент ёмкости (`capacityFactor`), норма/headcount — inline-правка (для админа).
+  - **Параметры:** норма часов/нед, горизонт планирования (если выносим в конфиг).
+  - **Справочники:** быстрые ссылки на «Виды работ» / «Категории» / «Производственный календарь».
+- **Dev 2 (S1-D2):** что конфигурируемо: поля Department (approvalRequired/capacityFactor) уже есть; нужен ли глобальный config-объект (норма/горизонт) — реши, заведи если да (`credosTimeSettings` singleton) + REQ.
+- **CISO:** настройки = админ-доступ (RBAC), не каждому.
+
+Очередь оркестрации: ввод планов v1 → R3 категории в отчётах → S1 настройки → v2 аллокации → волна-3 удобство. — arch
+
 ### 2026-06-20 23:05 — [arch] 📊 НОВОЕ: разрез «по категории работ» в Отчётах (очередь)
 
 Заказчик: в Отчётах для людей и отделов нужен доп. разрез **по категории работ** (WorkCategory: На клиента/Пресейл/Пилот/Внутренний/Инфраструктура/Обучение). Видно структуру времени: «Иванов 60% клиент, 20% обучение, 20% внутрянка»; «ОИБ: клиент N ч, пресейл M ч…».
@@ -900,7 +914,21 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
-### 2026-06-20 20:16 — [deployed] UX-пакет завершён → на сервере, parity восстановлена 🟢
+### 2026-06-20 22:48 — [infra-ok] Разбор DevOps-задач из QA: T1 сделан+запушен, T2/T3 — ответ
+
+Прошёлся по открытым задачам мне (из отчётов QA):
+
+**T1 ✅ СДЕЛАНО+ЗАПУШЕНО (46b3617).** Добавил `test:unit` + `test:unit:watch` в `apps/time/package.json` (`vitest run -c vitest.unit.config.ts`). Проверено: **525 passed**, 12 integration skipped. **QA — unit-прогон разблокирован**, гоняй `yarn test:unit`. secret-scan staged чисто, запушено напрямую (моя зона infra).
+
+**T2 (тест-креды QA) — РЕШЕНО.** Креды dev-workspace уже в корневом `.env` (gitignored): `TWENTY_DEV_EMAIL` + `TWENTY_DEV_PASSWORD` (+ `TWENTY_DEV_API_KEY` для REST). QA-агент на той же машине → `set -a; source .env; set +a` и логинься этими значениями. **Значения в канал не пишу** (секрет-дисциплина). Если нужен отдельный QA-аккаунт (не админ) — заведу по запросу.
+
+**T3 (контеншн chrome-devtools MCP) — РЕКОМЕНДАЦИЯ (нужно arch/юзер, конфиг вне репо).** Профиль `~/.cache/chrome-devtools-mcp/chrome-profile` общий → «browser is already running» при параллельных UI-агентах. Фикс: добавить флаг **`--isolated`** в args запуска chrome-devtools-mcp (каждому агенту свой профиль — снимает контеншн навсегда). Конфиг — в **глобальном** `~/.claude` (вне нашего репо) → молча не правлю, нужен apply arch/юзера. Временно: **сериализовать** браузер (один UI-агент за раз). @arch — решение по общему конфигу.
+
+**bug#1 delete (P1) — уже закрыт:** per-object objectPermissions (мой DO-2) задеплоен (ae34b54), op:delete должен работать. QA — это твоя пере-валидация delete.
+
+**Предложение (на будущее):** CI-степ `yarn lint && yarn test:unit` на push (pre-commit/CI) — оформлю в `infra/git-hooks` или CI, когда arch скажет.
+
+Health 🟢. — DevOps
 
 Прошлый WIP Dev 1 закоммичен (HEAD **e1a3e75**: отделы кириллицей, переполнение столбцов, Overview→Обзор) и **уже накатан** — dry-run = «No metadata changes», дрейфа нет. Health 🟢 все 200. Новое untracked `front-components/project-team/` — следующий WIP Dev 1, в манифест не попал, держу до коммита.
 
@@ -1039,6 +1067,25 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-20 22:58 — [smoke-ok] волна-3 (код в дереве): новый absence-объект прошёл guard'ы, 525 unit
+
+«Протестировал новое» — прогон против незакоммиченного кода волны-3 (Dev 1 ввод планов, Dev 2 объект отпусков). **525 unit + 12 todo, всё зелёное** (через `yarn test:unit`, спасибо DevOps).
+
+**Мои guard'ы авто-поймали новый код (статика, без деплоя):**
+- `schema-guard` 227→**249**: новый `credos-time-absence` (object+view+nav) прошёл — есть INDEX-view, nav-item, префикс `credosTime`, поля с валидными UUID v4, имена camelCase уникальны, SELECT-options непусты. Висячих ссылок нет.
+- `universal-identifiers` 130→**147**: +17 новых UUID (absence + поля) — все v4, уникальны, без коллизий.
+- `labels`/`select-options`/cross-SSOT зелёные: новый absence-тип консистентен (labels↔options).
+- `calc-load` 25 зелёный — правки Dev 1 в capacity (`types`/`use-capacity`) не сломали контракт расчётов.
+
+**Баги схемы/нейминга/UUID в новом коде — НЕ найдены.**
+
+**Ждёт деплоя (live-smoke нельзя до sync):**
+- ввод планов руководителем (REQ-0003/0004): руковод правит → загрузка меняется; сотрудник read-only.
+- объект отпусков `credosTimeAbsence` в UI.
+- **пере-валидация `op:delete`** — повторного деплоя роли пока не вижу (`[bug]#1` остаётся `[qa-nak]`). Дай `[synced]` — прогоню delete + plan-input + absence одним заходом.
+
+— QA
 
 ### 2026-06-20 22:50 — [qa-nak] [bug]#1 НЕ исправлен: op:delete всё ещё 400 PERMISSION_DENIED
 
