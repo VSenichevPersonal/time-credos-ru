@@ -1,17 +1,7 @@
-# time.credos.ru — Разведка и проектирование
+# time.credos.ru — учёт трудозатрат Кредо-С
 
-**Дата:** 2026-06-20
-**Задача:** Спроектировать систему учёта проектов и времени для Кредо-С
-
----
-
-## Источники
-
-| Система | Тип | Что взяли |
-|---------|------|-----------|
-| **Timetta** (timetta.com) | Проприетарная PPM/PSA, РФ | Модель данных (258 таблиц), Lifecycles (18 стейт-машин), CRM, AI, 152-ФЗ |
-| **Kimai** (github.com/kimai/kimai) | Open-source (AGPL-3.0), PHP/Symfony | Исходный код (85 Entity), инвойсинг, Team ACL, Meta Fields, плагины |
-| **Twenty CRM** (github.com/twentyhq/twenty) | Open-source CRM-платформа, TypeScript/NestJS | Фундамент: metadata-engine, GraphQL, AI-агенты, UI-библиотека |
+**Внутренний инструмент** учёта проектов, времени и планирования загрузки для Кредо-С.
+Реализуется как **Twenty SDK-приложение** (устанавливается в CRM-платформу CredosCRM1).
 
 ---
 
@@ -19,95 +9,85 @@
 
 ```
 time-credos-ru/
-├── README.md                          ← этот файл
-├── Intel 01 Timetta/                  ← разведка Timetta
-│   ├── RECON.md                       # общая разведка (компания, стек, цены)
-│   ├── TARGET_MODEL.md                # модель учёта проектов и времени
-│   ├── DATA_MODEL_BLUEPRINT.md        # полный blueprint (схемы, справочники)
-│   ├── ASSESSMENT.md                  # оценка воссоздания
-│   ├── db-schema-from-metadata.md     # 30160 строк — схема БД из $metadata
-│   ├── db-full-entity-model.md        # 186 сущностей с полями и связями
-│   ├── integration-model.md           # модель интеграций (OData, OIDC, AI, GitLab)
-│   ├── raw-odata-*.json               # 36 дампов API (справочники, lifecycle, users)
-│   ├── raw-odata-metadata.xml         # 1MB OData $metadata
-│   ├── raw-session.json               # 1.2MB сессия + метамодель
-│   ├── ux-*.css, ux-i18n-ru.json      # UX/UI: CSS-токены, переводы
-│   └── *.png                          # 15 скриншотов
+├── README.md                ← этот файл (навигация)
 │
-├── Intel 02 Kimai/                    ← разведка Kimai + сравнение с Timetta
-│   ├── RECON.md                       # разведка Kimai
-│   ├── BEST_PRACTICES.md              # Timetta vs Kimai — лучшие практики
-│   ├── CAN_WE_BUILD_IT.md             # можем ли написать без ошибок?
-│   ├── ON_TWENTY_CRM.md               # оценка Twenty CRM как фундамента
-│   ├── UX_UI_PLAN.md                  # план UX/UI (отдельный модуль)
-│   ├── SEPARATE_APP_PLAN.md           # план отдельного приложения (time.credos.ru)
-│   ├── entity-*.php                   # 12 исходников Entity-классов Kimai
-│   ├── swagger.json                   # OpenAPI-спецификация Kimai
-│   └── *.html, README.md              # документация Kimai
+├── apps/                    ← КОД SDK-приложений
+│   ├── time/                  time-app: учёт времени, проекты, планёрка (пишем сейчас)
+│   └── catalog/               catalog-app: каталог услуг (задел, после time)
+│
+├── docs/                    ← РЕШЕНИЯ и СПЕЦИФИКАЦИИ
+│   ├── adr/                   архитектурные решения (0001–0003)
+│   ├── architecture/          ARCHITECTURE_QA, DEV_WORKFLOW
+│   ├── data-model/            модель данных, аудит, сид, планирование загрузки
+│   └── catalog/               проектирование каталога услуг (RECON, SDK_DESIGN)
+│
+└── research/                ← РАЗВЕДКА (источники)
+    ├── timetta/               Timetta (целевая модель PSA)
+    ├── kimai/                 Kimai (логика трекинга, open-source)
+    ├── directum5/             реальные трудозатраты + каталог услуг + Битрикс
+    └── credos-it-catalog/     прототип каталога услуг (исходные доки)
 ```
+
+Три слоя: **research** (что узнали) → **docs** (что решили и спроектировали) → **apps** (что пишем).
 
 ---
 
-## Ключевые выводы
+## Текущие решения (ADR)
 
-### 1. Модель данных
-- **Timetta:** 258 таблиц (EntityType), 1490 связей (NavigationProperty), 79 enum'ов
-- **Kimai:** 85 Entity (Doctrine), чёткая иерархия Customer→Project→Activity→Timesheet
-- **Вывод:** Начинаем с Kimai-простоты (4 уровня), расширяем до Timetta-глубины (6 уровней)
+| ADR | Решение |
+|---|---|
+| [0001](docs/adr/0001-platform-and-data.md) | Платформа — Twenty CRM; данные внутри платформы; auth через центральный IdP. time.credos.ru — **внутренний инструмент** |
+| [0002](docs/adr/0002-sdk-app-isolated-repo.md) | time tracking — **SDK-app** в изолированном репо (этот); установка в workspace, не merge; старое не мигрируем |
+| [0003](docs/adr/0003-catalog-separate-app-shared-master-data.md) | Каталог услуг — **отдельный SDK-app** в контуре CRM; общие мастер-данные (Department/Employee/Service); Service — мост |
 
-### 2. Фундамент
-- **Twenty CRM** (форк CredosCRM1) — идеальная основа
-- Metadata-driven: объекты создаются через REST API без кода
-- Уже работает в продакшене: https://credoscrm1.up.railway.app
-- Репозиторий CRM: https://github.com/VSenichevPersonal/CredosCRM1
+---
 
-### 3. Архитектура time.credos.ru
-- Отдельный домен, отдельный UI, общая БД с CRM
-- `time.credos.ru` — недельная сетка + таймер
-- `crm.credos.ru` — Twenty CRM
-- Единый JWT, общий PostgreSQL 16 на Railway
+## Карта документов
 
-### 4. Сроки
-- На Twenty CRM: **1-2 недели** (metadata-объекты)
-- Отдельное приложение: **8-10 дней**
-- С нуля: 4-6 недель
+### Архитектура и процесс
+| Документ | О чём |
+|---|---|
+| [docs/architecture/ARCHITECTURE_QA.md](docs/architecture/ARCHITECTURE_QA.md) | 8 вопросов с разборами (платформа, SDK, репо, auth) |
+| [docs/architecture/DEV_WORKFLOW.md](docs/architecture/DEV_WORKFLOW.md) | как разрабатываем SDK-пакет и ставим в Twenty |
+
+### Модель данных
+| Документ | О чём |
+|---|---|
+| [docs/data-model/DATA_MODEL_SYNTHESIS.md](docs/data-model/DATA_MODEL_SYNTHESIS.md) | **главный** — единая модель, методология Директум5↔Kimai↔Timetta, локализация |
+| [docs/data-model/DATA_INTEGRITY_AUDIT.md](docs/data-model/DATA_INTEGRITY_AUDIT.md) | аудит целостности источников (сверка 11/11) |
+| [docs/data-model/SEED_DATA_PLAN.md](docs/data-model/SEED_DATA_PLAN.md) | сид-данные: реальные ОВ + мок (янв–июнь 2026) |
+| [docs/data-model/CAPACITY_PLANNING.md](docs/data-model/CAPACITY_PLANNING.md) | планирование загрузки отделов |
+
+### Каталог услуг
+| Документ | О чём |
+|---|---|
+| [docs/catalog/SDK_DESIGN.md](docs/catalog/SDK_DESIGN.md) | каталог как SDK-app |
+| [docs/catalog/RECON.md](docs/catalog/RECON.md) | разбор прототипа CredosITCatalog |
+
+### Разведка (research)
+| Источник | Ключевое |
+|---|---|
+| [research/directum5/RECON.md](research/directum5/RECON.md) | реальные трудозатраты (34k записей), каталог услуг 4 отделов |
+| [research/directum5/bitrix-users/roster.csv](research/directum5/bitrix-users/roster.csv) | реестр сотрудников (72 чел, оргструктура) |
+| [research/timetta/](research/timetta/) | целевая модель PSA (схема БД, lifecycles) |
+| [research/kimai/](research/kimai/) | логика трекинга (Customer→Project→Activity→Timesheet) |
+
+---
+
+## Источники модели
+
+| Система | Роль |
+|---|---|
+| **Директум 5** (реальная выгрузка) | фактическая модель трудозатрат + цель миграции |
+| **Kimai** (open-source AGPL) | референс логики трекинга (переписываем, не копируем) |
+| **Timetta** (РФ PSA) | целевая глубина (недельная сетка, Decimal-часы) |
+| **Twenty CRM** (форк CredosCRM1) | платформа: SDK, RBAC, аудит, общие данные |
 
 ---
 
 ## Связанные репозитории
 
 | Репозиторий | Назначение |
-|-------------|------------|
-| [CredosCRM1](https://github.com/VSenichevPersonal/CredosCRM1) | Twenty CRM форк — фундамент для time.credos.ru |
-| [Kimai](https://github.com/kimai/kimai) | #1 Open-Source Time-Tracker — источник лучших практик |
-
----
-
-## Карта документов (что читать)
-
-| Вопрос | Документ |
-|--------|----------|
-| **Архитектурные вопросы и разборы (6 вопросов)** | `ARCHITECTURE_QA.md` |
-| **Принятые решения (ADR)** | `docs/adr/` |
-| → Платформа / данные / auth | `docs/adr/0001-platform-and-data.md` |
-| → SDK-app в изолированном репо | `docs/adr/0002-sdk-app-isolated-repo.md` |
-| → Каталог услуг: отдельный app, общие данные | `docs/adr/0003-catalog-separate-app-shared-master-data.md` |
-| **Каталог услуг (SDK) — всё по теме** | `Catalog SDK/` |
-| **Как разрабатываем и устанавливаем (workflow)** | `docs/DEV_WORKFLOW.md` |
-| **Синтез модели данных (все источники)** | `docs/DATA_MODEL_SYNTHESIS.md` |
-| План сид-данных (реальные ОВ + мок) | `docs/SEED_DATA_PLAN.md` |
-| Аудит целостности данных | `docs/DATA_INTEGRITY_AUDIT.md` |
-| Планирование загрузки отделов | `docs/CAPACITY_PLANNING.md` |
-| Реестр сотрудников (Битрикс, 72 чел) | `Intel 03 Directum5/bitrix-users/roster.csv` |
-| Реальные трудозатраты Директум 5 | `Intel 03 Directum5/RECON.md` |
-| Каталог услуг 4 отделов | `Intel 03 Directum5/katalog-uslug-otdelov-2025.md` |
-| Что такое Timetta и как устроена? | `Intel 01 Timetta/RECON.md` |
-| Как смоделировать таймшиты и проекты? | `Intel 01 Timetta/TARGET_MODEL.md` |
-| Полная схема БД? | `Intel 01 Timetta/db-schema-from-metadata.md` |
-| Что можно воссоздать? | `Intel 01 Timetta/ASSESSMENT.md` |
-| Что такое Kimai? | `Intel 02 Kimai/RECON.md` |
-| Что взять из Timetta, а что из Kimai? | `Intel 02 Kimai/BEST_PRACTICES.md` |
-| Можем ли написать без ошибок? | `Intel 02 Kimai/CAN_WE_BUILD_IT.md` |
-| Реально ли на Twenty CRM? | `Intel 02 Kimai/ON_TWENTY_CRM.md` |
-| Как сделать UI не засоряя CRM? | `Intel 02 Kimai/UX_UI_PLAN.md` |
-| Как сделать отдельный домен с общей БД? | `Intel 02 Kimai/SEPARATE_APP_PLAN.md` |
+|---|---|
+| [CredosCRM1](https://github.com/VSenichevPersonal/CredosCRM1) | Twenty-форк — платформа, куда ставится time-app |
+| CredosITCatalog | прототип каталога услуг (Next.js+Prisma) — референс модели |

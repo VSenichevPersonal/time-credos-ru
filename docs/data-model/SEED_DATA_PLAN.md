@@ -87,4 +87,4 @@
 - Связь мок-компаний с реальной CRM-базой клиентов.
 - Точные объёмы мока — подстроим под нужды демо.
 
-Связано: `DATA_MODEL_SYNTHESIS.md` (модель), `../Intel 03 Directum5/RECON.md` (реальные данные).
+Связано: `DATA_MODEL_SYNTHESIS.md` (модель), `../../research/directum5/RECON.md` (реальные данные).

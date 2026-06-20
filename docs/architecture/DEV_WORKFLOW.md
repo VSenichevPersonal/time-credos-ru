@@ -59,6 +59,6 @@ time-credos-ru (этот репо)            CredosCRM1 (форк, 2.x GA)
 
 ## Связанные документы
 
-- `adr/0001-platform-and-data.md` — почему Twenty, данные внутри, auth через IdP
-- `adr/0002-sdk-app-isolated-repo.md` — почему SDK-app + изолированный репо + предусловие
-- `../ARCHITECTURE_QA.md` — полная история вопросов и разборов (Вопросы 1–8)
+- `../adr/0001-platform-and-data.md` — почему Twenty, данные внутри, auth через IdP
+- `../adr/0002-sdk-app-isolated-repo.md` — почему SDK-app + изолированный репо + предусловие
+- `ARCHITECTURE_QA.md` — полная история вопросов и разборов (Вопросы 1–8)

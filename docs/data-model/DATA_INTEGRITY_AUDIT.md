@@ -82,4 +82,4 @@
 ## 7. Вердикт
 **Данные и аналитика целостны и взаимно согласованы.** Кросс-сверка 11/11 подтвердила корректность привязки выгрузки к отделу. Внесены 2 исправления (имя ОВ, +отдел ОПР) и зафиксированы 5 пунктов на уточнение. Модель данных остаётся валидной.
 
-Связано: `DATA_MODEL_SYNTHESIS.md`, `SEED_DATA_PLAN.md`, `../Intel 03 Directum5/RECON.md`, `../Intel 03 Directum5/bitrix-users/roster.csv`.
+Связано: `DATA_MODEL_SYNTHESIS.md`, `SEED_DATA_PLAN.md`, `../../research/directum5/RECON.md`, `../../research/directum5/bitrix-users/roster.csv`.

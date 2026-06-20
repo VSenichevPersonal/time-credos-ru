@@ -69,7 +69,7 @@ admin · department_head (CRUD своих услуг) · editor · sales_manager
 
 ## 4. Что переиспользуем из прототипа CredosITCatalog
 
-- **Модель данных** (сущности, поля, enum-ы) — как референс (см. `source-docs-CredosITCatalog/DATA_MODEL.md`).
+- **Модель данных** (сущности, поля, enum-ы) — как референс (см. `../../research/credos-it-catalog/DATA_MODEL.md`).
 - **UX-идеи** (карточка-лендинг, режимы Wiki/Landing/DB/Docs) — `UI_COMPONENTS.md`, `VISION.md`.
 - **Scope/роли** — `SCOPE.md`.
 - **НЕ переносим стек** (Next.js+Prisma) — переписываем под Twenty SDK (React-front-компоненты + defineObject). AGPL/стек-согласование как с Kimai: модель — референс, код — свой.
@@ -86,4 +86,4 @@ admin · department_head (CRUD своих услуг) · editor · sales_manager
 - Rich-editor в SDK front-компоненте (TipTap внутри Twenty) — проверить на PoC.
 - Связь Service ↔ Quotes/Opportunity — модель.
 
-Связано: `RECON.md`, `../docs/adr/0003-catalog-separate-app-shared-master-data.md`.
+Связано: `RECON.md`, `../adr/0003-catalog-separate-app-shared-master-data.md`.

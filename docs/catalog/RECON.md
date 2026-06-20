@@ -2,7 +2,7 @@
 
 **Дата:** 2026-06-20
 **Источник:** `/Users/vsenichev/Documents/GitHub/CredosITCatalog` (прототип Next.js+Prisma, статус — Pre-MVP/«фантазии»)
-**Исходные доки прототипа:** `source-docs-CredosITCatalog/`
+**Исходные доки прототипа:** `../../research/credos-it-catalog/`
 
 ---
 
@@ -99,4 +99,4 @@ Direction (Отдел) → Category (Категория) → Service (Услуг
 - **Service** — мост трёх контуров (каталог владеет; продажи и time ссылаются).
 - Мастер-данные (Direction/Employee/Service) — определяются один раз в Twenty, не дублируются.
 
-Связано: `SDK_DESIGN.md`, `../docs/adr/0003-catalog-separate-app-shared-master-data.md`, `../docs/DATA_MODEL_SYNTHESIS.md`.
+Связано: `SDK_DESIGN.md`, `../adr/0003-catalog-separate-app-shared-master-data.md`, `../data-model/DATA_MODEL_SYNTHESIS.md`.

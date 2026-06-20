@@ -3,7 +3,7 @@
 **Дата:** 2026-06-20
 **Статус:** Принято
 **Зависит от:** ADR-0001 (платформа Twenty), ADR-0002 (SDK-app)
-**Источник анализа:** `CredosITCatalog` (прототип Next.js+Prisma) — изучен; `DATA_MODEL_SYNTHESIS.md`
+**Источник анализа:** `CredosITCatalog` (прототип Next.js+Prisma) — изучен; `../data-model/DATA_MODEL_SYNTHESIS.md`
 
 ---
 
