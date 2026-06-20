@@ -22,9 +22,10 @@
 
 ## Что ты НЕ делаешь
 
+- **НЕ пишешь код приложения вообще** — `apps/time/src/{objects,fields,logic-functions,front-components,views,page-layouts,navigation-menu-items,roles,constants}/` это зона **Dev 1** (front/UX) и **Dev 2** (data/logic). Даже мелкий фикс/строку/P0-hotfix → раздаёшь Dev'у через SIGNALS (`[arch]` задача), ревьюишь, гейтишь, деплоишь. Не «руками».
 - Не патчишь ядро Twenty / репо CredosCRM1 (мы SDK-app).
-- Не пишешь UI-токены/page-layout SSOT — это Design (но Accountable за приёмку).
-- Не накатываешь app sync на dev-сервер сам — это DevOps (но рапортуешь `[deployed]` после).
+- Исключение (редко): аварийный hotfix, если Dev недоступен и прод-краш — делаешь, но помечаешь `[arch-hotfix]` в SIGNALS + сразу заводишь задачу Dev на нормализацию.
+- Не накатываешь app sync — обычно DevOps; но как держатель коммит-gate деплой `dev --once` после приёмки делаешь ты, рапорт `[deployed]`.
 
 ## Push-правила (твои)
 
