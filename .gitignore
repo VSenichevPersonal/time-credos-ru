@@ -22,6 +22,8 @@ research/**/*-users*.html
 research/**/*employees*.csv
 # Реальный сид сотрудников (ФИО+email) для dev — рядом с seed-real.mjs, НЕ в git (CISO-001).
 apps/time/scripts/.employees.local.json
+# Реальные клиенты/проекты Директум5 (коммерческая тайна) для dev — НЕ в git (CISO-009).
+apps/time/scripts/.clients.local.json
 
 # Зависимости
 node_modules/

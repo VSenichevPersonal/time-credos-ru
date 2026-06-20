@@ -28,7 +28,9 @@ import {
   CREDOS_TIME_PROJECT_SUMMARY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -209,26 +211,45 @@ export default definePageLayout({
         },
       ],
     },
-    // 5d. Отделы — доли отделов проекта (часы + % от plannedEffort, front-component).
+    // 5d. Отделы — доли отделов проекта (обратная связь departmentShares).
     // Атрибут перенесён из сайдбара (nav «Доли отделов») в карточку проекта.
+    //  • Виджет 1 (FIELDS на card-view с relation departmentShares) — доли
+    //    ТЕКУЩЕГО проекта инлайн-таблицей (отдел + плановая доля в часах),
+    //    отфильтрованы по родителю автоматически, с нативной правкой
+    //    (CARDS_VIEWS_AUDIT §6). Основной способ ведения долей проекта.
+    //  • Виджет 2 (RECORD_TABLE на INDEX-view объекта) — полный реестр всех
+    //    долей (данные доступны после удаления пункта сайдбара).
+    // % от plannedEffort — follow-up (front-component с RestApiClient).
     {
       universalIdentifier:
         CREDOS_TIME_PROJECT_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
       title: 'Отделы',
       position: 7,
       icon: 'IconChartPie',
-      layoutMode: PageLayoutTabLayoutMode.CANVAS,
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
         {
           universalIdentifier:
             CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
-          title: 'Доли отделов',
-          type: 'FRONT_COMPONENT',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          title: 'Доли отделов проекта',
+          type: 'FIELDS',
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
-            configurationType: 'FRONT_COMPONENT',
-            frontComponentUniversalIdentifier:
-              CREDOS_TIME_PROJECT_DEPARTMENTS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_PROJECT_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все доли отделов (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],

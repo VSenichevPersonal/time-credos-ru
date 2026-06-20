@@ -449,11 +449,42 @@ export const CREDOS_TIME_PROJECT_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER =
   '3fd9e306-6520-4f6c-ab0d-793cfbb9ccdc';
 export const CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER =
   '580a44c5-d5be-4ab0-8364-781868a68618';
+// Виджет-реестр всех долей (RECORD_TABLE на INDEX-view объекта ProjectDepartment).
+export const CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER =
+  'eaed97e5-5166-45a0-bf1f-55009b0f2c60';
 // Project card-view «Проект — отделы» (code + departmentShares relation).
 export const CREDOS_TIME_PROJECT_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER =
   'b836a12c-f2c0-40e2-8795-646ef361bd1b';
 export const CREDOS_TIME_PROJECT_CARD_VF_6 = '8a21935d-5f83-4946-b292-12e197675727';
 export const CREDOS_TIME_PROJECT_CARD_VF_7 = '22ea7722-0edb-4b9b-b1af-4bc844712c53';
+
+// --- REQ-0011 (FTE-HEADCOUNT): сотрудник × отдел(ы) в % FTE с датами ---
+// Join-объект credosTimeEmployeeDepartment (employee × department × ftePercent
+// × startDate × endDate). Зеркало REQ-0013 «Доли отделов проекта». Численность
+// отдела = Σ(ftePercent/100) сотрудников с активной записью в периоде. Fallback:
+// нет записей → старый count по employee.departmentId (100%). Управление —
+// в карточке сотрудника (Dev1); index-view без отдельного nav-пункта.
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER =
+  '562c89a6-6604-4447-ba20-acf1dc9c08eb';
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_EMPLOYEE_FIELD_ID =
+  'adf953c7-e16f-4350-aa0c-a26823fb873e';
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_DEPARTMENT_FIELD_ID =
+  'e9c4cf7f-ef58-44ae-8e86-997808694721';
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_FTE_PERCENT_FIELD_ID =
+  'd3cdcfd7-3d4c-4a68-8d9c-53ddf305f697';
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_START_DATE_FIELD_ID =
+  'c8c22fdb-7498-4bc3-8795-3517c0659947';
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_END_DATE_FIELD_ID =
+  'a096e868-b5b4-4af2-90bd-5baa43413aa3';
+// Обратная сторона на Employee (ONE_TO_MANY): назначения сотрудника на отделы.
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_ASSIGNMENTS_FIELD_ID =
+  'c70dc6df-2bac-44cb-90fe-87cd99073b16';
+// Обратная сторона на Department (ONE_TO_MANY): FTE-назначения сотрудников отдела.
+export const CREDOS_TIME_DEPARTMENT_EMPLOYEE_ASSIGNMENTS_FIELD_ID =
+  '696fe49f-d716-4a24-aefd-aeff7b7f8662';
+// Index-view (для существования объекта; без отдельного nav-пункта).
+export const CREDOS_TIME_EMPLOYEE_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER =
+  '7df869ab-bedc-41cc-b35b-cb60193e4cff';
 
 // Post-install бэкфилл REQ-0013 13a: project.departmentId → доля 100% в join.
 // ЕДИНСТВЕННАЯ post-install функция приложения (SDK берёт E[0]) — будущие

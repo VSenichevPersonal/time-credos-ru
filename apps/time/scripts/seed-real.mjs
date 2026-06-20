@@ -268,75 +268,52 @@ if (!EMPLOYEES || EMPLOYEES.length === 0) {
 }
 console.log(`  [сотрудники] источник: ${empSource}`);
 
-// --- РЕАЛЬНЫЕ клиенты Директум5: ключ = короткое имя (Company.name), legal = юрлицо.
-const CLIENTS = [
-  { key: 'Мостоотряд-47', legal: 'ООО ФСК "Мостоотряд-47"' },
-  { key: 'Никольская Консалтинг', legal: 'ООО "Никольская Консалтинг"' },
-  { key: 'КрафтХайнц Восток', legal: 'ООО «КрафтХайнц Восток»' },
-  { key: 'НКТех (АЕОН)', legal: 'ООО ИК «Аеон»' },
-  { key: 'Белоблводоканал', legal: 'ГУП "Белгородский Областной Водоканал"' },
-  { key: 'Донбасстеплоэнерго', legal: 'ГУП ДНР "Донбасстеплоэнерго"' },
-  { key: 'ТехноНиколь', legal: 'ООО "Управление КВ" (ТехноНиколь)' },
-  { key: 'Геберит Рус', legal: 'ООО "Геберит Рус"' },
-  { key: 'Аэросила', legal: 'ПАО НПП "Аэросила"' },
-  { key: 'ТАМАК', legal: 'АО "ТАМАК"' },
-  { key: 'Гипростроймост — СПб', legal: 'АО "Институт Гипростроймост - Санкт-Петербург"' },
-  { key: 'Автодор-Инжиниринг', legal: 'ООО "Автодор-Инжиниринг"' },
-  { key: 'Гайде', legal: 'АО СК "Гайде"' },
-  { key: 'Евротэк-Югра', legal: 'АО "Евротэк-Югра"' },
-  { key: 'ИДС Боржоми', legal: 'ООО "Идс Боржоми"' },
-];
-const CLIENT_KEYS = CLIENTS.map((c) => c.key);
+// --- Клиенты/проекты (CISO-009: коммерческая тайна не в трекаемых файлах) ---
+// ПРИНЦИП (зеркало сотрудников, CISO-001): реальные клиенты Кредо-С + Directum-коды
+// читаются в рантайме из gitignored `.clients.local.json`. Трекаемый скрипт содержит
+// ТОЛЬКО синтетику (Клиент-NN / ООО «Пример-NN»). Цель: 0 реальных юрлиц/кодов в git.
+const LOCAL_CLIENTS = join(__dir, '.clients.local.json');
 
-// --- ОВ: реальные Directum-проекты (код + название из выгрузки), привязка к client.
-const OV_PROJECTS = [
-  { code: '2021-0544', name: 'Мостоотряд-47 (DIRECTUM RX)', client: 'Мостоотряд-47' },
-  { code: 'К2023-450-С5', name: 'МО-47. Спец5. ОВКА', client: 'Мостоотряд-47' },
-  { code: '2023-210', name: 'НИКО. Развитие. RX', client: 'Никольская Консалтинг' },
-  { code: '2023-210-С4', name: 'НИКО. Спец4. Интеграция с MS Exchange', client: 'Никольская Консалтинг' },
-  { code: '2024-158', name: 'Хайнц (Heinz)', client: 'КрафтХайнц Восток' },
-  { code: '2024-656-ТП', name: 'Хайнц. Техподдержка', client: 'КрафтХайнц Восток' },
-  { code: '2022-25', name: 'АЕОН (Directum RX, разработка + интеграция с 1С)', client: 'НКТех (АЕОН)' },
-  { code: 'КР-2025-255', name: 'НКТех (бывш. АЕОН). Развитие', client: 'НКТех (АЕОН)' },
-  { code: '2022-1012', name: 'Белоблводоканал (DIRECTUM RX)', client: 'Белоблводоканал' },
-  { code: '2023-111', name: 'ДТЭ. Внедрение', client: 'Донбасстеплоэнерго' },
-  { code: '3-ТНК', name: 'Проект DIRECTUM для Технониколь (тендер)', client: 'ТехноНиколь' },
-  { code: '2021-49', name: 'Геберит РУС (DIRECTUM RX)', client: 'Геберит Рус' },
-  { code: '2021-502', name: 'Аэросила (DIRECTUM 5, канцелярия)', client: 'Аэросила' },
-  { code: '30332', name: 'ТАМАК. Проект МКДО DIRECTUM 5', client: 'ТАМАК' },
-  { code: 'КР-2026-2007', name: 'Гипростроймост. СЭД', client: 'Гипростроймост — СПб' },
-  { code: 'КР-2026-2181', name: 'Гипростроймост. HR PRO', client: 'Гипростроймост — СПб' },
-  { code: '2021-001', name: 'Автодор-Инжиниринг (DIRECTUM RX с разработкой)', client: 'Автодор-Инжиниринг' },
-  { code: '2024-206', name: 'Гайде (Directum RX)', client: 'Гайде' },
-  { code: '30432', name: 'Евротэк-Югра (DIRECTUM RX)', client: 'Евротэк-Югра' },
-  { code: '2020-544', name: 'Боржоми (DIRECTUM RX, HR-процессы)', client: 'ИДС Боржоми' },
-];
+// Синтетика: 15 клиентов + 19 ОВ-проектов + ИБ/ИТ по 5 отделам. Проекты ссылаются
+// на синтетических клиентов по ключу (referential integrity сохранена).
+const SYNTH_CLIENTS = Array.from({ length: 15 }, (_, i) => ({
+  key: `Клиент-${String(i + 1).padStart(2, '0')}`,
+  legal: `ООО «Пример-${i + 1}»`,
+}));
+const SK = SYNTH_CLIENTS.map((c) => c.key);
 
-// --- ИБ/ИТ-проекты под реальных клиентов (правдоподобные, по профилю Кредо-С).
-const IB_PROJECTS = {
+// Синтетические ОВ-проекты (реальные Directum-коды → в .clients.local.json).
+const SYNTH_OV_PROJECTS = Array.from({ length: 20 }, (_, i) => ({
+  code: `DEMO-OV-${String(i + 1).padStart(3, '0')}`,
+  name: `Демо-проект ОВ ${i + 1}`,
+  client: SK[i % SK.length],
+}));
+
+// Синтетические ИБ/ИТ-проекты (реальные привязки клиентов → в .clients.local.json).
+const SYNTH_IB_PROJECTS = {
   OIB: [
-    { suffix: 'Категорирование КИИ', client: 'Аэросила', category: 'Client' },
-    { suffix: 'Защита ПДн (152-ФЗ)', client: 'Белоблводоканал', category: 'Client' },
-    { suffix: 'Аудит ИБ', client: 'Гипростроймост — СПб', category: 'Client' },
-    { suffix: 'Аттестация ГИС', client: 'Донбасстеплоэнерго', category: 'Client' },
-    { suffix: 'Аудит ГОСТ Р 57580', client: 'Гайде', category: 'Client' },
+    { suffix: 'Категорирование КИИ', client: SK[0], category: 'Client' },
+    { suffix: 'Защита ПДн (152-ФЗ)', client: SK[1], category: 'Client' },
+    { suffix: 'Аудит ИБ', client: SK[2], category: 'Client' },
+    { suffix: 'Аттестация ГИС', client: SK[3], category: 'Client' },
+    { suffix: 'Аудит ГОСТ Р 57580', client: SK[4], category: 'Client' },
     { suffix: 'Моделирование угроз и ОРД', category: 'Presale' },
-    { suffix: 'Пилот защиты АРМ', client: 'ТАМАК', category: 'Pilot' },
+    { suffix: 'Пилот защиты АРМ', client: SK[5], category: 'Pilot' },
   ],
   OPIB: [
-    { suffix: 'Пентест внешнего периметра', client: 'НКТех (АЕОН)', category: 'Client' },
-    { suffix: 'Анализ защищённости web-приложения', client: 'КрафтХайнц Восток', category: 'Client' },
-    { suffix: 'Внутренний пентест', client: 'Мостоотряд-47', category: 'Client' },
-    { suffix: 'Киберучения / фишинг', client: 'Геберит Рус', category: 'Client' },
+    { suffix: 'Пентест внешнего периметра', client: SK[6], category: 'Client' },
+    { suffix: 'Анализ защищённости web-приложения', client: SK[7], category: 'Client' },
+    { suffix: 'Внутренний пентест', client: SK[8], category: 'Client' },
+    { suffix: 'Киберучения / фишинг', client: SK[9], category: 'Client' },
     { suffix: 'Анализ защищённости', category: 'Presale' },
-    { suffix: 'Пилот мониторинга ИБ', client: 'Евротэк-Югра', category: 'Pilot' },
+    { suffix: 'Пилот мониторинга ИБ', client: SK[10], category: 'Pilot' },
   ],
   TC: [
-    { suffix: 'Комплексное администрирование ИТ', client: 'ТАМАК', category: 'Client' },
-    { suffix: 'Импортозамещение инфраструктуры', client: 'Автодор-Инжиниринг', category: 'Client' },
-    { suffix: 'Мониторинг ИТ', client: 'Боржоми (ИДС Боржоми)', category: 'Client' },
+    { suffix: 'Комплексное администрирование ИТ', client: SK[11], category: 'Client' },
+    { suffix: 'Импортозамещение инфраструктуры', client: SK[12], category: 'Client' },
+    { suffix: 'Мониторинг ИТ', client: SK[13], category: 'Client' },
     { suffix: 'Облачная миграция', category: 'Presale' },
-    { suffix: 'Обслуживание ИТ-инфраструктуры Кредо-С', category: 'Infrastructure' },
+    { suffix: 'Обслуживание ИТ-инфраструктуры (внутр.)', category: 'Infrastructure' },
   ],
   OPR: [
     { suffix: 'Разработка модуля учёта трудозатрат (time)', category: 'Internal' },
@@ -345,6 +322,26 @@ const IB_PROJECTS = {
     { suffix: 'Внутренний инструмент аналитики', category: 'Internal' },
   ],
 };
+
+// Приоритет: gitignored .clients.local.json (реальные) → синтетика (трекаемая).
+let CLIENTS;
+let OV_PROJECTS;
+let IB_PROJECTS;
+let clientSource;
+if (existsSync(LOCAL_CLIENTS)) {
+  const j = JSON.parse(readFileSync(LOCAL_CLIENTS, 'utf8'));
+  CLIENTS = j.clients;
+  OV_PROJECTS = j.ovProjects;
+  IB_PROJECTS = j.ibProjects;
+  clientSource = `.clients.local.json (${CLIENTS.length} клиентов)`;
+} else {
+  CLIENTS = SYNTH_CLIENTS;
+  OV_PROJECTS = SYNTH_OV_PROJECTS;
+  IB_PROJECTS = SYNTH_IB_PROJECTS;
+  clientSource = `синтетический набор «Клиент-NN» (${CLIENTS.length} клиентов)`;
+}
+const CLIENT_KEYS = CLIENTS.map((c) => c.key);
+console.log(`  [клиенты] источник: ${clientSource}`);
 
 // ===========================================================================
 // ЗАЛИВКА
