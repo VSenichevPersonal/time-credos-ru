@@ -15,7 +15,7 @@ export default definePageLayout({
   tabs: [
     {
       universalIdentifier: MAIN_PAGE_LAYOUT_TAB_UNIVERSAL_IDENTIFIER,
-      title: 'Overview',
+      title: 'Обзор',
       position: 0,
       icon: 'IconApps',
       layoutMode: PageLayoutTabLayoutMode.CANVAS,

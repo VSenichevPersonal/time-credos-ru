@@ -1,6 +1,7 @@
 // Типы доски планирования загрузки (capacity).
 
-export type CapacityMode = 'overview' | 'detail';
+// Метрика ячейки. Дефолт — «свободно ч» (то, что продажи могут ещё обещать).
+export type CellMetric = 'pct' | 'free' | 'plan';
 
 // Отдел с параметрами ёмкости.
 export type DeptRef = {
@@ -41,6 +42,7 @@ export type Period = {
 export type LoadCell = {
   capacity: number; // ёмкость (человеко-часы)
   load: number; // плановая загрузка (человеко-часы)
+  free: number; // свободно = ёмкость − загрузка (может быть < 0 при перегрузе)
   ratio: number | null; // load/capacity (null если ёмкость 0)
 };
 

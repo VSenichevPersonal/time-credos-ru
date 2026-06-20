@@ -12,7 +12,9 @@
 
 | ID | Тема | Статус | Источник | Файл |
 |---|---|---|---|---|
-| REQ-0001 | Approval: RBAC роли «Руководитель» + separation of duties | PROPOSED | CISO #002, handoff DEV2 | [REQ-0001-approval-rbac-sod.md](REQ-0001-approval-rbac-sod.md) |
+| REQ-0001 | Approval: RBAC роли «Руководитель» + separation of duties | PARTIALLY_IMPL (guard спуфится) | CISO #002, handoff DEV2 | [REQ-0001-approval-rbac-sod.md](REQ-0001-approval-rbac-sod.md) |
+| REQ-0002 | Финансы: PNL по проекту | PROPOSED (бэклог) | arch волна-2, Timetta | [REQ-0002-finance-pnl.md](REQ-0002-finance-pnl.md) |
+| REQ-0003 | Контракт `/s/reports`: утилизация/недогруз/агрегаты | DRAFT (design-proposal) | arch волна-2 R2-D2 + UX-2 | [REQ-0003-reports-aggregates-contract.md](REQ-0003-reports-aggregates-contract.md) |
 
 ## Шаблон записи
 

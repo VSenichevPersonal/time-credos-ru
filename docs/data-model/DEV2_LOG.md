@@ -31,6 +31,16 @@
 
 **Наблюдение (новое, к CISO):** в `seed-real.mjs` остаются реальные клиенты + юрлица (ООО/ГУП, `legal:`) + трудозатраты по ним — confidential business data вне scope #001 (employee PII). Кандидат в отдельный finding.
 
+**Исследование SDK (D2-1 / CISO-002 корень):** проверил twenty-sdk + openapi. `LogicFunctionEvent` несёт только `userWorkspaceId`; `/rest/workspaceMembers` без поля `userWorkspaceId`; `/userWorkspaces` не в REST → **чистого REST-резолва `userWorkspaceId→workspaceMember` нет**. Итог + 4 опции + рекомендация (ENV-allowlist по userWorkspaceId как interim + DevOps probe GraphQL) → [REQ-0001 «Исследование SDK»](../requirements/REQ-0001-approval-rbac-sod.md). Тегнул DevOps на probe.
+
+---
+
+## 2026-06-20 — волна-2: контракт reports + REQ-0002
+
+- **REQ-0003** `/s/reports` контракт (design-proposal): утилизация (`project.category==='Client'`), норма из WorkdayCalendar × capacityFactor, недогруз, groupBy department/employee/project/category/period, JSON-схема rows+totals, UX-2 по сотруднику, критерии приёмки QA. Цель — Dev1/QA параллельно с кодом.
+- **REQ-0002** Финансы PNL (PROPOSED, бэклог) по ask arch — stub: ставки + доход BillingLink + `/s/pnl`, блок=связка 1С.
+- Реестр REQ обновлён (README). Ждём arch: аппрув формул + кто реализует reports.logic (я / параллельный Dev2-агент).
+
 ---
 
 ## Карта рабочих доков Dev 2

@@ -1,15 +1,17 @@
-import { T, loadTone, formatPct } from 'src/front-components/capacity/cap-tokens';
-import type { DeptRef, LoadCell, Period } from 'src/front-components/capacity/types';
+import { T, loadTone, formatCell } from 'src/front-components/capacity/cap-tokens';
+import type { CellMetric, DeptRef, LoadCell, Period } from 'src/front-components/capacity/types';
+import { departmentLabel } from 'src/constants/labels';
 
-// Строка отдела в режиме «Общий»: название + ячейки % загрузки по периодам.
-// Кликабельна (в режиме детализации раскрывает проекты).
+// Строка отдела: имя + чип допущений (N чел × коэф) + бейдж «свободен с» +
+// ячейки по выбранной метрике. Всегда раскрываема (клик → проекты отдела).
 
 type Props = {
   dept: DeptRef;
   cells: LoadCell[];
   periods: Period[];
   nameWidth: number;
-  expandable: boolean;
+  metric: CellMetric;
+  freeFrom: string | null;
   expanded: boolean;
   onToggle: () => void;
 };
@@ -19,45 +21,60 @@ export const DeptRow = ({
   cells,
   periods,
   nameWidth,
-  expandable,
+  metric,
+  freeFrom,
   expanded,
   onToggle,
-}: Props) => (
+}: Props) => {
+  // Видимая подпись — кириллица-аббревиатура отдела (ОПИБ/ОИБ/ТЦ/…), не латиница.
+  // Полное название — в тултипе (title).
+  const shortName = dept.code ? departmentLabel(dept.code, { short: true }) : dept.name;
+  const fullName = dept.code ? departmentLabel(dept.code) : dept.name;
+  return (
   <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
     <button
-      onClick={expandable ? onToggle : undefined}
+      onClick={onToggle}
       style={{
         width: nameWidth,
         minWidth: nameWidth,
         textAlign: 'left',
         padding: '0 12px',
-        height: 40,
+        height: 46,
         display: 'flex',
-        alignItems: 'center',
-        gap: 6,
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: 2,
         border: 'none',
         borderRight: `1px solid ${T.border}`,
         background: T.surface,
-        cursor: expandable ? 'pointer' : 'default',
+        cursor: 'pointer',
         fontFamily: 'inherit',
-        fontSize: 13,
-        fontWeight: 600,
         color: T.text,
         position: 'sticky',
         left: 0,
         zIndex: 1,
       }}
     >
-      {expandable && (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ color: T.textFaint, fontSize: 10, width: 10 }}>
           {expanded ? '▾' : '▸'}
         </span>
-      )}
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {dept.code ?? dept.name}
+        <span
+          title={fullName}
+          style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
+          {shortName}
+        </span>
+        <span style={{ color: T.textFaint, fontSize: 11, fontWeight: 400, whiteSpace: 'nowrap' }}>
+          {dept.headcount} чел · ×{dept.capacityFactor}
+        </span>
       </span>
-      <span style={{ color: T.textFaint, fontSize: 11, fontWeight: 400 }}>
-        {dept.headcount} чел.
+      <span style={{ paddingLeft: 16, fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap' }}>
+        {freeFrom ? (
+          <span style={{ color: '#15803d' }}>свободен с {freeFrom}</span>
+        ) : (
+          <span style={{ color: T.textFaint }}>нет окна в горизонте</span>
+        )}
       </span>
     </button>
 
@@ -67,11 +84,11 @@ export const DeptRow = ({
       return (
         <div
           key={p.key}
-          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч`}
+          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч · свободно ${Math.round(cell.free)} ч`}
           style={{
             flex: 1,
             minWidth: 56,
-            height: 40,
+            height: 46,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -81,11 +98,13 @@ export const DeptRow = ({
             fontSize: 12.5,
             fontWeight: 600,
             fontVariantNumeric: 'tabular-nums',
+            boxShadow: i === 0 ? `inset 2px 0 0 ${T.accentRing}` : undefined,
           }}
         >
-          {formatPct(cell.ratio)}
+          {formatCell(metric, cell)}
         </div>
       );
     })}
   </div>
-);
+  );
+};

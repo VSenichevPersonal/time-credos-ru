@@ -41,6 +41,7 @@ export const GridRow = ({
   >
     <div style={{ padding: '5px 12px', borderRight: `1px solid ${T.border}`, minWidth: 0 }}>
       <div
+        title={projectName}
         style={{
           fontSize: 13,
           fontWeight: 600,
@@ -53,6 +54,7 @@ export const GridRow = ({
         {projectName}
       </div>
       <div
+        title={workTypeName}
         style={{
           fontSize: 11,
           color: T.textMuted,

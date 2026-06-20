@@ -4,20 +4,32 @@ import { T, FONT } from 'src/front-components/capacity/cap-tokens';
 import { Center } from 'src/front-components/grid/center';
 import { Segmented } from 'src/front-components/capacity/mode-switcher';
 import { PeriodHeader } from 'src/front-components/capacity/period-header';
+import { SummaryRow } from 'src/front-components/capacity/summary-row';
 import { DeptRow } from 'src/front-components/capacity/dept-row';
 import { ProjectDetail } from 'src/front-components/capacity/project-detail';
 import { useCapacity, type Granularity } from 'src/front-components/capacity/use-capacity';
-import { deptLoadCells, deptProjectLoads } from 'src/front-components/capacity/calc-load';
-import type { CapacityMode } from 'src/front-components/capacity/types';
+import {
+  deptLoadCells,
+  deptProjectLoads,
+  firstFreePeriod,
+  summaryCells,
+} from 'src/front-components/capacity/calc-load';
+import type { CellMetric } from 'src/front-components/capacity/types';
 
-const NAME_WIDTH = 200;
+const NAME_WIDTH = 240;
 
-// Доска планирования загрузки CAPACITY. 2 режима (Общий / Детализация),
-// 2 гранулярности (Недели / Месяцы). Ёмкость считается из производственного
-// календаря РФ (credosTimeWorkdayCalendar), не из фикс. 40ч.
+// Доска планирования загрузки. Отвечает на вопрос продаж «когда отдел свободен,
+// чтобы взять проект» (бейдж «свободен с» + метрика «свободно ч»). Ёмкость — из
+// производственного календаря РФ (credosTimeWorkdayCalendar), не фикс. 40ч.
+
+const HINT: Record<CellMetric, string> = {
+  free: 'Свободно ч = ёмкость − план (по производственному календарю РФ)',
+  pct: 'Загрузка % = план / ёмкость',
+  plan: 'План ч = плановые часы проектов отдела в периоде',
+};
 
 export const CapacityBoard = () => {
-  const [mode, setMode] = useState<CapacityMode>('overview');
+  const [metric, setMetric] = useState<CellMetric>('free');
   const [granularity, setGranularity] = useState<Granularity>('week');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -28,6 +40,11 @@ export const CapacityBoard = () => {
     for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods));
     return map;
   }, [departments, projects, periods]);
+
+  const summary = useMemo(
+    () => summaryCells([...cellsByDept.values()], periods),
+    [cellsByDept, periods],
+  );
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -62,14 +79,16 @@ export const CapacityBoard = () => {
           flexWrap: 'wrap',
         }}
       >
+        <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Планирование</span>
         <Segmented
-          ariaLabel="Режим доски"
-          value={mode}
+          ariaLabel="Метрика ячейки"
+          value={metric}
           segments={[
-            { value: 'overview', label: 'Общий' },
-            { value: 'detail', label: 'Детализация' },
+            { value: 'free', label: 'Свободно ч' },
+            { value: 'pct', label: 'Загрузка %' },
+            { value: 'plan', label: 'План ч' },
           ]}
-          onChange={setMode}
+          onChange={setMetric}
         />
         <Segmented
           ariaLabel="Гранулярность"
@@ -81,7 +100,7 @@ export const CapacityBoard = () => {
           onChange={setGranularity}
         />
         <span style={{ marginLeft: 'auto', fontSize: 11.5, color: T.textFaint }}>
-          Загрузка = план / ёмкость по производственному календарю РФ
+          {HINT[metric]}
         </span>
       </div>
 
@@ -92,13 +111,14 @@ export const CapacityBoard = () => {
           <Center>Нет отделов для планирования</Center>
         ) : (
           <div style={{ minWidth: NAME_WIDTH + periods.length * 56 }}>
-            <PeriodHeader periods={periods} nameWidth={NAME_WIDTH} />
+            <PeriodHeader periods={periods} nameWidth={NAME_WIDTH} granularity={granularity} />
+
+            <SummaryRow cells={summary} periods={periods} nameWidth={NAME_WIDTH} metric={metric} />
+
             {departments.map((dept) => {
               const cells = cellsByDept.get(dept.id) ?? [];
-              const isOpen = mode === 'detail' && expanded.has(dept.id);
-              const detail = isOpen
-                ? deptProjectLoads(dept, projects, periods)
-                : null;
+              const isOpen = expanded.has(dept.id);
+              const detail = isOpen ? deptProjectLoads(dept, projects, periods) : null;
               return (
                 <div key={dept.id}>
                   <DeptRow
@@ -106,7 +126,8 @@ export const CapacityBoard = () => {
                     cells={cells}
                     periods={periods}
                     nameWidth={NAME_WIDTH}
-                    expandable={mode === 'detail'}
+                    metric={metric}
+                    freeFrom={firstFreePeriod(cells, periods)}
                     expanded={isOpen}
                     onToggle={() => toggle(dept.id)}
                   />

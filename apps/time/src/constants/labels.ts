@@ -17,6 +17,27 @@ export const DEPARTMENT_LABELS: Record<DepartmentCode, string> = {
   OPR: 'Отдел продуктовой разработки',
 };
 
+// Кириллица-аббревиатуры отделов (для компактных колонок: доска планирования).
+// Полное название — в DEPARTMENT_LABELS (тултип/где есть место).
+export const DEPARTMENT_SHORT_LABELS: Record<DepartmentCode, string> = {
+  OV: 'ОВ',
+  OIB: 'ОИБ',
+  OPIB: 'ОПИБ',
+  TC: 'ТЦ',
+  OPR: 'ОПР',
+};
+
+// Русский ярлык отдела по коду (любая строка). Неизвестный код → как есть.
+// short=true — кириллица-аббревиатура, иначе полное название.
+export const departmentLabel = (
+  code: string | null | undefined,
+  options?: { short?: boolean },
+): string => {
+  if (!code) return '';
+  const map = options?.short ? DEPARTMENT_SHORT_LABELS : DEPARTMENT_LABELS;
+  return map[code as DepartmentCode] ?? code;
+};
+
 export const WORK_CATEGORY_LABELS: Record<WorkCategory, string> = {
   Client: 'На клиента (эффективные)',
   Presale: 'Пресейл',

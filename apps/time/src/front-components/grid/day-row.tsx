@@ -48,8 +48,30 @@ export const DayRow = ({
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>{projectName}</div>
-        <div style={{ fontSize: 11.5, color: T.textMuted, marginTop: 1 }}>
+        <div
+          title={projectName}
+          style={{
+            fontSize: 13.5,
+            fontWeight: 600,
+            color: T.text,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
+          {projectName}
+        </div>
+        <div
+          title={description ? `${workTypeName} · ${description}` : workTypeName}
+          style={{
+            fontSize: 11.5,
+            color: T.textMuted,
+            marginTop: 1,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {workTypeName}
           {description ? (
             <span style={{ color: T.textFaint }}> · {description}</span>

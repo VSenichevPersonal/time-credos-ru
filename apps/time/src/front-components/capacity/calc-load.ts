@@ -111,7 +111,33 @@ export const deptLoadCells = (
     for (const p of projects) {
       if (p.departmentId === dept.id) load += projectHoursInPeriod(p, period);
     }
-    return { capacity, load, ratio: capacity > 0 ? load / capacity : null };
+    return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
+  });
+
+// Первый период, где отдел освобождается (ratio < threshold) — ответ продажам
+// «когда обещать старт». null = окна в горизонте нет.
+export const firstFreePeriod = (
+  cells: LoadCell[],
+  periods: Period[],
+  threshold = 0.9,
+): string | null => {
+  for (let i = 0; i < cells.length; i++) {
+    const r = cells[i].ratio;
+    if (r !== null && r < threshold) return periods[i].label;
+  }
+  return null;
+};
+
+// Сводная строка «Все отделы»: суммарная ёмкость/загрузка компании по периодам.
+export const summaryCells = (perDept: LoadCell[][], periods: Period[]): LoadCell[] =>
+  periods.map((_, i) => {
+    let capacity = 0;
+    let load = 0;
+    for (const cells of perDept) {
+      capacity += cells[i]?.capacity ?? 0;
+      load += cells[i]?.load ?? 0;
+    }
+    return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
   });
 
 // Детализация: вклад каждого проекта отдела по периодам (только с планом/датами).
