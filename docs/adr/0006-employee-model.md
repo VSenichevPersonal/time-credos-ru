@@ -46,6 +46,8 @@
    - UI/таймшит/approval: отображаемое имя — резолв: если `workspaceMemberRef` → WorkspaceMember.name, иначе профиль.
    - Оценка миграции: 1 затронутая запись сейчас (vs@credos.ru) → дёшево внедрить ДО масштабирования штата в юзеры.
 2. Зафиксировать резолв ID в коде (см. REQ-0001: `userWorkspaceId`≠`workspaceMemberId`).
-3. CISO review: field-level RBAC на остаточные ПДн-поля профиля.
+3. **`email = NULL` для не-юзеров** (CISO review): для сотрудников без `workspaceMemberRef` поле `email` НЕ заполнять (оставлять null); источник email существует только у юзеров через `WorkspaceMember.userEmail`. Предотвращает случайное дублирование ПДн при импорте/сиде. (Минимизация ПДн, 152-ФЗ.)
+4. CISO review (RBAC-волна): field-level RBAC — скрыть `firstName`/`lastName`/`middleName`/`email` для ролей без HR-доступа (когда появятся). До RBAC-волны — OPEN.
+5. CISO-004 (catalog PII видимость) — отдельный трек, владелец до старта catalog-app (OPEN).
 
 > UUID-стабильность (ADR-0004): рефактор полей НЕ меняет опубликованные `universalIdentifier`. Удаление поля = миграция данных → согласовать с DevOps/arch.

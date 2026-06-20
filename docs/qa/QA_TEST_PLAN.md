@@ -6,15 +6,19 @@
 ## Приоритеты (что покрываем и почему)
 
 ### P0 — критичные расчёты и инварианты (unit, без сервера)
-- **`front-components/capacity/calc-load.ts`** — ёмкость/загрузка отделов. Ошибка = неверное планирование. ✅ покрыто (17).
-- **`constants/universal-identifiers.ts`** — UUID v4 + уникальность. Дубль/невалид = коллизия данных при sync. ✅ покрыто (129).
+- **`front-components/capacity/calc-load.ts`** — ёмкость/загрузка, бейдж «свободен с». ✅ покрыто (25 тестов).
+- **`constants/universal-identifiers.ts`** — UUID v4 + уникальность. ✅ покрыто (147).
 - **`constants/approval.ts`** — `isApprovalRequired` (приоритет проект/отдел). ✅ покрыто (6).
-- **`front-components/grid/` хелперы** — расчёт тоталов сетки, дни недели, агрегаты часов (Decimal). 🔴 gap.
-- **`constants/select-options.ts`** — `buildOptions` (форма SELECT-значений для БД). 🟡 gap.
+- **`constants/select-options.ts`** — cross-SSOT ENTRY_STATUS↔OPTIONS. ✅ покрыто (41).
+- **`constants/labels.ts`** — labels↔options синхронность. ✅ покрыто (16).
+- **`front-components/grid/format.ts`** — `parseHours`/`fmtHours`/`loadHint`/`loadColor`. ✅ покрыто (21).
+- **`logic-functions/reports-calc.ts`** — util/norm/under, byCategory, F-D норма с отсутствиями. ✅ покрыто (33+ тестов).
+- **`front-components/calendar/calc-month.ts`** — агрегат произв. календаря по месяцам/кварталам. ✅ покрыто (18 + 1 todo для [bug]#2).
+- **`front-components/grid/use-week.ts`** — дата-логика недели. 🟡 в хуке — нужен вынос (Dev 1).
 
 ### P1 — серверная бизнес-логика (unit с моком fetch / integration)
-- **`logic-functions/approval.logic.ts`** — `runSubmit`/`runResolve`/`buildApprovalMap`. Guard'ы статуса, фиксация actor. Связано с **CISO-002** (approve без авторизации). 🔴 gap — тест зафиксирует контракт guard'ов после введения роли «Руководитель».
-- **`logic-functions/time-entry-api.logic.ts`** — REST-фоллбэк. 🔴 gap.
+- **`logic-functions/approval.logic.ts`** — `runSubmit`/`runResolve`/`buildApprovalMap`. Guard'ы статуса, separation of duties (CISO-002). 🔴 gap — после роли «Руководитель» (RBAC-волна).
+- **`logic-functions/time-entry-api.logic.ts`** — CISO-005/006/007 security. 🟦 todo-спека (16 тестов, конвертируются после Dev 2 фикса).
 
 ### P2 — схема и приёмка (integration + smoke)
 - **`schema.integration-test.ts`** — CRUD на стандартных объектах. Нужен сервер. ✅ есть (typecheck починен).

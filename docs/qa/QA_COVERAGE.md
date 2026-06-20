@@ -1,19 +1,22 @@
 # QA — карта покрытия apps/time
 
-Живой документ. Обновляется при каждом приросте тестов. Дата среза: **2026-06-20**.
+Живой документ. Обновляется при каждом приросте тестов. Дата среза: **2026-06-21**.
 
 ## Сводка
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **494 + 12 todo** (9 файлов, все зелёные) |
+| unit-тестов | **557 + 17 todo** (10 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
-| backend-smoke (REST) | ✅ health 200 + 8/8 объектов 200 (без браузера) |
-| logic-smoke `/s/reports` | ✅ live: 3 группировки + H2 util=null + праздн. норма + арифметика |
-| browser-smoke UI (QA-1) | ⬜ §1-7 — блокирован (профиль+креды) |
+| backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
+| logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
+| logic-smoke P-D1 | ✅ live: PATCH plannedEffort 200 (restore ok) |
+| logic-smoke F-D | ✅ live: 11 absences (VACATION:4/SICK:3/UNPAID:2/OTHER:2) |
+| browser-smoke UI (QA-1) | ⬜ §1-7 — блокирован (chrome-devtools --isolated ждёт arch) |
 | oxlint | ✅ correctness=warn (61 правило, было 1) |
-| ждёт деплоя | пере-валидация op:delete ([bug]#1 fix, роль soft-delete) |
-| lint | ✅ 0/0 (112 файлов) |
+| [bug]#1 op:delete | ❌ всё ещё 400 — soft-delete не работает, нужен `canDestroyObjectRecords` |
+| [bug]#2 NaN guard | ⚠️ calc-month.ts L19 — NaN не проходит `m<0||m>11`, crash вместо skip (P3) |
+| lint | ✅ 0/0 |
 | typecheck | ✅ `tsc -b tsconfig.spec.json` exit 0 |
 
 ## Покрытие по модулям
@@ -23,21 +26,29 @@
 | `constants/approval.ts` | чистая логика | ✅ covered | `constants/approval.test.ts` |
 | `constants/universal-identifiers.ts` | инвариант данных | ✅ covered | `constants/universal-identifiers.test.ts` |
 | `constants/select-options.ts` | UI-пиклисты + cross-SSOT | ✅ covered | `constants/select-options.test.ts` |
-| `front-components/capacity/calc-load.ts` | расчёты | ✅ covered | `front-components/capacity/calc-load.test.ts` |
-| `front-components/grid/format.ts` | UX-логика ячеек/индикаторов | ✅ covered | `front-components/grid/format.test.ts` |
-| `objects/` ↔ `views/` ↔ `navigation-menu-items/` | schema-guard (pitfall) | ✅ covered | `__tests__/schema-guard.test.ts` |
-| `front-components/grid/use-week.ts` | дата-логика недели | 🟡 в хуке — нужен вынос чистой части (Dev 1) | — |
 | `constants/labels.ts` | cross-SSOT labels↔options | ✅ covered | `constants/labels.test.ts` |
-| `logic-functions/time-entry-api.logic.ts` | security-регресс | 🟦 todo-спека (CISO-005) | `logic-functions/time-entry-api.logic.test.ts` |
-| `logic-functions/approval.logic.ts` | серверная логика | 🔴 gap (P1, мок fetch, после роли REQ-0001) | — |
-| `logic-functions/time-entry-api.logic.ts` | серверная логика | 🔴 gap (P1) | — |
-| **UI-экраны (timesheet/capacity/карточки/нав)** | **browser-smoke** | **⬜ QA-1, приоритет волны** | `reports/QA_SMOKE_CHECKLIST.md` |
-| `objects/*` (схема `credosTime*`) | schema-guard | 🟡 предложено | — |
+| `front-components/capacity/calc-load.ts` | расчёты ёмкости/загрузки | ✅ covered | `front-components/capacity/calc-load.test.ts` |
+| `front-components/grid/format.ts` | UX-логика ячеек/индикаторов | ✅ covered | `front-components/grid/format.test.ts` |
+| `front-components/calendar/calc-month.ts` | агрегат произв. календаря | ✅ covered | `front-components/calendar/calc-month.test.ts` |
+| `logic-functions/reports-calc.ts` | отчёты: util/norm/under/byCategory/F-D норма | ✅ covered | `logic-functions/reports-calc.test.ts` |
+| `objects/` ↔ `views/` ↔ `navigation-menu-items/` | schema-guard (pitfall+UUID+fields) | ✅ covered | `__tests__/schema-guard.test.ts` |
+| `logic-functions/time-entry-api.logic.ts` | security-регресс CISO-005/006/007/008 | 🟦 todo-спека | `logic-functions/time-entry-api.logic.test.ts` |
+| `front-components/grid/use-week.ts` | дата-логика недели | 🟡 в хуке — нужен вынос (Dev 1) | — |
+| `logic-functions/approval.logic.ts` | guard'ы runSubmit/runResolve | 🔴 gap (P1, после роли «Руководитель» REQ-0001) | — |
+| **UI-экраны (timesheet/capacity/настройки/календарь)** | **browser-smoke** | **⬜ QA-1** | `reports/QA_SMOKE_CHECKLIST.md` |
 
-Легенда: ✅ covered · 🔴 gap (приоритет) · 🟡 предложено · ⚪ низкий приоритет.
+Легенда: ✅ covered · 🟦 todo-спека · 🔴 gap · 🟡 предложено · ⚪ низкий приоритет.
 
-## Очередь (next, UX/UI-first)
-1. 🔴 **QA-1 browser-smoke всех экранов** (`QA_SMOKE_CHECKLIST.md`) — как освободится браузер + будут тест-креды.
-2. 🟡 grid: вынести чистую дата-логику из `use-week`/grid-model → покрыть тоталы/дни.
-3. 🟡 schema-guard: префикс `credosTime` + object→view→nav-item (pitfall).
-4. 🔴 `approval.logic.ts` — guard'ы `runResolve` через мок `fetch` (после роли «Руководитель», связка CISO-002 / REQ-0001).
+## Открытые баги
+
+| # | Severity | Описание | Файл | Статус |
+|---|---|---|---|---|
+| [bug]#1 | P1 | `op:delete` → 400 PERMISSION_DENIED (нужен `canDestroyObjectRecords` в default-role) | `roles/default-role.ts` | ❌ ждёт arch |
+| [bug]#2 | P3 | `calc-month.ts`: NaN month-index проходит guard (crash вместо skip) | `front-components/calendar/calc-month.ts:19` | ⚠️ задокументирован `it.todo` |
+
+## Очередь (next)
+1. 🔴 **[bug]#1** → пере-валидация после `canDestroyObjectRecords` fix (ждёт `[synced]`)
+2. 🔴 **QA-1 browser-smoke** (`QA_SMOKE_CHECKLIST.md`) — ждёт --isolated в chrome-devtools-mcp
+3. 🔴 **CISO-005/006/007** → конвертировать `it.todo` в реальные тесты после Dev 2 фикса
+4. 🔴 `approval.logic.ts` — после роли «Руководитель» (RBAC-волна, связка CISO-002/REQ-0001)
+5. 🟡 grid: вынести чистую логику из `use-week` → покрыть тоталы/дни

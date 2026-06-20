@@ -13,19 +13,25 @@
 
 ```
 docs/security/
-├── README.md          ← навигация + posture (этот файл)
-├── STATUS.md          ← текущий posture + открытые findings + лог
-├── CISO_POLICY.md     ← policy + 152-ФЗ + правила PII/секретов/RBAC
-├── RISK_REGISTER.md   ← реестр рисков (ID, severity, статус, owner)
-├── PII_INVENTORY.md   ← карта ПДн (152-ФЗ ROPD-lite): поля, хранение, доступ
-├── findings/          ← детальные findings P0–P2 (репро, требование, DoD)
-│   ├── CISO-001-pii-in-git.md
-│   └── CISO-002-approval-rbac.md
-├── specs/             ← требования к разработке (для Dev 1/Dev 2)
-│   └── RBAC_APPROVAL.md
-├── reviews/           ← вердикты ciso-review по ADR
-│   └── ADR-REVIEW-LOG.md
-└── checklists/        ← операционные чек-листы
+├── README.md              ← навигация + posture (этот файл)
+├── STATUS.md              ← текущий posture + открытые findings + лог
+├── CISO_POLICY.md         ← policy + 152-ФЗ + правила PII/секретов/RBAC/filter-injection
+├── RISK_REGISTER.md       ← реестр рисков (CISO-001..008)
+├── PII_INVENTORY.md       ← карта ПДн (152-ФЗ ROPD-lite): поля, хранение, доступ
+├── PII_152FZ_REVIEW.md    ← ROPD-оценка по 152-ФЗ (C-1, прод-гейты)
+├── findings/              ← детальные findings (репро, требование, DoD)
+│   ├── CISO-001-pii-in-git.md          P1 MITIGATING
+│   ├── CISO-002-approval-rbac.md       P2
+│   ├── CISO-005-time-entry-idor.md     P1
+│   ├── CISO-006-filter-injection.md    P2
+│   ├── CISO-007-reports-data-disclosure.md  P2
+│   └── CISO-008-absence-pii.md         P3
+├── specs/                 ← требования к разработке (для Dev 1/Dev 2)
+│   ├── RBAC_APPROVAL.md   ← спека RBAC согласования (C1/C2/C3)
+│   └── RBAC_MODEL.md      ← полная матрица ролей (для RBAC-волны)
+├── reviews/               ← вердикты ciso-review по ADR
+│   └── ADR-REVIEW-LOG.md  ← ADR-0001..0006
+└── checklists/            ← операционные чек-листы
     └── pre-commit-security.md
 ```
 
@@ -34,11 +40,13 @@ docs/security/
 | Файл | Назначение |
 |---|---|
 | [STATUS.md](STATUS.md) | Текущий posture, открытые findings, лог изменений |
-| [RISK_REGISTER.md](RISK_REGISTER.md) | Реестр рисков (ID, severity, статус, owner) |
-| [CISO_POLICY.md](CISO_POLICY.md) | Security policy + 152-ФЗ posture + правила PII/секретов |
+| [RISK_REGISTER.md](RISK_REGISTER.md) | Реестр рисков CISO-001..008 (severity, статус, owner) |
+| [CISO_POLICY.md](CISO_POLICY.md) | Security policy + 152-ФЗ + правила PII/секретов/RBAC/filter/прод-гейты |
 | [PII_INVENTORY.md](PII_INVENTORY.md) | Карта ПДн: какие поля = PII, где хранятся, кто видит |
-| [specs/RBAC_APPROVAL.md](specs/RBAC_APPROVAL.md) | Спека RBAC согласования (для Dev 1/Dev 2) |
-| [reviews/ADR-REVIEW-LOG.md](reviews/ADR-REVIEW-LOG.md) | Вердикты ciso-review по ADR 0001–0004 |
+| [PII_152FZ_REVIEW.md](PII_152FZ_REVIEW.md) | ROPD-оценка: операции обработки, прод-гейты 152-ФЗ |
+| [specs/RBAC_APPROVAL.md](specs/RBAC_APPROVAL.md) | Спека RBAC согласования (C1 isManager, C2 SoD, C3 scope) |
+| [specs/RBAC_MODEL.md](specs/RBAC_MODEL.md) | Полная матрица ролей (Сотрудник/Руководитель/Владелец, RBAC-волна) |
+| [reviews/ADR-REVIEW-LOG.md](reviews/ADR-REVIEW-LOG.md) | Вердикты ciso-review по ADR 0001–0006 |
 | [checklists/pre-commit-security.md](checklists/pre-commit-security.md) | Чек-лист перед коммитом/push/sync |
 
 ## Принципы

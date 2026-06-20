@@ -21,6 +21,14 @@
 
 ## Лог
 
+### 2026-06-20 — волна-2 (продолжение)
+- Проактивный ревью всех logic-functions: найдены CISO-005 (P1 IDOR), CISO-006 (P2 filter injection), CISO-007 (P2 reports data disclosure), CISO-008 (P3 absence PII).
+- Ревью нового объекта `credosTimeAbsence` → CISO-008, PII_INVENTORY обновлён.
+- ADR security-review 0005–0006: оба approve с замечаниями (ADR-REVIEW-LOG обновлён).
+- Ответы команде: Settings S1 RBAC-требования, RBAC-волна модель ролей (Руководитель/Сотрудник/Владелец), DevOps research-ПДн политика.
+- `docs/security/specs/RBAC_MODEL.md` создан (матрица ролей для RBAC-волны).
+- Posture 🟡 LOW-MEDIUM: 2× P1 (CISO-001 MITIGATING, CISO-005 OPEN) + 3× P2 + 2× P3.
+
 ### 2026-06-20 — старт зоны
 - Онбординг CISO, начальный posture 🟢 LOW.
 - Заведена `docs/security/` (структура: policy / risk register / PII inventory / findings / specs / reviews / checklists / status).

@@ -37,3 +37,42 @@ Security policy + 152-ФЗ posture внутреннего инструмента
 ## 6. Эскалация findings
 
 `[ciso-finding] #N <P0-P3>` в SIGNALS. P0 = freeze коммитов до устранения. Регистрация в [RISK_REGISTER.md](RISK_REGISTER.md). Реализацию правок делает Dev 2 (Responsible по RBAC/PII), CISO даёт требования и ревьюит.
+
+## 7. Валидация client-params в logic-functions (anti-filter-injection)
+
+**Правило:** любой client-supplied параметр, интерполируемый в строку фильтра Twenty REST API, **обязан** быть валидирован по формату до интерполяции. Нарушение = injection условий в запрос (CISO-006).
+
+```typescript
+// UUID (employeeId, workspaceMemberRef, id, projectId, workTypeId, departmentId)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// ISO DateTime (from, to)
+const DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/;
+```
+
+Паттерн нарушения: `` `field[op]:${clientParam},status[eq]:DRAFT` `` без валидации → клиент инъецирует дополнительные условия.
+
+Применять во всех logic-functions: `time-entry-api`, `approval`, `reports` (и любых будущих). Исключение: параметры, полностью заданные сервером (hardcoded, не из client input).
+
+## 8. Авторизация агрегатных эндпоинтов
+
+**Правило:** эндпоинты, возвращающие данные нескольких сотрудников (`byEmployee`, `byDept` с детализацией до физлица), **обязаны** проверять роль actor до включения персональных данных в ответ.
+
+- `POST /s/reports` → `byEmployee` (ФИО + часы/утилизация): доступен только `isManager`. Без роли: `byEmployee: []`.
+- Любой будущий агрегатный endpoint с ФИО/часами физлиц — применить тот же принцип.
+- Зависимость: role-check через client `workspaceMemberRef` (временно) → server-side identity (CISO-005, целевое состояние).
+
+## 9. Медицинские ПДн (absence.note)
+
+**Правило:** поле `credosTimeAbsence.note` (TEXT) не должно содержать медицинских сведений (диагнозы, симптомы). Медицинские данные = спецкатегория 152-ФЗ ст. 10, требуют явного согласия и повышенной защиты.
+
+- UI: placeholder/help-текст «Примечание — не указывайте диагноз/медицинские сведения».
+- `PII_INVENTORY.md`: absence.note = «факт отсутствия без медицинских деталей».
+- При появлении HR-роли: field-level restriction (скрыть note от не-HR).
+
+## 10. Прод-гейты 152-ФЗ (до production deploy)
+
+1. РФ-контур хостинга (не Railway — нет РФ-региона) — ст. 18.5.
+2. ЛНА (локальные нормативные акты): реестр операций по обработке ПДн, согласия (не нужны для трудовых функций по ТК), инструктаж пользователей.
+3. API-ключ синка CRM↔time — в env secrets, TLS-канал. Синк = новая операция обработки ПДн → в ЛНА.
+4. `ENCRYPTION_KEY`/`APP_SECRET` зафиксированы до запуска.
+5. `seed-real.mjs` обезличен (CISO-001) — нет реальных ФИО/email в прод-деплое.

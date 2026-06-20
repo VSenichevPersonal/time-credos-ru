@@ -94,6 +94,10 @@ Settings → AI → MCP в Twenty. Endpoint `/mcp`. Конфиг Claude Code (`s
 | `Server does not expose a CLI client ID` | community-образ без OAuth-клиента | использовать `--api-key`, не OAuth |
 | SELECT reject на sync | значения не UPPER_SNAKE | опции SELECT в UPPER_CASE (ярлыки русские, коды латиницей) |
 | поле `position` конфликтует | системное поле POSITION | переименовать (напр. `jobTitle`) |
+| `INVALID_FIELD_INPUT: name "type" is reserved` (dry-run) | поле объекта названо `type` (зарезервировано Twenty) | переименовать поле (напр. `absenceType`); label/UUID-константу не трогать. Каскадом часто даёт ложную `INVALID_VIEW_DATA: Field metadata not found` — уходит после фикса имени |
+| `yarn test` → `Cannot connect to Twenty server` | дефолтный `test` = интеграционные (нужен сервер) | для юнитов `yarn test:unit` (vitest.unit.config.ts); интеграционные — только при живом сервере |
+| сид-скрипт падает `GET → 400 / exit 2` | объект ещё не задеплоен (dry-run only) | сперва `dev --once` (накат объекта), потом запуск сид-скрипта; скрипты идемпотентны |
+| right `403 PERMISSION_DENIED` на REST DELETE/PATCH под app-токеном | у дефолт-роли app нет per-object permissions (только top-level флаги) | задать явные `objectPermissions` (read/update/softDelete) на объекты в `default-role.ts` |
 | объект не виден в UI | нет view+nav | добавить `defineView` + `defineNavigationMenuItem` |
 | токен истёк (playground 2ч) | playground-токен | использовать постоянный API_KEY (exp далеко) |
 | front-component краш `getBoundingClientRect is not a function` | песочница Web Worker (Remote DOM) — НЕТ host DOM | не использовать getBoundingClientRect/window.innerHeight/document.* в front; направление/замеры — без DOM |

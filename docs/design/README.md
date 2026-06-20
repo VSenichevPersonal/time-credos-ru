@@ -8,13 +8,21 @@
 
 ```
 docs/design/
-├── README.md          ← этот файл (индекс зоны)
-├── UI_PLAYBOOK.md     ← гардрейлы UX/UI: как НЕ ловить баги фикс-виджетов (переполнение, клиппинг, скролл)
-├── BACKLOG.md         ← очередь задач Dev 1 (фичи, баги, предложения) с приоритетами
-├── proposals/         ← design-proposals (DP-NNNN): крупные изменения UI до реализации
-│   └── DP-0001-capacity-board-redesign.md
-└── audits/            ← критики/аудиты impeccable (снимки качества)
+├── README.md                  ← этот файл (индекс зоны)
+├── UI_PLAYBOOK.md             ← гардрейлы верстки в фикс-виджете (Web Worker, нет host-DOM, переполнение, скролл)
+├── FRONT_COMPONENT_RECIPES.md ← рецепты регистрации поверхностей (STANDALONE_PAGE / record-scoped / settingsCustomTab) + SDK-грабли
+├── BACKLOG.md                 ← очередь задач Dev 1 (сделано / готово-к-батчу / очередь) с приоритетами
+├── proposals/                 ← design-proposals (DP-NNNN): крупные изменения UI до реализации
+│   └── DP-0001-capacity-board-redesign.md  (✅ IMPLEMENTED)
+└── audits/                    ← критики/аудиты impeccable (снимки качества)
 ```
+
+**Реализованные front-component поверхности (карта):**
+- Разделы сайдбара (STANDALONE_PAGE): `capacity/` (Планирование), `calendar/` (Производственный календарь).
+- Главный виджет: `grid/` (таймшит, 3 режима + автосейв).
+- Виджеты карточек (record-scoped): `project-team/` (Команда проекта).
+- Settings: `settings/` (Настройки Time Credos, `settingsCustomTab`).
+- Дашборд (второй фронт-инстанс): `reports/` (Отчёты).
 
 ## Где SSOT дизайна
 

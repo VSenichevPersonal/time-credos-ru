@@ -41,9 +41,19 @@ Dev-fallback (если SDK не отдаёт роли в logic-function прос
 
 UI прячет approve/reject при `!isManager`, submit оставляет всем. Дублирует серверный контроль, не заменяет.
 
+## Статус реализации (Dev 2, волна-1, 2026-06-20)
+
+| Контроль | Статус | Детали |
+|---|---|---|
+| **C1** isManager | ✅ РЕАЛИЗОВАН | `approval.logic.ts` L139: `if (actor && !actor.isManager) return forbidden`. Dev-fallback: если actor не резолвлен (ref пуст) — guard пропускается с warn. |
+| **C2** actor ≠ owner | ✅ РЕАЛИЗОВАН | `approval.logic.ts` L159: `actor.employeeId === entry.employeeId → skippedOwn++`. Счётчик `skippedOwn` в ответе. |
+| **C3** scope отдела | ⏳ НЕ РЕАЛИЗОВАН | Отложено как P3. Руководитель видит все SUBMITTED. Добавить позже. |
+
+**⚠️ Зависимость от CISO-005:** C1/C2 работают через client-supplied `workspaceMemberRef`. Серверный enforcement только для замапленного юзера (сейчас 1/42). Полное закрытие — после server-side identity resolution.
+
 ## Definition of Done (для QA-приёмки)
 
-1. POST `/approval` op=approve от не-руководителя → `forbidden`, статус не изменился.
-2. Руководитель approve **своей** записи → отказ (C2).
-3. Руководитель approve чужой SUBMITTED → APPROVED + `approvedBy`/`approvedAt`.
-4. UI: у не-руководителя кнопок approve/reject нет.
+1. POST `/approval` op=approve от не-руководителя → `forbidden`, статус не изменился. ✅
+2. Руководитель approve **своей** записи → отказ (C2), `skippedOwn: 1`. ✅
+3. Руководитель approve чужой SUBMITTED → APPROVED + `approvedBy`/`approvedAt`. ✅
+4. UI: у не-руководителя кнопок approve/reject нет. ✅ (isManager gate Dev 1)

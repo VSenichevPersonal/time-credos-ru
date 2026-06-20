@@ -16,6 +16,11 @@
 | REQ-0002 | Финансы: PNL по проекту | PROPOSED (бэклог) | arch волна-2, Timetta | [REQ-0002-finance-pnl.md](REQ-0002-finance-pnl.md) |
 | REQ-0003 | Контракт `/s/reports`: утилизация/недогруз/агрегаты | IMPLEMENTED (задеплоен) | arch волна-2 R2-D2 + UX-2 | [REQ-0003-reports-aggregates-contract.md](REQ-0003-reports-aggregates-contract.md) |
 | REQ-0004 | credosTimePlanAllocation + гейт правки плана | PROPOSED | arch P-D2 (волна-3) | [REQ-0004-plan-allocation.md](REQ-0004-plan-allocation.md) |
+| REQ-0005 | Обязательность этапа в записи (project + conditional stage) | PROPOSED | заказчик | [REQ-0005-entry-stage-required.md](REQ-0005-entry-stage-required.md) |
+| REQ-0006 | Табель учёта (командировки/работа в выходной/переработка) | PROPOSED (бэклог) | заказчик, Timetta/Kimai | [REQ-0006-tabel-attendance.md](REQ-0006-tabel-attendance.md) |
+| REQ-0007 | Согласование по периодам (неделя/месяц) + обзор статусов | PROPOSED (бэклог) | заказчик, Timetta/Kimai | [REQ-0007-approval-by-period.md](REQ-0007-approval-by-period.md) |
+| REQ-0008 | Таймшит: контекст «чей» + селектор по роли | PROPOSED (бэклог) | заказчик, Timetta/Kimai | [REQ-0008-timesheet-person-selector.md](REQ-0008-timesheet-person-selector.md) |
+| REQ-0009 | Заявка на пресейл/пилот → согласование (Workflow) → план | PROPOSED (бэклог) | заказчик, Timetta/PSA | [REQ-0009-presale-request-to-plan.md](REQ-0009-presale-request-to-plan.md) |
 
 ## Шаблон записи
 

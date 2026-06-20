@@ -18,6 +18,8 @@
 **Вывод:** верстаем **без замеров DOM**. Направление/размер поповера — из **структурного знания** (где компонент стоит), не из `getBoundingClientRect`. Анимации — CSS-transition на `opacity`/`color`, не JS-измерения.
 
 > Источник: `research/twenty-sdk/fresh/layout/front-components.md`. Грабли стоили рабочего фикса (флип через `getBoundingClientRect` крашил в воркере).
+>
+> **Регистрация поверхностей (STANDALONE_PAGE / record-scoped / settingsCustomTab) + остальные SDK-грабли** (`navigate` требует `AppPath`, `useSelectedRecordIds`, `/s/` вызовы, дубль-UUID) — в [FRONT_COMPONENT_RECIPES.md](FRONT_COMPONENT_RECIPES.md).
 
 ## 1. Базовый закон
 

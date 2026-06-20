@@ -7,7 +7,8 @@ SSOT русской доменной терминологии. UI/i18n/доки 
 | Отдел | `credosTimeDepartment` | Department | OV/OIB/OPIB/… — 5 отделов |
 | Сотрудник | `credosTimeEmployee` | Employee | профиль (отдел+ёмкость); личность — `WorkspaceMember` |
 | Проект | `credosTimeProject` | Project | код `[ОТДЕЛ]-[ГОД]-[NNN]` + `externalCode` (1С) |
-| Этап | `credosTimeStage` | Stage | этап проекта |
+| Этап | `credosTimeStage` | Stage | этап проекта; **обязан иметь проект** (no orphan); запись с проектом-с-этапами обязана иметь этап (REQ-0005) |
+| Отсутствие | `credosTimeAbsence` | Absence | отпуск/больничный/без содержания/иное; период [start,end] вычитается из ёмкости (F-D) |
 | Вид работ | `credosTimeWorkType` | ~~Activity~~ (занято) | 38 видов; НЕ «Activity», НЕ «активность» |
 | Запись трудозатрат | `credosTimeEntry` | ~~TimeEntry~~ | НЕ «таймшит-запись» |
 | Связь с 1С | `credosTimeBillingLink` | BillingLink | биллинг/выгрузка |
@@ -27,6 +28,26 @@ SSOT русской доменной терминологии. UI/i18n/доки 
 | `SUBMITTED` | На согласовании |
 | `APPROVED` | Согласовано |
 | `REJECTED` | Отклонено |
+
+## Тип отсутствия (`credosTimeAbsence.absenceType`)
+
+Коды UPPER_CASE (SSOT: `constants/select-options.ts` `ABSENCE_TYPE_OPTIONS`). Поле названо `absenceType`, НЕ `type` (зарезервировано в Twenty).
+
+| Код | Русский (UI) |
+|---|---|
+| `VACATION` | Отпуск |
+| `SICK` | Больничный |
+| `UNPAID` | Без содержания |
+| `OTHER` | Иное |
+
+## Аналитика отчётов (`/s/reports`)
+
+| Термин | Где | Заметка |
+|---|---|---|
+| Утилизация | `util` | доля часов категории CLIENT / весь факт |
+| Недогруз | `under` | норма − факт (норма за вычетом отсутствий) |
+| Разрез по категории | `byCategory` | `[{category, hours, share}]` на строке отдела/проекта/сотрудника/итого (R3) |
+| Бюджет проекта | `budgetUsed` | факт / план (`plannedEffort`); >1 = перерасход (F-A) |
 
 ## Правила терминологии
 
