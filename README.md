@@ -94,6 +94,8 @@ time-credos-ru/
 | **Как разрабатываем и устанавливаем (workflow)** | `docs/DEV_WORKFLOW.md` |
 | **Синтез модели данных (все источники)** | `docs/DATA_MODEL_SYNTHESIS.md` |
 | План сид-данных (реальные ОВ + мок) | `docs/SEED_DATA_PLAN.md` |
+| Аудит целостности данных | `docs/DATA_INTEGRITY_AUDIT.md` |
+| Реестр сотрудников (Битрикс, 72 чел) | `Intel 03 Directum5/bitrix-users/roster.csv` |
 | Реальные трудозатраты Директум 5 | `Intel 03 Directum5/RECON.md` |
 | Каталог услуг 4 отделов | `Intel 03 Directum5/katalog-uslug-otdelov-2025.md` |
 | Что такое Timetta и как устроена? | `Intel 01 Timetta/RECON.md` |
