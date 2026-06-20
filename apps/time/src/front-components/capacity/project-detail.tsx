@@ -1,11 +1,14 @@
 import { T } from 'src/front-components/capacity/cap-tokens';
 import { DeptPlanRow } from 'src/front-components/capacity/dept-plan-row';
 import { ProjectPlanRow } from 'src/front-components/capacity/project-plan-row';
+import { PlannedProjectRow } from 'src/front-components/capacity/planned-project-row';
 import type {
   CapProject,
   DeptPlan,
   DeptPlanLoad,
+  DeptRef,
   Period,
+  ProjectDeptShare,
   ProjectLoad,
   ProjectPatch,
 } from 'src/front-components/capacity/types';
@@ -24,6 +27,9 @@ type Props = {
   planning?: boolean;
   onSave?: (id: string, patch: ProjectPatch) => Promise<boolean>;
   onSaveDeptPlan?: (id: string, patch: ProjectPatch) => Promise<boolean>; // REQ-0012
+  // Drill 3-й уровень: проект → доли по отделам (мульти-отдел REQ-0013 13b).
+  sharesByProject?: Map<string, ProjectDeptShare[]>;
+  deptById?: Map<string, DeptRef>;
 };
 
 // UX-5: name уже содержит «КОД · Клиент · Название» — показываем как есть.
@@ -95,6 +101,147 @@ const PlanningList = ({
   );
 };
 
+// Drill-строка проекта (read-mode): раскрывается в доли по отделам, если у
+// проекта >1 участвующего отдела. Иначе — обычная статичная строка (без мёртвых
+// кликов). Состояние раскрытия локальное (React, без host-DOM/URL).
+const deptCrumb = (id: string | null, deptById?: Map<string, DeptRef>): string => {
+  const dept = id ? deptById?.get(id) : undefined;
+  const code = dept?.code ?? null;
+  return code ? departmentLabel(code, { short: true }) || code : 'Без отдела';
+};
+
+const PlannedProjectRow = ({
+  load,
+  periods,
+  nameWidth,
+  sharesByProject,
+  deptById,
+}: {
+  load: ProjectLoad;
+  periods: Period[];
+  nameWidth: number;
+  sharesByProject?: Map<string, ProjectDeptShare[]>;
+  deptById?: Map<string, DeptRef>;
+}) => {
+  const { project, perPeriod } = load;
+  const [open, setOpen] = useState(false);
+  const breakdown = projectDeptShareLoads(project, periods, sharesByProject);
+  const drillable = breakdown.length > 1; // ≥2 отдела — есть что детализировать
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setOpen((v) => !v);
+    }
+  };
+  return (
+    <>
+      <div
+        role={drillable ? 'button' : undefined}
+        tabIndex={drillable ? 0 : undefined}
+        aria-expanded={drillable ? open : undefined}
+        aria-label={drillable ? `${title(project)} — доли по отделам` : undefined}
+        onClick={drillable ? () => setOpen((v) => !v) : undefined}
+        onKeyDown={drillable ? onKey : undefined}
+        style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, cursor: drillable ? 'pointer' : 'default' }}
+      >
+        <div
+          style={{
+            width: nameWidth,
+            minWidth: nameWidth,
+            padding: '0 12px 0 28px',
+            height: 32,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            borderRight: `1px solid ${T.border}`,
+            background: T.rowAlt,
+            fontSize: 12,
+            color: T.textMuted,
+            position: 'sticky',
+            left: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+          title={title(project)}
+        >
+          {drillable && (
+            <span aria-hidden style={{ fontSize: 9, color: T.textFaint, flexShrink: 0 }}>
+              {open ? '▾' : '▸'}
+            </span>
+          )}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{title(project)}</span>
+        </div>
+        {periods.map((p, i) => (
+          <div
+            key={p.key}
+            style={{
+              flex: 1,
+              minWidth: 56,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRight: `1px solid ${T.border}`,
+              fontSize: 11.5,
+              color: perPeriod[i] > 0 ? T.text : T.textFaint,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {cellNum(perPeriod[i])}
+          </div>
+        ))}
+      </div>
+      {open &&
+        breakdown.map((b) => (
+          <div key={b.departmentId ?? 'none'} style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, background: T.bg }}>
+            <div
+              style={{
+                width: nameWidth,
+                minWidth: nameWidth,
+                padding: '0 12px 0 44px',
+                height: 28,
+                display: 'flex',
+                alignItems: 'center',
+                borderRight: `1px solid ${T.border}`,
+                background: T.bg,
+                fontSize: 11.5,
+                color: T.textFaint,
+                position: 'sticky',
+                left: 0,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={deptCrumb(b.departmentId, deptById)}
+            >
+              {deptCrumb(b.departmentId, deptById)}
+            </div>
+            {periods.map((p, i) => (
+              <div
+                key={p.key}
+                style={{
+                  flex: 1,
+                  minWidth: 56,
+                  height: 28,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRight: `1px solid ${T.border}`,
+                  fontSize: 11,
+                  color: b.perPeriod[i] > 0 ? T.textMuted : T.textFaint,
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {cellNum(b.perPeriod[i])}
+              </div>
+            ))}
+          </div>
+        ))}
+    </>
+  );
+};
+
 export const ProjectDetail = ({
   planned,
   unplanned,
@@ -104,6 +251,8 @@ export const ProjectDetail = ({
   planning,
   onSave,
   onSaveDeptPlan,
+  sharesByProject,
+  deptById,
 }: Props) => {
   if (planning && onSave) {
     return (
@@ -121,50 +270,15 @@ export const ProjectDetail = ({
 
   return (
     <div style={{ background: T.rowAlt }}>
-      {planned.map(({ project, perPeriod }) => (
-        <div key={project.id} style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
-          <div
-            style={{
-              width: nameWidth,
-              minWidth: nameWidth,
-              padding: '0 12px 0 28px',
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              borderRight: `1px solid ${T.border}`,
-              background: T.rowAlt,
-              fontSize: 12,
-              color: T.textMuted,
-              position: 'sticky',
-              left: 0,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-            title={title(project)}
-          >
-            {title(project)}
-          </div>
-          {periods.map((p, i) => (
-            <div
-              key={p.key}
-              style={{
-                flex: 1,
-                minWidth: 56,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRight: `1px solid ${T.border}`,
-                fontSize: 11.5,
-                color: perPeriod[i] > 0 ? T.text : T.textFaint,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {cellNum(perPeriod[i])}
-            </div>
-          ))}
-        </div>
+      {planned.map((load) => (
+        <PlannedProjectRow
+          key={load.project.id}
+          load={load}
+          periods={periods}
+          nameWidth={nameWidth}
+          sharesByProject={sharesByProject}
+          deptById={deptById}
+        />
       ))}
 
       {deptPlans.map((load) => (

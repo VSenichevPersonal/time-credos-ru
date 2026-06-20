@@ -20,6 +20,7 @@ import {
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
+  CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID,
   CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
   CREDOS_TIME_ENTRY_TAGS_FIELD_ID,
   CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
@@ -108,6 +109,17 @@ export default defineObject({
       type: FieldType.DATE_TIME,
       label: 'Дата согласования',
       icon: 'IconCalendarCheck',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // Причина отклонения (op=reject). Сотрудник видит что исправить. Очищается
+    // при approve/повторном submit (запись «ожила»). UX-gap, подтверждён Timetta.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID,
+      name: 'rejectComment',
+      type: FieldType.TEXT,
+      label: 'Причина отклонения',
+      icon: 'IconMessageCircleX',
       isNullable: true,
       defaultValue: null,
     },

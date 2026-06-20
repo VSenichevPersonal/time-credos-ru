@@ -115,6 +115,9 @@ export const CREDOS_TIME_ENTRY_STATUS_FIELD_ID = '60cc0ef7-38ef-42aa-903a-2e13d1
 // approvedBy/approvedAt — фиксация кто/когда согласовал (заполняет /s/approval).
 export const CREDOS_TIME_ENTRY_APPROVED_BY_FIELD_ID = '034bfbad-fed9-4f0e-9917-d497bb9ceace';
 export const CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID = '1cb81c6a-41bd-4f69-8eca-e6c1efe8cd7e';
+// rejectComment — причина отклонения (заполняет /s/approval op=reject; сотрудник
+// видит что исправить). Очищается при approve/повторном submit. UX-gap (Timetta).
+export const CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID = 'c9d4029f-f588-4bfe-86ca-2252870e8272';
 // WorkType
 export const CREDOS_TIME_WORK_TYPE_GROUP_FIELD_ID = '78e61c8f-d18c-48c3-9897-5cf3316aebe9';
 // Employee

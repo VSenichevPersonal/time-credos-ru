@@ -405,6 +405,34 @@ export const deptProjectLoads = (
   return { planned, unplanned };
 };
 
+// Drill 3-й уровень (заказчик «дрилл-даун полный»): раскрытие ПРОЕКТА внутри
+// отдела → его доли по ВСЕМ участвующим отделам (мульти-отдел REQ-0013 13b).
+// Вклад каждой доли раскидан по датам проекта (projectShareHoursInPeriod).
+// Переиспользует уже загруженные sharesByProject — без новых запросов.
+// Пусто (или одна доля = текущий отдел) → детализировать нечего.
+export type ProjectDeptBreakdown = {
+  departmentId: string | null;
+  perPeriod: number[];
+  total: number;
+};
+
+export const projectDeptShareLoads = (
+  project: CapProject,
+  periods: Period[],
+  sharesByProject?: Map<string, ProjectDeptShare[]>,
+): ProjectDeptBreakdown[] => {
+  const shares = sharesByProject?.get(project.id);
+  if (!shares || shares.length === 0) return [];
+  const out: ProjectDeptBreakdown[] = [];
+  for (const s of shares) {
+    const perPeriod = periods.map((per) => projectShareHoursInPeriod(project, s, per));
+    const total = perPeriod.reduce((a, b) => a + b, 0);
+    if (total > 0) out.push({ departmentId: s.departmentId, perPeriod, total });
+  }
+  out.sort((a, b) => b.total - a.total);
+  return out;
+};
+
 // REQ-0012: детализация плановых загрузок отдела без проекта по периодам.
 // Возвращает только записи с ненулевым вкладом в горизонт, отсортированные по
 // сумме часов desc. Для опциональной детализации в UI карточки отдела (Dev1).

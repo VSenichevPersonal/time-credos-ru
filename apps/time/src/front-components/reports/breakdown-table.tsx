@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { T, fmtUtil, fmtHrs, fmtUnder, underTone, utilTone } from 'src/front-components/reports/report-tokens';
 import { Bar } from 'src/front-components/reports/bar';
 import { CategoryBar, CategoryChip, CategoryLegend } from 'src/front-components/reports/category-bar';
@@ -54,12 +56,30 @@ const rowName = (groupBy: GroupBy, r: ReportRow): string =>
 const rowTitle = (groupBy: GroupBy, r: ReportRow): string =>
   groupBy === 'dept' ? departmentLabel(r.name) || r.name : r.name;
 
-type Props = { groupBy: GroupBy; rows: ReportRow[] };
+type Props = {
+  groupBy: GroupBy;
+  rows: ReportRow[];
+  // Drill-down (research §3.2): onDrill — провал в дочерний срез. drillable —
+  // ключи строк, у которых детализация есть (иначе строка не кликабельна — без
+  // мёртвых кликов). Не задан onDrill → таблица плоская (виджет «Бюджет» и т.п.).
+  onDrill?: (row: ReportRow) => void;
+  drillable?: (row: ReportRow) => boolean;
+};
 
-export const BreakdownTable = ({ groupBy, rows }: Props) => {
+export const BreakdownTable = ({ groupBy, rows, onDrill, drillable }: Props) => {
   const isProject = groupBy === 'project';
   const maxFact = Math.max(1, ...rows.map((r) => r.fact));
   const { key: sortKey, dir, toggle, sort } = useSortable<SortKey>('fact');
+  const [hover, setHover] = useState<string | null>(null);
+
+  const canDrill = (r: ReportRow): boolean =>
+    !!onDrill && (drillable ? drillable(r) : true);
+  const onRowKey = (r: ReportRow) => (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      onDrill?.(r);
+    }
+  };
 
   // DP-0004: сортировка по выбранной колонке (имя/факт/метрика/хвост).
   const sortValue = (r: ReportRow): number | string => {
@@ -128,20 +148,37 @@ export const BreakdownTable = ({ groupBy, rows }: Props) => {
           const p = r as ProjectRow;
           const rest = isProject && p.plannedEffort ? p.plannedEffort - r.fact : null;
           const under = underTone(r.under);
+          const clickable = canDrill(r);
+          const isHover = clickable && hover === r.key;
           return (
             <div
               key={r.key}
+              role={clickable ? 'button' : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              aria-label={clickable ? `${rowTitle(groupBy, r)} — детализация` : undefined}
+              onClick={clickable ? () => onDrill?.(r) : undefined}
+              onKeyDown={clickable ? onRowKey(r) : undefined}
+              onMouseEnter={clickable ? () => setHover(r.key) : undefined}
+              onMouseLeave={clickable ? () => setHover(null) : undefined}
               style={{
                 display: 'grid',
                 gridTemplateColumns: COLS,
                 height: 40,
                 borderBottom: `1px solid ${T.border}`,
-                background: i % 2 === 1 ? T.rowAlt : 'transparent',
+                background: isHover ? T.accentSoft : i % 2 === 1 ? T.rowAlt : 'transparent',
                 fontSize: 12.5,
+                cursor: clickable ? 'pointer' : 'default',
+                transition: 'background 120ms ease',
+                outline: 'none',
               }}
             >
-              <span style={{ ...cell(), fontWeight: 500 }} title={rowTitle(groupBy, r)}>
+              <span style={{ ...cell(), fontWeight: 500, gap: 6 }} title={rowTitle(groupBy, r)}>
                 {rowName(groupBy, r)}
+                {clickable && (
+                  <span aria-hidden style={{ color: isHover ? T.accent : T.textFaint, fontSize: 11, flexShrink: 0 }}>
+                    ›
+                  </span>
+                )}
               </span>
 
               <span style={cell()}>

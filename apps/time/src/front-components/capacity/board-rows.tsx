@@ -24,6 +24,7 @@ import type {
 type DeptProps = {
   departments: DeptRef[];
   cellsByDept: Map<string, LoadCell[]>;
+  deptById: Map<string, DeptRef>;
   projects: CapProject[];
   deptPlans: DeptPlan[];
   periods: Period[];
@@ -42,6 +43,7 @@ type DeptProps = {
 export const DeptRows = ({
   departments,
   cellsByDept,
+  deptById,
   projects,
   deptPlans,
   periods,
@@ -84,6 +86,8 @@ export const DeptRows = ({
               planning={planning}
               onSave={onSavePlan}
               onSaveDeptPlan={onSaveDeptPlan}
+              sharesByProject={sharesByProject}
+              deptById={deptById}
             />
           )}
         </div>

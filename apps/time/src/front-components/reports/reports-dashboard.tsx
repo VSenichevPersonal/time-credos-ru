@@ -9,9 +9,12 @@ import { usePeriod, type PeriodGran } from 'src/front-components/reports/use-per
 import { useReports } from 'src/front-components/reports/use-reports';
 import { FilterChip, type Option } from 'src/front-components/grid/filter-chip';
 import { WORK_CATEGORY_OPTIONS } from 'src/constants/select-options';
-import type { GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
+import type { EmployeeRow, GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
+import { Breadcrumbs } from 'src/front-components/shared/breadcrumbs';
+import { useDrill } from 'src/front-components/shared/use-drill';
+import { departmentLabel } from 'src/constants/labels';
 
 const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
@@ -85,7 +88,22 @@ export const ReportsDashboard = () => {
   const { period, gran, isCurrent, prev, next, setGran } = usePeriod();
   const [groupBy, setGroupBy] = useState<GroupBy>('dept');
   const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
+  const { stack, drillInto, goToLevel, reset } = useDrill();
+  // Базовый запрос отдаёт все 3 среза разом — drill «Отдел → Сотрудники»
+  // делается client-side (EmployeeRow.dept = код отдела). Backend не дёргаем.
   const { loading, error, data, reload } = useReports(period.from, period.to, groupBy);
+
+  // Drill активен только из среза «Отдел» (в нём строки → сотрудники отдела).
+  // Смена среза/периода сбрасывает стек.
+  const drilledDept = groupBy === 'dept' && stack.length > 0 ? stack[0].value : null;
+  const switchGroupBy = (g: GroupBy) => {
+    reset();
+    setGroupBy(g);
+  };
+  const onPeriodChange = (fn: () => void) => () => {
+    reset();
+    fn();
+  };
 
   // DP-0004 P1: фильтр по категории — осмыслен в срезе «Проекты» (проект = 1 категория).
   const toggleCat = (v: string) =>
@@ -99,6 +117,15 @@ export const ReportsDashboard = () => {
     groupBy === 'project' && catFilter.size > 0
       ? rows.filter((r) => catFilter.has((r as ProjectRow).category ?? ''))
       : rows;
+
+  // Сотрудники отдела (drill «Отдел → Сотрудники»): EmployeeRow.dept = код отдела
+  // (= byDept[].name). Backend-фильтр не нужен — режем уже загруженный byEmployee.
+  const employeesOfDept = (dept: string): EmployeeRow[] =>
+    (data?.byEmployee ?? []).filter((e) => e.dept === dept);
+  // Отдел кликабелен, только если у него есть сотрудники в срезе (без мёртвых кликов).
+  const deptHasEmployees = (r: ReportRow): boolean => employeesOfDept(r.name).length > 0;
+  const onDrillDept = (r: ReportRow) =>
+    drillInto({ dim: 'dept', value: r.name, label: `Отдел: ${departmentLabel(r.name, { short: true }) || r.name}` });
 
   return (
     <div
@@ -124,7 +151,7 @@ export const ReportsDashboard = () => {
         }}
       >
         <span style={{ fontSize: 15, fontWeight: 600 }}>Отчёты</span>
-        <PeriodNav label={period.label} isCurrent={isCurrent} onPrev={prev} onNext={next} />
+        <PeriodNav label={period.label} isCurrent={isCurrent} onPrev={onPeriodChange(prev)} onNext={onPeriodChange(next)} />
         <Segmented
           ariaLabel="Гранулярность периода"
           value={gran}
@@ -133,7 +160,10 @@ export const ReportsDashboard = () => {
             { value: 'quarter', label: 'Квартал' },
             { value: 'year', label: 'Год' },
           ]}
-          onChange={(g: PeriodGran) => setGran(g)}
+          onChange={(g: PeriodGran) => {
+            reset();
+            setGran(g);
+          }}
         />
         {groupBy === 'project' && (
           <FilterChip
@@ -153,7 +183,7 @@ export const ReportsDashboard = () => {
               { value: 'project', label: 'Проект' },
               { value: 'employee', label: 'Человек' },
             ]}
-            onChange={(g: GroupBy) => setGroupBy(g)}
+            onChange={(g: GroupBy) => switchGroupBy(g)}
           />
         </span>
       </div>
@@ -165,10 +195,20 @@ export const ReportsDashboard = () => {
       ) : (
         <ErrorBoundary
           title="Не удалось показать отчёт"
-          resetKeys={[groupBy, period.from, period.to]}
+          resetKeys={[groupBy, period.from, period.to, drilledDept ?? '']}
         >
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <KpiCards totals={data.totals} />
+            {stack.length > 0 && (
+              <div style={{ padding: '0 14px 8px' }}>
+                <Breadcrumbs
+                  rootLabel="Все отделы"
+                  stack={stack}
+                  onRoot={reset}
+                  onLevel={goToLevel}
+                />
+              </div>
+            )}
             <div
               style={{
                 flex: 1,
@@ -182,7 +222,16 @@ export const ReportsDashboard = () => {
                 background: T.surface,
               }}
             >
-              <BreakdownTable groupBy={groupBy} rows={filterRows(pickRows(groupBy, data))} />
+              {drilledDept ? (
+                <BreakdownTable groupBy="employee" rows={employeesOfDept(drilledDept)} />
+              ) : (
+                <BreakdownTable
+                  groupBy={groupBy}
+                  rows={filterRows(pickRows(groupBy, data))}
+                  onDrill={groupBy === 'dept' ? onDrillDept : undefined}
+                  drillable={groupBy === 'dept' ? deptHasEmployees : undefined}
+                />
+              )}
             </div>
           </div>
         </ErrorBoundary>

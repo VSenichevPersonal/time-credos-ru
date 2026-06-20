@@ -131,6 +131,7 @@ export const CapacityBoard = () => {
               <DeptRows
                 departments={departments}
                 cellsByDept={cellsByDept}
+                deptById={deptById}
                 projects={projects}
                 deptPlans={deptPlans}
                 periods={periods}
