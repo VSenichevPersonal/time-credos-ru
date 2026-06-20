@@ -141,3 +141,11 @@ export const CREDOS_TIME_DEPARTMENT_NAV_UNIVERSAL_IDENTIFIER = '487b1d25-cba4-4c
 
 // Роль «Руководитель» (defineRole — доп. к defineApplicationRole).
 export const CREDOS_TIME_MANAGER_ROLE_UNIVERSAL_IDENTIFIER = '68211cf6-bc05-422a-b6e4-619d5edc5e51';
+
+// --- Wave 5 (GRID): недельная сетка трудозатрат ---
+// Front-компонент сетки (заменяет заглушку main-page как виджет «Трудозатраты»).
+export const WEEKLY_GRID_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  'e948a1b9-d06c-4f4b-9bfd-599455585b37';
+// Logic-функция /s/time-entry (CRUD трудозатрат для песочницы).
+export const TIME_ENTRY_API_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '7f6f5390-cac7-486e-b164-a2f459d07fee';
