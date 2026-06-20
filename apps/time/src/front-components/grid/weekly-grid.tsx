@@ -27,6 +27,7 @@ import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 
 export const WeeklyGrid = () => {
   const week = useWeek();
+  const normFor = useDailyNorm(week.days.map((d) => d.iso)); // T2 SSOT норма дня
   const { isManager } = useSelfEmployee();
   const [viewEmployeeId] = useState<string | null>(null);
 
@@ -206,6 +207,7 @@ export const WeeklyGrid = () => {
           workTypes={visibleWorkTypes}
           recentProjectIds={recentProjectIds}
           lastWorkTypeByProject={lastWorkTypeByProject}
+          normFor={normFor}
           loading={data.loading}
           onCellCommit={actions.commitCell}
           onCommitDescription={actions.commitDescription}
