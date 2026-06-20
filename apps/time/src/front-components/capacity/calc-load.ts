@@ -423,3 +423,63 @@ export const deptPlanLoads = (
   out.sort((a, b) => b.total - a.total);
   return out;
 };
+
+// ===========================================================================
+// REQ-0011: численность отдела (headcount) = Σ FTE сотрудников с активной
+// записью назначения в периоде. Зеркало REQ-0013 (доли отделов проекта):
+// сотрудник может работать в нескольких отделах с долями (50/50). Сверка с
+// Timetta: частичная занятость (FTE) и срок действия назначения.
+// ===========================================================================
+
+// Назначение активно в окне [from, to] (YYYY-MM-DD, включительно по дню):
+// startDate ≤ to И (endDate пуст ИЛИ endDate ≥ from). Пустой startDate = с начала
+// времён (всегда ≤ to), пустой endDate = бессрочно. Сравнение строкой ISO по дню.
+export const isAssignmentActive = (
+  assignment: EmpDeptAssignment,
+  from: string,
+  to: string,
+): boolean => {
+  const start = assignment.startDate ? assignment.startDate.slice(0, 10) : null;
+  const end = assignment.endDate ? assignment.endDate.slice(0, 10) : null;
+  if (start && start > to) return false;
+  if (end && end < from) return false;
+  return true;
+};
+
+// Доля ставки записи в единицах FTE (ftePercent/100), отнормированная в [0, 1].
+// Пустой ftePercent трактуем как 100% (1.0) — назначение без указанной доли = полная ставка.
+const fteUnits = (ftePercent: number | null): number => {
+  const pct = ftePercent == null ? 100 : ftePercent;
+  if (!(pct > 0)) return 0;
+  return Math.min(pct, 100) / 100;
+};
+
+// Численность отделов = Σ FTE назначений, активных в окне [from, to].
+// Fallback: если у сотрудника НЕТ ни одной записи назначения вообще — он учитывается
+// как 100% по employee.departmentId (обратная совместимость до перехода на FTE).
+// Сотрудник С записями, но без активной в окне, в численность НЕ попадает (0).
+export const fteHeadcountByDept = (
+  assignments: EmpDeptAssignment[],
+  employees: EmployeeRef[],
+  from: string,
+  to: string,
+): Map<string, number> => {
+  const counts = new Map<string, number>();
+  // Множество сотрудников, у которых есть хотя бы одна запись назначения —
+  // для них fallback по departmentId не применяется.
+  const hasAssignment = new Set<string>();
+  for (const a of assignments) {
+    if (a.employeeId) hasAssignment.add(a.employeeId);
+    if (!a.departmentId) continue;
+    if (!isAssignmentActive(a, from, to)) continue;
+    const fte = fteUnits(a.ftePercent);
+    if (fte > 0) counts.set(a.departmentId, (counts.get(a.departmentId) ?? 0) + fte);
+  }
+  // Fallback по сотрудникам без единой записи: 100% на их «родной» отдел.
+  for (const e of employees) {
+    if (hasAssignment.has(e.id)) continue;
+    if (!e.departmentId) continue;
+    counts.set(e.departmentId, (counts.get(e.departmentId) ?? 0) + 1);
+  }
+  return counts;
+};

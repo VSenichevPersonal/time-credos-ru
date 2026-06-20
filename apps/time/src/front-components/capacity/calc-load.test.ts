@@ -14,6 +14,8 @@ import {
   deptProjectLoads,
   employeeLoadCells,
   firstFreePeriod,
+  fteHeadcountByDept,
+  isAssignmentActive,
   projectHoursInPeriod,
   projectShareHoursInPeriod,
   summaryCells,
@@ -24,6 +26,7 @@ import type {
   CapProject,
   DeptPlan,
   DeptRef,
+  EmpDeptAssignment,
   EmployeeRef,
   LoadCell,
   Period,
@@ -655,5 +658,96 @@ describe('доли отделов в проектах (REQ-0013 13b)', () => {
     expect(planned[0].total).toBeCloseTo(100, 6);
     const { planned: p2 } = deptProjectLoads(dept({ id: 'd2' }), projects, [wk]);
     expect(p2).toHaveLength(0);
+  });
+});
+
+// =============================================================================
+// REQ-0011: isAssignmentActive + fteHeadcountByDept
+// =============================================================================
+
+const asgn = (over: Partial<EmpDeptAssignment> = {}): EmpDeptAssignment => ({
+  employeeId: 'e1',
+  departmentId: 'd1',
+  ftePercent: 100,
+  startDate: null,
+  endDate: null,
+  ...over,
+});
+const empRef = (over: Partial<EmployeeRef> = {}): EmployeeRef => ({
+  id: 'e1', name: 'Иванов', departmentId: 'd1', ...over,
+});
+
+describe('isAssignmentActive', () => {
+  it('null startDate + null endDate → всегда активно', () => {
+    expect(isAssignmentActive(asgn({ startDate: null, endDate: null }), '2026-01-01', '2026-01-31')).toBe(true);
+  });
+
+  it('startDate после to → неактивно', () => {
+    expect(isAssignmentActive(asgn({ startDate: '2026-02-01' }), '2026-01-01', '2026-01-31')).toBe(false);
+  });
+
+  it('endDate до from → неактивно', () => {
+    expect(isAssignmentActive(asgn({ endDate: '2025-12-31' }), '2026-01-01', '2026-01-31')).toBe(false);
+  });
+
+  it('startDate == to (граница) → активно', () => {
+    expect(isAssignmentActive(asgn({ startDate: '2026-01-31' }), '2026-01-01', '2026-01-31')).toBe(true);
+  });
+
+  it('endDate == from (граница) → активно', () => {
+    expect(isAssignmentActive(asgn({ endDate: '2026-01-01' }), '2026-01-01', '2026-01-31')).toBe(true);
+  });
+
+  it('активный диапазон внутри запроса', () => {
+    expect(isAssignmentActive(
+      asgn({ startDate: '2026-01-10', endDate: '2026-01-20' }),
+      '2026-01-01', '2026-01-31',
+    )).toBe(true);
+  });
+});
+
+describe('fteHeadcountByDept', () => {
+  it('100% FTE → 1.0 в отделе', () => {
+    const result = fteHeadcountByDept([asgn()], [], '2026-01-01', '2026-01-31');
+    expect(result.get('d1')).toBeCloseTo(1.0);
+  });
+
+  it('50% FTE → 0.5 в отделе', () => {
+    const result = fteHeadcountByDept([asgn({ ftePercent: 50 })], [], '2026-01-01', '2026-01-31');
+    expect(result.get('d1')).toBeCloseTo(0.5);
+  });
+
+  it('два сотрудника по 50% в одном отделе → 1.0', () => {
+    const result = fteHeadcountByDept([
+      asgn({ employeeId: 'e1', ftePercent: 50 }),
+      asgn({ employeeId: 'e2', ftePercent: 50 }),
+    ], [], '2026-01-01', '2026-01-31');
+    expect(result.get('d1')).toBeCloseTo(1.0);
+  });
+
+  it('истёкшее назначение → не учитывается', () => {
+    const result = fteHeadcountByDept(
+      [asgn({ endDate: '2025-12-31' })], [], '2026-01-01', '2026-01-31',
+    );
+    expect(result.get('d1')).toBeUndefined();
+  });
+
+  it('fallback: без записей → 1.0 по departmentId сотрудника', () => {
+    const result = fteHeadcountByDept([], [empRef()], '2026-01-01', '2026-01-31');
+    expect(result.get('d1')).toBeCloseTo(1.0);
+  });
+
+  it('fallback не применяется если у сотрудника есть запись (даже истёкшая)', () => {
+    const result = fteHeadcountByDept(
+      [asgn({ endDate: '2025-12-31' })],
+      [empRef()],
+      '2026-01-01', '2026-01-31',
+    );
+    expect(result.get('d1')).toBeUndefined();
+  });
+
+  it('ftePercent=null → трактуется как 100% (1.0)', () => {
+    const result = fteHeadcountByDept([asgn({ ftePercent: null })], [], '2026-01-01', '2026-01-31');
+    expect(result.get('d1')).toBeCloseTo(1.0);
   });
 });

@@ -60,6 +60,16 @@ export type RawAbsence = {
   endDate: string | null;
 };
 
+// REQ-0011: FTE-назначение сотрудника на отдел (employee × department × % FTE × даты).
+// Численность отдела для нормы = Σ(ftePercent/100) назначений, активных в периоде отчёта.
+export type RawEmpDeptAssignment = {
+  employeeId: string | null;
+  departmentId: string | null;
+  ftePercent: number | null;
+  startDate: string | null;
+  endDate: string | null;
+};
+
 // Разбивка часов по категории (R3-D2): доля категории внутри строки.
 export type CategoryShare = { category: string; hours: number; share: number | null };
 
@@ -82,6 +92,10 @@ export type ReportsInput = {
   calendar: RawCalendarDay[];
   absences?: RawAbsence[]; // F-D phase2: вычет рабочих часов отсутствий из нормы.
   workTypes?: RawWorkType[]; // W4-1 OLAP: справочник для осей workType/workTypeGroup.
+  // REQ-0011: FTE-назначения. Если переданы — численность отдела = Σ FTE активных
+  // в периоде назначений (fallback: сотрудник без записей = 100% по departmentId).
+  // Не переданы → прежнее поведение: count активных сотрудников (обратная совместимость).
+  assignments?: RawEmpDeptAssignment[];
 };
 
 // Строка проекта + бюджет (F-A: план vs факт). budgetUsed = fact/plannedEffort.
@@ -117,6 +131,39 @@ export const finalize = (row: Row): Row => ({
 const dayKey = (iso: string | null | undefined): string | null =>
   iso ? iso.slice(0, 10) : null;
 
+// REQ-0011: численность отделов = Σ FTE назначений, активных в окне [from, to]
+// (включительно по дню). Назначение активно: startDate ≤ to И (endDate пуст ИЛИ
+// endDate ≥ from). ftePercent пуст = 100%. Fallback: сотрудник без единой записи
+// назначения учитывается как 100% по departmentId. Без assignments → null
+// (вызывающий применяет прежний count по сотрудникам). Зеркало capacity calc-load.
+export const fteHeadcountByDept = (
+  assignments: RawEmpDeptAssignment[] | undefined,
+  employees: RawEmployee[],
+  from: string,
+  to: string,
+): Map<string, number> | null => {
+  if (!assignments) return null;
+  const counts = new Map<string, number>();
+  const hasAssignment = new Set<string>();
+  for (const a of assignments) {
+    if (a.employeeId) hasAssignment.add(a.employeeId);
+    if (!a.departmentId) continue;
+    const start = dayKey(a.startDate);
+    const end = dayKey(a.endDate);
+    if (start && start > to) continue;
+    if (end && end < from) continue;
+    const pct = a.ftePercent == null ? 100 : a.ftePercent;
+    if (!(pct > 0)) continue;
+    const fte = Math.min(pct, 100) / 100;
+    counts.set(a.departmentId, (counts.get(a.departmentId) ?? 0) + fte);
+  }
+  for (const e of employees) {
+    if (hasAssignment.has(e.id) || !e.departmentId) continue;
+    counts.set(e.departmentId, (counts.get(e.departmentId) ?? 0) + 1);
+  }
+  return counts;
+};
+
 export const computeReports = (
   input: ReportsInput,
   period: { from: string; to: string },
@@ -139,13 +186,21 @@ export const computeReports = (
   const deptById = new Map(departments.map((d) => [d.id, d]));
   const empById = new Map(employees.map((e) => [e.id, e]));
 
-  // Вычисляемая численность отдела (headcount) = число активных сотрудников.
-  // employees сюда приходят уже отфильтрованными по active=true (см. reports.logic),
-  // поэтому простой count по departmentId = численность для ёмкости/нормы.
-  // REQ-0011 (FTE-взвешивание) — отдельная задача, здесь не делаем.
-  const headcountByDept = new Map<string, number>();
-  for (const e of employees) {
-    if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+  // Вычисляемая численность отдела (headcount). REQ-0011: если переданы FTE-назначения
+  // (input.assignments) — численность = Σ(ftePercent/100) активных в периоде отчёта
+  // назначений (fallback по сотрудникам без записей = 100%). Иначе — прежний count
+  // активных сотрудников по departmentId (employees приходят отфильтрованными active=true).
+  const fteHeadcount = fteHeadcountByDept(
+    input.assignments,
+    employees,
+    period.from,
+    period.to,
+  );
+  const headcountByDept = fteHeadcount ?? new Map<string, number>();
+  if (!fteHeadcount) {
+    for (const e of employees) {
+      if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+    }
   }
 
   // Часы отсутствий сотрудника = Σ часов рабочих дней календаря, попадающих в
@@ -499,9 +554,18 @@ export const computeOlap = (
     }
     if (sum > 0) absByEmp.set(a.employeeId, (absByEmp.get(a.employeeId) ?? 0) + sum);
   }
-  const headcountByDept = new Map<string, number>();
-  for (const e of employees)
-    if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+  // REQ-0011: численность отдела для нормы = Σ FTE активных в периоде назначений
+  // (fallback по сотрудникам без записей = 100%). Без input.assignments — прежний count.
+  const fteHeadcount = fteHeadcountByDept(
+    input.assignments,
+    employees,
+    period.from,
+    period.to,
+  );
+  const headcountByDept = fteHeadcount ?? new Map<string, number>();
+  if (!fteHeadcount)
+    for (const e of employees)
+      if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
   const absByDept = new Map<string, number>();
   for (const e of employees) {
     const h = absByEmp.get(e.id) ?? 0;

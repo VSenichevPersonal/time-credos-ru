@@ -6,8 +6,11 @@ import {
   computeOlap,
   computeReports,
   finalize,
+  fteHeadcountByDept,
   util,
   type OlapParams,
+  type RawEmpDeptAssignment,
+  type RawEmployee,
   type ReportsInput,
 } from './reports-calc';
 
@@ -588,5 +591,70 @@ describe('OLAP_DIMENSIONS — SSOT набора осей', () => {
 
   it('нет дублей', () => {
     expect(new Set(OLAP_DIMENSIONS).size).toBe(OLAP_DIMENSIONS.length);
+  });
+});
+
+// REQ-0011: численность отдела = Σ FTE назначений, активных в периоде отчёта.
+const emp = (over: Partial<RawEmployee> = {}): RawEmployee => ({
+  id: 'e1', firstName: 'И', lastName: 'И', departmentId: 'd1', ...over,
+});
+const asgn = (over: Partial<RawEmpDeptAssignment> = {}): RawEmpDeptAssignment => ({
+  employeeId: 'e1', departmentId: 'd1', ftePercent: 100, startDate: null, endDate: null, ...over,
+});
+
+describe('fteHeadcountByDept (REQ-0011)', () => {
+  it('без assignments → null (fallback на count у вызывающего)', () => {
+    expect(fteHeadcountByDept(undefined, [emp()], '2026-01-01', '2026-01-31')).toBeNull();
+  });
+
+  it('Σ FTE: два по 50% → 1.0', () => {
+    const r = fteHeadcountByDept(
+      [asgn({ employeeId: 'e1', ftePercent: 50 }), asgn({ employeeId: 'e2', ftePercent: 50 })],
+      [], '2026-01-01', '2026-01-31',
+    );
+    expect(r?.get('d1')).toBeCloseTo(1.0);
+  });
+
+  it('дробный FTE: 30% → 0.3', () => {
+    const r = fteHeadcountByDept([asgn({ ftePercent: 30 })], [], '2026-01-01', '2026-01-31');
+    expect(r?.get('d1')).toBeCloseTo(0.3);
+  });
+
+  it('дата вне периода → не учитывается', () => {
+    const r = fteHeadcountByDept([asgn({ endDate: '2025-12-31' })], [], '2026-01-01', '2026-01-31');
+    expect(r?.get('d1')).toBeUndefined();
+  });
+
+  it('fallback: сотрудник без записей = 100% по departmentId', () => {
+    const r = fteHeadcountByDept([], [emp()], '2026-01-01', '2026-01-31');
+    expect(r?.get('d1')).toBeCloseTo(1.0);
+  });
+
+  it('50/50 на два отдела одним сотрудником', () => {
+    const r = fteHeadcountByDept(
+      [asgn({ departmentId: 'd1', ftePercent: 50 }), asgn({ departmentId: 'd2', ftePercent: 50 })],
+      [], '2026-01-01', '2026-01-31',
+    );
+    expect(r?.get('d1')).toBeCloseTo(0.5);
+    expect(r?.get('d2')).toBeCloseTo(0.5);
+  });
+});
+
+describe('computeReports норма по FTE (REQ-0011)', () => {
+  // baseNorm = 8+7 = 15 (1 рабочий + 1 сокращ. день), capacityFactor=1.
+  it('norm отдела с FTE 50% = baseNorm × 0.5', () => {
+    const input: ReportsInput = {
+      ...base(),
+      assignments: [asgn({ ftePercent: 50 })],
+    };
+    const res = computeReports(input, PERIOD);
+    const dept = res.byDept.find((r) => r.key === 'd1');
+    expect(dept?.norm).toBeCloseTo(15 * 0.5, 2);
+  });
+
+  it('без assignments — прежний count (norm = baseNorm × 1)', () => {
+    const res = computeReports(base(), PERIOD);
+    const dept = res.byDept.find((r) => r.key === 'd1');
+    expect(dept?.norm).toBeCloseTo(15, 2);
   });
 });

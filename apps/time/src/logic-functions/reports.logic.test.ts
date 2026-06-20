@@ -31,6 +31,7 @@ const ALL_PLURALS = [
   'credosTimeWorkdayCalendars',
   'credosTimeAbsences',
   'credosTimeWorkTypes',
+  'credosTimeEmployeeDepartments', // REQ-0011 FTE-назначения
 ];
 
 const mockFetch = (responses: unknown[]) => {
@@ -185,8 +186,8 @@ describe('reports.logic — restGetAll пагинация', () => {
     vi.stubGlobal('fetch', fetchMock);
     const result = await handler(event({ from: '2026-06-01', to: '2026-06-30' })) as Record<string, unknown>;
     expect(result).toMatchObject({ ok: true });
-    // 1 запрос на entries (1 страница) + 6 на остальные = 7 fetch
-    expect(fetchMock).toHaveBeenCalledTimes(7);
+    // 1 запрос на entries (1 страница) + 7 на остальные = 8 fetch (REQ-0011 +empDept)
+    expect(fetchMock).toHaveBeenCalledTimes(8);
   });
 
   it('две страницы entries → fetch вызывается 8 раз (2 для entries + 6 остальных)', async () => {
@@ -203,8 +204,8 @@ describe('reports.logic — restGetAll пагинация', () => {
     vi.stubGlobal('fetch', fetchMock);
     const result = await handler(event({ from: '2026-06-01', to: '2026-06-30' })) as Record<string, unknown>;
     expect(result).toMatchObject({ ok: true });
-    // 2 страницы entries + 6 остальных = 8
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    // 2 страницы entries + 7 остальных = 9 (REQ-0011 +empDept)
+    expect(fetchMock).toHaveBeenCalledTimes(9);
   });
 
   it('cursor передаётся на 2-й запрос (starting_after)', async () => {
@@ -219,7 +220,7 @@ describe('reports.logic — restGetAll пагинация', () => {
     vi.stubGlobal('fetch', fetchMock);
     await handler(event());
     // recs пустые → цикл прерван, starting_after не используется
-    expect(fetchMock).toHaveBeenCalledTimes(7);
+    expect(fetchMock).toHaveBeenCalledTimes(8); // REQ-0011 +empDept
     void page2; // не используется — пагинация не продолжилась
   });
 });

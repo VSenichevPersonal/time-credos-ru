@@ -13,6 +13,7 @@ import {
   type RawAbsence,
   type RawCalendarDay,
   type RawDepartment,
+  type RawEmpDeptAssignment,
   type RawEmployee,
   type RawEntry,
   type RawProject,
@@ -147,7 +148,16 @@ const run = async (event: RoutePayload) => {
   const to = validDateParam(params.to, '2999-12-31T23:59:59.999Z');
   const olap = readOlap(event, params);
 
-  const [entries, projects, employees, departments, calendar, absences, workTypes] = await Promise.all([
+  const [
+    entries,
+    projects,
+    employees,
+    departments,
+    calendar,
+    absences,
+    workTypes,
+    assignments,
+  ] = await Promise.all([
     restGetAll<RawEntry>('credosTimeEntries', { filter: `date[gte]:${from},date[lte]:${to}` }),
     restGetAll<RawProject>('credosTimeProjects', {}),
     restGetAll<RawEmployee>('credosTimeEmployees', { filter: 'active[eq]:true' }),
@@ -162,9 +172,21 @@ const run = async (event: RoutePayload) => {
     }),
     // W4-1 OLAP: справочник видов работ (оси workType/workTypeGroup).
     restGetAll<RawWorkType>('credosTimeWorkTypes', {}),
+    // REQ-0011: FTE-назначения сотрудников на отделы. Численность отдела для нормы =
+    // Σ FTE активных в периоде назначений (fallback по сотрудникам без записей = 100%).
+    restGetAll<RawEmpDeptAssignment>('credosTimeEmployeeDepartments', {}),
   ]);
 
-  const input = { entries, projects, employees, departments, calendar, absences, workTypes };
+  const input = {
+    entries,
+    projects,
+    employees,
+    departments,
+    calendar,
+    absences,
+    workTypes,
+    assignments,
+  };
 
   // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.
   if (olap) {

@@ -1,11 +1,13 @@
 import { RestApiClient } from 'twenty-client-sdk/rest';
 
+import { fteHeadcountByDept } from 'src/front-components/capacity/calc-load';
 import type {
   Absence,
   CalendarDay,
   CapProject,
   DeptPlan,
   DeptRef,
+  EmpDeptAssignment,
   EmployeeRef,
   ProjectDeptShare,
   ProjectPatch,
@@ -29,18 +31,28 @@ type RawDept = {
 };
 
 // headcount (численность) — НЕ ручное поле credosTimeDepartment.headcount, а
-// ВЫЧИСЛЯЕМОЕ значение: число активных сотрудников отдела (count credosTimeEmployee
-// where department=X, active=true). Поэтому fetchDepartments параллельно считает
-// активных сотрудников и подставляет их количество в headcount каждого отдела.
-// REQ-0011 (FTE-взвешивание) — отдельная задача, тут простой count.
+// ВЫЧИСЛЯЕМОЕ значение. REQ-0011: численность отдела = Σ(ftePercent/100) активных
+// сотрудников с действующим на СЕГОДНЯ FTE-назначением (credosTimeEmployeeDepartment).
+// Fallback (сотрудник без единой записи назначения): учитывается как 100% по
+// employee.departmentId — обратная совместимость до полного перехода на FTE.
+// DeptRef.headcount — единичный снимок «сейчас» (точечный период [сегодня, сегодня]);
+// период-зависимая численность по колонкам доски — follow-up (требует правок UI Dev1).
 export const fetchDepartments = async (): Promise<DeptRef[]> => {
   const c = client();
-  const [deptResp, headcountByDept] = await Promise.all([
+  const [deptResp, activeEmployees, assignments] = await Promise.all([
     c.get<ListResp<RawDept>>('/rest/credosTimeDepartments', {
       query: { limit: '50', orderBy: 'name[AscNullsFirst]' },
     }),
-    activeHeadcountByDept(c),
+    fetchActiveEmployeeRefs(c),
+    fetchEmployeeDepartments(),
   ]);
+  const today = new Date().toISOString().slice(0, 10);
+  const headcountByDept = fteHeadcountByDept(
+    assignments,
+    activeEmployees,
+    today,
+    today,
+  );
   return pickList(deptResp, 'credosTimeDepartments').map((d) => ({
     id: d.id,
     name: d.name,
@@ -52,12 +64,12 @@ export const fetchDepartments = async (): Promise<DeptRef[]> => {
 
 type RawActiveEmp = { id: string; departmentId?: string | null };
 
-// Вычисляемый headcount: число активных сотрудников по отделам (с пагинацией Core
-// REST: max 60 записей/страницу, иначе крупные отделы недосчитаются).
-const activeHeadcountByDept = async (
+// Активные сотрудники (id + departmentId) с пагинацией Core REST (max 60/страницу,
+// иначе крупные отделы недосчитаются). Нужны для fallback FTE-численности.
+const fetchActiveEmployeeRefs = async (
   c: RestApiClient,
-): Promise<Map<string, number>> => {
-  const counts = new Map<string, number>();
+): Promise<EmployeeRef[]> => {
+  const out: EmployeeRef[] = [];
   let cursor: string | null = null;
   for (let i = 0; i < 500; i++) {
     const query: Record<string, string> = { filter: 'active[eq]:true', limit: '60' };
@@ -70,13 +82,38 @@ const activeHeadcountByDept = async (
     >('/rest/credosTimeEmployees', { query });
     const recs = pickList(resp, 'credosTimeEmployees');
     for (const e of recs) {
-      if (e.departmentId) counts.set(e.departmentId, (counts.get(e.departmentId) ?? 0) + 1);
+      out.push({ id: e.id, name: '', departmentId: e.departmentId ?? null });
     }
     const pi = resp.pageInfo ?? resp.data?.pageInfo;
     if (!pi?.hasNextPage || recs.length === 0 || !pi.endCursor) break;
     cursor = pi.endCursor;
   }
-  return counts;
+  return out;
+};
+
+type RawEmpDeptAssignment = {
+  employeeId?: string | null;
+  departmentId?: string | null;
+  ftePercent?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+// REQ-0011: FTE-назначения сотрудников на отделы (employee × department × % FTE
+// × даты). Численность отдела = Σ долей активных назначений (fteHeadcountByDept).
+// Берём все записи — фильтр по дате делает чистая функция (окно зависит от вызова).
+export const fetchEmployeeDepartments = async (): Promise<EmpDeptAssignment[]> => {
+  const resp = await client().get<ListResp<RawEmpDeptAssignment>>(
+    '/rest/credosTimeEmployeeDepartments',
+    { query: { limit: '300', orderBy: 'createdAt[AscNullsFirst]' } },
+  );
+  return pickList(resp, 'credosTimeEmployeeDepartments').map((a) => ({
+    employeeId: a.employeeId ?? null,
+    departmentId: a.departmentId ?? null,
+    ftePercent: a.ftePercent ?? null,
+    startDate: a.startDate ?? null,
+    endDate: a.endDate ?? null,
+  }));
 };
 
 type RawProject = {

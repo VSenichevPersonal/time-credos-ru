@@ -31,6 +31,15 @@ const cfg = <T = unknown>(res: SdkResult, key: string): T => res.config[key] as 
 // Имя файла содержит `-card-`. Для таких nav-item не нужен — проверяем привязку к layout.
 const isCardView = (path: string): boolean => /-card-/.test(path);
 
+// Registry-вид = технический INDEX-вид для join-объектов, управляемых через карточку
+// другой сущности. SDK требует хотя бы одну view для объекта, но UI-навигация не нужна.
+// Добавлять сюда только по согласованию с arch (комментарий в view обязателен).
+const REGISTRY_VIEWS = new Set([
+  'credos-time-project-department.view.ts', // управление в карточке проекта (REQ-0013)
+  'credos-time-employee-department.view.ts', // управление в карточке сотрудника (REQ-0011)
+]);
+const isRegistryView = (path: string): boolean => REGISTRY_VIEWS.has(path);
+
 // Все UUID, встречающиеся в конфигурациях page-layouts (для проверки привязки card-вкладок).
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const layoutReferencedUuids = new Set(
@@ -79,8 +88,9 @@ describe('pitfall: у каждой INDEX-view есть navigationMenuItem', () =
       .map((n) => cfg<string>(n.res, 'viewUniversalIdentifier')),
   );
   // Standalone INDEX-виды (сайдбар) — должен быть nav-item.
+  // Registry-views (join-объекты) исключены: управляются через карточку, nav не нужен.
   const standaloneIndexViews = views.filter(
-    (v) => cfg<string>(v.res, 'key') === 'INDEX' && !isCardView(v.path),
+    (v) => cfg<string>(v.res, 'key') === 'INDEX' && !isCardView(v.path) && !isRegistryView(v.path),
   );
 
   it.each(standaloneIndexViews.map((v) => [v.path, v.res] as const))(

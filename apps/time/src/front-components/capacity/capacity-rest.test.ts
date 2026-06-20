@@ -131,8 +131,9 @@ describe('fetchAbsences — W3-1', () => {
 // ─── fetchDepartments ─────────────────────────────────────────────────────────
 
 describe('fetchDepartments', () => {
-  it('маппит код, headcount из активных сотрудников, capacityFactor дефолт 0.8', async () => {
-    // первый вызов — депты, второй — активные сотрудники (headcount)
+  it('маппит код, headcount из активных сотрудников (FTE fallback), capacityFactor дефолт 0.8', async () => {
+    // Promise.all([departments, employees, empDeptAssignments]) — 3 параллельных запроса.
+    // Сотрудники без FTE-записей → fallback headcount (100% на departmentId).
     mockGet
       .mockResolvedValueOnce(listOf('credosTimeDepartments', [
         { id: 'd1', name: 'Dev', code: 'DEV', capacityFactor: 1 },
@@ -142,7 +143,8 @@ describe('fetchDepartments', () => {
         { id: 'e1', departmentId: 'd1' },
         { id: 'e2', departmentId: 'd1' },
         { id: 'e3', departmentId: 'd2' },
-      ]));
+      ]))
+      .mockResolvedValueOnce(listOf('credosTimeEmployeeDepartments', [])); // нет FTE-записей → fallback
     const result = await fetchDepartments();
     expect(result).toHaveLength(2);
     expect(result.find((d) => d.id === 'd1')).toMatchObject({
@@ -156,7 +158,8 @@ describe('fetchDepartments', () => {
   it('пустые депты → []', async () => {
     mockGet
       .mockResolvedValueOnce(listOf('credosTimeDepartments', []))
-      .mockResolvedValueOnce(listOf('credosTimeEmployees', []));
+      .mockResolvedValueOnce(listOf('credosTimeEmployees', []))
+      .mockResolvedValueOnce(listOf('credosTimeEmployeeDepartments', []));
     expect(await fetchDepartments()).toEqual([]);
   });
 });
