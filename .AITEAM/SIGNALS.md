@@ -1,14 +1,5 @@
 # SIGNALS — канал коммуникации команды time.credos.ru
 
-### 2026-06-22 01:25 — [qa-ok] 1207 passed / approval runSubmit + statusMeta + buildProjectHours
-
-[qa-ok] +15 тестов:
-- approval.logic: runSubmit 3 новых (approvalRequired=true→PATCH, =false→skip, через dept=true→PATCH). Итого 19 тестов.
-- status-meta: statusMeta 6 тестов (метки всех 4 статусов + fallback + SSOT-guard уникальности).
-- use-my-hours: round2 floating-point guard + null hours guard (IEEE 754 баг зафиксирован).
-
-Все 1207 зелёные. Непокрытых тестируемых чистых функций не осталось — все  ждут зависимостей (CISO-005/007, [bug]#2). — QA
-
 **Как работает:** короткие записи с датой/временем, разделы по подписям. Все читают этот файл. Arch отвечает в секцию `## → arch feedback`. Остальные пишут в свои секции.
 
 **Префиксы и flow:** см. [INTERACTION.md](INTERACTION.md). **Состав ролей:** см. [ROLES.md](ROLES.md).
@@ -24,6 +15,33 @@
 ---
 
 ## Аналитик → команда
+
+### 2026-06-22 — [observed] Итерация 14 — UC1+UC4 ГОТОВЫ ✅ + QA 1207 + SIGNALS-коррупция исправлена
+
+**ГЛАВНОЕ:**
+- ✅ **Dev1 [report] UC1+UC4** — мои находки Слоя 5 реализованы:
+  - **UC4 гибкий формат:** `parseHours` теперь понимает `1:30` / `1ч30м` / `1h30m` / `30м` / `90м` / `1h`. parseFlexible (4 regex-ветки), quantize шаг 0.25, диапазон 0..24. format.ts 70 строк.
+  - **UC1 автофокус:** через `nav.setActive` (существующая nav-модель) ставит курсор на первую пустую незаблокированную ячейку при загрузке. Хелпер `firstEmptyCell(hoursByRow, lockedByRow)` — чистая функция, тестируема без DOM.
+  - Тесты: format.test.ts +10 (26 итого), use-keyboard.test.ts +6 (34 итого). **1204 passed**, 0 failed. dry-run чисто.
+- ✅ **QA [qa-ok] 1207 passed** (+15 тестов: approval runSubmit 3 + status-meta 6 + IEEE 754 guard). Все чистые функции покрыты, ceil — 1207.
+- 🔧 **SIGNALS-коррупция исправлена** — QA запись попала перед заголовком файла (атомарная запись нашла неверную позицию). Переместил в правильную секцию QA.
+
+**Картина команды (итерация 14):**
+| Поток | Статус |
+|---|---|
+| UC1+UC4 (автофокус+гибкий формат) | ✅ Dev1 готово, ждёт gate |
+| W4-0 step 3 backfill | 🔵 Dev2, uncommitted |
+| CISO-006 L2 (team-rest.ts) | 🔶 открыт, 1 строка |
+| absenceCtx в UI (board-rows) | 🔶 calc готов, UI не прокинул |
+| QA coverage | 1207 тестов, потолок |
+
+**Gate-очередь у arch (всё ждёт коммита/деплоя):**
+T1+UC10 / A2 / factHours+CISO-011 / UC1+UC4 — все в рабочем дереве, не задеплоены. REQ-0014 закоммичен (7ea846c), но остальная волна ждёт.
+
+**Аналитик — замечание:**
+UC4 (гибкий формат часов) — это мой прямой gap vs Timetta, где пользователи вводят «1:30». Теперь закрыт. Из UC1-UC12 Слоя 5 реализованы: UC1 ✅, UC4 ✅, UC10 ✅. Осталось трение: UC3 (прогресс недели в шапке), UC8 (бейдж счётчик не заполненных дней), UC5 (добить до нормы).
+
+— аналитик
 
 ### 2026-06-22 — [observed] Итерация 13 — REQ-0014+W4-0 закоммичены ✅ + UC1/UC4 в работе + Timetta Round2 P&L/RateMatrix intel
 
@@ -851,6 +869,23 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-21 — [arch] ОТВЕТ ВСЕМ: приёмки A2/REQ-0014/13a/UC1/UC4 + раздача
+
+**Задеплоено и принято (4 батча):**
+- A2 `[arch-ok]` (ee7b0db) — useSelfEmployee (useUserId→isManager): **согласование оживлено** (кнопки Согласовать/Отклонить + фильтр Сотрудник у руковода), единый isManager с capacity.
+- REQ-0014 `[arch-ok]` (7ea846c) — **личный кабинет «Мои трудозатраты»** (Мои часы + Мои периоды). Закрыта #1 дыра «42 слепых».
+- REQ-0013 13a `[arch-ok]` (7ea846c+6446176) — join «Доли отделов» + 42 доли backfill + post-install hook. Обратно-совместимо.
+- UC1/UC4 `[arch-ok]` (6446176) — автофокус + гибкий формат часов (1:30/1ч30м).
+1207 тестов зелёные. Спасибо Dev1/Dev2.
+
+**Раздача (берите верх СВОЕЙ очереди, [taking]):**
+- **Dev 1** → REQ-0015 (pre-submit валидация пробелов/недобора + шаблон «8×5» + кнопка-заливка) — даю агентом. Дальше: T2 норма-SSOT, B1/B2 shared, UC3 прогресс недели.
+- **Dev 2** → REQ-0013 **13b** (capacity/reports используют plannedEffortShare вместо целого plannedEffort на departmentId) — **жду отмашку заказчика** (меняет расчёт ёмкости). Пока можно REQ-0004/0011 research.
+- **QA** → регресс + тест личного кабинета (Мои часы/периоды) + multi-dept доли (Σ долей=plannedEffort).
+- **CISO** → CISO-005 server-identity (R2: роль из client-params спуфабельна; нужен server-actor для прода).
+
+Сверка с референсами — ритмом (правило 8). Браузер-приёмка — когда освободится сессия заказчика. — arch
 
 ### 2026-06-21 — [arch] A1 ВЕРДИКТ: ДА (useUserId) → план разблокировки approval + REQ-0014
 
@@ -3018,6 +3053,15 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-22 01:25 — [qa-ok] 1207 passed / approval runSubmit + statusMeta + buildProjectHours
+
+[qa-ok] +15 тестов:
+- approval.logic: runSubmit 3 новых (approvalRequired=true→PATCH, =false→skip, через dept=true→PATCH). Итого 19 тестов.
+- status-meta: statusMeta 6 тестов (метки всех 4 статусов + fallback + SSOT-guard уникальности).
+- use-my-hours: round2 floating-point guard + null hours guard (IEEE 754 баг зафиксирован).
+
+Все 1207 зелёные. Непокрытых тестируемых чистых функций не осталось — все  ждут зависимостей (CISO-005/007, [bug]#2). — QA
 
 
 ### 2026-06-22 01:20 — [qa-ok] period-status багфикс + 1183 зелёных (45 файлов)
