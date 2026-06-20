@@ -3,6 +3,7 @@ import { EmployeeRow } from 'src/front-components/capacity/employee-row';
 import { ProjectDetail } from 'src/front-components/capacity/project-detail';
 import {
   deptLoadCells,
+  deptPlanLoads,
   deptProjectLoads,
   employeeLoadCells,
   firstFreePeriod,
@@ -10,6 +11,7 @@ import {
 import type {
   CapProject,
   CellMetric,
+  DeptPlan,
   DeptRef,
   EmployeeRef,
   LoadCell,
@@ -21,6 +23,7 @@ type DeptProps = {
   departments: DeptRef[];
   cellsByDept: Map<string, LoadCell[]>;
   projects: CapProject[];
+  deptPlans: DeptPlan[];
   periods: Period[];
   nameWidth: number;
   metric: CellMetric;
@@ -35,6 +38,7 @@ export const DeptRows = ({
   departments,
   cellsByDept,
   projects,
+  deptPlans,
   periods,
   nameWidth,
   metric,
@@ -45,9 +49,11 @@ export const DeptRows = ({
 }: DeptProps) => (
   <>
     {departments.map((dept) => {
-      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods);
+      // REQ-0012: ячейки отдела учитывают план без проекта (deptPlans).
+      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans);
       const isOpen = expanded.has(dept.id);
       const detail = isOpen ? deptProjectLoads(dept, projects, periods) : null;
+      const planRows = isOpen ? deptPlanLoads(dept, deptPlans, periods) : null;
       return (
         <div key={dept.id}>
           <DeptRow
@@ -64,6 +70,7 @@ export const DeptRows = ({
             <ProjectDetail
               planned={detail.planned}
               unplanned={detail.unplanned}
+              deptPlans={planRows ?? []}
               periods={periods}
               nameWidth={nameWidth}
               planning={planning}
@@ -80,17 +87,20 @@ type EmpProps = {
   employees: EmployeeRef[];
   deptById: Map<string, DeptRef>;
   projects: CapProject[];
+  deptPlans: DeptPlan[];
   periods: Period[];
   nameWidth: number;
   metric: CellMetric;
 };
 
 // Срез «Люди»: личная ёмкость сотрудника (календарь × коэф отдела) + доля
-// плановых часов отдела. Сортировка по отделу, затем по имени.
+// плановых часов отдела (проекты + план без проекта REQ-0012). Сортировка по
+// отделу, затем по имени.
 export const EmployeeRows = ({
   employees,
   deptById,
   projects,
+  deptPlans,
   periods,
   nameWidth,
   metric,
@@ -104,7 +114,7 @@ export const EmployeeRows = ({
     <>
       {sorted.map((emp) => {
         const dept = emp.departmentId ? deptById.get(emp.departmentId) : undefined;
-        const cells = employeeLoadCells(emp, dept, projects, periods);
+        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans);
         return (
           <EmployeeRow
             key={emp.id}

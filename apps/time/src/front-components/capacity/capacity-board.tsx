@@ -25,7 +25,7 @@ export const CapacityBoard = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
 
-  const { loading, error, isManager, departments, employees, projects, periods, reloadProjects } =
+  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, reloadProjects } =
     useCapacity(granularity);
   const { save, status: saveStatus, error: saveError } = usePlanEdit(reloadProjects);
 
@@ -37,11 +37,12 @@ export const CapacityBoard = () => {
     [departments],
   );
 
+  // REQ-0012: ёмкость/загрузка отдела включает план без проекта (deptPlans).
   const cellsByDept = useMemo(() => {
     const map = new Map<string, ReturnType<typeof deptLoadCells>>();
-    for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods));
+    for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods, deptPlans));
     return map;
-  }, [departments, projects, periods]);
+  }, [departments, projects, deptPlans, periods]);
 
   const summary = useMemo(
     () => summaryCells([...cellsByDept.values()], periods),
@@ -114,6 +115,7 @@ export const CapacityBoard = () => {
                 departments={departments}
                 cellsByDept={cellsByDept}
                 projects={projects}
+                deptPlans={deptPlans}
                 periods={periods}
                 nameWidth={NAME_WIDTH}
                 metric={metric}
@@ -129,6 +131,7 @@ export const CapacityBoard = () => {
                 employees={employees}
                 deptById={deptById}
                 projects={projects}
+                deptPlans={deptPlans}
                 periods={periods}
                 nameWidth={NAME_WIDTH}
                 metric={metric}

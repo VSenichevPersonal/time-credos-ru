@@ -12,12 +12,25 @@ type Props = {
   projects: ProjectRef[];
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
+  lastWorkTypeByProject?: Record<string, string>; // проект → последний вид работ (W3-5)
   onAdd: (rowKey: string) => void;
 };
 
-export const AddRow = ({ projects, workTypes, recentProjectIds, onAdd }: Props) => {
+export const AddRow = ({
+  projects,
+  workTypes,
+  recentProjectIds,
+  lastWorkTypeByProject,
+  onAdd,
+}: Props) => {
   const [projectId, setProjectId] = useState<string | null>(null);
   const [workTypeId, setWorkTypeId] = useState<string | null>(null);
+
+  // W3-5 default-activity: при выборе проекта подставляем его последний вид работ.
+  const selectProject = (id: string | null) => {
+    setProjectId(id);
+    setWorkTypeId(id ? lastWorkTypeByProject?.[id] ?? null : null);
+  };
 
   const projectItems = useMemo(
     () => projects.map((p) => ({ id: p.id, label: p.name })),
@@ -57,7 +70,7 @@ export const AddRow = ({ projects, workTypes, recentProjectIds, onAdd }: Props) 
         items={projectItems}
         recentIds={recentProjectIds}
         value={projectId}
-        onChange={setProjectId}
+        onChange={selectProject}
         width={260}
         dropUp
       />

@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 
 import { T, cellFill } from 'src/front-components/grid/tokens';
 import { fmtHours, parseHours } from 'src/front-components/grid/format';
+import { categoryMeta } from 'src/front-components/shared/category-meta';
 
-// Строка дня: проект (600) · вид работ (400) · описание · крупная ячейка часов.
+// Строка дня: цвет-точка категории · проект (600) · вид работ (400) · описание · ячейка часов.
 
 type Props = {
   alt: boolean;
   projectName: string;
+  category?: string | null;
   workTypeName: string;
   hours: number;
   description: string | null;
@@ -17,6 +19,7 @@ type Props = {
 export const DayRow = ({
   alt,
   projectName,
+  category,
   workTypeName,
   hours,
   description,
@@ -48,18 +51,30 @@ export const DayRow = ({
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          title={projectName}
-          style={{
-            fontSize: 13.5,
-            fontWeight: 600,
-            color: T.text,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          {projectName}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+          <span
+            aria-hidden
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: category ? categoryMeta(category).solid : T.border,
+            }}
+          />
+          <div
+            title={projectName}
+            style={{
+              fontSize: 13.5,
+              fontWeight: 600,
+              color: T.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {projectName}
+          </div>
         </div>
         <div
           title={description ? `${workTypeName} · ${description}` : workTypeName}

@@ -91,6 +91,7 @@ export const ProjectView = ({
                   key={row.key}
                   rowIndex={i}
                   projectName={row.workTypeName}
+                  category={null}
                   workTypeName=""
                   days={days}
                   hoursByDay={row.hoursByDay}

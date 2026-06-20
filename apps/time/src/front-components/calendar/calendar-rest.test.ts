@@ -9,7 +9,7 @@ import { fetchCalendarYear } from './calendar-rest';
 
 const KEY = 'credosTimeWorkdayCalendars';
 
-const page = (rows: object[], hasNextPage = false, endCursor?: string) => ({
+const page = (rows: object[], hasNextPage = false, endCursor?: string | null) => ({
   data: { [KEY]: rows },
   pageInfo: { hasNextPage, endCursor: endCursor ?? null },
 });

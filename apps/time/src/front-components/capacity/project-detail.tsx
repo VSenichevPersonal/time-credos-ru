@@ -1,7 +1,9 @@
 import { T } from 'src/front-components/capacity/cap-tokens';
+import { DeptPlanRow } from 'src/front-components/capacity/dept-plan-row';
 import { ProjectPlanRow } from 'src/front-components/capacity/project-plan-row';
 import type {
   CapProject,
+  DeptPlanLoad,
   Period,
   ProjectLoad,
   ProjectPatch,
@@ -15,6 +17,7 @@ import type {
 type Props = {
   planned: ProjectLoad[];
   unplanned: CapProject[];
+  deptPlans?: DeptPlanLoad[]; // REQ-0012: плановая загрузка отдела без проекта
   periods: Period[];
   nameWidth: number;
   planning?: boolean;
@@ -61,6 +64,7 @@ const PlanningList = ({
 export const ProjectDetail = ({
   planned,
   unplanned,
+  deptPlans = [],
   periods,
   nameWidth,
   planning,
@@ -126,6 +130,10 @@ export const ProjectDetail = ({
         </div>
       ))}
 
+      {deptPlans.map((load) => (
+        <DeptPlanRow key={load.plan.id} load={load} nameWidth={nameWidth} periods={periods} />
+      ))}
+
       {unplanned.length > 0 && (
         <div
           style={{
@@ -140,7 +148,7 @@ export const ProjectDetail = ({
         </div>
       )}
 
-      {planned.length === 0 && unplanned.length === 0 && (
+      {planned.length === 0 && unplanned.length === 0 && deptPlans.length === 0 && (
         <div
           style={{
             padding: '6px 12px 6px 28px',

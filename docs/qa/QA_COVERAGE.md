@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **845 + 19 todo** (31 файлов, все зелёные) |
+| unit-тестов | **866 + 19 todo** (33 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -50,9 +50,12 @@
 | `front-components/calendar/calendar-rest.ts` | `fetchCalendarYear` — дефолты/paginация/cursor/стоп без cursor | ✅ 7 тестов | `front-components/calendar/calendar-rest.test.ts` |
 | `front-components/grid/time-rest.ts` | `resolveEmployeeId`/`fetchProjects`/`fetchEntries`/`upsertEntry`/`deleteEntry` | ✅ 16 тестов | `front-components/grid/time-rest.test.ts` |
 | `front-components/grid/approval-rest.ts` | `submitEntries`/`resolveEntries` — route+fallback+approve/reject | ✅ 9 тестов | `front-components/grid/approval-rest.test.ts` |
+| `front-components/project-summary/summary-rest.ts` | `fetchProjectSummary` — fact/team/lastDate/null-дефолты/ISO-slice | ✅ 7 тестов | `front-components/project-summary/summary-rest.test.ts` |
+| `front-components/project-team/team-rest.ts` | `fetchProjectEntries`/`fetchEmployees` — filter/limit/пустой | ✅ 5 тестов | `front-components/project-team/team-rest.test.ts` |
+| `front-components/grid/use-grid-model.ts` | `calcGridModel` — агрегация/dayTotals/weekTotal/сортировка/extraRowKeys | ✅ 11 тестов | `front-components/grid/use-grid-model.test.ts` |
 | `logic-functions/approval.logic.ts` | RBAC runSubmit/runResolve + SoD (CISO-002) | ✅ covered | `logic-functions/approval.logic.test.ts` |
 | `logic-functions/time-entry-api.logic.ts` | security-регресс CISO-005/006/007/008 | 🟦 todo-спека | `logic-functions/time-entry-api.logic.test.ts` |
-| `front-components/grid/use-week.ts` | дата-логика недели | 🟡 в хуке — нужен вынос (Dev 1) | — |
+| `front-components/grid/use-week.ts` | `mondayOf`/`toIso` — дата-логика (UTC Пн, переходы месяц/год) | ✅ 10 тестов | `front-components/grid/use-week.test.ts` |
 | **UI-экраны (timesheet/capacity/настройки/календарь)** | **browser-smoke** | **⬜ QA-1** | `reports/QA_SMOKE_CHECKLIST.md` |
 
 Легенда: ✅ covered · 🟦 todo-спека · 🔴 gap · 🟡 предложено · ⚪ низкий приоритет.

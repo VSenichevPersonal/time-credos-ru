@@ -473,6 +473,17 @@ ADR-0005 (прод-топология) / ADR-0006 (модель сотрудни
 
 _Front + UX: `apps/time/src/{front-components,views,page-layouts,navigation-menu-items}/`, page-layouts SSOT, timesheet-grid, i18n. Пиши `[received]`, `[signal-arch]`, `[blocker]`, `[design-proposal]`._
 
+### 2026-06-20 22:05 — [report] REQ-0012 строки «Без проекта» в детализации отдела (фронт)
+
+Прокинул `deptPlans` (из state `use-capacity`) в расчёт по всей цепочке, до этого передавался `[]`:
+- `capacity-board.tsx`: достал `deptPlans` из `useCapacity`; `cellsByDept` теперь `deptLoadCells(d, projects, periods, deptPlans)` → ёмкость/загрузка отдела и сводка «Все отделы» (`summaryCells` строится из cellsByDept) учитывают план без проекта. Прокинул `deptPlans` в `<DeptRows>` и `<EmployeeRows>`.
+- `board-rows.tsx`: `DeptRows` принимает `deptPlans`, передаёт в `deptLoadCells` и при раскрытии считает `deptPlanLoads(dept, deptPlans, periods)` → в `ProjectDetail`. `EmployeeRows` прокидывает `deptPlans` в `employeeLoadCells` (срез «Люди» — доля плана без проекта делится поровну на отдел).
+- `project-detail.tsx`: новый проп `deptPlans: DeptPlanLoad[]`, рендер строк «Без проекта» после проектов; пустое состояние учитывает их.
+
+Как показал «Без проекта»: вынес строку в отдельный `dept-plan-row.tsx` (project-detail держал бы 241 стр > лимита 200; теперь 165). Визуальное отличие от проектов: тег-чип «без проекта» (amber `#fef3c7`/`#92400e`), курсив подписи и часов, тултип «Без проекта · {label}». Часы по периодам — `tabular-nums`, формат как у проектов (`Math.round`, пусто при 0). Сортировка/раскид — из `deptPlanLoads`/`deptPlanHoursInPeriod` (Dev2, не трогал). На сервере 3 записи (Резерв 40ч ОПИБ, Пресейл-бронь 60ч ОВ, Прочее 20ч ТЦ) — отрисуются в соответствующих отделах.
+
+Валидация: `yarn lint` 0/0 (208 файлов); `yarn test:unit` 856 passed (calc-load.test 34 ✓); `yarn twenty dev --once --dry-run` чисто (typecheck OK, 2 frontComponent updated). Файлы <200 стр. Не коммитил.
+
 ### 2026-06-21 22:40 — [report] Вкладка «Сводка» 1-й в карточке проекта (customer-direct, нужен sync)
 
 Заказчик: «на карточку проекта первой вкладкой — дашборд-саммари, всё важное». Сделал.
@@ -936,6 +947,16 @@ DP-0001 (`[arch-ok]` был) реализован: метрика-тоггл (С
 
 _Data + Domain: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель, демо-данные, требования. Пиши `[received]`, `[signal-arch]`, `[requirement]`, `[blocker]`._
 
+### 2026-06-21 05:15 — [taking] W4-1 OLAP /s/reports параметрический (Dev 2 бэк)
+
+Self-serve, верх очереди Dev2 после REQ-0012. Беру **W4-1**: обобщить `/s/reports` → `groupBy` (любая ось) + `filters[]` (drill-контекст, cross-filter) + курсор-пагинация строк. **Обратная совместимость:** старый ответ (byDept/byProject/byEmployee/totals) сохраняю — дашборд/бюджет/viz Dev1 не ломаю.
+
+**Зона (бэк, не пересекается с Dev1-фронтом):** `logic-functions/reports.logic.ts`, `logic-functions/reports-calc.ts`, `reports-calc.test.ts`. Контракт обновлю в `REPORTS_CONTRACT.md`. constants не трогаю (drill-оси — строковые, без новых UUID).
+По research нашёл: `entry.stageId` не читается в `RawEntry` — добавлю для оси «этап».
+
+Оси: dept/project/stage/workType/category/period (employee — v2 за RBAC, оставляю гейт). Делаю по `.planning/phases/02-olap-reports/REQUIREMENTS.md` + `docs/research/OLAP_REPORTS_RESEARCH.md`. dry-run, не деплою.
+
+— Dev 2
 ### 2026-06-21 03:35 — [report] Dev 2 BACK: REQ-0012 готов (845 зелёных), очередь СЕЙЧАС пуста
 
 - **REQ-0012** (credosTimeDeptPlan: загрузка отдела без проекта) — закоммичен (3b2fe02), объект+view+nav+calc+сид. Полный сьют после моих SSOT/PII-правок — **845 unit зелёных**, oxlint 0.
@@ -1974,6 +1995,18 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
 
+### 2026-06-21 23:05 — [qa-ok] +10 unit → 866 зелёных (mondayOf/toIso)
+
+Вынес `mondayOf`/`toIso` из `use-week.ts` в экспорт (arch-ok #10).
+`use-week.test.ts` (10): WEEKDAY_LABELS Пн/Вс, toIso, mondayOf все дни→Пн, переходы месяц (1 июл→29 июн) + год (1 янв 2026→29 дек 2025), UTC-инвариант.
+**866 passed + 19 todo** (33 файла). — QA
+
+### 2026-06-21 22:58 — [qa-ok] +11 unit → 856 зелёных (calcGridModel)
+
+Вынес `calcGridModel` из `useMemo` в `useGridModel` в экспортированную чистую функцию (паттерн как calcCopyWithHours/calcPeriodRange). TypeCheck 0 ошибок.
+`use-grid-model.test.ts` (11): пустые entries, одна запись→hoursByDay, суммирование, две пары→две строки, запись вне недели игнорируется, dayTotals/weekTotal, сортировка ru, extraRowKeys пустая строка, неизвестный проект/вид→дефолты, category наследуется.
+**856 passed + 19 todo** (32 файла). — QA
+
 ### 2026-06-21 22:35 — [qa-ok] +12 unit → 845 зелёных (summary-rest + team-rest)
 
 `summary-rest.test.ts` (7): `fetchProjectSummary` fact/team/lastDate агрегат, нет записей → нули, null-поля→дефолты, ISO-slice дат, null employeeId не в team, filter по projectId.
@@ -2478,6 +2511,66 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-21 — [ciso-policy] статус очереди + REQ-0013 CISO-наблюдение
+
+**Статус CISO-очереди (BACKLOG_BOARD):**
+- C1 ✅ ADR-0005/0006 152-ФЗ review — завершено
+- C2 ⏳ CISO-005 server-identity — исследование выслано, жду решения arch/@Dev2 (3 варианта пути)
+- C3 ✅ Модель ролей — `docs/security/specs/RBAC_MODEL.md` создан
+- C4 ✅ OLAP ПДн-гейт — `docs/security/specs/OLAP_PII_SECURITY.md` создан
+- C5 ✅ Ревью F-E/F-F — CISO-010 P2 зарегистрирован
+
+CISO-очередь: свободен (все задачи выполнены или заблокированы на решение arch/Dev2). Жду раздачу новых задач.
+
+---
+
+**@arch — REQ-0013 (мульти-отдел) CISO наблюдение (pre-implementation):**
+
+Проект принадлежит нескольким отделам (project×dept×доля). Это меняет RBAC-модель:
+
+1. **Scope руководителя расширяется:** Руководитель отдела А через `/s/reports byProject` видит данные проекта, где также участвует отдел Б (если scope = все записи проекта). Может раскрыть трудозатраты сотрудников из чужого отдела.
+2. **Требование:** scope Руководителя в reports/OLAP = данные его отдела внутри проекта, а не весь проект. `byEmployee` для мульти-отдельного проекта = только сотрудники СВОЕГО отдела.
+3. **Влияет на:** `OLAP_PII_SECURITY.md` §1.1 (после CISO-005 scope = dept filter), `RBAC_MODEL.md` матрица. Обновлю спеку после принятия REQ-0013 архитектуры.
+
+Severity: P3 (dev-среда), P2 при выходе в прод.
+
+--- 
+
+CISO-001..010 в реестре. `docs/security/` актуален.
+
+— CISO
+### 2026-06-21 — [ciso-finding] C4 OLAP ПДн-гейт + C5 экспорт/cron (CISO-010)
+
+**C4 — OLAP by employee: CISO-требования готовы**
+
+Спека: `docs/security/specs/OLAP_PII_SECURITY.md`
+
+Ключевые правила для Dev 2 (OLAP фаза 02):
+1. `groupBy:dept/project/category/workType` — ✅ безопасен без ограничений
+2. `groupBy:employee` (агрегат по людям) — только `isManager`, остальным `rows:[self]`
+3. `groupBy:entry` (лист сырых записей) — жёсткий гейт: нет actor → `forbidden`
+4. Новые `filters[]` параметры OLAP — обязательная UUID/enum-валидация (CISO-006 поверхность растёт с OLAP)
+5. Контракт ответа: поле `scope.redactedPII: true` → фронт показывает объяснение, не пустоту
+
+**C5 — #CISO-010 P2: экспорт CSV + cron напоминания**
+
+Finding: `docs/security/findings/CISO-010-export-pii.md`
+
+**F-F экспорт:**
+- `Б` (SICK) в CSV = медПДн 152-ФЗ ст. 10 в скачиваемом файле → для не-HR маскировать как `Н` (неявка)
+- Role-guard обязателен: весь табель → только isManager; сотрудник → только свои строки
+- Интеграция 1С = новая операция ПДн → фиксировать в ЛНА до включения
+- Стриминг без temp-file на диске
+
+**F-E cron:**
+- Email-адреса не в логах/stack trace
+- Тело письма только про «тебя» — не называть коллег по имени/статусу
+
+**@arch:** C4 спека готова для Dev 2 при старте OLAP фазы 02. CISO-010 = pre-implementation requirement, не блокирует текущую волну.
+
+RISK_REGISTER обновлён (CISO-001..010).
+
+— CISO
 ### 2026-06-21 — [taking] CISO: C4 + C5 из бэклога
 
 Беру из CISO-очереди (BACKLOG_BOARD):

@@ -62,6 +62,7 @@ export const DayView = ({
               key={row.key}
               alt={i % 2 === 1}
               projectName={row.projectName}
+              category={row.category}
               workTypeName={row.workTypeName}
               hours={row.hoursByDay[dayIndex]}
               description={row.descByDay[dayIndex]}

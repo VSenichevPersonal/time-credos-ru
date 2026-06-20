@@ -15,7 +15,11 @@ export type RawEntry = {
   hours: number | null;
   projectId: string | null;
   employeeId: string | null;
+  workTypeId?: string | null; // W4-1 OLAP: ось «вид работ»/«группа видов».
+  stageId?: string | null; // W4-1 OLAP: ось «этап».
 };
+// Справочник видов работ — для осей workType/workTypeGroup (W4-1).
+export type RawWorkType = { id: string; name: string | null; group: string | null };
 export type RawProject = {
   id: string;
   name: string | null;
@@ -72,6 +76,7 @@ export type ReportsInput = {
   departments: RawDepartment[];
   calendar: RawCalendarDay[];
   absences?: RawAbsence[]; // F-D phase2: вычет рабочих часов отсутствий из нормы.
+  workTypes?: RawWorkType[]; // W4-1 OLAP: справочник для осей workType/workTypeGroup.
 };
 
 // Строка проекта + бюджет (F-A: план vs факт). budgetUsed = fact/plannedEffort.

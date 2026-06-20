@@ -26,14 +26,15 @@ const todayIso = (): string => {
   return new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())).toISOString().slice(0, 10);
 };
 
-const mondayOf = (dt: Date): Date => {
+// Понедельник недели dt (UTC). Тестируема — используется в хуке и тестах.
+export const mondayOf = (dt: Date): Date => {
   const d = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
   const dow = (d.getUTCDay() + 6) % 7; // Пн=0 … Вс=6
   d.setUTCDate(d.getUTCDate() - dow);
   return d;
 };
 
-const toIso = (d: Date): string => d.toISOString().slice(0, 10);
+export const toIso = (d: Date): string => d.toISOString().slice(0, 10);
 
 export const useWeek = () => {
   const [monday, setMonday] = useState<Date>(() => mondayOf(new Date()));

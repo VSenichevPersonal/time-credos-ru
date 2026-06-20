@@ -8,8 +8,11 @@ import type { ApiEntry } from './types';
 
 const day = (iso: string, isWeekend = false): WeekDay => ({
   iso,
-  label: iso.slice(8), // «21»
+  dayLabel: iso.slice(8, 10),
+  fullLabel: iso,
+  dateLabel: iso.slice(8),
   isWeekend,
+  isToday: false,
 });
 
 // Пн–Пт текущей недели, Сб–Вс выходные
@@ -32,10 +35,9 @@ const entry = (
   id: `e-${date}-${projectId}`,
   date,
   hours,
+  description: null,
   projectId,
   workTypeId,
-  workspaceMemberId: 'wm-1',
-  status: 'DRAFT',
 });
 
 describe('calcCopyWithHours', () => {
