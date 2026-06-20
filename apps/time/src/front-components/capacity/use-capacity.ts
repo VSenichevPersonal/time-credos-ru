@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   fetchCalendar,
   fetchDepartments,
+  fetchEmployees,
   fetchProjects,
 } from 'src/front-components/capacity/capacity-rest';
 import { buildPeriods } from 'src/front-components/capacity/calc-load';
@@ -10,6 +11,7 @@ import type {
   CalendarDay,
   CapProject,
   DeptRef,
+  EmployeeRef,
   Period,
 } from 'src/front-components/capacity/types';
 
@@ -29,6 +31,7 @@ type State = {
   loading: boolean;
   error: string | null;
   departments: DeptRef[];
+  employees: EmployeeRef[];
   projects: CapProject[];
   calendar: CalendarDay[];
 };
@@ -40,6 +43,7 @@ export const useCapacity = (granularity: Granularity) => {
     loading: true,
     error: null,
     departments: [],
+    employees: [],
     projects: [],
     calendar: [],
   });
@@ -47,10 +51,15 @@ export const useCapacity = (granularity: Granularity) => {
   useEffect(() => {
     let alive = true;
     const range = horizonRange(anchor, granularity);
-    Promise.all([fetchDepartments(), fetchProjects(), fetchCalendar(range.from, range.to)])
-      .then(([departments, projects, calendar]) => {
+    Promise.all([
+      fetchDepartments(),
+      fetchEmployees(),
+      fetchProjects(),
+      fetchCalendar(range.from, range.to),
+    ])
+      .then(([departments, employees, projects, calendar]) => {
         if (!alive) return;
-        setState({ loading: false, error: null, departments, projects, calendar });
+        setState({ loading: false, error: null, departments, employees, projects, calendar });
       })
       .catch((e: unknown) => {
         if (!alive) return;

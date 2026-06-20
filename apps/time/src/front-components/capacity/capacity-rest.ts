@@ -4,6 +4,7 @@ import type {
   CalendarDay,
   CapProject,
   DeptRef,
+  EmployeeRef,
 } from 'src/front-components/capacity/types';
 
 // Доступ к Core REST воркспейса из песочницы. Те же права, что у роли приложения.
@@ -59,6 +60,29 @@ export const fetchProjects = async (): Promise<CapProject[]> => {
     plannedEffort: p.plannedEffort ?? null,
     startDate: p.startDate ?? null,
     endDate: p.endDate ?? null,
+  }));
+};
+
+type RawEmployee = {
+  id: string;
+  name: string;
+  departmentId?: string | null;
+  active?: boolean | null;
+};
+
+// Активные сотрудники — для среза «по людям» доски планирования.
+export const fetchEmployees = async (): Promise<EmployeeRef[]> => {
+  const resp = await client().get<ListResp<RawEmployee>>('/rest/credosTimeEmployees', {
+    query: {
+      filter: 'active[eq]:true',
+      limit: '300',
+      orderBy: 'name[AscNullsFirst]',
+    },
+  });
+  return pickList(resp, 'credosTimeEmployees').map((e) => ({
+    id: e.id,
+    name: e.name,
+    departmentId: e.departmentId ?? null,
   }));
 };
 

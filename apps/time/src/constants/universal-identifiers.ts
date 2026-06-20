@@ -292,3 +292,20 @@ export const CREDOS_TIME_PROJECT_CARD_VF_5 = '94bccf56-ad28-48ca-bd23-cf0b1058a2
 // dept/project/employee). Контракт для Dev 1 — docs/data-model/REPORTS_CONTRACT.md.
 export const REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   '5536742c-7217-41c3-a2a6-8d0788f9bd88';
+
+// --- Wave 2 (REPORTS UI, Dev 1): дашборд «Отчёты» (front + nav + page-layout) ---
+// Front-component дашборда (KPI утилизации + таблица среза, данные /s/reports).
+export const REPORTS_DASHBOARD_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  'df4eeaa5-c93e-4f72-b078-8e22e8588441';
+export const REPORTS_NAV_UNIVERSAL_IDENTIFIER =
+  '9fa480ba-c8f3-4cb0-b293-78d27baae6bf';
+export const REPORTS_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER =
+  'cd8d9f98-05e3-4b6a-8034-2f634749d839';
+export const REPORTS_PAGE_LAYOUT_TAB_UNIVERSAL_IDENTIFIER =
+  'd949bca4-2f10-4d1f-82c8-2f7b8adc44bd';
+export const REPORTS_PAGE_WIDGET_UNIVERSAL_IDENTIFIER =
+  '4e31f950-d85f-480d-bd32-acf20e53407b';
+
+// Front-component вкладки «Бюджет» карточки проекта (план vs факт из /s/reports byProject).
+export const CREDOS_TIME_PROJECT_BUDGET_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  '3e9489b0-49a8-49ca-bf13-f0c0a0558cce';

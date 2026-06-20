@@ -129,3 +129,60 @@ describe('computeReports — edge', () => {
     expect(res.byEmployee).toHaveLength(0);
   });
 });
+
+// Дополнение QA (R2-QA): семантика util, множитель нормы отдела, группировки >1.
+describe('computeReports — util семантика + группировки (QA)', () => {
+  it('util=0 при fact>0 без клиентских часов (НЕ null) — отличие от пустого периода', () => {
+    const inp = base();
+    inp.entries = [{ hours: 5, projectId: 'p-int', employeeId: 'e1' }]; // только внутренний
+    const res = computeReports(inp, PERIOD);
+    expect(res.totals.fact).toBe(5);
+    expect(res.totals.util).toBe(0); // client=0, fact>0 → 0, не null
+  });
+
+  it('норма отдела учитывает headcount: baseNorm(15) × headcount(3) × factor(1) = 45', () => {
+    const inp = base();
+    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 1, headcount: 3 }];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byDept[0].norm).toBe(45);
+    expect(res.byEmployee[0].norm).toBe(15); // личная норма headcount НЕ множит
+  });
+
+  it('группировка по 2 отделам: факт распределён, Σ byDept == totals', () => {
+    const inp = base();
+    inp.departments = [
+      { id: 'd1', code: 'OV', capacityFactor: 1, headcount: 1 },
+      { id: 'd2', code: 'OIB', capacityFactor: 1, headcount: 1 },
+    ];
+    inp.employees = [
+      { id: 'e1', firstName: 'И', lastName: 'И', departmentId: 'd1' },
+      { id: 'e2', firstName: 'П', lastName: 'П', departmentId: 'd2' },
+    ];
+    inp.entries = [
+      { hours: 6, projectId: 'p-cli', employeeId: 'e1' },
+      { hours: 4, projectId: 'p-int', employeeId: 'e2' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byDept.find((r) => r.key === 'd1')?.fact).toBe(6);
+    expect(res.byDept.find((r) => r.key === 'd2')?.fact).toBe(4);
+    expect(res.byDept.reduce((s, r) => s + r.fact, 0)).toBe(res.totals.fact);
+    expect(res.byEmployee).toHaveLength(2);
+  });
+
+  it('budgetUsed > 1 при перевыработке плана (факт 20 / план 12)', () => {
+    const inp = base();
+    inp.entries = [{ hours: 20, projectId: 'p-cli', employeeId: 'e1' }];
+    const res = computeReports(inp, PERIOD);
+    expect(res.byProject.find((p) => p.key === 'p-cli')?.budgetUsed).toBeCloseTo(20 / 12, 4);
+  });
+
+  it('запись с hours=null пропускается (не ломает суммы)', () => {
+    const inp = base();
+    inp.entries = [
+      { hours: null, projectId: 'p-cli', employeeId: 'e1' },
+      { hours: 3, projectId: 'p-int', employeeId: 'e1' },
+    ];
+    const res = computeReports(inp, PERIOD);
+    expect(res.totals.fact).toBe(3);
+  });
+});

@@ -1,6 +1,6 @@
 # ADR-0006. Модель сотрудника — `credosTimeEmployee` + ссылка на WorkspaceMember
 
-**Статус:** PROPOSED (Dev 2 → arch/CISO на review)
+**Статус:** ACCEPTED (arch CONFIRMED 2026-06-20 22:05; CISO review минимизации ПДн ожидается)
 **Дата:** 2026-06-20
 **Связано:** [ADR-0003](0003-catalog-separate-app-shared-master-data.md) (общие мастер-данные), ADR-0005 (прод-топология, 2 инстанса), CISO-004 (PII-видимость/дубль), задача R-EMP (arch)
 

@@ -1,8 +1,8 @@
 # ADR-0005. Прод-топология — отдельный Twenty 2.14 для time + синк Company по API
 
-**Статус:** PROPOSED (Dev 2 оформил по решению-направлению arch; arch confirm)
+**Статус:** ACCEPTED (arch CONFIRMED 2026-06-20 22:05, Стратегия C)
 **Дата:** 2026-06-20
-**Связано:** [ADR-0002](0002-sdk-app-isolated-repo.md) (app=install-юнит), [ADR-0003](0003-catalog-separate-app-shared-master-data.md) (общие мастер-данные), [ADR-0006](0006-employee-model.md), CISO-004, 152FZ-001, `docs/devops/UPSTREAM_SYNC_ASSESSMENT.md`
+**Связано:** [ADR-0001](0001-platform-and-data.md) (платформа Twenty/один workspace), [ADR-0002](0002-sdk-app-isolated-repo.md) (app=install-юнит), [ADR-0003](0003-catalog-separate-app-shared-master-data.md) (общие мастер-данные), [ADR-0006](0006-employee-model.md), CISO-004, 152FZ-001, `docs/devops/UPSTREAM_SYNC_ASSESSMENT.md`, `docs/security/PII_152FZ_REVIEW.md`
 
 ## Контекст
 
@@ -16,7 +16,7 @@
 
 ## Решение
 
-**Вариант B:** time-app разворачивается на **отдельном инстансе Twenty 2.14** (клон dev-конфигурации), **в РФ-контуре** (не Railway). `Company` (и при необходимости штат) **синхронизируются по REST API** между CRM-форком и time-инстансом, не шарятся через общую БД.
+**Стратегия C** (по `UPSTREAM_SYNC_ASSESSMENT.md` §4, рекомендована DevOps): time-app разворачивается на **отдельном чистом инстансе Twenty 2.14** (клон dev-конфигурации), **в РФ-контуре** (не Railway). `Company` (и при необходимости штат) **синхронизируются по REST API** между CRM-форком и time-инстансом, не шарятся через общую БД. Апгрейд форка CredosCRM1 до 2.x (Стратегия A rebase или B пере-форк) — **отдельный независимый трек**, не блокирует time-app.
 
 - time-app **не ждёт** полного upstream-sync форка (апгрейд CRM v1.19→2.x — отдельный трек).
 - Соответствует ADR-0002 (app = самостоятельный install-юнит).
@@ -36,7 +36,7 @@
 
 ## Действие
 
-1. arch: confirm B (PROPOSED→ACCEPTED).
+1. arch: confirm Стратегия C (PROPOSED→ACCEPTED). ✅ CONFIRMED (arch, 22:05).
 2. DevOps: спецификация синка `Company` по API (CRM↔time) + выбор РФ-хостинга (замена Railway для прода).
 3. Dev 2: модель матчинга Company/штата между инстансами (ключ: ИНН/externalCode для Company; `workspaceMemberRef`/email для штата) → при ACCEPTED оформить как REQ.
 4. CISO: review межинстансной видимости ПДн (CISO-004) до прод-старта.

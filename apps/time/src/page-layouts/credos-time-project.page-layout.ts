@@ -22,6 +22,7 @@ import {
   CREDOS_TIME_PROJECT_RP_W_TEAM_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_TEAM_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_BUDGET_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -138,26 +139,24 @@ export default definePageLayout({
         },
       ],
     },
-    // 5a. Бюджет / план vs факт — placeholder «скоро».
+    // 5a. Бюджет / план vs факт — front-component (/s/reports byProject).
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_BUDGET_UNIVERSAL_IDENTIFIER,
       title: 'Бюджет',
       position: 4,
       icon: 'IconChartHistogram',
-      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      layoutMode: PageLayoutTabLayoutMode.CANVAS,
       widgets: [
         {
           universalIdentifier:
             CREDOS_TIME_PROJECT_RP_W_BUDGET_UNIVERSAL_IDENTIFIER,
           title: 'Бюджет · план vs факт',
-          type: 'STANDALONE_RICH_TEXT',
-          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
+          type: 'FRONT_COMPONENT',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
           configuration: {
-            configurationType: 'STANDALONE_RICH_TEXT',
-            body: {
-              markdown:
-                '### Бюджет · план vs факт — скоро\n\nЗдесь будет сравнение **плановых часов** проекта с **фактической суммой** списанных трудозатрат (и, позже, суммами из связей с 1С).\n\nПлан: `plannedEffort` проекта · Факт: сумма `hours` по записям трудозатрат проекта.',
-            },
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier:
+              CREDOS_TIME_PROJECT_BUDGET_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
           },
         },
       ],

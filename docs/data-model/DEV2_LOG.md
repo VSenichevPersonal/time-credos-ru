@@ -68,7 +68,8 @@
 - **D2-2 seed H2:** project endDate раскинуты `nextEndDate()` по июн–дек 2026 (CAPACITY июль+ оживёт). `node --check` ок.
 - На сервере не прогонял (creds/мутация) → DevOps при reseed/sync.
 - **reports-calc.ts:** вынес чистый расчёт из reports.logic в тестируемый модуль (паттерн «calc в .ts»). `computeReports()` без сети. reports.logic = fetch+пагинация+вызов.
-- **reports-calc.test.ts:** 14 unit (vitest.unit.config) — edge по запросу arch: праздники вне нормы, 0 ёмкость→norm0/under=-fact, пустой период→util=null, capacityFactor 0.8, запись без employeeId→через проект, Σ byDept==totals. Всё зелёное. oxlint/tsc чисто.
+- **бюджет-агрегат F-A:** `byProject` += `plannedEffort` + `budgetUsed` (факт/план, null без плана) для виджета «Бюджет» Dev1.
+- **reports-calc.test.ts:** 15 unit (vitest.unit.config) — edge по запросу arch: праздники вне нормы, 0 ёмкость→norm0/under=-fact, пустой период→util=null, capacityFactor 0.8, запись без employeeId→через проект, Σ byDept==totals, бюджет план/факт. Всё зелёное. oxlint/tsc чисто.
 
 ---
 

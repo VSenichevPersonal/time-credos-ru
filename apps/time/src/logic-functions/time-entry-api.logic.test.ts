@@ -22,3 +22,13 @@ describe('approval: separation of duties (CISO-002)', () => {
   it.todo('runResolve: актор не может approve/reject СВОИ записи (actor != owner)');
   it.todo('runResolve: approve/reject доступны только роли «Руководитель» (canApprove)');
 });
+
+// CISO-006 (P2): REST filter injection — client params интерполируются в filter-строки
+// без валидации; запятая в значении = инъекция AND-условия. Детали:
+// docs/security/findings/CISO-006-filter-injection.md.
+describe('REST filter injection (CISO-006)', () => {
+  it.todo('employeeId/from/to валидируются (UUID_RE / DATE_RE) до интерполяции в filter');
+  it.todo('runSubmit: employeeId="VICTIM,status[neq]:DRAFT" отвергается, не обходит status[eq]:DRAFT');
+  it.todo('workspaceMemberRef с запятой/доп-условием отвергается (усиление CISO-005)');
+  it.todo('params.ids: каждый id матчит UUID_RE перед filter id[eq]:${id}');
+});

@@ -2,6 +2,7 @@ import type {
   CalendarDay,
   CapProject,
   DeptRef,
+  EmployeeRef,
   LoadCell,
   Period,
   ProjectLoad,
@@ -113,6 +114,31 @@ export const deptLoadCells = (
     }
     return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
   });
+
+// Срез «по людям»: ячейки загрузки сотрудника. Личная ёмкость = рабочие часы
+// периода × коэффициент его отдела. Загрузка = доля плановых часов проектов
+// отдела, поделённая поровну на численность отдела (allocation по людям в модели
+// нет — равномерное распределение, согласовано с REPORTS_CONTRACT byEmployee).
+export const employeeLoadCells = (
+  employee: EmployeeRef,
+  dept: DeptRef | undefined,
+  projects: CapProject[],
+  periods: Period[],
+): LoadCell[] => {
+  const factor = dept?.capacityFactor ?? 0.8;
+  const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
+  return periods.map((period) => {
+    const capacity = period.workHours * factor;
+    let deptLoad = 0;
+    if (dept) {
+      for (const p of projects) {
+        if (p.departmentId === dept.id) deptLoad += projectHoursInPeriod(p, period);
+      }
+    }
+    const load = deptLoad * share;
+    return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
+  });
+};
 
 // Первый период, где отдел освобождается (ratio < threshold) — ответ продажам
 // «когда обещать старт». null = окна в горизонте нет.

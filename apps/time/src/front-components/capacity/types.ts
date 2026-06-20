@@ -3,6 +3,9 @@
 // Метрика ячейки. Дефолт — «свободно ч» (то, что продажи могут ещё обещать).
 export type CellMetric = 'pct' | 'free' | 'plan';
 
+// Ось группировки доски планирования.
+export type CapAxis = 'dept' | 'employee';
+
 // Отдел с параметрами ёмкости.
 export type DeptRef = {
   id: string;
@@ -10,6 +13,13 @@ export type DeptRef = {
   code: string | null;
   headcount: number; // численность (0 если не задана)
   capacityFactor: number; // коэффициент (отпуска/накладные)
+};
+
+// Сотрудник для среза «по людям». Личная ёмкость = workHours × capacityFactor отдела.
+export type EmployeeRef = {
+  id: string;
+  name: string;
+  departmentId: string | null;
 };
 
 // Проект, формирующий загрузку. plannedEffort раскидывается по периоду.

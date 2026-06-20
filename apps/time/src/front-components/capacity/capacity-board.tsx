@@ -5,16 +5,10 @@ import { Center } from 'src/front-components/grid/center';
 import { Segmented } from 'src/front-components/capacity/mode-switcher';
 import { PeriodHeader } from 'src/front-components/capacity/period-header';
 import { SummaryRow } from 'src/front-components/capacity/summary-row';
-import { DeptRow } from 'src/front-components/capacity/dept-row';
-import { ProjectDetail } from 'src/front-components/capacity/project-detail';
+import { DeptRows, EmployeeRows } from 'src/front-components/capacity/board-rows';
 import { useCapacity, type Granularity } from 'src/front-components/capacity/use-capacity';
-import {
-  deptLoadCells,
-  deptProjectLoads,
-  firstFreePeriod,
-  summaryCells,
-} from 'src/front-components/capacity/calc-load';
-import type { CellMetric } from 'src/front-components/capacity/types';
+import { deptLoadCells, summaryCells } from 'src/front-components/capacity/calc-load';
+import type { CapAxis, CellMetric } from 'src/front-components/capacity/types';
 
 const NAME_WIDTH = 240;
 
@@ -30,10 +24,17 @@ const HINT: Record<CellMetric, string> = {
 
 export const CapacityBoard = () => {
   const [metric, setMetric] = useState<CellMetric>('free');
+  const [axis, setAxis] = useState<CapAxis>('dept');
   const [granularity, setGranularity] = useState<Granularity>('week');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const { loading, error, departments, projects, periods } = useCapacity(granularity);
+  const { loading, error, departments, employees, projects, periods } =
+    useCapacity(granularity);
+
+  const deptById = useMemo(
+    () => new Map(departments.map((d) => [d.id, d])),
+    [departments],
+  );
 
   const cellsByDept = useMemo(() => {
     const map = new Map<string, ReturnType<typeof deptLoadCells>>();
@@ -81,6 +82,15 @@ export const CapacityBoard = () => {
       >
         <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Планирование</span>
         <Segmented
+          ariaLabel="Срез группировки"
+          value={axis}
+          segments={[
+            { value: 'dept', label: 'Отделы' },
+            { value: 'employee', label: 'Люди' },
+          ]}
+          onChange={setAxis}
+        />
+        <Segmented
           ariaLabel="Метрика ячейки"
           value={metric}
           segments={[
@@ -115,33 +125,29 @@ export const CapacityBoard = () => {
 
             <SummaryRow cells={summary} periods={periods} nameWidth={NAME_WIDTH} metric={metric} />
 
-            {departments.map((dept) => {
-              const cells = cellsByDept.get(dept.id) ?? [];
-              const isOpen = expanded.has(dept.id);
-              const detail = isOpen ? deptProjectLoads(dept, projects, periods) : null;
-              return (
-                <div key={dept.id}>
-                  <DeptRow
-                    dept={dept}
-                    cells={cells}
-                    periods={periods}
-                    nameWidth={NAME_WIDTH}
-                    metric={metric}
-                    freeFrom={firstFreePeriod(cells, periods)}
-                    expanded={isOpen}
-                    onToggle={() => toggle(dept.id)}
-                  />
-                  {isOpen && detail && (
-                    <ProjectDetail
-                      planned={detail.planned}
-                      unplanned={detail.unplanned}
-                      periods={periods}
-                      nameWidth={NAME_WIDTH}
-                    />
-                  )}
-                </div>
-              );
-            })}
+            {axis === 'dept' ? (
+              <DeptRows
+                departments={departments}
+                cellsByDept={cellsByDept}
+                projects={projects}
+                periods={periods}
+                nameWidth={NAME_WIDTH}
+                metric={metric}
+                expanded={expanded}
+                onToggle={toggle}
+              />
+            ) : employees.length === 0 ? (
+              <Center>Нет сотрудников для среза «по людям»</Center>
+            ) : (
+              <EmployeeRows
+                employees={employees}
+                deptById={deptById}
+                projects={projects}
+                periods={periods}
+                nameWidth={NAME_WIDTH}
+                metric={metric}
+              />
+            )}
           </div>
         )}
       </div>
