@@ -4684,6 +4684,37 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-preflight] OLAP drill-down — CISO BLOCKER на CISO-005
+
+**Drill-down = критично підвищує ризик CISO-005/CISO-007**
+
+Сьогодні звіти показують агрегати (цифри без ФІО). Drill-down розкриває **рядки записей**: `employeeId`, `hours`, `date`, `projectId` — для конкретного співробітника.
+
+**Сценарій атаки без CISO-005:**
+1. Звичайний співробітник Іванов відкриває звіт
+2. Клікає drill-down на комірку відділу/проекту
+3. Бачить рядки записей ВСІХ колег: хто скільки годин, на яких проектах
+4. **Порушення 152-ФЗ** + комерційна таємниця (видно завантаження по проектах)
+
+**CISO вимога:** OLAP drill-down НЕ реалізувати до закриття **CISO-005 P1** (server-side identity: `event.userWorkspaceId → workspaceMember → employee`).
+
+**Після CISO-005:**
+- Drill-down по своїх записях: дозволено всім
+- Drill-down по записах інших: тільки `isManager === true` (CISO-007 guard)
+- Drill-down до рівня відділу (без ФІО): можна всім (агрегат, не ПДн)
+
+**Архітектурне правило для реалізатора:**
+```typescript
+// Drill-down endpoint/logic-function:
+const actor = await resolveActor(event); // CISO-005
+if (targetEmployeeId !== actor.employeeId && !actor.isManager) {
+  return { ok: false, error: 'forbidden' };
+}
+```
+
+**Статус:** CISO-005 = P1 OPEN → drill-down = BLOCKED.
+
+— CISO
 ### 2026-06-22 — [ciso-preflight] REQ-0011 credosTimeEmployeeDepartmentFte — CISO constraints
 
 **Аналіз CISO для нового join-об'єкта:**

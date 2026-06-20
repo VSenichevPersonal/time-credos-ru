@@ -5,6 +5,7 @@ import type {
   DeptPlan,
   DeptPlanLoad,
   DeptRef,
+  EmpDeptAssignment,
   EmployeeRef,
   LoadCell,
   Period,

@@ -45,6 +45,19 @@ export type ProjectDeptShare = {
   plannedEffortShare: number | null; // плановые часы доли отдела
 };
 
+// REQ-0011: назначение сотрудника на отдел в % FTE с датами действия (join
+// credosTimeEmployeeDepartment). Численность отдела (headcount) для ёмкости =
+// Σ(ftePercent/100) сотрудников с активной записью в периоде. Дата активна:
+// startDate ≤ конец периода И (endDate пуст ИЛИ endDate ≥ начало периода).
+// Fallback (нет записей вообще): старый count по employee.departmentId (100%).
+export type EmpDeptAssignment = {
+  employeeId: string | null;
+  departmentId: string | null;
+  ftePercent: number | null; // 0..100, доля ставки в отделе
+  startDate: string | null; // ISO, пусто = с начала времён
+  endDate: string | null; // ISO, пусто = бессрочно
+};
+
 // REQ-0012: плановая загрузка отдела БЕЗ привязки к проекту (резерв/пресейл-бронь
 // /прочее). plannedEffort раскидывается по периоду той же логикой, что у проекта,
 // и суммируется к загрузке отдела на доске.
