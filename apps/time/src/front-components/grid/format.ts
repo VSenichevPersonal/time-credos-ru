@@ -14,11 +14,52 @@ export const fmtHours = (n: number): string => {
 // То же, но с заглушкой «—» для итоговых колонок.
 export const fmtTotal = (n: number): string => (n > 0 ? fmtHours(n) : '—');
 
-// Парсинг ввода: запятая/точка, шаг 0.25, диапазон 0..24.
+// Квантование к шагу 0.25 и проверка диапазона 0..24. null — вне диапазона.
+const quantize = (hours: number): number | null => {
+  if (Number.isNaN(hours) || hours < 0 || hours > 24) return null;
+  return Math.round(hours * 4) / 4;
+};
+
+// Сырое число часов из разных форматов (без квантования/диапазона). null — не распознано.
+// Поддержка (люди думают в ч:мин — Timetta даёт выбор Decimal/HH:MM):
+//   «1.5» / «1,5»   — десятичные (точка/запятая)
+//   «1:30»          — HH:MM
+//   «1ч30м» / «1ч»  — русские суффиксы ч/м (минуты опциональны)
+//   «30м» / «90м»   — только минуты (90м → 1.5 ч)
+//   «1h30» / «1h»   — латинский h (+ опц. минуты)
+const parseFlexible = (s: string): number | null => {
+  // Чистое десятичное (точка/запятая): «1.5», «.5», «3», «3.».
+  if (/^\d*[.,]?\d+$/.test(s) || /^\d+[.,]$/.test(s)) {
+    const n = Number(s.replace(',', '.'));
+    return Number.isNaN(n) ? null : n;
+  }
+  // HH:MM: «1:30», «:45», «2:».
+  let m = /^(\d*):(\d*)$/.exec(s);
+  if (m) {
+    const h = m[1] === '' ? 0 : Number(m[1]);
+    const min = m[2] === '' ? 0 : Number(m[2]);
+    return h + min / 60;
+  }
+  // Часы/минуты с суффиксами ч/h/м/m: «1ч30м», «1ч», «30м», «1h30м», «90м».
+  m = /^(?:(\d+)\s*[чh])?\s*(?:(\d+)\s*[мm])?$/.exec(s);
+  if (m && (m[1] !== undefined || m[2] !== undefined)) {
+    const h = m[1] ? Number(m[1]) : 0;
+    const min = m[2] ? Number(m[2]) : 0;
+    return h + min / 60;
+  }
+  // «1h30» — латинский h как разделитель без суффикса минут.
+  m = /^(\d+)h(\d+)$/.exec(s);
+  if (m) return Number(m[1]) + Number(m[2]) / 60;
+  return null;
+};
+
+// Парсинг ввода: гибкие форматы → часы float, шаг 0.25, диапазон 0..24.
+// Пустой/пробельный ввод → 0 (очистка ячейки). null — нераспознано/вне диапазона.
 export const parseHours = (raw: string): number | null => {
-  const n = Number(raw.replace(',', '.').trim());
-  if (Number.isNaN(n) || n < 0 || n > 24) return null;
-  return Math.round(n * 4) / 4;
+  const s = raw.trim().toLowerCase();
+  if (s === '') return 0;
+  const hours = parseFlexible(s);
+  return hours === null ? null : quantize(hours);
 };
 
 export type LoadLevel = 'empty' | 'under' | 'ok' | 'over';

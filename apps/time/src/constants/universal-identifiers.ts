@@ -439,3 +439,9 @@ export const CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER =
   '9ff4e0ab-a53c-4977-bae2-7f48bb326c77';
 export const CREDOS_TIME_PROJECT_DEPARTMENT_NAV_UNIVERSAL_IDENTIFIER =
   'cac47fc6-5365-4603-8ef9-198a5e2d6034';
+
+// Post-install бэкфилл REQ-0013 13a: project.departmentId → доля 100% в join.
+// ЕДИНСТВЕННАЯ post-install функция приложения (SDK берёт E[0]) — будущие
+// миграции добавляются В ЭТОТ ЖЕ handler, не отдельным файлом.
+export const BACKFILL_PROJECT_DEPARTMENTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '81b054aa-ce6a-4059-aab2-cb0401030b8d';
