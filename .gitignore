@@ -1,6 +1,7 @@
 # Секреты / окружение — НИКОГДА не коммитить
 .env
 .env.*
+!.env.example
 *.local
 **/secrets/**
 *.pem

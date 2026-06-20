@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Pre-commit guard для time-credos-ru.
+# Блокирует коммит при найденных секретах/ПДн (см. infra/scripts/secret-scan.sh).
+#
+# Установка (один раз, у каждого разработчика):
+#   git config core.hooksPath infra/git-hooks
+# Проверка: git config --get core.hooksPath  → infra/git-hooks
+#
+# Обход в исключительном случае (не злоупотреблять): git commit --no-verify
+set -euo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+exec "$ROOT/infra/scripts/secret-scan.sh"

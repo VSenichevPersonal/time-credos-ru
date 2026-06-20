@@ -127,3 +127,50 @@
 - `page-layouts/credos-time-entry.page-layout.ts` — ➕ RECORD_PAGE карточки записи.
 - `navigation-menu-items/credos-time-{stage,billing-link}.navigation-menu-item.ts` — ➕ пункты в папке «Трудозатраты».
 - `constants/universal-identifiers.ts` — новые UUID-константы (view/nav/record-page/поля для колонок).
+
+---
+
+## 6. Развитая карточка проекта (RECORD_PAGE со вкладками) — Wave 8
+
+**Дата:** 2026-06-20. **Статус:** накатано (`yarn twenty dev --once`, 35 created / 1 updated, без ошибок и дублей UUID).
+
+Карточка `credosTimeProject` получила собственную `RECORD_PAGE` «Карточка проекта»
+(`page-layouts/credos-time-project.page-layout.ts`) с 7 вкладками. Заголовок карточки =
+`labelIdentifier` проекта (`code`); поля `name` у объекта нет (см. §3), поэтому «название
+проекта как заголовок» сейчас невозможно без добавления TEXT-поля `name`.
+
+**Механика вкладок (как у карточки записи):** FIELDS-виджет показывает поля, привязанные к
+конкретной **card-view**. Для каждой содержательной вкладки создана своя card-view
+(`key: INDEX`, но **без navigationMenuItem** → в сайдбар не попадает; `position` 10–13).
+Вкладки-таблицы дочерних записей построены так: в card-view виден **relation-field обратной
+связи** (`timeEntries` / `stages` / `billingLinks`, ONE_TO_MANY) — ядро рендерит его
+инлайн-таблицей дочерних записей этого проекта (колонки берутся из самой дочерней записи).
+В каждой card-view поле `code` (labelIdentifier) стоит в позиции 0 (требование ядра).
+
+| # | Вкладка | Тип виджета | Что показывает | card-view / источник |
+|---|---|---|---|---|
+| 1 | **Обзор** | FIELDS | Код, Код клиента/Директум, Клиент, Отдел, Руководитель, Категория, Статус, Дата начала/окончания, Плановые часы | view «Проект — обзор» (10 полей) |
+| 2 | **Трудозатраты** | FIELDS (relation) | Инлайн-таблица записей трудозатрат проекта (дата/часы/вид работ/сотрудник/статус — из записи) | view «Проект — трудозатраты» (relation `timeEntries`) |
+| 3 | **Этапы** | FIELDS (relation) | Инлайн-таблица этапов проекта | view «Проект — этапы» (relation `stages`) |
+| 4 | **Связи с 1С** | FIELDS (relation) | Инлайн-таблица документов 1С (номер/тип/дата/сумма) — задел под финансы | view «Проект — связи с 1С» (relation `billingLinks`) |
+| 5 | **Бюджет** | STANDALONE_RICH_TEXT | Заглушка «скоро»: план (`plannedEffort`) vs факт (Σ `hours` записей) | текст-markdown |
+| 6 | **Команда** | STANDALONE_RICH_TEXT | Заглушка «скоро»: кто списывал время + Σ часов по сотруднику | текст-markdown |
+| 7 | **Документы** | FILES | Нативные attachments проекта | ядро Twenty |
+
+**Файлы Wave 8:**
+- `page-layouts/credos-time-project.page-layout.ts` — ➕ RECORD_PAGE «Карточка проекта» (7 вкладок).
+- `views/credos-time-project-card-{overview,time-entries,stages,billing-links}.view.ts` — ➕ 4 card-view.
+- `constants/universal-identifiers.ts` — ➕ UUID record-page/табов/виджетов/card-view + field-id start/end date.
+
+**Замечание про FIELDS-relation vs «отдельный RELATION-виджет»:** в текущем SDK нет
+выделенного RELATION-таблица-виджета по обратной связи. `RECORD_TABLE`-виджет показывает
+произвольную view объекта (не фильтруется по родителю). Поэтому связи проекта показаны
+нативным способом — relation-field в FIELDS-виджете (рендерится инлайн-списком дочерних
+записей, отфильтрованных по родителю автоматически). Это документированный механизм Twenty.
+
+**TODO-доделки (на будущее):**
+- «Бюджет план vs факт» — заменить заглушку на AGGREGATE_CHART/BAR_CHART или front-компонент
+  (план `plannedEffort` против суммы `hours`; позже — суммы из `billingLinks`).
+- «Команда» — front-компонент со сводкой часов по сотрудникам проекта.
+- При необходимости «название проекта» в заголовке карточки — добавить TEXT-поле `name`
+  и переключить `labelIdentifier`.
