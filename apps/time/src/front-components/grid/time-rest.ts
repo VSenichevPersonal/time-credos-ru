@@ -2,6 +2,7 @@ import { RestApiClient } from 'twenty-client-sdk/rest';
 
 import type {
   ApiEntry,
+  DepartmentRef,
   EmployeeRef,
   ProjectRef,
   Ref,
@@ -44,6 +45,7 @@ type RawProject = {
   category?: string | null;
   departmentId?: string | null;
   companyId?: string | null;
+  approvalRequired?: boolean | null;
 };
 
 export const fetchProjects = async (): Promise<ProjectRef[]> => {
@@ -67,6 +69,7 @@ export const fetchProjects = async (): Promise<ProjectRef[]> => {
       client,
       departmentId: p.departmentId ?? null,
       category: p.category ?? null,
+      approvalRequired: p.approvalRequired ?? null,
       name: parts.join(' · '),
     };
   });
@@ -91,11 +94,17 @@ export const fetchWorkTypes = async (): Promise<WorkTypeRef[]> => {
   }));
 };
 
-export const fetchDepartments = async (): Promise<Ref[]> => {
-  const resp = await client().get<ListResp<Ref>>('/rest/credosTimeDepartments', {
+type RawDepartment = { id: string; name: string; approvalRequired?: boolean | null };
+
+export const fetchDepartments = async (): Promise<DepartmentRef[]> => {
+  const resp = await client().get<ListResp<RawDepartment>>('/rest/credosTimeDepartments', {
     query: { limit: '50' },
   });
-  return pickList(resp, 'credosTimeDepartments').map((d) => ({ id: d.id, name: d.name }));
+  return pickList(resp, 'credosTimeDepartments').map((d) => ({
+    id: d.id,
+    name: d.name,
+    approvalRequired: d.approvalRequired ?? null,
+  }));
 };
 
 type RawEmployee = { id: string; name: string; departmentId?: string | null };

@@ -11,6 +11,14 @@ export type ProjectRef = {
   client: string | null;
   departmentId: string | null;
   category: string | null; // UPPER_CASE код категории
+  approvalRequired: boolean | null; // null = наследует отдел
+};
+
+// Отдел: id, имя, флаг согласования (для резолва на фронте).
+export type DepartmentRef = {
+  id: string;
+  name: string;
+  approvalRequired: boolean | null;
 };
 
 // Вид работ: имя, группа, отдел (nullable = глобальный).
@@ -32,6 +40,7 @@ export type ApiEntry = {
   date: string;
   hours: number;
   description: string | null;
+  status?: string | null; // UPPER_CASE код статуса согласования
   projectId: string | null;
   workTypeId: string | null;
   employeeId?: string | null;

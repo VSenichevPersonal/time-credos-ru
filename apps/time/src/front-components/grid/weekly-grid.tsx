@@ -12,6 +12,8 @@ import { useGridData } from 'src/front-components/grid/use-grid-data';
 import { useGridModel } from 'src/front-components/grid/use-grid-model';
 import { useFilters, filterProjects, filterWorkTypes } from 'src/front-components/grid/use-filters';
 import { useTimesheetActions } from 'src/front-components/grid/use-timesheet-actions';
+import { useApproval } from 'src/front-components/grid/use-approval';
+import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
 
 // Корневой компонент таймшита. Виджет фиксированного размера: скроллится только
@@ -55,6 +57,17 @@ export const WeeklyGrid = () => {
     upsert: data.upsert,
     upsertMany: data.upsertMany,
     remove: data.remove,
+  });
+
+  // Согласование периода (отключаемое): бейдж + действия в подвале.
+  const approval = useApproval({
+    entries: data.entries,
+    projects: data.projects,
+    departments: data.departments,
+    employeeId: viewEmployeeId ?? data.selfEmployeeId,
+    from: week.range.from,
+    to: week.range.to,
+    reload: data.reload,
   });
 
   // Недавние проекты: из текущих записей (частые сверху автокомплита).
@@ -163,6 +176,19 @@ export const WeeklyGrid = () => {
           }}
         />
       )}
+
+      <ApprovalBar
+        status={approval.periodStatus}
+        isManager={isManager}
+        canSubmit={approval.canSubmit}
+        canResolve={approval.canResolve}
+        draftCount={approval.draftCount}
+        submittedCount={approval.submittedCount}
+        busy={approval.busy}
+        onSubmit={approval.submit}
+        onApprove={approval.approve}
+        onReject={approval.reject}
+      />
     </div>
   );
 };

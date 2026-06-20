@@ -13,6 +13,8 @@ import {
 import {
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
+  CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID,
+  CREDOS_TIME_ENTRY_APPROVED_BY_FIELD_ID,
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
@@ -70,6 +72,26 @@ export default defineObject({
       icon: 'IconProgress',
       defaultValue: ENTRY_STATUS_DEFAULT,
       options: ENTRY_STATUS_OPTIONS,
+    },
+    // Кто согласовал/отклонил (userWorkspaceId руководителя). Заполняет /s/approval.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_APPROVED_BY_FIELD_ID,
+      name: 'approvedBy',
+      type: FieldType.TEXT,
+      label: 'Кто согласовал',
+      icon: 'IconUserCheck',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // Когда согласовали/отклонили.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID,
+      name: 'approvedAt',
+      type: FieldType.DATE_TIME,
+      label: 'Дата согласования',
+      icon: 'IconCalendarCheck',
+      isNullable: true,
+      defaultValue: null,
     },
     // TimeEntry.employee -> Employee.timeEntries (MANY_TO_ONE).
     {

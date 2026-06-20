@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
   ApiEntry,
+  DepartmentRef,
   EmployeeRef,
   ProjectRef,
-  Ref,
   WorkTypeRef,
 } from 'src/front-components/grid/types';
 import {
@@ -33,7 +33,7 @@ export type UpsertInput = {
 type Refs = {
   projects: ProjectRef[];
   workTypes: WorkTypeRef[];
-  departments: Ref[];
+  departments: DepartmentRef[];
   employees: EmployeeRef[];
 };
 

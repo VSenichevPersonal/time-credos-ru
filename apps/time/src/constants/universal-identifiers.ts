@@ -112,6 +112,9 @@ export const CREDOS_TIME_ENTRY_DATE_FIELD_ID = '359bdb1d-f6c5-4780-b560-5013858d
 export const CREDOS_TIME_ENTRY_HOURS_FIELD_ID = '3b8ea288-2594-4d9a-8314-b1d8dee0e0c5';
 export const CREDOS_TIME_ENTRY_DESCRIPTION_FIELD_ID = 'c59758a1-5b6f-4ee0-b0b9-da3f2b7e44d4';
 export const CREDOS_TIME_ENTRY_STATUS_FIELD_ID = '60cc0ef7-38ef-42aa-903a-2e13d178fafc';
+// approvedBy/approvedAt — фиксация кто/когда согласовал (заполняет /s/approval).
+export const CREDOS_TIME_ENTRY_APPROVED_BY_FIELD_ID = '034bfbad-fed9-4f0e-9917-d497bb9ceace';
+export const CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID = '1cb81c6a-41bd-4f69-8eca-e6c1efe8cd7e';
 // WorkType
 export const CREDOS_TIME_WORK_TYPE_GROUP_FIELD_ID = '78e61c8f-d18c-48c3-9897-5cf3316aebe9';
 // Employee
@@ -150,6 +153,16 @@ export const WEEKLY_GRID_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
 // Logic-функция /s/time-entry (CRUD трудозатрат для песочницы).
 export const TIME_ENTRY_API_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   '7f6f5390-cac7-486e-b164-a2f459d07fee';
+
+// --- Wave 5 (APPROVAL): согласование трудозатрат (отключаемое) ---
+// Logic-функция /s/approval (submit/approve/reject, фиксирует userWorkspaceId).
+export const APPROVAL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '00a4d3f7-a783-4bb8-a71c-4142d9c0aabc';
+// View «Согласование» (записи со status=SUBMITTED) + nav-пункт в папке Трудозатраты.
+export const CREDOS_TIME_APPROVAL_VIEW_UNIVERSAL_IDENTIFIER =
+  '6ad54e03-9826-4ce2-8929-5c107ce1ca02';
+export const CREDOS_TIME_APPROVAL_NAV_UNIVERSAL_IDENTIFIER =
+  '5da29a3c-b90a-4ff2-b2c1-7463317c50b4';
 
 // --- Wave 6 (CALENDAR): производственный календарь РФ как отдельный слой ---
 // Объект credosTimeWorkdayCalendar + поля + view + nav.
