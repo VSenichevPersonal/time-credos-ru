@@ -64,6 +64,11 @@ time-credos-ru/
 | [docs/catalog/SDK_DESIGN.md](docs/catalog/SDK_DESIGN.md) | каталог как SDK-app |
 | [docs/catalog/RECON.md](docs/catalog/RECON.md) | разбор прототипа CredosITCatalog |
 
+### DevOps / инфраструктура
+| Документ | О чём |
+|---|---|
+| [docs/devops/DEV_SERVER.md](docs/devops/DEV_SERVER.md) | dev-сервер Twenty 2.14 на Railway: пути, сервисы, CLI, подключение app |
+
 ### Стандарты разработки
 | Документ | О чём |
 |---|---|
