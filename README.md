@@ -95,6 +95,7 @@ time-credos-ru/
 | **Синтез модели данных (все источники)** | `docs/DATA_MODEL_SYNTHESIS.md` |
 | План сид-данных (реальные ОВ + мок) | `docs/SEED_DATA_PLAN.md` |
 | Аудит целостности данных | `docs/DATA_INTEGRITY_AUDIT.md` |
+| Планирование загрузки отделов | `docs/CAPACITY_PLANNING.md` |
 | Реестр сотрудников (Битрикс, 72 чел) | `Intel 03 Directum5/bitrix-users/roster.csv` |
 | Реальные трудозатраты Директум 5 | `Intel 03 Directum5/RECON.md` |
 | Каталог услуг 4 отделов | `Intel 03 Directum5/katalog-uslug-otdelov-2025.md` |
