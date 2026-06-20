@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { fetchReports } from 'src/front-components/reports/reports-rest';
 import type {
@@ -13,8 +13,15 @@ type State = {
 };
 
 // Загрузка /s/reports под выбранный период+срез. Перезапрос при смене аргументов.
-export const useReports = (from: string, to: string, groupBy: GroupBy): State => {
+// reload() — ручной повтор (кнопка «Повторить» при ошибке): bump nonce → useEffect.
+export const useReports = (
+  from: string,
+  to: string,
+  groupBy: GroupBy,
+): State & { reload: () => void } => {
   const [state, setState] = useState<State>({ loading: true, error: null, data: null });
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     let alive = true;
@@ -39,7 +46,7 @@ export const useReports = (from: string, to: string, groupBy: GroupBy): State =>
     return () => {
       alive = false;
     };
-  }, [from, to, groupBy]);
+  }, [from, to, groupBy, nonce]);
 
-  return state;
+  return { ...state, reload };
 };

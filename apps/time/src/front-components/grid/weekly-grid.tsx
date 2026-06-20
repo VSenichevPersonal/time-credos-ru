@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 
 import { T, FONT } from 'src/front-components/grid/tokens';
-import { Center } from 'src/front-components/grid/center';
 import { Toolbar } from 'src/front-components/grid/toolbar';
 import { FiltersBar } from 'src/front-components/grid/filters-bar';
 import { WeekGrid } from 'src/front-components/grid/week-grid';
@@ -15,6 +14,8 @@ import { useTimesheetActions } from 'src/front-components/grid/use-timesheet-act
 import { useApproval } from 'src/front-components/grid/use-approval';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
+import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
+import { ErrorState } from 'src/front-components/shared/error-state';
 
 // Корневой компонент таймшита. Виджет фиксированного размера: скроллится только
 // тело таблицы. 3 режима (День/Неделя/Проект), клавиатура, мультиселект-фильтры.
@@ -95,7 +96,13 @@ export const WeeklyGrid = () => {
     setExtraRowKeys((prev) => [...new Set([...prev, key])]);
 
   if (data.error) {
-    return <Center>Не удалось загрузить трудозатраты: {data.error}</Center>;
+    return (
+      <ErrorState
+        title="Не удалось загрузить трудозатраты"
+        detail={data.error}
+        onRetry={data.reload}
+      />
+    );
   }
 
   const periodTitle = mode === 'day' ? week.dayTitle : week.weekTitle;
@@ -152,6 +159,10 @@ export const WeeklyGrid = () => {
         onClearAll={clearAll}
       />
 
+      <ErrorBoundary
+        title="Не удалось показать таблицу"
+        resetKeys={[mode, week.range.from, week.range.to]}
+      >
       {mode === 'week' && (
         <WeekGrid
           days={week.days}
@@ -204,6 +215,7 @@ export const WeeklyGrid = () => {
           }}
         />
       )}
+      </ErrorBoundary>
 
       <ApprovalBar
         status={approval.periodStatus}

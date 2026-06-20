@@ -18,6 +18,7 @@ type Props = {
   tags?: string[]; // W3-2: теги записей строки (чипы под видом работ)
   days: WeekDay[];
   hoursByDay: number[];
+  lockedByDay?: boolean[];
   rowTotal: number;
   alt: boolean;
   nav: Nav;
@@ -33,6 +34,7 @@ export const GridRow = ({
   tags,
   days,
   hoursByDay,
+  lockedByDay,
   rowTotal,
   alt,
   nav,
@@ -97,6 +99,7 @@ export const GridRow = ({
         value={hoursByDay[i]}
         weekend={day.isWeekend}
         today={day.isToday}
+        locked={lockedByDay?.[i]}
         active={nav.isActive(rowIndex, i)}
         seed={nav.isActive(rowIndex, i) ? nav.editSeed : null}
         onActivate={() => nav.setActive({ row: rowIndex, col: i })}

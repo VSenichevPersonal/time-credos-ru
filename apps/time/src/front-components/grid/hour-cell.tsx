@@ -12,6 +12,7 @@ type Props = {
   weekend: boolean;
   today: boolean;
   active: boolean;
+  locked?: boolean; // W6-2: согласованная запись — только чтение
   seed: string | null; // символ, с которого начали печатать
   onActivate: () => void;
   onCommit: (hours: number) => void;
@@ -24,6 +25,7 @@ export const HourCell = ({
   weekend,
   today,
   active,
+  locked,
   seed,
   onActivate,
   onCommit,
@@ -34,14 +36,17 @@ export const HourCell = ({
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Вход в редактирование по seed (печать цифры на активной ячейке).
+  // Вход в редактирование по seed (печать цифры на активной ячейке). Заблокированную
+  // (согласованную) ячейку не редактируем — только seed гасим.
   useEffect(() => {
     if (active && seed !== null && !editing) {
-      setDraft(seed === '0' ? '' : seed);
-      setEditing(true);
+      if (!locked) {
+        setDraft(seed === '0' ? '' : seed);
+        setEditing(true);
+      }
       onSeedConsumed();
     }
-  }, [active, seed, editing, onSeedConsumed]);
+  }, [active, seed, editing, locked, onSeedConsumed]);
 
   useEffect(() => {
     if (!editing) setDraft(fmtHours(value));
@@ -112,17 +117,19 @@ export const HourCell = ({
   return (
     <div
       tabIndex={-1}
+      title={locked ? 'Согласовано — только чтение' : undefined}
       onClick={() => {
         onActivate();
+        if (locked) return; // W6-2: согласованную не редактируем
         setDraft(fmtHours(value));
         setEditing(true);
       }}
       onMouseDown={onActivate}
       style={{
         ...base,
-        cursor: 'text',
+        cursor: locked ? 'default' : 'text',
         background: value > 0 ? cellFill(value) : bg,
-        color: over12 ? T.warn : value > 0 ? T.text : T.textFaint,
+        color: locked ? T.textMuted : over12 ? T.warn : value > 0 ? T.text : T.textFaint,
         fontWeight: value > 0 ? 500 : 400,
         boxShadow: active ? `inset 0 0 0 2px ${T.accent}` : 'none',
         borderRadius: active ? 4 : 0,

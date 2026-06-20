@@ -69,6 +69,7 @@ export const DayView = ({
               category={row.category}
               workTypeName={row.workTypeName}
               hours={row.hoursByDay[dayIndex]}
+              locked={row.lockedByDay[dayIndex]}
               description={row.descByDay[dayIndex]}
               onCommit={(h) => onCellCommit(row.key, day.iso, h)}
               onCommitDescription={

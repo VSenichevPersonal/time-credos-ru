@@ -10,6 +10,8 @@ import { useReports } from 'src/front-components/reports/use-reports';
 import { FilterChip, type Option } from 'src/front-components/grid/filter-chip';
 import { WORK_CATEGORY_OPTIONS } from 'src/constants/select-options';
 import type { GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
+import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
+import { ErrorState } from 'src/front-components/shared/error-state';
 
 const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
@@ -83,7 +85,7 @@ export const ReportsDashboard = () => {
   const { period, gran, isCurrent, prev, next, setGran } = usePeriod();
   const [groupBy, setGroupBy] = useState<GroupBy>('dept');
   const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
-  const { loading, error, data } = useReports(period.from, period.to, groupBy);
+  const { loading, error, data, reload } = useReports(period.from, period.to, groupBy);
 
   // DP-0004 P1: фильтр по категории — осмыслен в срезе «Проекты» (проект = 1 категория).
   const toggleCat = (v: string) =>
@@ -157,28 +159,33 @@ export const ReportsDashboard = () => {
       </div>
 
       {error ? (
-        <Center>Не удалось загрузить отчёт: {error}</Center>
+        <ErrorState title="Не удалось загрузить отчёт" detail={error} onRetry={reload} />
       ) : loading || !data ? (
         <Center>Загрузка отчёта…</Center>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-          <KpiCards totals={data.totals} />
-          <div
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              minHeight: 0,
-              margin: '0 14px 14px',
-              border: `1px solid ${T.border}`,
-              borderRadius: 10,
-              overflow: 'hidden',
-              background: T.surface,
-            }}
-          >
-            <BreakdownTable groupBy={groupBy} rows={filterRows(pickRows(groupBy, data))} />
+        <ErrorBoundary
+          title="Не удалось показать отчёт"
+          resetKeys={[groupBy, period.from, period.to]}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <KpiCards totals={data.totals} />
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                minHeight: 0,
+                margin: '0 14px 14px',
+                border: `1px solid ${T.border}`,
+                borderRadius: 10,
+                overflow: 'hidden',
+                background: T.surface,
+              }}
+            >
+              <BreakdownTable groupBy={groupBy} rows={filterRows(pickRows(groupBy, data))} />
+            </div>
           </div>
-        </div>
+        </ErrorBoundary>
       )}
     </div>
   );

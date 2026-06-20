@@ -12,6 +12,7 @@ type Props = {
   category?: string | null;
   workTypeName: string;
   hours: number;
+  locked?: boolean; // W6-2: согласованная запись — только чтение
   description: string | null;
   onCommit: (hours: number) => void;
   onCommitDescription?: (text: string) => void; // U11: инлайн-комментарий
@@ -23,6 +24,7 @@ export const DayRow = ({
   category,
   workTypeName,
   hours,
+  locked,
   description,
   onCommit,
   onCommitDescription,
@@ -180,7 +182,9 @@ export const DayRow = ({
         />
       ) : (
         <div
+          title={locked ? 'Согласовано — только чтение' : undefined}
           onClick={() => {
+            if (locked) return; // W6-2: согласованную не редактируем
             setDraft(fmtHours(hours));
             setEditing(true);
           }}
@@ -194,11 +198,11 @@ export const DayRow = ({
             fontSize: 16,
             fontWeight: hours > 0 ? 600 : 400,
             fontVariantNumeric: 'tabular-nums',
-            color: hours > 0 ? T.text : T.textFaint,
+            color: locked ? T.textMuted : hours > 0 ? T.text : T.textFaint,
             background: hours > 0 ? cellFill(hours) : T.panelBg,
             border: `1px solid ${T.border}`,
             borderRadius: 8,
-            cursor: 'text',
+            cursor: locked ? 'default' : 'text',
             boxSizing: 'border-box',
           }}
         >

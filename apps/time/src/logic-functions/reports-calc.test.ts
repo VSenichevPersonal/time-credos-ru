@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  OLAP_DIMENSIONS,
+  WORKDAY_TYPES,
   computeOlap,
   computeReports,
   finalize,
@@ -551,5 +553,40 @@ describe('computeOlap — dimLabel', () => {
     const { rows } = computeOlap(inp, PERIOD, { groupBy: 'employee' });
     expect(rows.find((r) => r.key === null)).toBeUndefined();
     expect(rows.map((r) => r.key)).not.toContain(null);
+  });
+});
+
+describe('WORKDAY_TYPES — SSOT рабочих дней', () => {
+  it('содержит WORKDAY и SHORT', () => {
+    expect(WORKDAY_TYPES.has('WORKDAY')).toBe(true);
+    expect(WORKDAY_TYPES.has('SHORT')).toBe(true);
+  });
+
+  it('не содержит HOLIDAY, DAYOFF (нерабочие дни вне нормы)', () => {
+    expect(WORKDAY_TYPES.has('HOLIDAY')).toBe(false);
+    expect(WORKDAY_TYPES.has('DAYOFF')).toBe(false);
+    expect(WORKDAY_TYPES.has('')).toBe(false);
+  });
+
+  it('ровно 2 значения (SSOT-guard на расширение)', () => {
+    expect(WORKDAY_TYPES.size).toBe(2);
+  });
+});
+
+describe('OLAP_DIMENSIONS — SSOT набора осей', () => {
+  const EXPECTED = ['dept', 'employee', 'project', 'workType', 'category', 'stage', 'workTypeGroup'];
+
+  it('содержит все 7 ожидаемых осей', () => {
+    for (const dim of EXPECTED) {
+      expect(OLAP_DIMENSIONS).toContain(dim);
+    }
+  });
+
+  it('ровно 7 осей (SSOT-guard на добавление без теста)', () => {
+    expect(OLAP_DIMENSIONS).toHaveLength(7);
+  });
+
+  it('нет дублей', () => {
+    expect(new Set(OLAP_DIMENSIONS).size).toBe(OLAP_DIMENSIONS.length);
   });
 });

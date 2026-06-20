@@ -84,6 +84,7 @@ export const WeekGrid = ({
               tags={row.tags}
               days={days}
               hoursByDay={row.hoursByDay}
+              lockedByDay={row.lockedByDay}
               rowTotal={row.rowTotal}
               alt={i % 2 === 1}
               nav={nav}

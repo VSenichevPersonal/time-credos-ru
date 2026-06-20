@@ -59,3 +59,34 @@ describe('WEEKLY_NORM_HOURS', () => {
     expect(WEEKLY_NORM_HOURS).toBe(40);
   });
 });
+
+describe('departmentLabel', () => {
+  it('null/undefined → пустая строка', () => {
+    expect(departmentLabel(null)).toBe('');
+    expect(departmentLabel(undefined)).toBe('');
+    expect(departmentLabel('')).toBe('');
+  });
+
+  it('известный код → полный ярлык из DEPARTMENT_LABELS', () => {
+    for (const [code, label] of Object.entries(DEPARTMENT_LABELS)) {
+      expect(departmentLabel(code)).toBe(label);
+    }
+  });
+
+  it('известный код + short=true → краткий ярлык из DEPARTMENT_SHORT_LABELS', () => {
+    for (const [code, label] of Object.entries(DEPARTMENT_SHORT_LABELS)) {
+      expect(departmentLabel(code, { short: true })).toBe(label);
+    }
+  });
+
+  it('неизвестный код → возвращает сам код (безопасный fallback)', () => {
+    expect(departmentLabel('UNKNOWN_DEPT')).toBe('UNKNOWN_DEPT');
+    expect(departmentLabel('UNKNOWN_DEPT', { short: true })).toBe('UNKNOWN_DEPT');
+  });
+
+  it('все известные коды дают непустые ярлыки', () => {
+    for (const code of Object.keys(DEPARTMENT_LABELS)) {
+      expect(departmentLabel(code).length).toBeGreaterThan(0);
+    }
+  });
+});

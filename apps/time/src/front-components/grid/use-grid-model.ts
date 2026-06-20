@@ -23,6 +23,7 @@ export type GridRowModel = {
   hoursByDay: number[]; // длина 7
   entryIdByDay: (string | null)[];
   descByDay: (string | null)[];
+  lockedByDay: boolean[]; // W6-2: день только для чтения (запись APPROVED)
   tags: string[]; // W3-2: объединение тегов записей строки (без дублей)
   rowTotal: number;
 };
@@ -58,6 +59,7 @@ export const calcGridModel = (
         hoursByDay: Array(7).fill(0),
         entryIdByDay: Array(7).fill(null),
         descByDay: Array(7).fill(null),
+        lockedByDay: Array(7).fill(false),
         tags: [],
         rowTotal: 0,
       };
@@ -82,6 +84,7 @@ export const calcGridModel = (
     row.hoursByDay[idx] += e.hours;
     row.entryIdByDay[idx] = e.id;
     row.descByDay[idx] = e.description;
+    if (e.status === 'APPROVED') row.lockedByDay[idx] = true; // W6-2: согласованное — read-only
     for (const t of entryTags) if (!row.tags.includes(t)) row.tags.push(t);
     row.rowTotal += e.hours;
   }

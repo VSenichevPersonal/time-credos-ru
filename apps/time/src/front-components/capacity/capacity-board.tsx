@@ -10,6 +10,8 @@ import { useCapacity, type Granularity } from 'src/front-components/capacity/use
 import { usePlanEdit } from 'src/front-components/capacity/use-plan-edit';
 import { deptLoadCells, summaryCells } from 'src/front-components/capacity/calc-load';
 import type { CapAxis, CellMetric } from 'src/front-components/capacity/types';
+import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
+import { ErrorState } from 'src/front-components/shared/error-state';
 
 const NAME_WIDTH = 240;
 
@@ -25,7 +27,7 @@ export const CapacityBoard = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
 
-  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, absenceCtx, reloadProjects, reloadDeptPlans } =
+  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, absenceCtx, reload, reloadProjects, reloadDeptPlans } =
     useCapacity(granularity);
   const { save, saveDeptPlan, status: saveStatus, error: saveError } = usePlanEdit(
     reloadProjects,
@@ -60,7 +62,15 @@ export const CapacityBoard = () => {
       return next;
     });
 
-  if (error) return <Center>Не удалось загрузить данные планирования: {error}</Center>;
+  if (error) {
+    return (
+      <ErrorState
+        title="Не удалось загрузить данные планирования"
+        detail={error}
+        onRetry={reload}
+      />
+    );
+  }
 
   return (
     <div
@@ -108,6 +118,10 @@ export const CapacityBoard = () => {
         ) : departments.length === 0 ? (
           <Center>Нет отделов для планирования</Center>
         ) : (
+          <ErrorBoundary
+            title="Не удалось показать доску планирования"
+            resetKeys={[effectiveAxis, metric, granularity]}
+          >
           <div style={{ minWidth: NAME_WIDTH + periods.length * 56 }}>
             <PeriodHeader periods={periods} nameWidth={NAME_WIDTH} granularity={granularity} />
 
@@ -144,6 +158,7 @@ export const CapacityBoard = () => {
               />
             )}
           </div>
+          </ErrorBoundary>
         )}
       </div>
     </div>

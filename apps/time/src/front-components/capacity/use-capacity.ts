@@ -62,6 +62,9 @@ export const useCapacity = (granularity: Granularity) => {
     calendar: [],
     absences: [],
   });
+  // reload() — полный повтор загрузки доски (кнопка «Повторить» при ошибке).
+  const [nonce, setNonce] = useState(0);
+  const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     let alive = true;
@@ -102,7 +105,7 @@ export const useCapacity = (granularity: Granularity) => {
     return () => {
       alive = false;
     };
-  }, [anchor, granularity]);
+  }, [anchor, granularity, nonce]);
 
   const reloadProjects = useCallback(async () => {
     const projects = await fetchProjects();
@@ -127,5 +130,5 @@ export const useCapacity = (granularity: Granularity) => {
     [state.absences, state.employees, state.calendar],
   );
 
-  return { ...state, periods, absenceCtx, anchor, reloadProjects, reloadDeptPlans };
+  return { ...state, periods, absenceCtx, anchor, reload, reloadProjects, reloadDeptPlans };
 };

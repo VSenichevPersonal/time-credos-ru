@@ -236,4 +236,48 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
     );
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining('руководитель') });
   });
+
+  it('ids с не-UUID → isUuid фильтрует, только валидные обрабатываются', async () => {
+    // actor=null (dev-bypass, нет workspaceMemberRef) → guard пропущен
+    const entryRes = {
+      data: {
+        credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000001', status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }],
+      },
+    };
+    const patchRes = { data: { updateCredosTimeEntry: { id: '00000000-0000-4000-8000-000000000001' } } };
+    vi.stubGlobal('fetch', mockFetch([entryRes, patchRes]));
+
+    // ids: один UUID + один не-UUID (инъекция отфильтрована)
+    const result = await handler(
+      event({ op: 'approve', ids: '00000000-0000-4000-8000-000000000001,not-a-uuid' }),
+    );
+    // не-UUID отброшен → 1 valid id → 1 approved
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+
+  it('batch approve: два uuid, оба чужие → updated:2', async () => {
+    const actorRes = {
+      data: {
+        credosTimeEmployees: [{ id: 'e-manager', isManager: true, workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }],
+      },
+    };
+    const entry1Res = {
+      data: { credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000001', status: 'SUBMITTED', employeeId: 'e-other1', projectId: 'p1' }] },
+    };
+    const entry2Res = {
+      data: { credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000002', status: 'SUBMITTED', employeeId: 'e-other2', projectId: 'p1' }] },
+    };
+    const patch1 = { data: { updateCredosTimeEntry: { id: '00000000-0000-4000-8000-000000000001' } } };
+    const patch2 = { data: { updateCredosTimeEntry: { id: '00000000-0000-4000-8000-000000000002' } } };
+    vi.stubGlobal('fetch', mockFetch([actorRes, entry1Res, patch1, entry2Res, patch2]));
+
+    const result = await handler(
+      event({
+        op: 'approve',
+        ids: '00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002',
+        workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 2, skippedOwn: 0 });
+  });
 });
