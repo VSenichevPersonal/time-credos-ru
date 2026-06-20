@@ -281,4 +281,31 @@ describe('calcGridModel — теги (W3-2)', () => {
     );
     expect(rowList).toHaveLength(0);
   });
+
+  it('tag + status: запись должна удовлетворять ОБОИМ фильтрам (AND-семантика)', () => {
+    const withBoth = (id: string, date: string, status: string, tags: string[]): ApiEntry => ({
+      id, date, hours: 8, description: null, projectId: 'p1', workTypeId: 'w1',
+      status: status as ApiEntry['status'], tags,
+    });
+    const filter: FilterState = {
+      ...NO_FILTERS, status: new Set(['SUBMITTED']), tag: new Set(['OVERTIME']),
+    };
+    // entry A: SUBMITTED + OVERTIME → проходит оба
+    // entry B: DRAFT + OVERTIME → не проходит по status
+    // entry C: SUBMITTED + REMOTE → не проходит по tag
+    const { rowList } = calcGridModel(
+      [
+        withBoth('a', '2026-06-22', 'SUBMITTED', ['OVERTIME']),
+        withBoth('b', '2026-06-23', 'DRAFT', ['OVERTIME']),
+        withBoth('c', '2026-06-24', 'SUBMITTED', ['REMOTE']),
+      ],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], filter,
+    );
+    // строка есть (entry A прошла)
+    expect(rowList).toHaveLength(1);
+    // только entry A (день 0) прошла оба фильтра
+    expect(rowList[0].hoursByDay[0]).toBe(8);
+    expect(rowList[0].hoursByDay[1]).toBe(0);
+    expect(rowList[0].hoursByDay[2]).toBe(0);
+  });
 });
