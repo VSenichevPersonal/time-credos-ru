@@ -3,7 +3,11 @@ import { useSelectedRecordIds } from 'twenty-sdk/front-component';
 import { T, FONT } from 'src/front-components/grid/tokens';
 import { fmtHours } from 'src/front-components/grid/format';
 import { Center } from 'src/front-components/grid/center';
+import { useSortable } from 'src/front-components/shared/use-sortable';
+import { SortHeader } from 'src/front-components/shared/sort-header';
 import { useProjectTeam } from 'src/front-components/project-team/use-project-team';
+
+type TeamSortKey = 'name' | 'hours' | 'entries' | 'last';
 
 // Виджет вкладки «Команда» карточки проекта: таблица сотрудников, списывавших
 // время на проект, с суммарными часами/долей/последней датой. Источник — записи
@@ -30,12 +34,23 @@ export const ProjectTeam = () => {
   const ids = useSelectedRecordIds();
   const projectId = ids.length === 1 ? ids[0] : null;
   const { loading, error, members, total } = useProjectTeam(projectId);
+  const { key: sortKey, dir, toggle, sort } = useSortable<TeamSortKey>('hours');
 
   if (error) return <Center>Не удалось загрузить команду: {error}</Center>;
   if (loading) return <Center>Загрузка команды…</Center>;
   if (members.length === 0) {
     return <Center>Никто ещё не списывал время на проект.</Center>;
   }
+
+  const sorted = sort(members, (m) =>
+    sortKey === 'name'
+      ? m.name.toLowerCase()
+      : sortKey === 'entries'
+        ? m.entries
+        : sortKey === 'last'
+          ? m.lastDate ?? ''
+          : m.hours,
+  );
 
   return (
     <div
@@ -63,15 +78,23 @@ export const ProjectTeam = () => {
           top: 0,
         }}
       >
-        <span style={cell()}>Сотрудник</span>
-        <span style={cell('right')}>Часов</span>
+        <span style={cell()}>
+          <SortHeader label="Сотрудник" active={sortKey === 'name'} dir={dir} onSort={() => toggle('name')} />
+        </span>
+        <span style={cell('right')}>
+          <SortHeader label="Часов" align="right" active={sortKey === 'hours'} dir={dir} onSort={() => toggle('hours')} />
+        </span>
         <span style={cell('right')}>Доля</span>
-        <span style={cell('right')}>Записей</span>
-        <span style={cell('right')}>Последняя</span>
+        <span style={cell('right')}>
+          <SortHeader label="Записей" align="right" active={sortKey === 'entries'} dir={dir} onSort={() => toggle('entries')} />
+        </span>
+        <span style={cell('right')}>
+          <SortHeader label="Последняя" align="right" active={sortKey === 'last'} dir={dir} onSort={() => toggle('last')} />
+        </span>
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {members.map((m, i) => (
+        {sorted.map((m, i) => (
           <div
             key={m.employeeId}
             style={{

@@ -146,6 +146,37 @@
 
 ---
 
+---
+
+## СЛОЙ 6 — Timetta API Intel (из postman 285 эндпоинтов + recon 2026-06-21)
+
+> Дизайн-референсы из реального Timetta API. Не внедрять blindly — сверить с нашей моделью. Arch ADR при расхождении.
+
+### Блок I — паттерны для нашего бэклога
+
+| ID | Timetta pattern | URL/endpoint | Применение у нас | Когда |
+|---|---|---|---|---|
+| I1 | `GetIdForPeriod(date, userId)` | `GET /odata/TimeSheets/GetIdForPeriod(date=...,userId=...)` | logic-function хелпер «период→timesheet ID» для QuickTrack | W4 |
+| I2 | `TrackTime` action | `POST /odata/TrackTime` | быстрый ввод без grid (мобильный/CLI) | W5+ |
+| I3 | `BookingEntries/SwitchToSoft` + `SwitchToHard` | отдельные POST-actions | REQ-0009: Soft/Hard booking как state actions, не флаг | W5 |
+| I4 | `ResourcePools` | CRUD + `GET /odata/ResourcePools` | пулы людей отдельно от Department — смотреть при REQ-0009 ресурс-план | W5 |
+| I5 | `ActsOfAcceptance + $expand=lines + SetState` | 15 эндпоинтов | G1: `credosTimeActOfAcceptance` объект, lines→TimeEntry, state machine DRAFT→SENT→SIGNED | W6+ |
+| I6 | `reporting.timetta.com/OData` (отдельный домен) | `GET reporting.timetta.com/OData/ResourcePlan` | W4-1 OLAP = отдельный aggregate endpoint, не inline | W4 ADR |
+| I7 | `TimeSheets/{id}/SetState` | POST action | подтверждает нашу модель: approve через action, не PATCH status | уже правильно |
+
+### Что НЕ берём (не наш домен сейчас)
+- **Invoices** — бэклог (G1 prerequisite)
+- **Accounting Entries/Periods** — E1 бэклог (ставки не вводим до RBAC)
+- **Issues** — task tracking не наш домен
+- **Programs** — иерархия проектов слишком рано
+- **Time Off Requests** — не в roadmap
+- **Certificates** — не применимо
+
+### Auth-паттерн (для будущей интеграции Директум5)
+`client_id=external` + password grant → Access Token 1ч / Refresh 15д / API Token 1год (`/settings/api-tokens`). Когда понадобится pull из Директум5 или push в 1С.
+
+---
+
 ## Сквозные приоритеты (рекомендация аналитика)
 1. 🔴 **A1 research current-user** — линчпин (approval+личный кабинет+CISO-005). ВЗЯТ.
 2. 🔴 **T1 error-boundary + T2 норма-один-источник** — дёшево, бьют по случившемуся/доверию. ВЗЯТЫ.

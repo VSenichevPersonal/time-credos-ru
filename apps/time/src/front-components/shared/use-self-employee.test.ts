@@ -114,4 +114,16 @@ describe('resolveSelfEmployee — цепочка userId → member → employee'
       }),
     );
   });
+
+  it('сетевая ошибка на первом запросе → пробрасывается (хук ловит в catch → рядовой)', async () => {
+    mockGet.mockRejectedValueOnce(new Error('network error'));
+    await expect(resolveSelfEmployee(VALID_UUID)).rejects.toThrow('network error');
+  });
+
+  it('сетевая ошибка на втором запросе → пробрасывается', async () => {
+    mockGet
+      .mockResolvedValueOnce(list('workspaceMembers', [{ id: 'm1' }]))
+      .mockRejectedValueOnce(new Error('timeout'));
+    await expect(resolveSelfEmployee(VALID_UUID)).rejects.toThrow('timeout');
+  });
 });

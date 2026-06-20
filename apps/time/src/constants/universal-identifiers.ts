@@ -387,6 +387,22 @@ export const CREDOS_TIME_DEPT_PLAN_VIEW_UNIVERSAL_IDENTIFIER =
 export const CREDOS_TIME_DEPT_PLAN_NAV_UNIVERSAL_IDENTIFIER =
   '5f7a2f23-eb17-43f8-a9d8-bcac6d1c214b';
 
+// --- REQ-0014 (SELF-SERVICE, Dev1): личный раздел «Мои трудозатраты» ---
+// Front-component «Мои часы» + «Мои периоды» для ТЕКУЩЕГО юзера
+// (useSelfEmployee.employeeId). Данные: /s/reports byEmployee (фильтр self) +
+// /rest/credosTimeEntries (группировка по неделям со статусами). nav +
+// STANDALONE_PAGE-страница (паттерн «Отчёты»).
+export const MY_TIME_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
+  '402a8f9f-1685-4939-88f3-57965f0fe13f';
+export const MY_TIME_NAV_UNIVERSAL_IDENTIFIER =
+  'b48b58ca-7590-48c2-89a2-f15701bb9cfa';
+export const MY_TIME_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER =
+  'ec2ef5f4-df92-4d80-bf63-eb3a93376011';
+export const MY_TIME_PAGE_LAYOUT_TAB_UNIVERSAL_IDENTIFIER =
+  'c3e2448a-bf32-4b47-850b-a87102784c70';
+export const MY_TIME_PAGE_WIDGET_UNIVERSAL_IDENTIFIER =
+  '017bed6e-a0e6-4331-89b6-3ba17c3f0826';
+
 // --- W3-2 (TAGS): теги записей трудозатрат (паттерн Kimai tags) ---
 // MULTI_SELECT-поле tags на credosTimeEntry — свободные метки для срезов в
 // отчётах. nullable (миграция). Опции: ENTRY_TAG_OPTIONS (select-options).
@@ -401,3 +417,25 @@ export const CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID =
   'a3165791-e8ef-4883-b0c7-4fe88bebbda6';
 export const CREDOS_TIME_PROJECT_BUDGET_REMAINING_FIELD_ID =
   '08ee9a38-44e2-4454-b289-5a0cf0c4b49a';
+
+// --- REQ-0013 13a (MULTI-DEPT): проект участвует в нескольких отделах с долями ---
+// Join-объект credosTimeProjectDepartment (project × department × plannedEffortShare
+// в часах). Заменяет жёсткую связь project.departmentId для capacity-раскида: загрузка
+// отдела = Σ долей проектов отдела. departmentId остаётся «основным отделом» + fallback.
+// Обратные стороны: Project.departmentShares / Department.projectShares (ONE_TO_MANY).
+export const CREDOS_TIME_PROJECT_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER =
+  '2a587986-7654-4708-92d7-22c6546da879';
+export const CREDOS_TIME_PROJECT_DEPARTMENT_PROJECT_FIELD_ID =
+  'abd0fe98-5e5b-46a5-ab8f-e179d5b2bc5c';
+export const CREDOS_TIME_PROJECT_DEPARTMENT_DEPARTMENT_FIELD_ID =
+  '66627a19-be51-4233-a2f2-b7ebcd15fb28';
+export const CREDOS_TIME_PROJECT_DEPARTMENT_PLANNED_EFFORT_SHARE_FIELD_ID =
+  '41a2d1c0-0ae0-4119-8561-3c68c4c53ab6';
+export const CREDOS_TIME_PROJECT_DEPARTMENT_SHARES_FIELD_ID =
+  '10f80455-c667-40eb-8514-2f9e16578e70';
+export const CREDOS_TIME_DEPARTMENT_PROJECT_SHARES_FIELD_ID =
+  '444f0ba8-e55f-48c4-a60d-e1ddcfe08755';
+export const CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER =
+  '9ff4e0ab-a53c-4977-bae2-7f48bb326c77';
+export const CREDOS_TIME_PROJECT_DEPARTMENT_NAV_UNIVERSAL_IDENTIFIER =
+  'cac47fc6-5365-4603-8ef9-198a5e2d6034';

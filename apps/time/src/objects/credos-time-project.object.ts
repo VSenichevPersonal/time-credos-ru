@@ -221,6 +221,7 @@ export default defineObject({
       },
     },
     // Обратные стороны (ONE_TO_MANY) вынесены в src/fields/ для лимита размера:
-    // project-stages, project-time-entries, project-billing-links.
+    // project-stages, project-time-entries, project-billing-links,
+    // project-department-shares (REQ-0013 13a, доли отделов).
   ],
 });
