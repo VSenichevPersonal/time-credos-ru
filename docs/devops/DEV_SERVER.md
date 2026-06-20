@@ -107,6 +107,16 @@ yarn twenty app:install
 
 **Состояние app:** remote «dev» добавлен; app «Трудозатраты» (`9c5fbbb6-…`) **установлен** в workspace `fb9ff9ef-…` (создано: role, frontComponent, pageLayout, pageLayoutTab, pageLayoutWidget, navigationMenuItem). `dev --once --dry-run` и `dev --once` проходят.
 
+## Доступ закреплён (полный dev+sync)
+- **Постоянный админ-ключ** (`TWENTY_DEV_API_KEY` в `.env`, type API_KEY, exp ~2126): metadata 200, `dev --once`/`dry-run` проходят. Полный цикл разработки и наката доступен.
+- Первый ограниченный API-ключ давал 403 на metadata → нужен ключ с **админ-ролью** (Settings → API & Webhooks). Используем админский.
+- Playground-токены (Settings → Playground, ~2ч) — для разовых REST/metadata-проб.
+
+## База REST и OpenAPI
+- **Базовый путь данных: `/rest/core/...`** (напр. `/rest/core/companies`). Metadata: `/rest/metadata/...`.
+- Пагинация: cursor-based (`limit`≤60, `starting_after`/`ending_before`, `pageInfo`). Фильтры: `filter=field[eq]:value`. Сортировка: `order_by`.
+- **OpenAPI-схемы сохранены:** `../../research/twenty-sdk/openapi/twenty-core-openapi.json` (226 путей, 84 схемы), `twenty-metadata-openapi.json` (27 путей, 66 схем). Скачано: `GET /rest/open-api/core` и `/rest/open-api/metadata` (Bearer admin).
+
 ## Twenty MCP (нативный)
 Сервер отдаёт MCP на `/mcp` (Bearer API key) — `tools/list` отвечает 200. Можно подключить как MCP-сервер в Claude Code (`settings.json`):
 ```json
