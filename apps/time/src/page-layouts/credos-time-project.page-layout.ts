@@ -26,6 +26,9 @@ import {
   CREDOS_TIME_PROJECT_RP_TAB_SUMMARY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_SUMMARY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_SUMMARY_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -206,11 +209,35 @@ export default definePageLayout({
         },
       ],
     },
-    // 5c. Документы — нативные attachments проекта (FILES).
+    // 5d. Отделы — доли отделов проекта (часы + % от plannedEffort, front-component).
+    // Атрибут перенесён из сайдбара (nav «Доли отделов») в карточку проекта.
+    {
+      universalIdentifier:
+        CREDOS_TIME_PROJECT_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+      title: 'Отделы',
+      position: 7,
+      icon: 'IconChartPie',
+      layoutMode: PageLayoutTabLayoutMode.CANVAS,
+      widgets: [
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+          title: 'Доли отделов',
+          type: 'FRONT_COMPONENT',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier:
+              CREDOS_TIME_PROJECT_DEPARTMENTS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+          },
+        },
+      ],
+    },
+    // 5e. Документы — нативные attachments проекта (FILES).
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_DOCS_UNIVERSAL_IDENTIFIER,
       title: 'Документы',
-      position: 7,
+      position: 8,
       icon: 'IconPaperclip',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [

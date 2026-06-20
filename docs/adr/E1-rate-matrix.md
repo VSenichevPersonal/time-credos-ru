@@ -46,3 +46,42 @@
 - Порядок аналитик в структуре матрицы важен (приоритет поиска)
 - Матрицы привязаны к LegalEntity
 - MVP: достаточно Role × LegalEntity = ставка
+
+---
+
+## Дополнения (из API-данных)
+
+### RateMatrixLine — поля (проверено $metadata)
+| Поле | Тип | Обязательно | Описание |
+|------|-----|-------------|----------|
+| rateMatrixId | Guid | да | → RateMatrix |
+| roleId | Guid | нет | Роль |
+| levelId | Guid | нет | Уровень |
+| gradeId | Guid | нет | Грейд |
+| competenceId | Guid | нет | Компетенция |
+| locationId | Guid | нет | Локация |
+| legalEntityId | Guid | нет | Юрлицо |
+| resourcePoolId | Guid | нет | Ресурсный пул |
+| rate | Decimal | да | Значение ставки |
+| effectiveDate | Date | нет | Начало действия |
+| expiryDate | Date | нет | Окончание |
+
+### RateMatrix — поля
+| Поле | Тип | Описание |
+|------|-----|----------|
+| typeId | Guid | → RateMatrixType (Billing/Cost) |
+| effectiveDate | Date | Дата активации матрицы |
+| expiryDate | Date | Срок действия |
+| rateMatrixStructure | Collection(RateMatrixAnalytics) | Набор аналитик |
+| lines | → RateMatrixLine[] | Строки матрицы |
+
+### Реальные данные стенда
+- Cost Matrix: 8 линий (Role × LegalEntity)
+- Billing Matrix: 3 линии (Role × LegalEntity)
+- Все остальные аналитики = null
+- Это подтверждает MVP: достаточно Role + LegalEntity
+
+### Важные механики
+- «Заполнить матрицу» — авто-генерация всех комбинаций (удаляет старые строки!)
+- RateBC — авто-конвертация в базовую валюту по курсу на EffectiveDate
+- EffectiveDate + ExpiryDate — версионирование ставок по датам

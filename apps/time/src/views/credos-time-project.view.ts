@@ -8,12 +8,14 @@ import {
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_PLANNED_EFFORT_FIELD_ID,
+  CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID,
+  CREDOS_TIME_PROJECT_BUDGET_REMAINING_FIELD_ID,
   CREDOS_TIME_PROJECT_STATUS_FIELD_ID,
   CREDOS_TIME_PROJECT_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Index-view проектов. Колонки = код, категория, статус, клиент, отдел,
-// руководитель, плановые часы.
+// руководитель, план, факт (rollup), остаток/перерасход.
 export default defineView({
   universalIdentifier: CREDOS_TIME_PROJECT_VIEW_UNIVERSAL_IDENTIFIER,
   name: 'Все проекты',
@@ -69,7 +71,23 @@ export default defineView({
       fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_PLANNED_EFFORT_FIELD_ID,
       position: 6,
       isVisible: true,
-      size: 140,
+      size: 120,
+    },
+    {
+      // Факт — rollup Σ часов записей проекта (хранимое поле, пересчёт в /s/time-entry).
+      universalIdentifier: 'b1f4c2a7-3d56-4e89-9a0b-1c2d3e4f5a60',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID,
+      position: 7,
+      isVisible: true,
+      size: 110,
+    },
+    {
+      // Остаток/перерасход = план − факт (отрицательное = перерасход).
+      universalIdentifier: 'c2a5d3b8-4e67-4f90-8b1c-2d3e4f5a6b71',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_BUDGET_REMAINING_FIELD_ID,
+      position: 8,
+      isVisible: true,
+      size: 120,
     },
   ],
 });

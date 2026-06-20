@@ -440,6 +440,21 @@ export const CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER =
 export const CREDOS_TIME_PROJECT_DEPARTMENT_NAV_UNIVERSAL_IDENTIFIER =
   'cac47fc6-5365-4603-8ef9-198a5e2d6034';
 
+// Вкладка «Отделы» карточки проекта (доли отделов текущего проекта).
+// nav-menu-item «Доли отделов» убран из сайдбара — атрибут перенесён в карточку.
+// Tab + FIELDS-виджет на Project card-view, где виден relation-field departmentShares
+// (ONE_TO_MANY) → ядро рендерит доли текущего проекта инлайн-таблицей (отдел + часы),
+// нативная правка plannedEffortShare. % от plannedEffort — follow-up (front-component).
+export const CREDOS_TIME_PROJECT_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER =
+  '3fd9e306-6520-4f6c-ab0d-793cfbb9ccdc';
+export const CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER =
+  '580a44c5-d5be-4ab0-8364-781868a68618';
+// Project card-view «Проект — отделы» (code + departmentShares relation).
+export const CREDOS_TIME_PROJECT_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER =
+  'b836a12c-f2c0-40e2-8795-646ef361bd1b';
+export const CREDOS_TIME_PROJECT_CARD_VF_6 = '8a21935d-5f83-4946-b292-12e197675727';
+export const CREDOS_TIME_PROJECT_CARD_VF_7 = '22ea7722-0edb-4b9b-b1af-4bc844712c53';
+
 // Post-install бэкфилл REQ-0013 13a: project.departmentId → доля 100% в join.
 // ЕДИНСТВЕННАЯ post-install функция приложения (SDK берёт E[0]) — будущие
 // миграции добавляются В ЭТОТ ЖЕ handler, не отдельным файлом.

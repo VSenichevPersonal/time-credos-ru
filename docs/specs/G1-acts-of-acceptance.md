@@ -142,3 +142,31 @@ POST   /odata/Comments                   — добавить комментар
 - resourceId, projectId, resourceRequestId
 - detailEntries → BookingDetailEntry[]
 - changeEntries → ResourceRequestChangeEntry[]
+
+---
+
+## Дополнения (проверено)
+
+### TimeSheet → Act: НЕ автоматический
+- Агрегация НЕ встроена. Акт создаётся вручную.
+- Связь через ProjectTask: TimeSheetLine.projectTask ↔ ActOfAcceptanceLine.projectTaskId
+- Часы из таймшита в акт НЕ подтягиваются автоматически
+- Сумма в акте = оценка × BillingRate (не из таймшита)
+
+### Chart of Accounts (системные — 6)
+| Код | Тип | Назначение |
+|-----|-----|-----------|
+| REVENUE | Доход | Выручка |
+| LABOR_COST | Затраты | Себестоимость труда штатных |
+| SUBCONTRACTOR_LABOR_COST | Затраты | Себестоимость подрядчиков |
+| ABSENCE_COST | Затраты | Оплачиваемые отсутствия |
+| CORP_TAX | Затраты | Корпоративные налоги |
+| CAPITAL_COST | Затраты | Стоимость капитала |
+
++ 6 дополнительных (MTRL, CNTR, TRVL, TRNS, ENTRT, RISK)
+= 12 счетов «из коробки»
+
+### AccountType (типы статей)
+- Доход (REV-)
+- Затраты (COS-, EXP-)
+- Прочее (OTH-)
