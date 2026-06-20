@@ -17,6 +17,7 @@ import type {
   EmployeeRef,
   LoadCell,
   Period,
+  ProjectDeptShare,
   ProjectPatch,
 } from 'src/front-components/capacity/types';
 
@@ -27,6 +28,7 @@ type DeptProps = {
   deptPlans: DeptPlan[];
   periods: Period[];
   absenceCtx?: AbsenceCtx;
+  sharesByProject?: Map<string, ProjectDeptShare[]>;
   nameWidth: number;
   metric: CellMetric;
   expanded: Set<string>;
@@ -44,6 +46,7 @@ export const DeptRows = ({
   deptPlans,
   periods,
   absenceCtx,
+  sharesByProject,
   nameWidth,
   metric,
   expanded,
@@ -55,9 +58,9 @@ export const DeptRows = ({
   <>
     {departments.map((dept) => {
       // REQ-0012: ячейки отдела учитывают план без проекта (deptPlans).
-      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx);
+      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx, sharesByProject);
       const isOpen = expanded.has(dept.id);
-      const detail = isOpen ? deptProjectLoads(dept, projects, periods) : null;
+      const detail = isOpen ? deptProjectLoads(dept, projects, periods, sharesByProject) : null;
       const planRows = isOpen ? deptPlanLoads(dept, deptPlans, periods) : null;
       return (
         <div key={dept.id}>
@@ -96,6 +99,7 @@ type EmpProps = {
   deptPlans: DeptPlan[];
   periods: Period[];
   absenceCtx?: AbsenceCtx;
+  sharesByProject?: Map<string, ProjectDeptShare[]>;
   nameWidth: number;
   metric: CellMetric;
 };
@@ -110,6 +114,7 @@ export const EmployeeRows = ({
   deptPlans,
   periods,
   absenceCtx,
+  sharesByProject,
   nameWidth,
   metric,
 }: EmpProps) => {
@@ -122,7 +127,7 @@ export const EmployeeRows = ({
     <>
       {sorted.map((emp) => {
         const dept = emp.departmentId ? deptById.get(emp.departmentId) : undefined;
-        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx);
+        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx, sharesByProject);
         return (
           <EmployeeRow
             key={emp.id}
