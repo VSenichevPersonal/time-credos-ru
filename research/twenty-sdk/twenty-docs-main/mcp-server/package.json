@@ -1,0 +1,31 @@
+{
+  "name": "twenty-crm-mcp-server",
+  "version": "1.1.0",
+  "description": "MCP Server for AI-native control of Twenty CRM",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "twenty-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "start:http": "node dist/http-server.js",
+    "dev": "tsx src/index.ts",
+    "dev:http": "tsx src/http-server.ts",
+    "docker:build": "docker build -t twenty-mcp-server .",
+    "docker:run": "docker run -p 3001:3001 -e TWENTY_API_KEY=$TWENTY_API_KEY twenty-mcp-server"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twenty-server
+  namespace: twentycrm
+  labels:
+    app: twenty-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twenty-server
+  template:
+    metadata:
+      labels:
+        app: twenty-server
+    spec:
+      containers:
+        - name: twenty-server
+          image: twentycrm/twenty:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: NODE_PORT
+            - name: SERVER_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: SERVER_URL
+            - name: PG_DATABASE_URL
+              value: "postgres://postgres:TwentyPG2024Secure!@104.198.72.168/default"
+            - name: PG_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: twenty-secrets
+                  key: PG_DATABASE_PASSWORD
+            - name: REDIS_URL
+              value: "redis://10.3.107.75:6379"
+            - name: APP_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twenty-secrets
+                  key: APP_SECRET
+            - name: STORAGE_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: STORAGE_TYPE
+            - name: STORAGE_S3_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: STORAGE_S3_REGION
+            - name: STORAGE_S3_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: STORAGE_S3_NAME
+            - name: STORAGE_S3_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: STORAGE_S3_ENDPOINT
+            - name: MESSAGING_PROVIDER_GMAIL_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: MESSAGING_PROVIDER_GMAIL_ENABLED
+            - name: CALENDAR_PROVIDER_GOOGLE_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: CALENDAR_PROVIDER_GOOGLE_ENABLED
+            - name: AUTH_GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: twenty-secrets
+                  key: AUTH_GOOGLE_CLIENT_ID
+            - name: AUTH_GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: twenty-secrets
+                  key: AUTH_GOOGLE_CLIENT_SECRET
+            - name: AUTH_GOOGLE_CALLBACK_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: AUTH_GOOGLE_CALLBACK_URL
+            - name: AUTH_GOOGLE_APIS_CALLBACK_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: twenty-config
+                  key: AUTH_GOOGLE_APIS_CALLBACK_URL
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 120
+            periodSeconds: 15
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3000
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: twenty-server
+  namespace: twentycrm
+spec:
+  selector:
+    app: twenty-server
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP

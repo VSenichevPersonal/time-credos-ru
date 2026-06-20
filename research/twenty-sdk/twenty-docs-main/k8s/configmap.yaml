@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: twenty-config
+  namespace: twentycrm
+data:
+  NODE_PORT: "3000"
+  SERVER_URL: "https://twenty.split-llc.com"
+  STORAGE_TYPE: "s3"
+  STORAGE_S3_REGION: "us-central1"
+  STORAGE_S3_NAME: "twenty-crm-split-storage"
+  STORAGE_S3_ENDPOINT: "https://storage.googleapis.com"
+  MESSAGING_PROVIDER_GMAIL_ENABLED: "true"
+  CALENDAR_PROVIDER_GOOGLE_ENABLED: "true"
+  AUTH_GOOGLE_CALLBACK_URL: "https://twenty.split-llc.com/auth/google/redirect"
+  AUTH_GOOGLE_APIS_CALLBACK_URL: "https://twenty.split-llc.com/auth/google-apis/get-access-token"

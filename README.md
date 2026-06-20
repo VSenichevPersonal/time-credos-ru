@@ -64,6 +64,19 @@ time-credos-ru/
 | [docs/catalog/SDK_DESIGN.md](docs/catalog/SDK_DESIGN.md) | каталог как SDK-app |
 | [docs/catalog/RECON.md](docs/catalog/RECON.md) | разбор прототипа CredosITCatalog |
 
+### Стандарты разработки
+| Документ | О чём |
+|---|---|
+| [docs/standards/DEV_STANDARDS.md](docs/standards/DEV_STANDARDS.md) | **стандарты модуля time** (стиль, нейминг `tt`, SDK-правила, процесс) |
+| [research/credos-crm-standards/](research/credos-crm-standards/) | референс-копии стандартов CredosCRM |
+
+### Документация Twenty SDK (контекст)
+| Документ | О чём |
+|---|---|
+| [research/twenty-sdk/README.md](research/twenty-sdk/README.md) | индекс + ключевые факты SDK |
+| [research/twenty-sdk/CONSISTENCY_CHECK.md](research/twenty-sdk/CONSISTENCY_CHECK.md) | сверка фактов SDK с нашими планами (8 уточнений) |
+| [research/twenty-sdk/fresh/](research/twenty-sdk/fresh/) | актуальные доки (31 страница, docs.twenty.com) |
+
 ### Разведка (research)
 | Источник | Ключевое |
 |---|---|

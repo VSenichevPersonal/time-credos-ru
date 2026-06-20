@@ -1,0 +1,25 @@
+{
+  "name": "twenty-ai-automations",
+  "version": "1.0.0",
+  "description": "AI-powered automation functions for Twenty CRM",
+  "main": "src/index.ts",
+  "scripts": {
+    "auth": "twenty auth",
+    "dev": "twenty dev",
+    "deploy": "twenty deploy",
+    "deploy:all": "node scripts/deploy-all.js",
+    "generate": "twenty generate",
+    "list": "twenty functions list"
+  },
+  "dependencies": {
+    "twenty-sdk": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "twenty": {
+    "workspaceId": "",
+    "apiKey": ""
+  }
+}

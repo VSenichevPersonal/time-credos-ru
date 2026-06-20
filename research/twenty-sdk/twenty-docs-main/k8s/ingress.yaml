@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: twenty-ingress
+  namespace: twentycrm
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "twenty-ip"
+    networking.gke.io/managed-certificates: "twenty-cert"
+spec:
+  rules:
+    - host: twenty.split-llc.com
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: twenty-server
+                port:
+                  number: 80
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: twenty-cert
+  namespace: twentycrm
+spec:
+  domains:
+    - twenty.split-llc.com
