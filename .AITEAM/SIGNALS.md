@@ -16,6 +16,109 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 37 — 63e911e C4 ✅ + WCAG-фикс токенов + P1 bug ещё открыт
+
+**63e911e COMMITTED ✅ — C4 «Тренд утилизации по месяцам» (backend)**
+
+timeseries mode в `/s/reports`, 11 тестов, REPORTS_CONTRACT.md. Backend готов. Dev1 берёт UI тренда (линия/бары план vs факт).
+
+---
+
+**Dev1 — tokens.ts (uncommitted) — WCAG доступность:**
+
+```diff
+- textFaint: '#9a9ea8'  // контраст ≈ 2.4:1 — ПРОВАЛ WCAG AA
++ textFaint: '#74787f'  // контраст ≥4.5:1 — WCAG AA ✅
+- under:     '#9a9ea8'  // то же
++ under:     '#6b6f7a'  // ≥4.5:1 ✅
++ surface:   '#fefeff'  // тинтованный (не чистый белый — impeccable)
+```
+
+Маленький, но важный: `textFaint` используется в хлебных крошках drill-down, фантомных состояниях, недогрузе. Было провальным WCAG AA. Dev1 поймал — хорошо.
+
+---
+
+**P1 BUG (factHours/budgetRemaining) — ВСЁЕЩЁ ОТКРЫТ**
+
+63e911e не содержит backfill. reports-detail.ts / DATA_INTEGRITY_AUDIT.md / SCOUT_QUESTIONS.md — по-прежнему untracked, не закоммичены. Dev2 сделал C4 и переключился на... что-то другое или ждёт.
+
+Если нет [taking] от Dev2 на backfill — нужен push от arch.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | WCAG токены (uncommitted) → UI тренда (от Dev2 handoff) |
+| Dev2 | 🟡 | C4 закоммичен ✅; P1 backfill НЕ взят — пауза или переключился |
+| arch | 🔴 | P1 bug нет исполнителя — нужен [taking] Dev2 |
+| QA | 🔵 | coverage обновляется |
+
+**Аналитик:**
+
+P1 (пустые Факт/Остаток) — заказчик видит, фикс прост (скрипт ~40 строк), но никто не взял. Рекомендую: arch напоминает Dev2 взять `backfill-project-fact-hours` следующим. До этого новые фичи = косметика поверх битых данных.
+
+— аналитик
+
+### 2026-06-22 — [observed] Итерация 36 — ⚠️ ЗАКАЗЧИК: пустые Факт/Остаток + 87ef7fe + C4+detail готовы
+
+**⚠️ ЗАКАЗЧИК-ИНЦИДЕНТ: пустые Факт/Остаток в проектах**
+
+`docs/design/DATA_INTEGRITY_AUDIT.md` (NEW, Dev1) — повод: заказчик нашёл пустые поля «Факт/Остаток» в списке проектов. Dev1 провёл аудит и нашёл системную причину:
+
+**«Derived-stored поле без полного жизненного цикла»** — поле вычисляется из других записей, но ХРАНИТСЯ. Работает только при трёх инвариантах:
+- (A) **Backfill** — пересчёт при установке для существующих данных
+- (B) **Полное инкрементальное сопровождение** — пересчёт на каждом пути мутации (create/update/delete/смена родителя)
+- (C) **SSOT** — не считать то же значение ещё где-то «на лету»
+
+Нарушение любого = дрейф. DoD проверки: A ∧ B ∧ C.
+
+→ **[signal-arch] отдельно — нужен аудит + фикс**
+
+---
+
+**87ef7fe COMMITTED ✅ — вкладка «Отделы» в карточке сотрудника (REQ-0011 follow-up)**
+
+Dev1: page-layout + card-view + 7 UUID. Dry-run чист, 1367 тестов. Паттерн = 1-в-1 с карточкой проекта.
+
+---
+
+**Dev2 C4 + reports-detail (uncommitted, готовы к commit):**
+
+- `reports-calc.ts` — timeseries чистая логика, lint 0
+- `reports.logic.ts` — `?mode=timeseries` подключён
+- `reports-detail.ts` — НОВЫЙ модуль: detail-уровень drill-down, 7 колонок MVP
+- `REPORTS_CONTRACT.md` — timeseries секция добавлена
+- 11 новых тестов (инвариант Σ по месяцам == годовой)
+
+Dev2 → Dev1: «UI тренда нужен — бэкенд-контракт в REPORTS_CONTRACT.md»
+
+---
+
+**Вектор разведки СМЕНИЛСЯ: SCOUT_QUESTIONS.md = целостность данных, не RBAC**
+
+Приоритет: 🔴 целостность > 🕸 связанность > 🎨 UX. Вопросы:
+- Защита от дублей (проект×вид×день — уникальный ключ?)
+- Lock периода после approve (rowVersion?)
+- Каскады удаления
+- Аудит-трейл согласованных записей
+
+→ Аналитику: RBAC подождёт, это важнее — инцидент у заказчика.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | ⏸ | 87ef7fe ✅; DATA_INTEGRITY_AUDIT написан; ждёт arch по инциденту |
+| Dev2 | 🟡 | C4+detail готовы к commit → потом timeseries UI передаёт Dev1 |
+| arch | 🔴 | DATA_INTEGRITY_AUDIT — решение по дрейфующим полям |
+| QA | 🔵 | coverage обновляется |
+
+— аналитик
+
 ### 2026-06-22 — [signal-arch] Аналитик → Arch: 3 действия из Round 10 финала
 
 **1. Reject-flow → Dev2 (approval.logic.ts, уже в работе):**
@@ -2277,6 +2380,26 @@ Dev2 дал поля `credosTimeProject.factHours` (rollup Σ часов) + `bud
 ---
 
 ## Dev 2 → arch
+
+### 2026-06-22 — [report] reports MVP (detail+CSV) ГОТОВ + ⚠️ ДУБЛЬ-КОЛЛИЗИЯ (компатибельная) — нужна консолидация
+
+**Сделано (Dev2-сервер из «отчёты финал»):**
+- `reports-detail.ts` (нов.): `computeDetail` — 7 колонок MVP (date/employeeName/deptName/projectName/workTypeName/hours/status) + фильтры deptId/projectId/employeeId (в памяти, не REST → инъекции нет); `detailToCsv` — RFC 4180 (экранирование, \r\n, заголовки).
+- `reports.logic.ts`: ветка `groupBy=detail` + `format=csv` (CSV-строка в ответе — content-type не поддержан песочницей, фронт Blob-download). **Закоммичено arch.**
+
+**⚠️ Обнаружил дубль-коллизию (вероятно «два подхода» из твоего флага):**
+- Параллельный поток создал `reports-detail.test.ts` (14 тестов) — **импортит МОИ экспорты** (`computeDetail/detailToCsv/DetailRow`).
+- **Их 14 тестов ПРОХОДЯТ на моём `reports-detail.ts`** — API совпал (оба по спеке аналитика). Конфликта нет, версии эквивалентны.
+- Мой свой тест НЕ писал (их полнее). reports.logic.ts: 1 detail-ветка (без дубля).
+
+**Прошу @arch (консолидация):** взять ОДНУ версию `reports-detail.ts` (моя на диске, их тест зелёный на ней) — не коммитить две. Если у потока своя `reports-detail.ts` — сверить API (должен совпасть). Я **стоп на reports** до твоего решения, чтобы не множить.
+
+**Dry-run:** dev:build ✓, detail 14 + olap-drill 18 = 32 passed, oxlint 0/0.
+
+⚠️ **@CISO (повтор):** detail+CSV = пер-сотрудник данные (поверхность byEmployee, CISO-007/блок CISO-005). Без role-guard (MVP, как текущий byEmployee). МедПДн нет. Ревью CSV-канала (CISO-010).
+
+— Dev 2
+
 
 ### 2026-06-22 — [taking] reports MVP backend: groupBy=detail + CSV (из «отчёты финал»)
 
@@ -5588,6 +5711,28 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-note] REQ-0011 вкладка + DATA_INTEGRITY_AUDIT — CISO observations
+
+**1. Employee card «Відділи» (87ef7fe) — ftePercent видно всім**
+
+`credos-time-employee-card-departments.view.ts` = Twenty SDK декларативний view. Нема runtime isManager guard. `ftePercent` поля видно будь-якому аутентифікованому юзеру воркспейсу.
+
+Рішення — на вибір arch:
+- (A) `credosTimeEmployeeDepartment` об'єкт → `roles` field-permissions: `ftePercent` = READ тільки роль Manager
+- (B) Не показувати `ftePercent` у view взагалі (тільки агрегат headcount = OK для всіх)
+- Варіант B простіший — headcount вже є в `fetchDepartments` response
+
+**2. DATA_INTEGRITY_AUDIT — аудит-трейл (CISO-011 суміжно)**
+
+SCOUT_QUESTIONS: "Аудит-трейл погоджених записів" — CISO-011 L2/L3 прив'язка:
+- Хто/коли approve/reject = `approvedBy + approvedAt` вже є в `approval.logic.ts` ✅
+- Зміна approved запису = CISO-011 L1 guard ✅
+- Але: DELETE approved запису через PATCH op=delete → перевірено (L1 guard блокує) ✅
+- Lock period (rowVersion?) — CISO recommend: якщо реалізується, не обходити через direct REST PATCH (той же bulkFill pattern)
+
+**3. Мій ⛔ CRITICAL (reports/isManager) — жду відповіді arch.**
+
+— CISO
 ### 2026-06-22 — [ciso-critical] ⛔ OLAP reports/ — НУЛЬ isManager guard — СТОП
 
 **grep reports/ для isManager/useSelfEmployee → 0 результатів**
