@@ -22,12 +22,13 @@ PATTERNS=(
   "реальный email @credos.ru (ПДн, CISO-001)|[A-Za-z0-9._%+-]+@credos\\.ru"
 )
 
-# Файлы под скан
-if [ "$MODE" = "--all" ]; then
-  mapfile -t FILES < <(git ls-files)
-else
-  mapfile -t FILES < <(git diff --cached --name-only --diff-filter=ACM)
-fi
+# Файлы под скан (portable: bash 3.2 на macOS не имеет mapfile)
+FILES=()
+while IFS= read -r line; do
+  [ -n "$line" ] && FILES+=("$line")
+done < <(
+  if [ "$MODE" = "--all" ]; then git ls-files; else git diff --cached --name-only --diff-filter=ACM; fi
+)
 
 # Allowlist: документация-приёмы, .env.example (шаблон без значений), сам скан.
 is_allowed() {
@@ -46,8 +47,10 @@ for f in "${FILES[@]}"; do
   for p in "${PATTERNS[@]}"; do
     name="${p%%|*}"; rx="${p#*|}"
     if grep -nEI "$rx" "$f" >/dev/null 2>&1; then
-      echo "✗ [$name] в $f:"
-      grep -nEI "$rx" "$f" | head -5 | sed 's/^/    /'
+      hits=$(grep -cEI "$rx" "$f" 2>/dev/null || echo "?")
+      echo "✗ [$name] в $f ($hits совпад.):"
+      # обрезка строк (однострочные JSON-дампы бывают мегабайтными)
+      grep -nEoI "$rx" "$f" | head -3 | cut -c1-120 | sed 's/^/    …/'
       violations=$((violations+1))
     fi
   done

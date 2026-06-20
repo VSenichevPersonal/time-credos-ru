@@ -9,12 +9,37 @@
 - **Auth/RBAC:** через платформу Twenty (ADR-0001, central IdP). Приложение определяет свои роли (`apps/time/src/roles/`).
 - **Общий workspace** с CRM и app catalog → разграничение доступа к общим мастер-данным Department/Employee (ADR-0003).
 
+## Структура зоны
+
+```
+docs/security/
+├── README.md          ← навигация + posture (этот файл)
+├── STATUS.md          ← текущий posture + открытые findings + лог
+├── CISO_POLICY.md     ← policy + 152-ФЗ + правила PII/секретов/RBAC
+├── RISK_REGISTER.md   ← реестр рисков (ID, severity, статус, owner)
+├── PII_INVENTORY.md   ← карта ПДн (152-ФЗ ROPD-lite): поля, хранение, доступ
+├── findings/          ← детальные findings P0–P2 (репро, требование, DoD)
+│   ├── CISO-001-pii-in-git.md
+│   └── CISO-002-approval-rbac.md
+├── specs/             ← требования к разработке (для Dev 1/Dev 2)
+│   └── RBAC_APPROVAL.md
+├── reviews/           ← вердикты ciso-review по ADR
+│   └── ADR-REVIEW-LOG.md
+└── checklists/        ← операционные чек-листы
+    └── pre-commit-security.md
+```
+
 ## Документы зоны
 
 | Файл | Назначение |
 |---|---|
+| [STATUS.md](STATUS.md) | Текущий posture, открытые findings, лог изменений |
 | [RISK_REGISTER.md](RISK_REGISTER.md) | Реестр рисков (ID, severity, статус, owner) |
 | [CISO_POLICY.md](CISO_POLICY.md) | Security policy + 152-ФЗ posture + правила PII/секретов |
+| [PII_INVENTORY.md](PII_INVENTORY.md) | Карта ПДн: какие поля = PII, где хранятся, кто видит |
+| [specs/RBAC_APPROVAL.md](specs/RBAC_APPROVAL.md) | Спека RBAC согласования (для Dev 1/Dev 2) |
+| [reviews/ADR-REVIEW-LOG.md](reviews/ADR-REVIEW-LOG.md) | Вердикты ciso-review по ADR 0001–0004 |
+| [checklists/pre-commit-security.md](checklists/pre-commit-security.md) | Чек-лист перед коммитом/push/sync |
 
 ## Принципы
 

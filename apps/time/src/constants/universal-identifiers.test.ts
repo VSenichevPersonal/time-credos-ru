@@ -10,9 +10,9 @@ const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 
 // Все строковые экспорты, похожие на UUID (имя кончается на ..._IDENTIFIER или ..._FIELD_ID
 // и значение — 36-символьная строка с дефисами).
-const uuidEntries: Array<[string, string]> = Object.entries(ids).filter(
-  ([, v]): v is string => typeof v === 'string' && v.length === 36 && v.includes('-'),
-);
+const uuidEntries = Object.entries(ids).filter(
+  ([, v]) => typeof v === 'string' && v.length === 36 && v.includes('-'),
+) as Array<[string, string]>;
 
 describe('universal-identifiers (UUID-SSOT)', () => {
   it('найдены UUID-константы (sanity: модуль не пуст)', () => {

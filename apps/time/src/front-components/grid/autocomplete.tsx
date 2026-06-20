@@ -31,7 +31,24 @@ export const Autocomplete = ({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [hi, setHi] = useState(0);
+  // Направление и высота меню считаем по свободному месту: у нижней кромки
+  // виджета (add-row) список открывается ВВЕРХ, иначе обрежется overflow:hidden.
+  const [dropUp, setDropUp] = useState(false);
+  const [maxH, setMaxH] = useState(260);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const openMenu = () => {
+    const r = inputRef.current?.getBoundingClientRect();
+    if (r) {
+      const below = window.innerHeight - r.bottom - 8;
+      const above = r.top - 8;
+      const up = below < 200 && above > below;
+      setDropUp(up);
+      setMaxH(Math.max(120, Math.min(260, up ? above : below)));
+    }
+    setOpen(true);
+    setHi(0);
+  };
 
   const selectedLabel = items.find((i) => i.id === value)?.label ?? '';
 
@@ -65,14 +82,10 @@ export const Autocomplete = ({
         autoFocus={autoFocus}
         value={open ? query : selectedLabel}
         placeholder={placeholder}
-        onFocus={() => {
-          setOpen(true);
-          setHi(0);
-        }}
+        onFocus={openMenu}
         onChange={(e) => {
           setQuery(e.target.value);
-          setOpen(true);
-          setHi(0);
+          openMenu();
         }}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') {
@@ -110,16 +123,18 @@ export const Autocomplete = ({
         <div
           style={{
             position: 'absolute',
-            top: 33,
+            ...(dropUp ? { bottom: 33 } : { top: 33 }),
             left: 0,
             zIndex: 12,
             width,
-            maxHeight: 260,
+            maxHeight: maxH,
             overflowY: 'auto',
             background: T.surface,
             border: `1px solid ${T.borderStrong}`,
             borderRadius: 9,
-            boxShadow: '0 8px 24px rgba(29,31,38,0.14)',
+            boxShadow: dropUp
+              ? '0 -8px 24px rgba(29,31,38,0.14)'
+              : '0 8px 24px rgba(29,31,38,0.14)',
             padding: 4,
           }}
         >
