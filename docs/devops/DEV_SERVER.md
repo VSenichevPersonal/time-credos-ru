@@ -78,5 +78,42 @@ yarn twenty app:install
 2. **API key** из Settings → положить в `.env` (например `TWENTY_DEV_API_KEY`).
 3. Затем `remote:add` → `dev` → валидация Wave 1 + Wave 2 (объекты через `yarn twenty dev:add object`).
 
+## API-доступы и прозвон (2026-06-20)
+
+**Ключ/креды — в `.env` (gitignored):** `TWENTY_DEV_API_KEY` (playground-токен, живёт ~2ч — для постоянной работы создать обычный API key в Settings → API & Webhooks), `TWENTY_DEV_EMAIL`, `TWENTY_DEV_PASSWORD`.
+
+**Эндпоинты (все 200):**
+| Endpoint | Назначение | Статус |
+|---|---|---|
+| `/` | фронт | 200 |
+| `/healthz` | health | 200 `{"status":"ok"}` |
+| `/graphql` | core GraphQL (данные workspace) | 200 |
+| `/rest` | REST playground | 200 |
+| `/metadata` | metadata GraphQL playground | 200 |
+| `/rest/metadata/objects` (Bearer) | список объектов | 200 |
+| `/rest/companies` (Bearer) | CRUD компаний | 200 |
+| **`/mcp`** (POST, Bearer) | **MCP-сервер** (tools/list → 200) | 200 |
+
+**Формат REST metadata:** `{ data: [...объекты...], pageInfo, totalCount }` (в 2.14 `data` — массив напрямую).
+
+**Стандартные объекты (id — для связей Wave 2):**
+| Объект | id |
+|---|---|
+| company | `0c3126cb-f936-4bc3-ae72-5a93b933b5a1` |
+| person | `06d2ffb2-baa7-4d73-ba1a-bb5172c9512b` |
+| workspaceMember | `f3606d2d-d830-4ee6-a126-6dbebda8131c` |
+
+Всего объектов: 28. Кастомных пока нет (Wave 2 создаст `tt*`).
+
+**Состояние app:** remote «dev» добавлен; app «Трудозатраты» (`9c5fbbb6-…`) **установлен** в workspace `fb9ff9ef-…` (создано: role, frontComponent, pageLayout, pageLayoutTab, pageLayoutWidget, navigationMenuItem). `dev --once --dry-run` и `dev --once` проходят.
+
+## Twenty MCP (нативный)
+Сервер отдаёт MCP на `/mcp` (Bearer API key) — `tools/list` отвечает 200. Можно подключить как MCP-сервер в Claude Code (`settings.json`):
+```json
+{ "mcpServers": { "twenty": { "url": "https://twenty-production-e5c5.up.railway.app/mcp",
+  "headers": { "Authorization": "Bearer <API_KEY>" } } } }
+```
+Даёт чтение/запись CRM из LLM. ⚠️ Для постоянного MCP нужен НЕ playground-токен (2ч), а обычный API key.
+
 ## Прод-таргет (позже)
 Прод-установка time-app — в CredosCRM1 после upstream-sync форка до 2.x (ADR-0002). Этот Railway-сервер — dev/staging.
