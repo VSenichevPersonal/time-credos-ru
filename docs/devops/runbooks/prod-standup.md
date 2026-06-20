@@ -58,4 +58,26 @@ node apps/time/scripts/check-consistency.mjs
 
 ## Откат
 Прод-установку откатывают установкой предыдущей версии app (`app:install` нужной версии — версии в package.json растут, прежние доступны). БД — бэкап `pg_dumpall` до старта.
+
+## Бэкапы и мониторинг (D5)
+
+**Бэкапы БД (РФ-контур):**
+- Регулярный `pg_dumpall` (или provider-snapshot) Postgres прод — расписание (ежедневно + перед каждым app-upgrade/sdk-bump). Хранить в РФ-контуре (152-ФЗ).
+- Перед `app:install`/миграцией — обязательный ручной дамп (точка отката, см. `rollback.md`).
+- Проверять восстановимость дампа (test-restore периодически), иначе бэкап = иллюзия.
+
+**Мониторинг:**
+- Health: `./infra/scripts/health.sh` периодически (healthz/metadata/graphql/mcp) — как на dev. Loop/cron + алерт при FAIL.
+- Сервисы провайдера (Twenty server/Worker/Postgres/Redis) — рестарт-петли/OOM/деградация (см. `incident-health.md`).
+- App-sync дрейф: `dev --once --dry-run` — на прод НЕ применять автоматически (прод = `app:publish`+`app:install`, не dev-sync).
+- ENCRYPTION_KEY/секреты в env, не в git (`secret-scan.sh` + pre-commit hook).
+
+## Карта задач очереди DevOps (BACKLOG_BOARD)
+- **D1** Прод-инстанс Twenty 2.14 (Стратегия C) → §1 + §3-4.
+- **D2** ENCRYPTION_KEY до первого старта → §2 (КРИТИЧНО).
+- **D3** 152-ФЗ локализация БД РФ + ЛНА → «Предусловия» + §7 (CISO-гейт).
+- **D4** Синк Company из CRM по REST API → §5.
+- **D5** Бэкапы/мониторинг прод + healthz → этот раздел.
+
+> Исполнение D1-D5 **гейтится появлением прод-инстанса + бизнес-решением по РФ-хостингу** (152-ФЗ). До этого — план готов (этот runbook), dev-сервер работает по Стратегии C де-факто.
 </content>
