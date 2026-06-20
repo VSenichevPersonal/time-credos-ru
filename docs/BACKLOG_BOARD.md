@@ -8,7 +8,7 @@
 **Координация общих файлов:** `constants/universal-identifiers.ts` — один владелец на задачу (кто первый анонсил `[taking]` с правкой constants). `calc-load.ts`/`reports-calc.ts` — расчёт = Dev2; UI-компоненты = Dev1.
 
 
-> 🔴 **OLAP drill-down — СЛЕДУЮЩИЙ крупный (заказчик 2026-06-22 «углубить drill down»):** Dev2 `/s/reports` параметрический (groupBy+filters[]+пагинация, обезличенные оси) → Dev1 drill-UI+хлебные крошки+cross-filter+связь с «Людьми». research: `OLAP_REPORTS_RESEARCH.md`. Запуск после REQ-0011 (Dev2) и доли-в-карточку (Dev1). [OLAP-PRIORITY]
+> 🔴 **OLAP drill-down — СЛЕДУЮЩИЙ крупный (заказчик 2026-06-22 «углубить drill down»):** Dev2 `/s/reports` параметрический (groupBy+filters[]+пагинация, обезличенные оси) → Dev1 drill-UI+хлебные крошки+cross-filter+связь с «Людьми». research: `OLAP_REPORTS_RESEARCH.md`. Запуск после REQ-0011 (Dev2) и доли-в-карточку (Dev1). [OLAP-PRIORITY] МИНИМАЛЬНЫЙ подход (аналитик I30): 1 клик→child-таблица (фильтр+sub-request), БЕЗ тяжёлого движка. 3 оси: отдел→сотрудники, проект→записи, capacity-ячейка→проекты.
 
 Детали задач: `docs/requirements/REQ-*`, `docs/ROADMAP.md`, `data-model/GAP_AUDIT_TIMETTA_KIMAI*.md`.
 
