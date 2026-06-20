@@ -16,6 +16,7 @@ import {
   firstFreePeriod,
   fteHeadcountByDept,
   isAssignmentActive,
+  projectDeptShareLoads,
   projectHoursInPeriod,
   projectShareHoursInPeriod,
   summaryCells,
@@ -658,6 +659,24 @@ describe('доли отделов в проектах (REQ-0013 13b)', () => {
     expect(planned[0].total).toBeCloseTo(100, 6);
     const { planned: p2 } = deptProjectLoads(dept({ id: 'd2' }), projects, [wk]);
     expect(p2).toHaveLength(0);
+  });
+
+  // Drill 3-й уровень: проект → доли по всем участвующим отделам.
+  it('projectDeptShareLoads: доли проекта по отделам, сорт по убыв. часов', () => {
+    const sbp = buildSharesByProject([
+      share({ departmentId: 'd1', plannedEffortShare: 60 }),
+      share({ departmentId: 'd2', plannedEffortShare: 40 }),
+    ]);
+    const out = projectDeptShareLoads(proj(), [wk], sbp);
+    expect(out).toHaveLength(2);
+    expect(out[0].departmentId).toBe('d1'); // 60 раньше 40
+    expect(out[0].total).toBeCloseTo(60, 6);
+    expect(out[1].total).toBeCloseTo(40, 6);
+  });
+
+  it('projectDeptShareLoads: у проекта без долей → пусто (нечего детализировать)', () => {
+    expect(projectDeptShareLoads(proj(), [wk], buildSharesByProject([]))).toHaveLength(0);
+    expect(projectDeptShareLoads(proj(), [wk])).toHaveLength(0);
   });
 });
 

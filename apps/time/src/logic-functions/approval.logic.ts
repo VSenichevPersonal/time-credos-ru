@@ -98,12 +98,16 @@ const setStatus = async (
   id: string,
   status: string,
   actor: string | null,
+  comment: string | null = null,
 ): Promise<void> => {
   const data: Record<string, unknown> = { status };
   if (status === ENTRY_STATUS.APPROVED || status === ENTRY_STATUS.REJECTED) {
     data.approvedBy = actor ?? null;
     data.approvedAt = new Date().toISOString();
   }
+  // rejectComment: при REJECT сохраняем причину (сотрудник видит что исправить);
+  // при approve/повторном submit очищаем прежнюю причину — запись «ожила».
+  data.rejectComment = status === ENTRY_STATUS.REJECTED ? comment ?? null : null;
   await restPatch(`/rest/credosTimeEntries/${id}`, data);
 };
 
@@ -144,6 +148,9 @@ const runResolve = async (
   // (инъекция-строки отбрасываются до запроса).
   const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
   if (ids.length === 0) return { ok: false, error: 'ids required' };
+  // Причина отклонения (op=reject). Хранится на каждой записи батча. min-длина —
+  // UI-валидация (Dev1); backend сохраняет переданное (decoupled rollout).
+  const comment = params.comment ?? null;
 
   // Guard роли. Если actor резолвлен — требуем isManager. Если не резолвлен
   // (workspaceMemberRef ещё не сопоставлен — dev), пропускаем с предупреждением.
@@ -171,7 +178,7 @@ const runResolve = async (
       skippedOwn += 1;
       continue;
     }
-    await setStatus(id, status, actorId);
+    await setStatus(id, status, actorId, comment);
     updated += 1;
   }
   return { ok: true, updated, skippedOwn };

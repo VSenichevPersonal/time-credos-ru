@@ -14,12 +14,13 @@ export type DrillState = {
   stack: DrillLevel[]; // [] = корень (срез верхнего уровня)
 };
 
-type Action =
+export type DrillAction =
   | { type: 'into'; level: DrillLevel }
   | { type: 'goTo'; index: number } // обрезать стек до уровня i (крошка)
   | { type: 'reset' };
 
-const reducer = (state: DrillState, action: Action): DrillState => {
+// Экспортируем редьюсер для юнит-тестов (хук требует React-окружения).
+export const drillReducer = (state: DrillState, action: Action): DrillState => {
   switch (action.type) {
     case 'into':
       return { stack: [...state.stack, action.level] };
