@@ -153,6 +153,16 @@ export const BILLING_DOC_TYPE_OPTIONS: SelectOption[] = buildOptions(
   BILLING_DOC_TYPE_COLORS,
 );
 
+// Тип дня производственного календаря РФ. Значения UPPER_CASE (требование SDK),
+// ярлыки русские. Используется объектом credosTimeWorkdayCalendar.
+export const WORKDAY_TYPE_OPTIONS: SelectOption[] = [
+  { value: 'WORKDAY', label: 'Рабочий', position: 0, color: 'green' },
+  { value: 'WEEKEND', label: 'Выходной', position: 1, color: 'gray' },
+  { value: 'HOLIDAY', label: 'Праздник', position: 2, color: 'red' },
+  { value: 'SHORT', label: 'Предпраздничный', position: 3, color: 'orange' },
+];
+export const WORKDAY_TYPE_DEFAULT = "'WORKDAY'";
+
 // Дефолты SELECT — UPPER_CASE значение в одинарных кавычках (требование SDK).
 export const PROJECT_STATUS_DEFAULT = "'ACTIVE'";
 export const PROJECT_CATEGORY_DEFAULT = "'CLIENT'";
