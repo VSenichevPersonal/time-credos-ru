@@ -145,5 +145,19 @@ export default defineObject({
         CREDOS_TIME_ABSENCE_EMPLOYEE_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
+    // REQ-0011: обратная сторона EmployeeDepartment.employee (ONE_TO_MANY) —
+    // назначения сотрудника на отделы в % FTE с датами (мульти-отдел).
+    {
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_DEPARTMENT_ASSIGNMENTS_FIELD_ID,
+      name: 'departmentAssignments',
+      type: FieldType.RELATION,
+      label: 'Назначения в отделы (FTE)',
+      icon: 'IconUsersGroup',
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_EMPLOYEE_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_EMPLOYEE_DEPARTMENT_EMPLOYEE_FIELD_ID,
+      universalSettings: { relationType: RelationType.ONE_TO_MANY },
+    },
   ],
 });
