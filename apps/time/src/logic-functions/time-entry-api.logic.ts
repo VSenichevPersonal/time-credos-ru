@@ -70,18 +70,32 @@ const readParams = (event: RoutePayload): Record<string, string> => {
   return merged;
 };
 
-// Сотрудник текущего пользователя (или дефолтный) — id для фильтра/записи.
+// Резолв сотрудника по workspaceMemberRef.
+// ВАЖНО: RoutePayload отдаёт только event.userWorkspaceId (userWorkspace ID,
+// НЕ workspaceMember ID) и не содержит email — серверного маппинга
+// userWorkspace -> workspaceMember через REST нет. Поэтому клиент обязан
+// передавать workspaceMemberRef явно в params. Сопоставление идёт по
+// credosTimeEmployee.workspaceMemberRef == переданный ref.
 const resolveEmployeeId = async (
-  userWorkspaceMemberRef: string | undefined,
+  workspaceMemberRef: string | undefined,
 ): Promise<string | null> => {
-  if (userWorkspaceMemberRef) {
+  if (workspaceMemberRef) {
     const byRef = await api.get<{ data: { credosTimeEmployees: RefItem[] } }>(
       '/rest/credosTimeEmployees',
-      { filter: `workspaceMemberRef[eq]:${userWorkspaceMemberRef}`, limit: '1' },
+      { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
     );
     const found = byRef.data?.credosTimeEmployees?.[0];
     if (found) return found.id;
   }
+  // Fallback (DEV-ONLY): ref не передан или не сопоставлен. Возвращаем первого
+  // активного, чтобы dev-сетка не падала. В проде это маскирует
+  // несопоставленного пользователя — заполни workspaceMemberRef у сотрудников.
+  // TODO(prod): убрать fallback, отдавать null + ошибку «сотрудник не сопоставлен».
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[time-entry-api] workspaceMemberRef не сопоставлен (ref=%s) — DEV fallback на первого активного',
+    workspaceMemberRef ?? '(пусто)',
+  );
   const fallback = await api.get<{ data: { credosTimeEmployees: RefItem[] } }>(
     '/rest/credosTimeEmployees',
     { filter: 'active[eq]:true', limit: '1' },

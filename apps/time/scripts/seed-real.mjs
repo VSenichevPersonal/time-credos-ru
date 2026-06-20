@@ -188,54 +188,38 @@ const WORK_TYPES = [
   { name: 'Внутренняя автоматизация', group: 'INTERNAL', dept: null },
 ];
 
-const EMPLOYEES = [
-  ['Анна', 'Сухова', 'a.sukhova@credos.ru', 'OV'],
-  ['Надежда', 'Экономцева', 'nadia@credos.ru', 'OV'],
-  ['Татьяна', 'Кудухашвили', 't.kudukhashvili@credos.ru', 'OV'],
-  ['Роман', 'Белов', 'r.belov@credos.ru', 'OV'],
-  ['Александр', 'Медведев', 'a.medvedev@credos.ru', 'OV'],
-  ['Марина', 'Меньшикова', 'm.menshikova@credos.ru', 'OV'],
-  ['Александр', 'Черкасов', 'a.cherkasov@credos.ru', 'OV'],
-  ['Дмитрий', 'Колесников', 'd.kolesnikov@credos.ru', 'OV'],
-  ['Игорь', 'Шмыков', 'i.shmykov@credos.ru', 'OV'],
-  ['Елена', 'Коряжкина', 'e.koryagkina@credos.ru', 'OV'],
-  ['Никита', 'Подпорин', 'n.podporin@credos.ru', 'OV'],
+// --- Сотрудники (ПДн-safe, 152-ФЗ / CISO #001) ---
+// Реальные ФИО+email НЕ хранятся в git. Если рядом лежит gitignored
+// `.employees.local.json` (массив [first,last,email,dept]) — берём его (реальный сид
+// на dev). Иначе — синтетический набор @example.test с сохранением распределения
+// по отделам. Формат файла: [["Имя","Фамилия","mail@example.test","OV"], ...].
+import { readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-  ['Олег', 'Демьянов', 'o.demyanov@credos.ru', 'OIB'],
-  ['Кирилл', 'Терещенко', 'k.terewenko@credos.ru', 'OIB'],
-  ['Дмитрий', 'Чекмарев', 'd.chekmarev@credos.ru', 'OIB'],
-  ['Валентина', 'Сотникова', 'v.sotnikova@credos.ru', 'OIB'],
-  ['Дмитрий', 'Елисеев', 'd.eliseev@credos.ru', 'OIB'],
-  ['Денис', 'Шашкин', 'd.shashkin@credos.ru', 'OIB'],
-  ['Елена', 'Красова', 'e.krasova@credos.ru', 'OIB'],
-  ['Даниил', 'Новиков', 'd.novikov@credos.ru', 'OIB'],
-  ['Анна', 'Третьякова', 'a.tretyakova@credos.ru', 'OIB'],
-  ['Елизавета', 'Козлова', 'e.kozlova@credos.ru', 'OIB'],
-  ['Олег', 'Кобозев', 'o.kobozev@credos.ru', 'OIB'],
+const __dir = dirname(fileURLToPath(import.meta.url));
+const LOCAL_EMP = join(__dir, '.employees.local.json');
 
-  ['Юрий', 'Вишняков', 'vishnyakov@credos.ru', 'OPIB'],
-  ['Степан', 'Гостеев', 's.gosteev@credos.ru', 'OPIB'],
-  ['Роман', 'Якунин', 'r.yakunin@credos.ru', 'OPIB'],
-  ['Дмитрий', 'Кузнецов', 'd.kuznecov@credos.ru', 'OPIB'],
-  ['Наталья', 'Симак', 'viter@credos.ru', 'OPIB'],
-  ['Валерия', 'Жидкова', 'v.zhidkova@credos.ru', 'OPIB'],
-  ['Илья', 'Афанасьев', 'i.afanasev@credos.ru', 'OPIB'],
-  ['Михаил', 'Вакулко', 'm.vakulko@credos.ru', 'OPIB'],
-  ['Александр', 'Исак', 'a.isak@credos.ru', 'OPIB'],
+// Синтетический набор: распределение OV 11 / OIB 11 / OPIB 9 / TC 6 / OPR 5 = 42.
+const SYNTH_DIST = { OV: 11, OIB: 11, OPIB: 9, TC: 6, OPR: 5 };
+const SYNTH_EMPLOYEES = Object.entries(SYNTH_DIST).flatMap(([dept, n]) =>
+  Array.from({ length: n }, (_, i) => [
+    'Сотрудник',
+    `${dept}-${i + 1}`,
+    `emp.${dept.toLowerCase()}.${i + 1}@example.test`,
+    dept,
+  ]),
+);
 
-  ['Иван', 'Тростенюк', 'i.trost@credos.ru', 'TC'],
-  ['Андрей', 'Мурашкин', 'murashkin@credos.ru', 'TC'],
-  ['Константин', 'Лобанов', 'k.lobanov@credos.ru', 'TC'],
-  ['Дмитрий', 'Горячев', 'd.goryachev@credos.ru', 'TC'],
-  ['Артур', 'Каримов', 'ak@credos.ru', 'TC'],
-  ['Даниил', 'Телышев', 'td@credos.ru', 'TC'],
+const EMPLOYEES = existsSync(LOCAL_EMP)
+  ? JSON.parse(readFileSync(LOCAL_EMP, 'utf8'))
+  : SYNTH_EMPLOYEES;
 
-  ['Николай', 'Будников', 'n.budnikov@credos.ru', 'OPR'],
-  ['Татьяна', 'Кривощапова', 'kit@credos.ru', 'OPR'],
-  ['Александр', 'Губский', 'a.gubsky@credos.ru', 'OPR'],
-  ['Ксения', 'Ерохина', 'k.erokhina@credos.ru', 'OPR'],
-  ['Дмитрий', 'Игошев', 'd.igoshev@credos.ru', 'OPR'],
-];
+if (!existsSync(LOCAL_EMP)) {
+  console.log(
+    '  [сотрудники] .employees.local.json не найден — синтетический набор (@example.test).',
+  );
+}
 
 // --- РЕАЛЬНЫЕ клиенты Директум5: ключ = короткое имя (Company.name), legal = юрлицо.
 const CLIENTS = [

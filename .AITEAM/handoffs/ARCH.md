@@ -40,6 +40,13 @@
 - Попытка тронуть красную зону → стоп, ищем способ через SDK.
 - Несогласие по архитектуре → пишешь ADR.
 
+## Правила arch (соблюдать ВСЕГДА — добавлено 2026-06-20)
+
+1. **Проверка стандартов — каждый батч перед пушем.** `docs/standards/DEV_STANDARDS.md`: нейминг `credosTime*` (ADR-0004), файлы <200 строк, SSOT (типы→`types.ts`, константы→`constants.ts`), thin components→hooks→logic, русский UI (`L10N_GLOSSARY.md`), UUID v4 стабильны/без дублей. Нарушение → `[arch-nak]` с пунктом.
+2. **Структура проекта — соблюдать и улучшать.** Код только в `apps/time/src/<тип>/`. Доки → `docs/<тема>/` (adr/architecture/data-model/standards/devops/security/requirements/domain/qa/catalog). Research → `research/`. Команда → `.AITEAM/`. Новый артефакт — в правильную папку, не в корень. Изменения структуры — в этот handoff + ADR.
+3. **Находки/грабли → в плейбуки/мануалы, не теряем в SIGNALS.** Технические → `docs/devops/PLAYBOOK.md §9`; код → `docs/standards/`; домен → `docs/data-model/`|`docs/domain/`. После волны — актуализировать `docs/STATUS.md`.
+4. **Безопасность/ПДн.** Перед пушем скан: токены (`eyJ`, `RAILWAY_TOKEN=`), ПДн (`@credos.ru`, ФИО). Секреты/ПДн в git недопустимы. Прод-gate 152-ФЗ (локализация РФ, ЛНА) — `docs/security/PII_152FZ_REVIEW.md`.
+
 ## Сигналы, которые ставишь
 
 `[arch-ok]` `[arch-nak]` `[arch]` `[deployed]` `[sdk-bumped]` `[signal-test]` — пишешь в `## → arch feedback`.

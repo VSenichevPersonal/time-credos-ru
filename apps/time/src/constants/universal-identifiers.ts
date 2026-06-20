@@ -122,6 +122,8 @@ export const CREDOS_TIME_EMPLOYEE_FIRST_NAME_FIELD_ID = 'a52484bf-afd2-4a01-ace3
 export const CREDOS_TIME_EMPLOYEE_LAST_NAME_FIELD_ID = 'ca5f2e4e-bf80-4bd4-b049-219b7c464429';
 export const CREDOS_TIME_EMPLOYEE_JOB_TITLE_FIELD_ID = 'bcfaaf12-5e9a-4eb1-b5d5-4ac6eb2a340b';
 export const CREDOS_TIME_EMPLOYEE_ACTIVE_FIELD_ID = 'c2dca599-9ba4-4a03-aca4-75dd1008b079';
+// isManager — признак руководителя (для UI-gate approve/reject + резолва в logic).
+export const CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID = '2f8a6d31-4c7e-4b59-9a0d-7e1f3c2b5a48';
 // Department
 export const CREDOS_TIME_DEPARTMENT_CODE_FIELD_ID = '474dd507-0969-4a74-a981-2da5ede39fe0';
 export const CREDOS_TIME_DEPARTMENT_APPROVAL_REQUIRED_FIELD_ID = 'b399c04e-af37-48cc-ae3e-b6899776c174';

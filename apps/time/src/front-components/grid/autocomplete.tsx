@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 
 import { T } from 'src/front-components/grid/tokens';
+import { useDropdownDirection } from 'src/front-components/grid/use-dropdown-direction';
 
 // Комбобокс с автокомплитом: печатаешь — фильтрует, ↑↓ выбор, Enter подтверждает.
 // «Недавние» опции (recentIds) поднимаются вверх под подзаголовком.
@@ -31,21 +32,12 @@ export const Autocomplete = ({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [hi, setHi] = useState(0);
-  // Направление и высота меню считаем по свободному месту: у нижней кромки
-  // виджета (add-row) список открывается ВВЕРХ, иначе обрежется overflow:hidden.
-  const [dropUp, setDropUp] = useState(false);
-  const [maxH, setMaxH] = useState(260);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Направление меню: у нижней кромки фикс-виджета открываем вверх (UI_PLAYBOOK §2.1).
+  const { dropUp, maxH, measure } = useDropdownDirection();
 
   const openMenu = () => {
-    const r = inputRef.current?.getBoundingClientRect();
-    if (r) {
-      const below = window.innerHeight - r.bottom - 8;
-      const above = r.top - 8;
-      const up = below < 200 && above > below;
-      setDropUp(up);
-      setMaxH(Math.max(120, Math.min(260, up ? above : below)));
-    }
+    measure(inputRef.current);
     setOpen(true);
     setHi(0);
   };

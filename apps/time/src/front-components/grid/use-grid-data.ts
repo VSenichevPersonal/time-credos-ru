@@ -17,6 +17,7 @@ import {
   resolveEmployeeId,
   upsertEntry,
 } from 'src/front-components/grid/time-rest';
+import { useSaveStatus } from 'src/front-components/grid/use-save-status';
 
 // Состояние данных таймшита: справочники (грузятся раз) + записи периода.
 // CRUD напрямую по Core REST. Перезагрузка записей после правки.
@@ -46,6 +47,7 @@ export const useGridData = (from: string, to: string, viewEmployeeId: string | n
   const [error, setError] = useState<string | null>(null);
   const selfIdRef = useRef<string | null>(null);
   const refsLoaded = useRef(false);
+  const { status: saveStatus, track } = useSaveStatus();
 
   // Чей таймшит показываем: явно выбранный (руководитель) или свой.
   const targetId = viewEmployeeId ?? selfIdRef.current;
@@ -90,13 +92,15 @@ export const useGridData = (from: string, to: string, viewEmployeeId: string | n
         return;
       }
       try {
-        await upsertEntry({ ...input, employeeId: targetId });
-        await loadEntries(targetId);
+        await track(async () => {
+          await upsertEntry({ ...input, employeeId: targetId });
+          await loadEntries(targetId);
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка сохранения');
       }
     },
-    [loadEntries, targetId],
+    [loadEntries, targetId, track],
   );
 
   // Пакетная запись (копирование недели / bulk-fill) — один reload в конце.
@@ -104,25 +108,29 @@ export const useGridData = (from: string, to: string, viewEmployeeId: string | n
     async (inputs: UpsertInput[]) => {
       if (!targetId || inputs.length === 0) return;
       try {
-        for (const input of inputs) await upsertEntry({ ...input, employeeId: targetId });
-        await loadEntries(targetId);
+        await track(async () => {
+          for (const input of inputs) await upsertEntry({ ...input, employeeId: targetId });
+          await loadEntries(targetId);
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка сохранения');
       }
     },
-    [loadEntries, targetId],
+    [loadEntries, targetId, track],
   );
 
   const remove = useCallback(
     async (id: string) => {
       try {
-        await deleteEntry(id);
-        await loadEntries(targetId);
+        await track(async () => {
+          await deleteEntry(id);
+          await loadEntries(targetId);
+        });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка удаления');
       }
     },
-    [loadEntries, targetId],
+    [loadEntries, targetId, track],
   );
 
   return {
@@ -131,6 +139,7 @@ export const useGridData = (from: string, to: string, viewEmployeeId: string | n
     selfEmployeeId: selfIdRef.current,
     loading,
     error,
+    saveStatus,
     reload: load,
     upsert,
     upsertMany,

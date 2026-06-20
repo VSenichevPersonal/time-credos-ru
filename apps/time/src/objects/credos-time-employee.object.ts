@@ -9,6 +9,7 @@ import {
   CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
@@ -83,6 +84,17 @@ export default defineObject({
       description: 'Идентификатор workspaceMember CRM',
       isNullable: true,
       defaultValue: null,
+    },
+    // Признак руководителя: открывает approve/reject (UI-gate + резолв в logic).
+    // Серверный контроль роли остаётся в /s/approval; это поле — источник для UI/логики.
+    {
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID,
+      name: 'isManager',
+      type: FieldType.BOOLEAN,
+      label: 'Руководитель',
+      icon: 'IconUserStar',
+      description: 'Может согласовывать трудозатраты сотрудников',
+      defaultValue: false,
     },
     // Employee.department -> Department.employees (MANY_TO_ONE).
     {

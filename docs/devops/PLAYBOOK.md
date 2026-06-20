@@ -52,7 +52,8 @@ yarn twenty app:install               # установка в workspace
 ```
 - Версия в `package.json` строго растёт (иначе `VERSION_ALREADY_EXISTS`).
 - `engines.twenty` (`>=2.14.0`) ↔ версия сервера (иначе `SERVER_VERSION_INCOMPATIBLE`).
-- Прод-таргет — CredosCRM1 после upstream-sync до 2.x (ADR-0002). Сейчас прод = тот же Railway dev/staging.
+- **Прод-таргет (решено DO-1, см. `UPSTREAM_SYNC_ASSESSMENT.md`):** НЕ ждём upstream-sync форка CredosCRM1 (он на **v1.19.0**, SDK 0.7 — app туда физически не встанет). Прод time-app = **отдельный чистый Twenty 2.x** (клон dev-сервера, Стратегия C). Апгрейд форка CRM до 2.x — независимый трек.
+- ⚠️ **ENCRYPTION_KEY ДО первого старта на 2.5+** (КРИТИЧНО): на свежем прод-инстансе задать выделенный `ENCRYPTION_KEY` в env **до** первого запуска. Иначе Twenty при backfill зашифрует at-rest секреты (OAuth/app-variables/TOTP) под `APP_SECRET`, и смена ключа потом = дорогая key-rotation. На dev-сервере (2.14) проверить наличие до апгрейда.
 
 ## 6. Прозвон (health)
 ```bash

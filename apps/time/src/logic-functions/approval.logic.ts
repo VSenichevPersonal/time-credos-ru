@@ -16,9 +16,27 @@ type RawEntry = {
   id: string;
   status: string;
   projectId: string | null;
+  employeeId: string | null;
 };
 type RawProject = { id: string; approvalRequired: boolean | null; departmentId: string | null };
 type RawDepartment = { id: string; approvalRequired: boolean | null };
+type RawEmployee = { id: string; isManager: boolean | null; workspaceMemberRef: string | null };
+
+// Actor-сотрудник, выполняющий approve/reject. Резолвится по workspaceMemberRef,
+// который клиент передаёт явно в params (RoutePayload.userWorkspaceId — это
+// userWorkspace ID, не workspaceMember; маппинга через REST нет).
+type Actor = { employeeId: string; isManager: boolean } | null;
+
+const resolveActor = async (workspaceMemberRef: string | undefined): Promise<Actor> => {
+  if (!workspaceMemberRef) return null;
+  const res = await restGet<{ data: { credosTimeEmployees: RawEmployee[] } }>(
+    '/rest/credosTimeEmployees',
+    { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
+  );
+  const e = res.data?.credosTimeEmployees?.[0];
+  if (!e) return null;
+  return { employeeId: e.id, isManager: e.isManager === true };
+};
 
 const apiBase = () => (process.env.TWENTY_API_URL ?? '').replace(/\/$/, '');
 const authHeaders = () => ({
@@ -105,14 +123,31 @@ const runSubmit = async (params: Record<string, string>): Promise<object> => {
 };
 
 // approve/reject: переданные id (SUBMITTED) → APPROVED/REJECTED, фиксируем actor+дату.
+// RBAC (CISO-002): согласовывать может только руководитель (actor.isManager),
+// и нельзя согласовывать собственные записи (separation of duties: actor != owner).
 const runResolve = async (
   params: Record<string, string>,
   status: string,
-  actor: string | null,
+  actorId: string | null,
+  actor: Actor,
 ): Promise<object> => {
   const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   if (ids.length === 0) return { ok: false, error: 'ids required' };
+
+  // Guard роли. Если actor резолвлен — требуем isManager. Если не резолвлен
+  // (workspaceMemberRef ещё не сопоставлен — dev), пропускаем с предупреждением.
+  if (actor && !actor.isManager) {
+    return { ok: false, error: 'forbidden: только руководитель может согласовывать' };
+  }
+  if (!actor) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[approval] actor не сопоставлен (workspaceMemberRef пуст) — RBAC-guard пропущен (DEV)',
+    );
+  }
+
   let updated = 0;
+  let skippedOwn = 0;
   for (const id of ids) {
     const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
       '/rest/credosTimeEntries',
@@ -120,19 +155,27 @@ const runResolve = async (
     );
     const entry = res.data?.credosTimeEntries?.[0];
     if (entry?.status !== ENTRY_STATUS.SUBMITTED) continue; // только из «На согласовании»
-    await setStatus(id, status, actor);
+    // Separation of duties: руководитель не согласует собственные трудозатраты.
+    if (actor && entry.employeeId === actor.employeeId) {
+      skippedOwn += 1;
+      continue;
+    }
+    await setStatus(id, status, actorId);
     updated += 1;
   }
-  return { ok: true, updated };
+  return { ok: true, updated, skippedOwn };
 };
 
 const run = async (event: RoutePayload) => {
   const params = readParams(event);
-  const actor = event.userWorkspaceId ?? null;
+  // actorId — для аудита approvedBy (userWorkspaceId фиксирует, кто нажал).
+  const actorId = event.userWorkspaceId ?? null;
+  // actor — employee актора (роль + id) по явно переданному workspaceMemberRef.
+  const actor = await resolveActor(params.workspaceMemberRef);
   const op = params.op ?? '';
   if (op === 'submit') return runSubmit(params);
-  if (op === 'approve') return runResolve(params, ENTRY_STATUS.APPROVED, actor);
-  if (op === 'reject') return runResolve(params, ENTRY_STATUS.REJECTED, actor);
+  if (op === 'approve') return runResolve(params, ENTRY_STATUS.APPROVED, actorId, actor);
+  if (op === 'reject') return runResolve(params, ENTRY_STATUS.REJECTED, actorId, actor);
   return { ok: false, error: `unknown op: ${op}` };
 };
 

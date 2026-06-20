@@ -7,6 +7,22 @@
 *.pem
 *.key
 
+# ПДн / 152-ФЗ — реальные персональные данные сотрудников НИКОГДА не коммитить (CISO-001).
+# Сырые выгрузки-источники (ФИО/email/трудозатраты): Директум5, Bitrix-реестр, Timetta Users.
+research/directum5/trudozatraty-dir5.xlsx
+research/directum5/bitrix-users/
+research/timetta/raw-odata-Users-deep.json
+research/timetta/raw-odata-Users-expand.json
+# Конвенция для будущих ПДн-дампов: складывать с этими именами/папками — игнорируются автоматом.
+**/pii/**
+**/pdn/**
+*.pii.*
+research/**/roster*.csv
+research/**/*-users*.html
+research/**/*employees*.csv
+# Реальный сид сотрудников (ФИО+email) для dev — рядом с seed-real.mjs, НЕ в git (CISO-001).
+apps/time/scripts/.employees.local.json
+
 # Зависимости
 node_modules/
 .yarn/
@@ -29,3 +45,11 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# ПДн — реальные источники (152-ФЗ): не трекать в git (на диске остаются)
+research/**/*.xlsx
+research/**/*roster*.csv
+research/**/*users-bitrix*.html
+research/timetta/raw-odata-Users-deep.json
+research/timetta/raw-odata-Users-expand.json
+research/**/raw-session.json

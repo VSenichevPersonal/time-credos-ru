@@ -14,13 +14,19 @@ cd "$ROOT"
 
 MODE="${1:-}"
 
-# Паттерны. Имя|regex. Исключения для example/шаблонов — ниже по allowlist.
+# Секрет-паттерны (scope=secret): блок ВЕЗДЕ (кроме allowlist).
+# ПДн-паттерн (scope=pii): блок только в коде apps/** и infra/**.
+# В research/**, docs/**, .AITEAM/** ПДн — политика CISO (см. runbooks/secrets-pii.md),
+# скан туда не лезет, чтобы не блокировать pre-existing источники-интел.
 PATTERNS=(
-  "JWT/playground-токен|eyJhbGciOiJ"
-  "RAILWAY_TOKEN присвоен|RAILWAY_TOKEN=[^\"'[:space:]]"
-  "Bearer-ключ в коде|Bearer [A-Za-z0-9._-]{20,}"
-  "реальный email @credos.ru (ПДн, CISO-001)|[A-Za-z0-9._%+-]+@credos\\.ru"
+  "secret|JWT/playground-токен|eyJhbGciOiJ[A-Za-z0-9._-]{20,}"
+  "secret|RAILWAY_TOKEN со значением|RAILWAY_TOKEN=[A-Za-z0-9]"
+  "secret|Bearer-ключ в коде|Bearer [A-Za-z0-9._-]{20,}"
+  "pii|реальный email @credos.ru (ПДн)|[A-Za-z0-9._%+-]+@credos\\.ru"
 )
+
+# ПДн-скан только для кода (не для интел-источников/доков/канала).
+pii_in_scope() { case "$1" in apps/*|infra/*) return 0 ;; *) return 1 ;; esac; }
 
 # Файлы под скан (portable: bash 3.2 на macOS не имеет mapfile)
 FILES=()
@@ -45,7 +51,9 @@ for f in "${FILES[@]}"; do
   [ -f "$f" ] || continue
   is_allowed "$f" && continue
   for p in "${PATTERNS[@]}"; do
-    name="${p%%|*}"; rx="${p#*|}"
+    scope="${p%%|*}"; rest="${p#*|}"; name="${rest%%|*}"; rx="${rest#*|}"
+    # ПДн-паттерн — только в коде apps/** infra/**
+    if [ "$scope" = "pii" ] && ! pii_in_scope "$f"; then continue; fi
     if grep -nEI "$rx" "$f" >/dev/null 2>&1; then
       hits=$(grep -cEI "$rx" "$f" 2>/dev/null || echo "?")
       echo "✗ [$name] в $f ($hits совпад.):"

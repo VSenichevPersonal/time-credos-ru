@@ -1,6 +1,6 @@
 # REQ-0001 — Approval: RBAC роли «Руководитель» + separation of duties
 
-**Статус:** PROPOSED
+**Статус:** PARTIALLY_IMPLEMENTED (guard есть, но обходится — см. «Ревью реализации»)
 **Источник:** CISO #002 (P2), CISO #003 (P3), TODO коммита c515b55 («isManager хардкод»)
 **Затрагивает:** `roles/manager.role.ts`, `logic-functions/approval.logic.ts`, `constants/approval.ts` (опц.), фронт (контракт Dev 1)
 
@@ -28,6 +28,21 @@
 - Руководитель на чужой SUBMITTED-записи своего скоупа → APPROVED + `approvedBy=actor`, `approvedAt`.
 - Фронт: кнопки approve/reject не видны без `canApprove`.
 - QA smoke на 3 кейсах; lint/dry-run чисто.
+
+## Ревью реализации (2026-06-20, Dev 2)
+
+Guard добавлен в `approval.logic.ts` (`resolveActor` + `runResolve`): роль-чек `actor.isManager` + SoD `entry.employeeId === actor.employeeId`. Структурно верно, **но обходится** — CISO-002 НЕ закрыт:
+
+1. 🔴 **Spoofable authorization.** `actor = resolveActor(params.workspaceMemberRef)`, а `params` = `readParams(event)` (query + body, **client-supplied**). Вызывающий передаёт **любой** `workspaceMemberRef` → может выдать себя за руководителя (`isManager:true`) или за другого сотрудника (обход SoD). Авторизация на самозаявленной identity.
+2. 🔴 **Fail-open.** Нет `workspaceMemberRef` → `actor=null` → guard пропускается (только `console.warn`), approve проходит. Тривиальный обход: не передавать параметр.
+3. Доверенная серверная identity — `event.userWorkspaceId` — используется только для аудита `approvedBy`, НЕ для guard.
+
+**Корень:** нет резолва `userWorkspaceId → workspaceMember → credosTimeEmployee` (в коде: «маппинга через REST нет»). Решили через client-param — небезопасно.
+
+**Требуется доработка:**
+- actor резолвить из `event.userWorkspaceId` **серверно**, не из client-param (найти путь: Twenty REST `/rest/...` userWorkspace→workspaceMember, или SDK-контекст logic-function).
+- **fail-closed** в проде: если approval требуется, а actor не резолвлен → `forbidden`, не пропускать.
+- (dev-bypass допустим только за явным флагом окружения, не дефолтом).
 
 ## Открытые вопросы
 

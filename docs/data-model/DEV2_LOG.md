@@ -19,6 +19,20 @@
 
 ---
 
+## 2026-06-20 — фикс #001 (ПДн в seed) + ревью guard #002
+
+**#001 P1 — сделано (dev-часть):**
+- `seed-real.mjs`: убраны 42 реальных ФИО+email. Лоадер: `.employees.local.json` (gitignored) если есть → реальный сид; иначе синтетический `@example.test` (распределение по отделам сохранено: OV11/OIB11/OPIB9/TC6/OPR5).
+- Реальные данные вынесены в `apps/time/scripts/.employees.local.json` (gitignored).
+- `.gitignore` += `.employees.local.json`. `node --check` чисто.
+- Сырые ПДн-источники (`research/.../roster.csv`, `trudozatraty-dir5.xlsx`, timetta Users) — уже `git rm` (staged) силами CISO/arch.
+
+**#002 — ревью реализованного guard (другой агент уже добавил):** структурно ок, но **обходится** (spoofable client-param + fail-open). CISO-002 НЕ закрыт. Детали → [REQ-0001 «Ревью реализации»](../requirements/REQ-0001-approval-rbac-sod.md). Отписал arch/CISO.
+
+**Наблюдение (новое, к CISO):** в `seed-real.mjs` остаются реальные клиенты + юрлица (ООО/ГУП, `legal:`) + трудозатраты по ним — confidential business data вне scope #001 (employee PII). Кандидат в отдельный finding.
+
+---
+
 ## Карта рабочих доков Dev 2
 
 | Что | Где |

@@ -1,10 +1,33 @@
 # CISO-001 — Реальные ПДн сотрудников в git (P1)
 
-**Статус:** OPEN · **Severity:** P1 · **Owner устранения:** Dev 2 (+ arch по истории git) · **Дата:** 2026-06-20
+**Статус:** MITIGATING · **Severity:** P1 · **Owner устранения:** CISO (gitignore ✅) / Dev 2 (сид) / arch (история) · **Дата:** 2026-06-20
 
 ## Суть
 
-`apps/time/scripts/seed-real.mjs` (git-tracked, коммит `56bc320`) содержит **42 реальных сотрудника** Кредо-С: ФИО + корпоративный email (`@credos.ru`) + привязка к отделам (OV/OIB/OPIB/ТЦ/ОПР).
+Реальные ПДн сотрудников Кредо-С в git двумя путями:
+
+**(а) Сырые дампы-источники** (tracked, не код):
+- `research/directum5/trudozatraty-dir5.xlsx` — выгрузка Директум5, ~13k строк трудозатрат с ФИО.
+- `research/directum5/bitrix-users/roster.csv` — 72 сотрудника (ФИО + подразделение + email).
+- `research/directum5/bitrix-users/users-bitrix.html` — экспорт Bitrix-юзеров (@credos.ru).
+- `research/timetta/raw-odata-Users-deep.json` — содержит @credos.ru.
+
+**(б) Хардкод в коде:** `apps/time/scripts/seed-real.mjs` (коммит `56bc320`) — **42 сотрудника** ФИО + `@credos.ru` + отделы.
+
+> Прочие `research/timetta/raw-*.json` (~40 дампов конкурента Timetta) и md-доки содержат 1× собственный аккаунт исследователя — не реестр третьих лиц, пропорционально оставлены. Токенов в `raw-session.json` нет.
+
+## Сделано (CISO, 2026-06-20)
+
+Дампы (а) сняты с tracking, gitignore поставлен (файлы на диске сохранены):
+```bash
+git rm --cached research/directum5/trudozatraty-dir5.xlsx \
+  research/directum5/bitrix-users/{roster.csv,users-bitrix.html} \
+  research/timetta/raw-odata-Users-{deep,expand}.json
+# + .gitignore: секция «ПДн / 152-ФЗ» + конвенция **/pii/**, **/pdn/**, roster*.csv
+```
+Проверено: `git check-ignore` = ДА, `git ls-files` = пусто, файлы на диске целы. Изменения **staged, не закоммичены** — push по батчу arch.
+
+⚠️ **История git** всё ещё содержит файлы (`git rm --cached` чистит только будущие коммиты). Решение по `filter-repo`/BFG — за arch (internal-repo, пропорционально).
 
 ## Репро
 

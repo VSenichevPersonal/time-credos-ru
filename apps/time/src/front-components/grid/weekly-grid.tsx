@@ -104,6 +104,7 @@ export const WeeklyGrid = () => {
         mode={mode}
         onModeChange={setMode}
         periodTitle={periodTitle}
+        saveStatus={data.saveStatus}
         onPrev={onPrev}
         onNext={onNext}
         onToday={week.reset}
