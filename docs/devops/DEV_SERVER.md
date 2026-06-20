@@ -125,5 +125,12 @@ yarn twenty app:install
 ```
 Даёт чтение/запись CRM из LLM. ⚠️ Для постоянного MCP нужен НЕ playground-токен (2ч), а обычный API key.
 
+## Серверные настройки (Railway env)
+- **`LOGIC_FUNCTION_TYPE=LOCAL`** (Twenty + Worker) — включает исполнение `/s/`-logic-функций. Без неё — `500 LOGIC_FUNCTION_EXECUTION_ERROR` / «execution is disabled». Задано 2026-06-20.
+- Прочее: `APP_SECRET`, `PG_DATABASE_URL`, `SERVER_URL`, `NODE_PORT=3000`, приватная сеть — в Railway.
+
+## Известные нюансы dev-данных
+- **`workspaceMemberRef` у seed-сотрудников пустой** → недельная сетка показывает данные первого активного сотрудника. TODO: смэппить `credosTimeEmployee.workspaceMemberRef` на реальных workspaceMember (или при логине). Переключатель сотрудника для руководителя — отдельный TODO.
+
 ## Прод-таргет (позже)
 Прод-установка time-app — в CredosCRM1 после upstream-sync форка до 2.x (ADR-0002). Этот Railway-сервер — dev/staging.
