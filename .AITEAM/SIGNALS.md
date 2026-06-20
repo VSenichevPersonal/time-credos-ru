@@ -16,6 +16,17 @@
 
 ## → arch feedback (ответы)
 
+### 2026-06-20 22:40 — [arch] 📥 НОВОЕ: ввод планов руководителями в «Планировании» (раздача)
+
+Заказчик: «Планирование» только смотрит — нужен ВВОД планов рук. отделов, сейчас непонятно как. Спека — `docs/data-model/CAPACITY_PLANNING.md §7`.
+
+**v1 (приоритет, старт):**
+- **Dev 1 (P-D1):** в «Планировании» режим/кнопка **«Планировать»** (видна при `isManager`). В срезе «Детализация по проектам» — inline-правка проекту `plannedEffort` + `endDate` (понятный affordance: инпут/карандаш «задать план»), сохранение REST PATCH credosTimeProject, пересчёт загрузки на лету. Не-руковод → read-only. (Поля и роль isManager уже есть — без нового logic.)
+- **Dev 2 (P-D2):** подтверди, что REST PATCH plannedEffort/startDate/endDate работает под ролью app; гейт «план правит только isManager/руковод отдела» (логика/проверка); заведи **REQ-0003** «credosTimePlanAllocation» (план по неделям, v2, PROPOSED).
+- **QA:** smoke ввода плана (руковод правит → загрузка меняется; сотрудник read-only).
+
+Старт после волны-3-удобства ИЛИ вместо — приоритет заказчика высокий, **ставлю P-D1 вперёд волны-3**. Оба dry-run, деплою я. — arch
+
 ### 2026-06-20 22:20 — [arch] ✅ Волна-2 ЗАКРЫТА: дашборд+бюджет+«по людям»+[bug]#1 задеплоены и приняты в браузере
 
 **Dev1 `[arch-ok]`** (браузер-приёмка, 4 оси): дашборд «Отчёты» рендерится — KPI Утилизация 65%/Факт 247/Норма 5611/Недогруз −5365, таблица по отделам (ОВ 100%, ОПИБ 54%...), срезы Отдел/Проект/Человек, гранулярность Месяц/Квартал/Год. UX-5 дубль кода устранён (строка таймшита чистая). impeccable ✅.
@@ -478,6 +489,40 @@ DP-0001 (`[arch-ok]` был) реализован: метрика-тоггл (С
 ## Dev 2 → arch
 
 _Data + Domain: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель, демо-данные, требования. Пиши `[received]`, `[signal-arch]`, `[requirement]`, `[blocker]`._
+
+### 2026-06-20 22:35 — [report] Dev 2 BACK: F-D «Отсутствия» phase 1 готов (data-model)
+
+Новый объект `credosTimeAbsence` + полный data-model slice. dry-run/деплой — за тобой (arch).
+
+**Файлы:**
+- `objects/credos-time-absence.object.ts`: `type` (SELECT Отпуск/Больничный/Без содержания/Иное), `startDate`/`endDate` (DATE_TIME), `note`, `employee` (MANY_TO_ONE → Employee, CASCADE).
+- `objects/credos-time-employee.object.ts`: reverse `absences` (ONE_TO_MANY).
+- `views/credos-time-absence.view.ts` + `navigation-menu-items/credos-time-absence...` («Отсутствия» в папке «Трудозатраты»). Pitfalls соблюдены: object→view→nav.
+- `constants/`: universal-identifiers (9 UUID, аппенд в конец — без гонки с Dev1), domain-types `AbsenceType`, labels `ABSENCE_TYPE_LABELS`, select-options `ABSENCE_TYPE_OPTIONS`.
+
+**Проверка:** oxlint 0, tsc 0, **525 unit зелёных** (schema-guard 249 + uuid-guard 147 авто-валидировали новый объект: UUID v4 уникальны, object↔view↔nav связаны). Готово к dry-run+батч.
+
+**Phase 2 (контракт, согласовать):** отсутствия вычитаются из ёмкости.
+- `reports-calc`: норма сотрудника = baseNorm − (рабочие дни в интервалах absence ∩ период) × дневная норма. Нужно подать absences в `computeReports` (+ fetch в reports.logic).
+- capacity-доска (Dev1): тот же вычет в плановой ёмкости.
+- **@arch:** phase 2 в этой волне или отдельно? Если да — оформлю контракт + реализую вычет в reports-calc (+тесты), Dev1 подхватит ёмкость.
+
+Дальше по волне-3: **F-C теги** записей → потом **F-E cron-напоминание**.
+
+— Dev 2
+
+### 2026-06-20 22:20 — [signal-arch] Dev 2 BACK: старт ВОЛНА-3 F-D «Отсутствия» (claim constants)
+
+Беру **F-D отсутствия** первым (ядро Dev2-домена, влияет на ёмкость capacity). Phase 1 = data-model.
+
+⚠️ **@Dev1 координация constants:** добавляю в `universal-identifiers.ts` блок `CREDOS_TIME_ABSENCE_*` (object+5 полей+view+nav+reverse на Employee). Если ты сейчас правишь `universal-identifiers.ts` под UI-A/B/D — скажи, разведём по времени (избегаем merge-гонки). UUID мои, аппендом в конец — конфликт маловероятен.
+
+**Phase 1 (сейчас):** объект `credosTimeAbsence` (тип VACATION/SICK/UNPAID/OTHER, employee, startDate, endDate, note) + view + nav + reverse `employee.absences` + select-options/domain-types. dry-run, не деплою.
+**Phase 2 (следом):** интеграция в ёмкость — отсутствия вычитаются из нормы периода (reports-calc + capacity-доска Dev1). Подниму контракт.
+
+F-C теги + F-E cron — после F-D.
+
+— Dev 2
 
 ### 2026-06-20 22:08 — [received] Dev 2 BACK: принял подтверждения arch
 
@@ -952,6 +997,24 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-20 22:50 — [qa-nak] [bug]#1 НЕ исправлен: op:delete всё ещё 400 PERMISSION_DENIED
+
+Пере-валидировал после деплоя волны-2. **Фикс не сработал в поведении** (dry-run был зелёный, но runtime — нет).
+
+**Repro (live, dev-сервер):**
+1. `POST /s/time-entry {op:upsert,date:2026-12-31,hours:0.25}` → 200, создана запись `9117ed5a-…`.
+2. `POST /s/time-entry {op:delete,id:9117ed5a-…}` → **`ok:false`, error: `DELETE /rest/credosTimeEntries/{id} -> 400 PERMISSION_DENIED "Entity performing the request does not have permission"`** (`hasToken:true`).
+3. Контроль: тот же DELETE **admin-токеном** (REST) → **200 `deleteCredosTimeEntry`** ✓. (Им же убрал тест-запись — почистил за собой.)
+
+**Вывод:** app-роль (`TWENTY_APP_ACCESS_TOKEN`) по-прежнему без эффективного delete-права на `credosTimeEntries`; admin-токен удаляет. Значит либо (а) роль-деплой не доехал при sync, либо (б) выданного soft-delete (`destroy=false`) недостаточно для пути, которым ходит logic-function (`DELETE /rest/...` → у Twenty это `deleteCredosTimeEntry`/soft, admin его проходит, app — нет).
+
+**Severity P1** (юзер не удалит запись из сетки — исходный DoD не выполнен).
+**Файл:** `apps/time/src/logic-functions/time-entry-api.logic.ts:113-117` (вызов), первопричина — `apps/time/src/roles/default-role.ts` (objectPermission) + фактическая накатка роли при sync.
+
+**→ Dev 2 + DevOps:** (1) проверить, что objectPermission роли реально накатился (`yarn twenty` app sync прошёл по roles, не только metadata-objects?); (2) сверить, какое именно право (soft-delete vs destroy) требует REST `DELETE /rest/credosTimeEntries/{id}` под app-токеном — выдать его роли. Готов пере-валидировать сразу после повторного деплоя.
+
+— QA
 
 ### 2026-06-20 22:40 — [smoke-ok] /s/reports live (R2-QA) + reports/CISO-006 кейсы + 494 теста
 
