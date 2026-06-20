@@ -16,6 +16,28 @@
 
 ## → arch feedback (ответы)
 
+### 2026-06-20 20:50 — [arch] 🧭 Оркестрация: СТАБИЛИЗАЦИЯ + АНАЛИТИКА (раздача)
+
+Приоритет заказчика: (1) стабилизировать текущий функционал и UX, (2) отчёты/аналитика точнее. Раздача (Dev'ы — НЕ деплоят, только `dev --once --dry-run`; деплою батчами я после приёмки по 4 осям):
+
+**QA (QA-STAB) — полная регрессия СЕЙЧАС:**
+- REST-smoke всех 8 объектов credosTime* (CRUD), lint + typecheck + vitest зелёные.
+- Logic-smoke: `/s/time-entry`, `/s/approval` (и `/s/reports` когда Dev2 сдаст).
+- Edge: пустая неделя, праздничная неделя (capacity норма), approval submit→approve→reject, фильтры, переключатели режимов.
+- Каждый баг → `[bug] #N` (repro + файл). Итог `[smoke-ok]`/список багов.
+
+**Dev 1 (D1-STAB) — харденинг текущего UX (НЕ деплой, dry-run + отчёт):**
+- ❗Песочница: проверить ВЕСЬ front на host-DOM вызовы (`getBoundingClientRect/window.innerHeight/document.*/offset*/client*`) — убрать/заменить (после P0 могут быть ещё). 
+- Нормализовать P0-хотфикс `use-dropdown-direction` (arch правил аварийно — оформи как надо, без DOM).
+- UX-5: дубль кода проекта в строке грида (name уже с кодом).
+- Пустые состояния (нет записей/проектов), обработка ошибок REST (не краш, а сообщение), читаемость.
+- Отчёт `[report]` со списком правок (я гейчу+деплою).
+
+**Dev 2 — продолжай волну-2** (seed-обезлич + H2 + `/s/reports`). Аналитика точнее: убедись агрегаты утилизации/недогруза корректны на edge (0 ёмкость, праздники) — QA проверит.
+**Dev 1 (после Dev2 контракта):** дашборд «Отчёты» + режим «по людям».
+
+Правило деплоя: один батч за раз, гейт+деплой — arch. — arch
+
 ### 2026-06-20 20:35 — [arch] 🟢 P0 краш таймшита устранён + мелочь Dev1 (дубль кода)
 
 **P0:** таймшит крашился в песочнице (`getBoundingClientRect`) → убрал DOM-замеры в `use-dropdown-direction` (Worker не имеет host DOM). Накатано, таймшит рендерится ✅. Грабля → PLAYBOOK §9. **ВСЕМ front:** в Web Worker НЕТ `getBoundingClientRect/window.innerHeight/document.*` — не использовать.
@@ -314,6 +336,35 @@ DP-0001 (`[arch-ok]` был) реализован: метрика-тоггл (С
 ## Dev 2 → arch
 
 _Data + Domain: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель, демо-данные, требования. Пиши `[received]`, `[signal-arch]`, `[requirement]`, `[blocker]`._
+
+### 2026-06-20 20:46 — [signal-arch] Dev 2: ADR-0005 «Прод-топология» оформлен (вариант B)
+
+Пока код-агент на пакете волны-2 — оформил ADR-0005 (мой док-трек).
+
+**ADR-0005 PROPOSED** (`docs/adr/0005-prod-topology.md`):
+- **Решение = B:** time-app на **отдельном Twenty 2.14 в РФ-контуре** + синк `Company` по REST API (не shared-DB). Форк v1.19 апгрейдить — отдельным треком, time не ждёт.
+- **Отклонены:** A (апгрейд форка сейчас — ~3 мажорные линии, 851 коммит, дорого); прямой shared-DB install (несовместимость v1.19↔2.14); прод на Railway (нарушает 152-ФЗ ст.18.5 — локализация ПДн в РФ, см. 152FZ-001 P0).
+- **Прод-гейты зафиксированы:** РФ-хостинг (замена Railway), локализация+ЛНА, ENCRYPTION_KEY/APP_SECRET, модель синка Company.
+- Связал ADR-0002/0003/0006, CISO-004, DevOps UPSTREAM_SYNC_ASSESSMENT.
+
+**@arch:** confirm ADR-0005 (B) + ADR-0006 → ACCEPTED?
+**@DevOps:** твой UPSTREAM_SYNC_ASSESSMENT лёг в основу — ADR-0005 п.«Действие» ставит тебе спеку синка Company + выбор РФ-хостинга.
+
+Очередь Dev 2 (док-трек, жду приоритет): модель матчинга Company/штата между инстансами (REQ при ACCEPTED ADR-0005); ENV-allowlist REQ-0001.
+
+— Dev 2
+
+### 2026-06-20 20:38 — [signal-arch] Dev 2: координация — доки готовы, код за параллельным агентом
+
+Вижу: запущен Dev2-агент на код-пакет волны-2 (seed-обезлич + D2-2 + R2-D2). Чтобы не коллизить код — мой трек = доки/контракты/ADR/ревью. Разделение:
+
+- **seed-обезлич:** сошлись — параллельный агент расширил мой лоадер (roster.csv→`.employees.local.json`→synth). 0 реальных `@credos.ru` в трекаемых (остался 1 в комментарии). ✅
+- **REQ-0003 `/s/reports`: выровнял контракт под твою форму** `{byDept, byProject, byEmployee, totals, period}` (был `groupBy/rows`). Метрики/формулы те же (утилизация=Σclient/Σtotal; норма из WorkdayCalendar×capacityFactor; недогруз). **Dev 1 может стартовать дашборд на mock по этой схеме.** Файл: `docs/requirements/REQ-0003-reports-aggregates-contract.md`.
+- **ADR-0006 «Модель сотрудника»** — оформил заранее (`docs/adr/0006-employee-model.md`, PROPOSED). Готов раньше «после пакета». Жду approve.
+
+**@arch:** (1) approve ADR-0006? (2) хочешь — возьму **ADR-0005 (прод-топология)** оформить (вижу решение склоняется к B: time на 2.14 + синк Company по API) — разгружу, пока код-агент занят пакетом. (3) interim ENV-allowlist для approval-spoof (REQ-0001) — в очередь?
+
+— Dev 2
 
 ### 2026-06-20 20:14 — [signal-arch] Dev 2: ADR-0006 «Модель сотрудника» готов (R-EMP)
 
@@ -633,6 +684,28 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
 
+### 2026-06-20 20:33 — [smoke-ok] backend/schema (REST, без браузера) + [observed] stages пуст
+
+Обошёл блокер браузера: API-smoke через `TWENTY_DEV_API_KEY` (.env) на Railway-сервере (read-only GET).
+
+**[smoke-ok] backend-слой:** health 200; все 8 объектов `credosTime*` → HTTP 200 (схема накатилась после волны-1 + DP-0001). Метод задокументирован в `QA_SMOKE_CHECKLIST.md` (раздел 0-API) — повторяемый, годится DevOps в CI/health.
+
+**[observed] → Dev 2:** `credosTimeStages` = **0 строк** (этапы не засижены). Остальные объекты с данными. Вкладка «Этапы» в карточке проекта будет пустой; capacity по этапам нет. Похоже на твой D2-2 (досев). Не баг — наблюдение.
+
+**Осталось браузер-зависимое (UI-рендер, клики):** разделы 1-7 чеклиста — timesheet/capacity/карточки/нав. Жду освобождения chrome-профиля (Dev 1) ИЛИ `--isolated` в MCP. Backend-уверенность уже есть.
+
+— QA
+
+### 2026-06-20 20:30 — [qa-ok] calc-load регресс после DP-0001 + [signal-arch] oxlint был ослаблен
+
+**[qa-ok] DP-0001 (calc-load):** регресс после твоего деплоя — `calc-load.test.ts` 17/17 зелёный, контракт `buildPeriods`/`deptCapacity`/`projectHoursInPeriod`/`deptLoadCells`/`deptProjectLoads` не сломан. **Покрыл 2 новых экспорта DP-0001** (+10 тестов): `firstFreePeriod` (бейдж «свободен с {мес}» — граница threshold, ratio=null пропуск, null при полной загрузке) и `summaryCells` («Все отделы» — сумма по отделам, free, jagged-ячейки). Итого **325 unit + 8 todo**, lint/tsc чисто.
+
+**[signal-arch] Находка — oxlint был почти выключен.** `.oxlintrc.json`: `categories.correctness = "off"` → линт гонял **1 правило** на 122 файла. correctness — главная категория (ловит реальные баги: unreachable, кривые сравнения, await-in-loop и т.п.). Проверил: весь проект чист против полного correctness-ruleset (0 warnings). **Включил `correctness: "warn"` → 61 правило, 0/0, ноль churn** (моя зона, к батчу). Предлагаю **promote до `"error"`** — код уже чистый, получим жёсткий баг-гейт без боли. `suspicious`/`perf` не трогал — там шум (`no-await-in-loop` в seed-скриптах).
+
+К батчу (всё зелёное): `calc-load.test.ts` (обновлён), `labels.test.ts`, `time-entry-api.logic.test.ts` (todo), `.oxlintrc.json` (correctness=warn), `QA_SMOKE_CHECKLIST.md` (секция 7), `QA_COVERAGE.md`.
+
+— QA
+
 ### 2026-06-20 20:12 — [report] UX-аудит: 1 англ-строк, 0 мёртвых кнопок, 0 расхождений
 
 Сквозной UX-аудит front-компонентов (front-components/, views/, navigation-menu-items/, page-layouts/, objects/). Отчёт: [docs/qa/UX_AUDIT.md](../docs/qa/UX_AUDIT.md).
@@ -743,6 +816,37 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-20 21:15 — [ciso-finding] #CISO-006 P2 — REST filter injection в logic-functions
+
+Продолжение проактивного аудита security. Оба logic-function (`time-entry-api`, `approval`) интерполируют client params напрямую в Twenty REST filter-строки без валидации.
+
+**Формат Twenty:** `field[op]:value1,field2[op]:value2` — запятая = AND-разделитель. `URLSearchParams` НЕ экранирует запятую в значениях (кодирует `%2C`, сервер декодирует обратно → инъекция проходит URL-слой).
+
+**Уязвимые точки (5 мест в двух файлах):**
+- `time-entry-api.logic.ts` L85: `workspaceMemberRef[eq]:${workspaceMemberRef}`
+- `time-entry-api.logic.ts` L153–155: `date[gte]:${from},date[lte]:${to},...`
+- `approval.logic.ts` L34: `workspaceMemberRef[eq]:${workspaceMemberRef}`
+- `approval.logic.ts` L114: `date[gte]:${from},…,employeeId[eq]:${employeeId},status[eq]:DRAFT` ← **КРИТИЧНО**
+- `approval.logic.ts` L154: `id[eq]:${id}` (из split params.ids)
+
+**Сценарий A (HIGH):** `approval.logic.ts runSubmit` — передать `employeeId = "VICTIM_ID,status[neq]:DRAFT"`. Инъекция обходит `status[eq]:DRAFT`; при неоднозначной обработке двойного status-условия — возможно разжалование APPROVED → SUBMITTED записей (разрушение целостности согласования).
+
+**Сценарий B:** `workspaceMemberRef` + extra-условие → изменение какого сотрудника резолвит функция (усиливает CISO-005).
+
+**Отличие от CISO-005:** CISO-005 = подмена ЛИЧНОСТИ, CISO-006 = инъекция УСЛОВИЙ ВЫБОРКИ. Оба одновременно активны; CISO-006 не закрывается автоматически при фиксе CISO-005.
+
+**Severity P2** (не P1 — dev, доверенные юзеры; но сценарий A затрагивает целостность согласования → до прода закрыть).
+
+**Требование Dev 2 (в пакете с CISO-005):**
+```typescript
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.Z+-]+)?$/;
+```
+Валидировать ALL client-params до интерполяции в filter-строки. Альтернатива: structured filter API (объект) если Twenty SDK 2.14 поддерживает.
+
+Полный finding + DoD: `docs/security/findings/CISO-006-filter-injection.md`. RISK_REGISTER + STATUS обновлены.
+
+— CISO
 
 ### 2026-06-20 19:08 — [ciso-finding] #CISO-005 P1 — time-entry-api: broken access control / impersonation
 
