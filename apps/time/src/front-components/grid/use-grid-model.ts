@@ -23,6 +23,7 @@ export type GridRowModel = {
   hoursByDay: number[]; // длина 7
   entryIdByDay: (string | null)[];
   descByDay: (string | null)[];
+  tags: string[]; // W3-2: объединение тегов записей строки (без дублей)
   rowTotal: number;
 };
 
@@ -57,6 +58,7 @@ export const calcGridModel = (
         hoursByDay: Array(7).fill(0),
         entryIdByDay: Array(7).fill(null),
         descByDay: Array(7).fill(null),
+        tags: [],
         rowTotal: 0,
       };
       rows.set(key, row);
@@ -72,10 +74,15 @@ export const calcGridModel = (
     if (!rowPasses(pid, wid, projMap, filters)) continue;
     // W3-3: фильтр по статусу согласования (на уровне записи).
     if (filters.status.size > 0 && !filters.status.has(e.status ?? '')) continue;
+    // W3-2: фильтр по тегу (на уровне записи) — запись проходит, если содержит
+    // хотя бы один из выбранных тегов.
+    const entryTags = e.tags ?? [];
+    if (filters.tag.size > 0 && !entryTags.some((t) => filters.tag.has(t))) continue;
     const row = ensure(pid, wid);
     row.hoursByDay[idx] += e.hours;
     row.entryIdByDay[idx] = e.id;
     row.descByDay[idx] = e.description;
+    for (const t of entryTags) if (!row.tags.includes(t)) row.tags.push(t);
     row.rowTotal += e.hours;
   }
 

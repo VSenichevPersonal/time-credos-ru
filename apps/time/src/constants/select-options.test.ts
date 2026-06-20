@@ -6,6 +6,7 @@ import {
   DEPARTMENT_CODE_OPTIONS,
   ENTRY_STATUS_DEFAULT,
   ENTRY_STATUS_OPTIONS,
+  ENTRY_TAG_OPTIONS,
   PROJECT_STATUS_DEFAULT,
   PROJECT_STATUS_OPTIONS,
   WORKDAY_TYPE_DEFAULT,
@@ -13,6 +14,8 @@ import {
   WORK_CATEGORY_OPTIONS,
   WORK_TYPE_GROUP_OPTIONS,
 } from 'src/constants/select-options';
+import { ENTRY_TAG_LABELS } from 'src/constants/labels';
+import type { EntryTag } from 'src/constants/domain-types';
 
 const ALL_OPTION_SETS = {
   DEPARTMENT_CODE_OPTIONS,
@@ -88,5 +91,52 @@ describe('дефолты ссылаются на существующее зна
 
   it('WORKDAY_TYPE_DEFAULT ∈ WORKDAY_TYPE_OPTIONS', () => {
     expect(WORKDAY_TYPE_OPTIONS.map((o) => o.value)).toContain(unquote(WORKDAY_TYPE_DEFAULT));
+  });
+});
+
+// ─── ENTRY_TAG_OPTIONS SSOT-guard (W3-2) ──────────────────────────────────────
+
+// Кросс-SSOT: domain-types.EntryTag ↔ labels.ENTRY_TAG_LABELS ↔ select-options.ENTRY_TAG_OPTIONS.
+// buildOptions() применяет toUpperSnake(PascalCase) → опции хранят UPPER_SNAKE (SDK-требование).
+// Ловит рассинхрон при добавлении нового тега.
+describe('ENTRY_TAG_OPTIONS — SSOT cross-check (W3-2)', () => {
+  // domain-types.EntryTag в UPPER_SNAKE = значения SELECT (SDK) = option.value:
+  // ключ union/labels/colors совпадает с value, ENTRY_TAG_LABELS[value] резолвится
+  // напрямую (нет приведения регистра в рендере чипов).
+  const TAG_CODES = ['OVERTIME', 'URGENT', 'REMOTE', 'ON_SITE', 'REWORK', 'RESEARCH'] as EntryTag[];
+
+  it('6 тегов (по числу EntryTag в domain-types)', () => {
+    expect(ENTRY_TAG_OPTIONS).toHaveLength(6);
+  });
+
+  it('значения опций = UPPER_SNAKE (SDK-требование) = коды EntryTag', () => {
+    const optionValues = ENTRY_TAG_OPTIONS.map((o) => o.value).sort();
+    expect(optionValues).toEqual([...TAG_CODES].sort());
+  });
+
+  it('все label непустые русские строки (лейблы из ENTRY_TAG_LABELS)', () => {
+    expect(ENTRY_TAG_OPTIONS.every((o) => typeof o.label === 'string' && o.label.length > 0)).toBe(true);
+  });
+
+  it('ENTRY_TAG_LABELS[value] резолвится по option.value (рендер чипов)', () => {
+    // value=ключ=union → lookup напрямую; именно это чинит баг ярлыков чипов.
+    const expectedLabels = TAG_CODES.map((t) => ENTRY_TAG_LABELS[t]);
+    const actualLabels = ENTRY_TAG_OPTIONS.map((o) => o.label);
+    expect(actualLabels).toEqual(expectedLabels);
+    for (const o of ENTRY_TAG_OPTIONS) {
+      expect(ENTRY_TAG_LABELS[o.value as EntryTag]).toBe(o.label);
+    }
+  });
+
+  it('каждый тег имеет color', () => {
+    expect(ENTRY_TAG_OPTIONS.every((o) => typeof o.color === 'string' && o.color.length > 0)).toBe(true);
+  });
+
+  it('ENTRY_TAG_LABELS покрывает все 6 тегов (нет пропусков)', () => {
+    expect(new Set(Object.keys(ENTRY_TAG_LABELS))).toEqual(new Set(TAG_CODES));
+  });
+
+  it('все label непустые строки в ENTRY_TAG_LABELS', () => {
+    expect(Object.values(ENTRY_TAG_LABELS).every((l) => typeof l === 'string' && l.length > 0)).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Security-регресс-спека для CISO-005 (broken access control / IDOR / impersonation)
 // и связанного CISO-002 (separation of duties в approval).
@@ -9,6 +9,40 @@ import { describe, it } from 'vitest';
 // чужого имени. Тесты — `it.todo`: НЕ падают, фиксируют контракт, который QA
 // проверит, как только Dev 2 введёт server-side резолв userWorkspace→employee
 // (корень фикса). Тогда `todo` → реальные тесты с мок-`fetch`.
+
+import timeDef from './time-entry-api.logic';
+
+const handler = (
+  timeDef as unknown as { config: { handler: (event: unknown) => Promise<unknown> } }
+).config.handler;
+
+const event = (body: Record<string, unknown>) => ({
+  headers: {},
+  queryStringParameters: {},
+  pathParameters: {},
+  body,
+  isBase64Encoded: false,
+  requestContext: { http: { method: 'POST', path: '/time-entry' } },
+  userWorkspaceId: null,
+});
+
+const mockFetch = (responses: unknown[]) => {
+  let i = 0;
+  return vi.fn().mockImplementation(() => {
+    const data = responses[i++] ?? {};
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve(data),
+      text: () => Promise.resolve(''),
+    });
+  });
+};
+
+const emptyEmployees = { data: { credosTimeEmployees: [] } };
+const emptyEntries = { data: { credosTimeEntries: [] } };
+const emptyProjects = { data: { credosTimeProjects: [] } };
+const emptyWorkTypes = { data: { credosTimeWorkTypes: [] } };
+
 describe('time-entry-api: ownership / anti-impersonation (CISO-005)', () => {
   it.todo('identity сотрудника берётся из event.userWorkspaceId, НЕ из params.workspaceMemberRef');
   it.todo('op=upsert create: employeeId = резолв актора, нельзя создать запись от чужого имени');
@@ -27,10 +61,95 @@ describe('approval: separation of duties (CISO-002)', () => {
 // без валидации; запятая в значении = инъекция AND-условия. Детали:
 // docs/security/findings/CISO-006-filter-injection.md.
 describe('REST filter injection (CISO-006)', () => {
-  it.todo('employeeId/from/to валидируются (UUID_RE / DATE_RE) до интерполяции в filter');
-  it.todo('runSubmit: employeeId="VICTIM,status[neq]:DRAFT" отвергается, не обходит status[eq]:DRAFT');
-  it.todo('workspaceMemberRef с запятой/доп-условием отвергается (усиление CISO-005)');
-  it.todo('params.ids: каждый id матчит UUID_RE перед filter id[eq]:${id}');
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('невалидный workspaceMemberRef (не UUID) → не идёт в filter (DEV-fallback)', async () => {
+    // 'ref-with-comma,active[eq]:false' → isUuid=false → не идёт в REST-filter,
+    // уходит в DEV-fallback (первый активный). Нет запроса with malicious value.
+    const fetchMock = mockFetch([
+      emptyEmployees, // DEV-fallback: активные сотрудники
+      emptyEntries, emptyProjects, emptyWorkTypes, // op=list
+    ]);
+    vi.stubGlobal('fetch', fetchMock);
+    await handler(event({
+      op: 'list',
+      from: '2026-06-01',
+      to: '2026-06-30',
+      workspaceMemberRef: 'not-a-uuid,active[eq]:false',
+    }));
+    // Ни один вызов fetch не должен содержать инъекцию
+    const calls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(calls.every((url) => !url.includes('not-a-uuid'))).toBe(true);
+  });
+
+  it('op=delete, невалидный id → error invalid id, fetch НЕ вызывается для DELETE', async () => {
+    const fetchMock = mockFetch([emptyEmployees]); // только resolveEmployeeId
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await handler(event({ op: 'delete', id: '../../../etc/passwd' }));
+    expect(result).toMatchObject({ ok: false, error: 'invalid id' });
+    // DELETE-запрос НЕ должен был отправиться (fetchMock — только resolveEmployeeId)
+    const deleteCalls = fetchMock.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('op=delete, id с запятой (инъекция filter) → error invalid id', async () => {
+    const fetchMock = mockFetch([emptyEmployees]);
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await handler(event({ op: 'delete', id: 'uuid-1,id[neq]:uuid-1' }));
+    expect(result).toMatchObject({ ok: false, error: 'invalid id' });
+  });
+
+  it('op=upsert patch, невалидный id → error invalid id', async () => {
+    // resolveEmployeeId вызывается до isUuid(id) — нужен мок с employee
+    const empRes = { data: { credosTimeEmployees: [{ id: 'e-fallback', name: 'Test' }] } };
+    vi.stubGlobal('fetch', mockFetch([empRes]));
+    const result = await handler(event({
+      op: 'upsert',
+      id: 'not-uuid',
+      hours: '8',
+      date: '2026-06-01',
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'invalid id' });
+  });
+
+  it('op=list, from с инъекцией → error invalid from/to', async () => {
+    const fetchMock = mockFetch([emptyEmployees]);
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await handler(event({
+      op: 'list',
+      from: '2026-06-01,employeeId[eq]:VICTIM',
+      to: '2026-06-30',
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'invalid from/to' });
+  });
+
+  it('op=list, to невалидная дата → error invalid from/to', async () => {
+    const fetchMock = mockFetch([emptyEmployees]);
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await handler(event({
+      op: 'list',
+      from: '2026-06-01',
+      to: 'not-a-date',
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'invalid from/to' });
+  });
+
+  it('op=list, валидные from/to → ok=true (гарнитура)', async () => {
+    vi.stubGlobal('fetch', mockFetch([
+      emptyEmployees, // resolveEmployeeId DEV-fallback
+      emptyEntries, emptyProjects, emptyWorkTypes, // op=list 3 параллельных
+    ]));
+    const result = await handler(event({
+      op: 'list',
+      from: '2026-06-01',
+      to: '2026-06-30',
+    }));
+    expect(result).toMatchObject({ ok: true });
+  });
 });
 
 // CISO-007 (P2): /s/reports отдаёт byEmployee (ФИО+переработки 42 сотрудников)

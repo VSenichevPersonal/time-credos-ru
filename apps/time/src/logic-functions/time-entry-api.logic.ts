@@ -3,6 +3,8 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 
 import { TIME_ENTRY_API_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
+import { isIsoDate, isUuid } from './params-validate';
+
 // /s/time-entry — CRUD трудозатрат для front-компонента (песочница без доступа к БД).
 // Работает поверх Core REST воркспейса (TWENTY_API_URL + TWENTY_APP_ACCESS_TOKEN
 // инжектятся платформой). Сотрудник определяется по workspaceMemberRef; если не
@@ -79,7 +81,9 @@ const readParams = (event: RoutePayload): Record<string, string> => {
 const resolveEmployeeId = async (
   workspaceMemberRef: string | undefined,
 ): Promise<string | null> => {
-  if (workspaceMemberRef) {
+  // CISO-006: workspaceMemberRef идёт в filter — запрашиваем только если это UUID
+  // (невалидный/инъекция → как несопоставленный, уходит в DEV-fallback ниже).
+  if (workspaceMemberRef && isUuid(workspaceMemberRef)) {
     const byRef = await api.get<{ data: { credosTimeEmployees: RefItem[] } }>(
       '/rest/credosTimeEmployees',
       { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
@@ -103,6 +107,26 @@ const resolveEmployeeId = async (
   return fallback.data?.credosTimeEmployees?.[0]?.id ?? null;
 };
 
+// Пересчёт factHours + budgetRemaining на проекте после изменения записей.
+// Суммируем все entries по projectId (до 2000, на практике проекты не имеют больше).
+const recalcProjectFactHours = async (projectId: string): Promise<void> => {
+  const entriesRes = await api.get<{ data: { credosTimeEntries: Array<{ hours: number }> } }>(
+    '/rest/credosTimeEntries',
+    { filter: `projectId[eq]:${projectId}`, limit: '2000' },
+  );
+  const entries = entriesRes.data?.credosTimeEntries ?? [];
+  const factHours = entries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
+
+  const projRes = await api.get<{ data: { credosTimeProjects: Array<{ plannedEffort: number | null }> } }>(
+    '/rest/credosTimeProjects',
+    { filter: `id[eq]:${projectId}`, limit: '1' },
+  );
+  const plannedEffort = projRes.data?.credosTimeProjects?.[0]?.plannedEffort ?? null;
+  const budgetRemaining = plannedEffort !== null ? plannedEffort - factHours : null;
+
+  await api.patch(`/rest/credosTimeProjects/${projectId}`, { factHours, budgetRemaining });
+};
+
 const run = async (event: RoutePayload) => {
   const params = readParams(event);
   // Один POST-маршрут /s/time-entry; операция выбирается полем `op`.
@@ -112,43 +136,71 @@ const run = async (event: RoutePayload) => {
   // delete — удаление записи по id.
   if (op === 'delete') {
     if (!params.id) return { ok: false, error: 'id required' };
+    // CISO-006: id идёт в REST-путь — только UUID (защита от инъекции в path).
+    if (!isUuid(params.id)) return { ok: false, error: 'invalid id' };
+    // Читаем projectId до удаления — после DELETE запись недоступна.
+    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null }> } }>(
+      '/rest/credosTimeEntries',
+      { filter: `id[eq]:${params.id}`, limit: '1' },
+    );
+    const deletedProjectId = preRes.data?.credosTimeEntries?.[0]?.projectId ?? null;
     await api.delete(`/rest/credosTimeEntries/${params.id}`);
+    if (deletedProjectId && isUuid(deletedProjectId)) {
+      await recalcProjectFactHours(deletedProjectId);
+    }
     return { ok: true };
   }
 
   // upsert — создать или обновить запись.
   if (op === 'upsert') {
+    // CISO-006: id в REST-путь PATCH — только UUID. Проверяем ДО резолва сотрудника,
+    // чтобы невалидный id сразу падал на 'invalid id', а не на 'employee not resolved'.
+    if (params.id && !isUuid(params.id)) return { ok: false, error: 'invalid id' };
     const hours = Number(params.hours);
     if (Number.isNaN(hours) || hours < HOURS_MIN || hours > HOURS_MAX)
       return { ok: false, error: 'hours out of range' };
     if (!employeeId) return { ok: false, error: 'employee not resolved' };
 
+    const newProjectId = params.projectId && isUuid(params.projectId) ? params.projectId : null;
     const data: Record<string, unknown> = {
       date: params.date,
       hours,
       description: params.description ?? null,
       employeeId,
-      projectId: params.projectId || null,
+      projectId: newProjectId,
       workTypeId: params.workTypeId || null,
     };
 
     if (params.id) {
+      // Читаем старый projectId (мог измениться при update) — оба пересчитываем.
+      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null }> } }>(
+        '/rest/credosTimeEntries',
+        { filter: `id[eq]:${params.id}`, limit: '1' },
+      );
+      const prevProjectId = prevRes.data?.credosTimeEntries?.[0]?.projectId ?? null;
       const res = await api.patch<{ data: { updateCredosTimeEntry: TimeEntry } }>(
         `/rest/credosTimeEntries/${params.id}`,
         data,
       );
+      const projectIdsToRecalc = new Set<string>(
+        [prevProjectId, newProjectId].filter((id): id is string => !!id && isUuid(id)),
+      );
+      for (const pid of projectIdsToRecalc) await recalcProjectFactHours(pid);
       return { ok: true, entry: res.data?.updateCredosTimeEntry };
     }
     const res = await api.post<{ data: { createCredosTimeEntry: TimeEntry } }>(
       '/rest/credosTimeEntries',
       data,
     );
+    if (newProjectId) await recalcProjectFactHours(newProjectId);
     return { ok: true, entry: res.data?.createCredosTimeEntry };
   }
 
   // GET (по умолчанию) — список записей за неделю + справочники для сетки.
+  // CISO-006: from/to идут в filter-строку — валидируем ISO-date (инъекция → ошибка).
   const from = params.from ?? '1970-01-01T00:00:00.000Z';
   const to = params.to ?? '2999-12-31T23:59:59.999Z';
+  if (!isIsoDate(from) || !isIsoDate(to)) return { ok: false, error: 'invalid from/to' };
 
   const entriesFilter = employeeId
     ? `date[gte]:${from},date[lte]:${to},employeeId[eq]:${employeeId}`

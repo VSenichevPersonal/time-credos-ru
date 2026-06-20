@@ -14,6 +14,7 @@ type Props = {
   hours: number;
   description: string | null;
   onCommit: (hours: number) => void;
+  onCommitDescription?: (text: string) => void; // U11: инлайн-комментарий
 };
 
 export const DayRow = ({
@@ -24,13 +25,24 @@ export const DayRow = ({
   hours,
   description,
   onCommit,
+  onCommitDescription,
 }: Props) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [editDesc, setEditDesc] = useState(false);
+  const [draftDesc, setDraftDesc] = useState('');
 
   useEffect(() => {
     if (!editing) setDraft(fmtHours(hours));
   }, [hours, editing]);
+  useEffect(() => {
+    if (!editDesc) setDraftDesc(description ?? '');
+  }, [description, editDesc]);
+
+  const commitDesc = () => {
+    setEditDesc(false);
+    if (draftDesc !== (description ?? '')) onCommitDescription?.(draftDesc);
+  };
 
   const commit = () => {
     setEditing(false);
@@ -77,7 +89,7 @@ export const DayRow = ({
           </div>
         </div>
         <div
-          title={description ? `${workTypeName} · ${description}` : workTypeName}
+          title={workTypeName}
           style={{
             fontSize: 11.5,
             color: T.textMuted,
@@ -88,10 +100,54 @@ export const DayRow = ({
           }}
         >
           {workTypeName}
-          {description ? (
-            <span style={{ color: T.textFaint }}> · {description}</span>
-          ) : null}
         </div>
+        {onCommitDescription && hours > 0 &&
+          (editDesc ? (
+            <input
+              autoFocus
+              value={draftDesc}
+              placeholder="Комментарий…"
+              onChange={(e) => setDraftDesc(e.target.value)}
+              onBlur={commitDesc}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur();
+                if (e.key === 'Escape') {
+                  setDraftDesc(description ?? '');
+                  setEditDesc(false);
+                }
+              }}
+              style={{
+                marginTop: 3,
+                width: '100%',
+                maxWidth: 340,
+                height: 24,
+                fontSize: 11.5,
+                padding: '0 7px',
+                border: `1px solid ${T.accent}`,
+                borderRadius: 5,
+                outline: 'none',
+                color: T.text,
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
+            />
+          ) : (
+            <div
+              onClick={() => setEditDesc(true)}
+              title="Добавить/изменить комментарий"
+              style={{
+                marginTop: 2,
+                fontSize: 11.5,
+                color: description ? T.textFaint : T.accent,
+                cursor: 'text',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {description || '+ комментарий'}
+            </div>
+          ))}
       </div>
 
       {editing ? (

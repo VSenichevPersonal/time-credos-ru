@@ -64,21 +64,39 @@ describe('approval.logic — runSubmit', () => {
 
   it('нет from → ok:false без fetch', async () => {
     const result = await handler(event({ op: 'submit', to: '2026-06-30', employeeId: 'e1' }));
+    // нет from → отсекается ещё на required-проверке (до isUuid/isIsoDate)
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining('from/to/employeeId') });
+  });
+
+  // UUID-заглушки для CISO-006 isUuid validation
+  const EMP_UUID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+  // CISO-006 вектор A: filter-инъекция в employeeId/from/to должна отклоняться.
+  it('submit: не-UUID employeeId → ok:false invalid employeeId (инъекция отклонена)', async () => {
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: 'id,status[neq]:DRAFT' }),
+    );
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('invalid employeeId') });
+  });
+
+  it('submit: не-ISO from → ok:false invalid from/to (инъекция отклонена)', async () => {
+    const result = await handler(
+      event({ op: 'submit', from: 'date[gte]:x', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('invalid from/to') });
   });
 
   it('submit с полными params + пустой approvalMap → ok:true, updated:0', async () => {
     vi.stubGlobal(
       'fetch',
       mockFetch([
-        emptyEmployees, // resolveActor (workspaceMemberRef пуст → первый fetch? нет)
         { data: { credosTimeProjects: [] } }, // buildApprovalMap projects
         { data: { credosTimeDepartments: [] } }, // buildApprovalMap depts
         emptyEntries, // entries
       ]),
     );
     const result = await handler(
-      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: 'e1' }),
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
     );
     expect(result).toMatchObject({ ok: true, updated: 0 });
   });
@@ -98,10 +116,10 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
   });
 
   it('actor не менеджер → forbidden, fetch на entry НЕ вызывается', async () => {
-    // resolveActor: workspaceMemberRef='ref1' → employee isManager:false
+    // resolveActor: workspaceMemberRef='aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' → employee isManager:false
     const employeeRes = {
       data: {
-        credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: 'ref1' }],
+        credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }],
       },
     };
     const fetchMock = vi.fn().mockResolvedValueOnce({
@@ -112,7 +130,7 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await handler(
-      event({ op: 'approve', ids: 'entry-1', workspaceMemberRef: 'ref1' }),
+      event({ op: 'approve', ids: '00000000-0000-4000-8000-000000000001', workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }),
     );
     expect(result).toMatchObject({
       ok: false,
@@ -125,12 +143,12 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
   it('actor isManager=true, своя запись → пропущена (separation of duties)', async () => {
     const employeeRes = {
       data: {
-        credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: 'ref1' }],
+        credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }],
       },
     };
     const entryRes = {
       data: {
-        credosTimeEntries: [{ id: 'entry-1', status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }],
+        credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000001', status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }],
       },
     };
     vi.stubGlobal(
@@ -142,7 +160,7 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
     );
 
     const result = await handler(
-      event({ op: 'approve', ids: 'entry-1', workspaceMemberRef: 'ref1' }),
+      event({ op: 'approve', ids: '00000000-0000-4000-8000-000000000001', workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }),
     ) as Record<string, unknown>;
     // Запись принадлежит actor (e1 == e1) → SoD skip
     expect(result).toMatchObject({ ok: true, updated: 0, skippedOwn: 1 });
@@ -151,21 +169,21 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
   it('actor isManager=true, чужая запись → approved (updated:1)', async () => {
     const employeeRes = {
       data: {
-        credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: 'ref1' }],
+        credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }],
       },
     };
     const entryRes = {
       data: {
         // employeeId='e2' — чужая запись
-        credosTimeEntries: [{ id: 'entry-1', status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }],
+        credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000001', status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }],
       },
     };
     // PATCH setStatus вернёт ок
-    const patchRes = { data: { updateCredosTimeEntry: { id: 'entry-1' } } };
+    const patchRes = { data: { updateCredosTimeEntry: { id: '00000000-0000-4000-8000-000000000001' } } };
     vi.stubGlobal('fetch', mockFetch([employeeRes, entryRes, patchRes]));
 
     const result = await handler(
-      event({ op: 'approve', ids: 'entry-1', workspaceMemberRef: 'ref1' }),
+      event({ op: 'approve', ids: '00000000-0000-4000-8000-000000000001', workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }),
     );
     expect(result).toMatchObject({ ok: true, updated: 1, skippedOwn: 0 });
   });
@@ -174,13 +192,13 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
     // resolveActor(!workspaceMemberRef) → ранний return null, fetch НЕ вызывается
     const entryRes = {
       data: {
-        credosTimeEntries: [{ id: 'entry-1', status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }],
+        credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000001', status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }],
       },
     };
-    const patchRes = { data: { updateCredosTimeEntry: { id: 'entry-1' } } };
+    const patchRes = { data: { updateCredosTimeEntry: { id: '00000000-0000-4000-8000-000000000001' } } };
     vi.stubGlobal('fetch', mockFetch([entryRes, patchRes]));
 
-    const result = await handler(event({ op: 'approve', ids: 'entry-1' }));
+    const result = await handler(event({ op: 'approve', ids: '00000000-0000-4000-8000-000000000001' }));
     // actor=null → guard пропущен (dev-режим), запись одобрена
     expect(result).toMatchObject({ ok: true, updated: 1 });
   });
@@ -188,19 +206,19 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
   it('запись не SUBMITTED → пропускается (updated:0)', async () => {
     const employeeRes = {
       data: {
-        credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: 'ref1' }],
+        credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }],
       },
     };
     const entryRes = {
       data: {
         // status = DRAFT, не SUBMITTED
-        credosTimeEntries: [{ id: 'entry-1', status: 'DRAFT', employeeId: 'e2', projectId: 'p1' }],
+        credosTimeEntries: [{ id: '00000000-0000-4000-8000-000000000001', status: 'DRAFT', employeeId: 'e2', projectId: 'p1' }],
       },
     };
     vi.stubGlobal('fetch', mockFetch([employeeRes, entryRes]));
 
     const result = await handler(
-      event({ op: 'approve', ids: 'entry-1', workspaceMemberRef: 'ref1' }),
+      event({ op: 'approve', ids: '00000000-0000-4000-8000-000000000001', workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }),
     );
     expect(result).toMatchObject({ ok: true, updated: 0, skippedOwn: 0 });
   });
@@ -208,13 +226,13 @@ describe('approval.logic — runResolve: RBAC (CISO-002)', () => {
   it('reject: те же правила RBAC (isManager guard)', async () => {
     const employeeRes = {
       data: {
-        credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: 'ref1' }],
+        credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }],
       },
     };
     vi.stubGlobal('fetch', mockFetch([employeeRes]));
 
     const result = await handler(
-      event({ op: 'reject', ids: 'entry-1', workspaceMemberRef: 'ref1' }),
+      event({ op: 'reject', ids: '00000000-0000-4000-8000-000000000001', workspaceMemberRef: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' }),
     );
     expect(result).toMatchObject({ ok: false, error: expect.stringContaining('руководитель') });
   });

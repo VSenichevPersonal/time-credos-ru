@@ -4,6 +4,8 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 import { ENTRY_STATUS, isApprovalRequired } from 'src/constants/approval';
 import { APPROVAL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
+import { isIsoDate, isUuid } from './params-validate';
+
 // /s/approval — согласование трудозатрат (фиксирует userWorkspaceId руководителя).
 //   submit  — записи периода сотрудника (где требуется согласование) DRAFT → SUBMITTED.
 //   approve — выбранные записи SUBMITTED → APPROVED (+ approvedBy/approvedAt).
@@ -28,7 +30,9 @@ type RawEmployee = { id: string; isManager: boolean | null; workspaceMemberRef: 
 type Actor = { employeeId: string; isManager: boolean } | null;
 
 const resolveActor = async (workspaceMemberRef: string | undefined): Promise<Actor> => {
-  if (!workspaceMemberRef) return null;
+  // CISO-006: workspaceMemberRef интерполируется в filter — пропускаем только UUID
+  // (невалидный/инъекция → actor не резолвлен, как при отсутствии).
+  if (!workspaceMemberRef || !isUuid(workspaceMemberRef)) return null;
   const res = await restGet<{ data: { credosTimeEmployees: RawEmployee[] } }>(
     '/rest/credosTimeEmployees',
     { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
@@ -107,6 +111,11 @@ const setStatus = async (
 const runSubmit = async (params: Record<string, string>): Promise<object> => {
   const { from, to, employeeId } = params;
   if (!from || !to || !employeeId) return { ok: false, error: 'from/to/employeeId required' };
+  // CISO-006 вектор A: эти три параметра идут в filter-строку, где запятая —
+  // разделитель условий. Инъекция в employeeId (напр. `id,status[neq]:DRAFT`)
+  // обошла бы `status[eq]:DRAFT` → submit чужих/не-DRAFT записей. Валидируем формат.
+  if (!isIsoDate(from) || !isIsoDate(to)) return { ok: false, error: 'invalid from/to' };
+  if (!isUuid(employeeId)) return { ok: false, error: 'invalid employeeId' };
   const approvalMap = await buildApprovalMap();
   const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
     '/rest/credosTimeEntries',
@@ -131,7 +140,9 @@ const runResolve = async (
   actorId: string | null,
   actor: Actor,
 ): Promise<object> => {
-  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  // CISO-006: каждый id идёт в `id[eq]:${id}` filter — оставляем только UUID
+  // (инъекция-строки отбрасываются до запроса).
+  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
   if (ids.length === 0) return { ok: false, error: 'ids required' };
 
   // Guard роли. Если actor резолвлен — требуем isManager. Если не резолвлен

@@ -9,7 +9,7 @@ import type {
 // Состояние мультиселект-фильтров. Каждый фильтр — Set выбранных id/кодов.
 // Пустой Set = «все». Фильтры влияют на строки сетки и опции добавления.
 
-export type FilterKey = 'project' | 'department' | 'workType' | 'category' | 'employee' | 'status';
+export type FilterKey = 'project' | 'department' | 'workType' | 'category' | 'employee' | 'status' | 'tag';
 
 export type FilterState = Record<FilterKey, Set<string>>;
 
@@ -20,6 +20,7 @@ const emptyState = (): FilterState => ({
   category: new Set(),
   employee: new Set(),
   status: new Set(), // W3-3: фильтр по статусу согласования записи (DRAFT/SUBMITTED/…)
+  tag: new Set(), // W3-2: фильтр по тегу записи (Overtime/Urgent/…), применяется в use-grid-model
 });
 
 export const useFilters = () => {

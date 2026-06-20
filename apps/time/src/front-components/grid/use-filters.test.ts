@@ -13,6 +13,7 @@ const noFilter = (): FilterState => ({
   category: new Set(),
   employee: new Set(),
   status: new Set(),
+  tag: new Set(),
 });
 
 const proj = (

@@ -180,6 +180,7 @@ export const WeeklyGrid = () => {
           lastWorkTypeByProject={lastWorkTypeByProject}
           loading={data.loading}
           onCellCommit={actions.commitCell}
+          onCommitDescription={actions.commitDescription}
           onAddRow={addRow}
         />
       )}

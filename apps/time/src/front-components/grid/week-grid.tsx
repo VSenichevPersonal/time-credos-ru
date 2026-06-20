@@ -81,6 +81,7 @@ export const WeekGrid = ({
               projectName={row.projectName}
               category={row.category}
               workTypeName={row.workTypeName}
+              tags={row.tags}
               days={days}
               hoursByDay={row.hoursByDay}
               rowTotal={row.rowTotal}

@@ -41,6 +41,7 @@ export type ApiEntry = {
   hours: number;
   description: string | null;
   status?: string | null; // UPPER_CASE код статуса согласования
+  tags?: string[] | null; // W3-2: теги записи (MULTI_SELECT, коды EntryTag)
   projectId: string | null;
   workTypeId: string | null;
   employeeId?: string | null;

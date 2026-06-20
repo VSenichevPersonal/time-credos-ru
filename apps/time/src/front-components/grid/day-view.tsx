@@ -27,6 +27,7 @@ type Props = {
   lastWorkTypeByProject?: Record<string, string>;
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
+  onCommitDescription?: (rowKey: string, dayIso: string, text: string) => void;
   onAddRow: (rowKey: string) => void;
 };
 
@@ -40,6 +41,7 @@ export const DayView = ({
   lastWorkTypeByProject,
   loading,
   onCellCommit,
+  onCommitDescription,
   onAddRow,
 }: Props) => {
   // Только строки с записью в этот день или пустые добавленные.
@@ -69,6 +71,11 @@ export const DayView = ({
               hours={row.hoursByDay[dayIndex]}
               description={row.descByDay[dayIndex]}
               onCommit={(h) => onCellCommit(row.key, day.iso, h)}
+              onCommitDescription={
+                onCommitDescription
+                  ? (text) => onCommitDescription(row.key, day.iso, text)
+                  : undefined
+              }
             />
           ))
         )}

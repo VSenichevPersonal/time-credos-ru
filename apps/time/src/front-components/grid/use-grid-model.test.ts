@@ -30,7 +30,7 @@ const entry = (
 
 const NO_FILTERS: FilterState = {
   project: new Set(), department: new Set(), workType: new Set(),
-  category: new Set(), employee: new Set(), status: new Set(),
+  category: new Set(), employee: new Set(), status: new Set(), tag: new Set(), // W3-2
 };
 
 // ─── Тесты ────────────────────────────────────────────────────────────────
@@ -237,5 +237,48 @@ describe('calcGridModel — фильтр status (W3-3)', () => {
       [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], statusFilter('DRAFT'),
     );
     expect(rowList).toHaveLength(0); // строка не создаётся без записей
+  });
+});
+
+describe('calcGridModel — теги (W3-2)', () => {
+  const withTags = (id: string, date: string, tags: string[] | null): ApiEntry => ({
+    id, date, hours: 8, description: null, projectId: 'p1', workTypeId: 'w1', tags,
+  });
+
+  const tagFilter = (...tags: string[]): FilterState => ({
+    ...NO_FILTERS, tag: new Set(tags),
+  });
+
+  it('строка собирает union тегов всех своих записей без дублей', () => {
+    const { rowList } = calcGridModel(
+      [withTags('a', '2026-06-22', ['OVERTIME', 'URGENT']), withTags('b', '2026-06-23', ['URGENT', 'REMOTE'])],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], NO_FILTERS,
+    );
+    expect(rowList[0].tags.sort()).toEqual(['OVERTIME', 'REMOTE', 'URGENT']);
+  });
+
+  it('запись без тегов → строка tags пустой', () => {
+    const { rowList } = calcGridModel(
+      [withTags('a', '2026-06-22', null)],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], NO_FILTERS,
+    );
+    expect(rowList[0].tags).toEqual([]);
+  });
+
+  it('фильтр по тегу: проходит запись, содержащая хотя бы один выбранный тег', () => {
+    const { rowList } = calcGridModel(
+      [withTags('a', '2026-06-22', ['OVERTIME']), withTags('b', '2026-06-23', ['REMOTE'])],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], tagFilter('OVERTIME'),
+    );
+    expect(rowList[0].hoursByDay[0]).toBe(8); // только запись с Overtime
+    expect(rowList[0].hoursByDay[1]).toBe(0); // Remote отфильтрован
+  });
+
+  it('фильтр по тегу убирает строку, если ни одна запись не подходит', () => {
+    const { rowList } = calcGridModel(
+      [withTags('a', '2026-06-22', ['REMOTE'])],
+      [proj('p1', 'A')], [wt('w1', 'R')], DAYS, [], tagFilter('OVERTIME'),
+    );
+    expect(rowList).toHaveLength(0);
   });
 });

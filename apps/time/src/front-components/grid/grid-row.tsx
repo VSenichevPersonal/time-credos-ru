@@ -1,4 +1,5 @@
 import { HourCell } from 'src/front-components/grid/hour-cell';
+import { TagChips } from 'src/front-components/grid/tag-chips';
 import { T } from 'src/front-components/grid/tokens';
 import { GRID_TEMPLATE } from 'src/front-components/grid/week-header';
 import { fmtTotal } from 'src/front-components/grid/format';
@@ -14,6 +15,7 @@ type Props = {
   projectName: string;
   category: string | null;
   workTypeName: string;
+  tags?: string[]; // W3-2: теги записей строки (чипы под видом работ)
   days: WeekDay[];
   hoursByDay: number[];
   rowTotal: number;
@@ -28,6 +30,7 @@ export const GridRow = ({
   projectName,
   category,
   workTypeName,
+  tags,
   days,
   hoursByDay,
   rowTotal,
@@ -85,6 +88,7 @@ export const GridRow = ({
       >
         {workTypeName}
       </div>
+      <TagChips tags={tags} />
     </div>
 
     {days.map((day, i) => (

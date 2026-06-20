@@ -186,20 +186,20 @@ export const ABSENCE_TYPE_DEFAULT = "'VACATION'";
 // Теги записи трудозатрат (W3-2, Kimai tags). MULTI_SELECT — несколько меток
 // на запись для срезов/группировки в отчётах. Значения UPPER_CASE, ярлыки рус.
 const ENTRY_TAG_ORDER: ReadonlyArray<EntryTag> = [
-  'Overtime',
-  'Urgent',
-  'Remote',
-  'OnSite',
-  'Rework',
-  'Research',
+  'OVERTIME',
+  'URGENT',
+  'REMOTE',
+  'ON_SITE',
+  'REWORK',
+  'RESEARCH',
 ];
 const ENTRY_TAG_COLORS: Record<EntryTag, TagColor> = {
-  Overtime: 'red',
-  Urgent: 'orange',
-  Remote: 'sky',
-  OnSite: 'turquoise',
-  Rework: 'yellow',
-  Research: 'purple',
+  OVERTIME: 'red',
+  URGENT: 'orange',
+  REMOTE: 'sky',
+  ON_SITE: 'turquoise',
+  REWORK: 'yellow',
+  RESEARCH: 'purple',
 };
 export const ENTRY_TAG_OPTIONS: SelectOption[] = buildOptions(
   ENTRY_TAG_ORDER,

@@ -34,10 +34,12 @@ export type AbsenceType = 'Vacation' | 'Sick' | 'Unpaid' | 'Other';
 // Тег записи трудозатрат (W3-2, паттерн Kimai tags) — свободная метка для
 // срезов/группировки в отчётах. Контролируемый словарь (MULTI_SELECT), не
 // справочник-объект: проще и даёт типобезопасные срезы/цвета.
+// Коды в UPPER_SNAKE — совпадают со значениями SELECT (SDK) и option.value:
+// ENTRY_TAG_LABELS[value] резолвится напрямую, без приведения регистра.
 export type EntryTag =
-  | 'Overtime'
-  | 'Urgent'
-  | 'Remote'
-  | 'OnSite'
-  | 'Rework'
-  | 'Research';
+  | 'OVERTIME'
+  | 'URGENT'
+  | 'REMOTE'
+  | 'ON_SITE'
+  | 'REWORK'
+  | 'RESEARCH';

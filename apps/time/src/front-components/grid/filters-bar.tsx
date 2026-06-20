@@ -9,7 +9,7 @@ import type {
   WorkTypeRef,
 } from 'src/front-components/grid/types';
 import type { FilterKey, FilterState } from 'src/front-components/grid/use-filters';
-import { WORK_CATEGORY_OPTIONS, ENTRY_STATUS_OPTIONS } from 'src/constants/select-options';
+import { WORK_CATEGORY_OPTIONS, ENTRY_STATUS_OPTIONS, ENTRY_TAG_OPTIONS } from 'src/constants/select-options';
 
 // Панель фильтров (чипы-дропдауны). Сотрудник — только для руководителя.
 
@@ -51,6 +51,10 @@ export const FiltersBar = ({
   );
   const statusOpts: Option[] = useMemo(
     () => ENTRY_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
+    [],
+  );
+  const tagOpts: Option[] = useMemo(
+    () => ENTRY_TAG_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
     [],
   );
 
@@ -100,6 +104,13 @@ export const FiltersBar = ({
         selected={state.status}
         onToggle={(v) => onToggle('status', v)}
         onClear={() => onClearKey('status')}
+      />
+      <FilterChip
+        label="Тег"
+        options={tagOpts}
+        selected={state.tag}
+        onToggle={(v) => onToggle('tag', v)}
+        onClear={() => onClearKey('tag')}
       />
       {isManager && (
         <FilterChip

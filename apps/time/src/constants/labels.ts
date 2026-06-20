@@ -81,12 +81,12 @@ export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
 
 // Теги записи трудозатрат (W3-2, Kimai tags) — свободные метки для срезов
 export const ENTRY_TAG_LABELS: Record<EntryTag, string> = {
-  Overtime: 'Переработка',
-  Urgent: 'Срочно',
-  Remote: 'Удалённо',
-  OnSite: 'На площадке',
-  Rework: 'Доработка',
-  Research: 'Исследование',
+  OVERTIME: 'Переработка',
+  URGENT: 'Срочно',
+  REMOTE: 'Удалённо',
+  ON_SITE: 'На площадке',
+  REWORK: 'Доработка',
+  RESEARCH: 'Исследование',
 };
 
 // Норма часов в неделю на сотрудника (для планирования загрузки)

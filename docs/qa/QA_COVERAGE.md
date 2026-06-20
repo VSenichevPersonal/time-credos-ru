@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **998 + 19 todo** (37 файлов, все зелёные) |
+| unit-тестов | **1043 + 15 todo** (38 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -36,7 +36,7 @@
 | `front-components/grid/types.ts` | `makeRowKey`/`splitRowKey` контракт | ✅ covered | `front-components/grid/types.test.ts` |
 | `front-components/grid/tokens.ts` | дизайн-токены + `cellFill` alpha | ✅ covered | `front-components/grid/tokens.test.ts` |
 | `front-components/reports/report-tokens.ts` | `fmtUtil`/`fmtHrs`/`fmtUnder`/`underTone`/`utilTone` | ✅ covered | `front-components/reports/report-tokens.test.ts` |
-| `front-components/capacity/capacity-rest.ts` | `resolveSelfIsManager` (byRef + fallback) | ✅ covered + 1 todo [bug]#3 | `front-components/capacity/capacity-rest.test.ts` |
+| `front-components/capacity/capacity-rest.ts` | `resolveSelfIsManager`/`fetchDepartments`/`fetchProjects`/`fetchDeptPlans`/`fetchEmployees`/`fetchCalendar`/`patchProject`/`patchDeptPlan` + mockPatch | ✅ 23 тестов + 1 todo [bug]#3 | `front-components/capacity/capacity-rest.test.ts` |
 | **SSOT-guard категорий** | `domain-types → select-options → tag-color-hex → category-meta` | ✅ 13 тестов + 2 todo | `__tests__/ssot-categories.test.ts` |
 | `front-components/shared/category-meta.ts` | `categoryMeta` SSOT-резолв + fallback OTHER/неизвестный | ✅ 7 тестов | `front-components/shared/category-meta.test.ts` |
 | `front-components/reports/category-bar.ts` | `toSegments` — порядок/ширина/цвет/фильтрация ([bug]#4 регресс-guard) | ✅ 7 тестов | `front-components/reports/category-bar.test.ts` |
@@ -54,7 +54,7 @@
 | `front-components/project-team/team-rest.ts` | `fetchProjectEntries`/`fetchEmployees` — filter/limit/пустой | ✅ 5 тестов | `front-components/project-team/team-rest.test.ts` |
 | `front-components/grid/use-grid-model.ts` | `calcGridModel` — агрегация/dayTotals/weekTotal/сортировка/extraRowKeys | ✅ 11 тестов | `front-components/grid/use-grid-model.test.ts` |
 | `logic-functions/approval.logic.ts` | RBAC runSubmit/runResolve + SoD (CISO-002) | ✅ covered | `logic-functions/approval.logic.test.ts` |
-| `logic-functions/time-entry-api.logic.ts` | security-регресс CISO-005/006/007/008 | 🟦 todo-спека | `logic-functions/time-entry-api.logic.test.ts` |
+| `logic-functions/time-entry-api.logic.ts` | **CISO-006 реальные тесты**: inject guard `workspaceMemberRef`/`id`/`from,to`, 4 инъекции отклонены | ✅ 7 real + 12 todo (CISO-005/007/008) | `logic-functions/time-entry-api.logic.test.ts` |
 | `front-components/grid/use-week.ts` | `mondayOf`/`toIso` — дата-логика (UTC Пн, переходы месяц/год) | ✅ 10 тестов | `front-components/grid/use-week.test.ts` |
 | `front-components/grid/use-keyboard.ts` | `keyAction` (стрелки/Tab/Enter/цифры/Delete) + `clampCell` (границы сетки) | ✅ 28 тестов | `front-components/grid/use-keyboard.test.ts` |
 | `front-components/capacity/calc-load.ts` | W3-1: `buildHoursByDay`/`absenceHoursInPeriod`/`absenceHoursByEmpInPeriod` + вычет из `deptCapacity`/`employeeLoadCells` | ✅ +20 тестов (Dev2) | `front-components/capacity/calc-load.test.ts` |

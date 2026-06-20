@@ -83,6 +83,28 @@ export const useTimesheetActions = ({
     [rowList, days, upsert, remove],
   );
 
+  // U11: инлайн-комментарий к записи дня (сохраняем, не трогая часы). Без записи
+  // (нет часов) — комментировать нечего.
+  const commitDescription = useCallback(
+    (rowKey: string, dayIso: string, description: string) => {
+      const { projectId, workTypeId } = splitRowKey(rowKey);
+      const row = rowList.find((r) => r.key === rowKey);
+      const dayIdx = days.findIndex((d) => d.iso === dayIso);
+      const existingId = row?.entryIdByDay[dayIdx] ?? undefined;
+      const hours = row?.hoursByDay[dayIdx] ?? 0;
+      if (!existingId && hours <= 0) return;
+      void upsert({
+        id: existingId,
+        date: dayIso,
+        hours,
+        projectId,
+        workTypeId,
+        description: description.trim() || undefined,
+      });
+    },
+    [rowList, days, upsert],
+  );
+
   // Bulk-fill: применить часы на все будни строки (где ещё нет значения).
   const bulkFill = useCallback(
     (rowKey: string, hours: number) => {
@@ -130,5 +152,5 @@ export const useTimesheetActions = ({
     [days, entries],
   );
 
-  return { commitCell, bulkFill, copyPreviousWeek, copyPreviousWeekWithHours };
+  return { commitCell, commitDescription, bulkFill, copyPreviousWeek, copyPreviousWeekWithHours };
 };
