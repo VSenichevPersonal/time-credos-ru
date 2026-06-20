@@ -1,15 +1,16 @@
 import { T } from 'src/front-components/grid/tokens';
 import type { WeekDay } from 'src/front-components/grid/use-week';
-import { DAILY_NORM_HOURS } from 'src/front-components/grid/format';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 
 // Шапка недельной сетки: метка колонки + 7 дней (выходные приглушены, today
-// подсвечен) + «Итого». Под датой — план «8 ч».
+// подсвечен) + «Итого». Под датой — норма дня из произв. календаря (T2 SSOT;
+// нерабочий/праздник → «—», короткий день = его часы).
 
 export const GRID_TEMPLATE = 'minmax(0, 1fr) repeat(7, 58px) 66px';
 
-type Props = { days: WeekDay[]; leftLabel: string };
+type Props = { days: WeekDay[]; leftLabel: string; normFor: NormForDay };
 
-export const WeekHeader = ({ days, leftLabel }: Props) => (
+export const WeekHeader = ({ days, leftLabel, normFor }: Props) => (
   <div
     style={{
       display: 'grid',
@@ -58,7 +59,7 @@ export const WeekHeader = ({ days, leftLabel }: Props) => (
           {day.dayLabel} {day.dateLabel}
         </div>
         <div style={{ fontSize: 9.5, color: T.textFaint, fontVariantNumeric: 'tabular-nums' }}>
-          {day.isWeekend ? '—' : `${DAILY_NORM_HOURS} ч`}
+          {((n) => (n > 0 ? `${n} ч` : '—'))(normFor(day.iso, day.isWeekend))}
         </div>
       </div>
     ))}

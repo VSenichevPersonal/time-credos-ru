@@ -189,6 +189,7 @@ export const WeeklyGrid = () => {
           workTypes={visibleWorkTypes}
           recentProjectIds={recentProjectIds}
           lastWorkTypeByProject={lastWorkTypeByProject}
+          normFor={normFor}
           loading={data.loading}
           onCellCommit={actions.commitCell}
           onBulkFill={actions.bulkFill}

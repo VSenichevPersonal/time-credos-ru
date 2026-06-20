@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 import { GridRow } from 'src/front-components/grid/grid-row';
 import { WeekHeader } from 'src/front-components/grid/week-header';
 import { FooterTotals } from 'src/front-components/grid/footer-totals';
@@ -23,6 +24,7 @@ type Props = {
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
   lastWorkTypeByProject?: Record<string, string>;
+  normFor: NormForDay;
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
@@ -38,6 +40,7 @@ export const WeekGrid = ({
   workTypes,
   recentProjectIds,
   lastWorkTypeByProject,
+  normFor,
   loading,
   onCellCommit,
   onBulkFill,
@@ -86,7 +89,7 @@ export const WeekGrid = ({
   return (
     <>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} onKeyDown={onContainerKeyDown}>
-        <WeekHeader days={days} leftLabel="Проект / вид работ" />
+        <WeekHeader days={days} leftLabel="Проект / вид работ" normFor={normFor} />
         {loading && rowList.length === 0 ? (
           <Center>Загрузка…</Center>
         ) : rowList.length === 0 ? (
@@ -113,7 +116,7 @@ export const WeekGrid = ({
           ))
         )}
       </div>
-      <FooterTotals days={days} dayTotals={dayTotals} weekTotal={weekTotal} />
+      <FooterTotals days={days} dayTotals={dayTotals} weekTotal={weekTotal} normFor={normFor} />
       <AddRow
         projects={projects}
         workTypes={workTypes}

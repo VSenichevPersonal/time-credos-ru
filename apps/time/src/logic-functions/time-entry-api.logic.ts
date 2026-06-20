@@ -5,6 +5,9 @@ import { TIME_ENTRY_API_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constant
 
 import { ENTRY_STATUS } from 'src/constants/approval';
 import { isIsoDate, isUuid } from './params-validate';
+// SSOT-пересчёт rollup-поля проекта (factHours/budgetRemaining). Один источник
+// формулы и поведения — общий с database-event триггерами (project-fact-rollup.logic.ts).
+import { recalcProjectFactHours } from './project-fact-rollup';
 
 // /s/time-entry — CRUD трудозатрат для front-компонента (песочница без доступа к БД).
 // Работает поверх Core REST воркспейса (TWENTY_API_URL + TWENTY_APP_ACCESS_TOKEN
@@ -108,25 +111,8 @@ const resolveEmployeeId = async (
   return fallback.data?.credosTimeEmployees?.[0]?.id ?? null;
 };
 
-// Пересчёт factHours + budgetRemaining на проекте после изменения записей.
-// Суммируем все entries по projectId (до 2000, на практике проекты не имеют больше).
-const recalcProjectFactHours = async (projectId: string): Promise<void> => {
-  const entriesRes = await api.get<{ data: { credosTimeEntries: Array<{ hours: number }> } }>(
-    '/rest/credosTimeEntries',
-    { filter: `projectId[eq]:${projectId}`, limit: '2000' },
-  );
-  const entries = entriesRes.data?.credosTimeEntries ?? [];
-  const factHours = entries.reduce((sum, e) => sum + (Number(e.hours) || 0), 0);
-
-  const projRes = await api.get<{ data: { credosTimeProjects: Array<{ plannedEffort: number | null }> } }>(
-    '/rest/credosTimeProjects',
-    { filter: `id[eq]:${projectId}`, limit: '1' },
-  );
-  const plannedEffort = projRes.data?.credosTimeProjects?.[0]?.plannedEffort ?? null;
-  const budgetRemaining = plannedEffort !== null ? plannedEffort - factHours : null;
-
-  await api.patch(`/rest/credosTimeProjects/${projectId}`, { factHours, budgetRemaining });
-};
+// recalcProjectFactHours вынесен в ./project-fact-rollup (SSOT) и переиспользуется
+// database-event триггерами — единая формула и единый сбор записей по курсору.
 
 const run = async (event: RoutePayload) => {
   const params = readParams(event);

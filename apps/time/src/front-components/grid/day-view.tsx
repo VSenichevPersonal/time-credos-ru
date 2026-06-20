@@ -13,6 +13,7 @@ import {
 } from 'src/front-components/grid/format';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
 
 // Режим «День»: список записей одного дня. Крупная ячейка часов, видно описание.
@@ -25,6 +26,7 @@ type Props = {
   workTypes: WorkTypeRef[];
   recentProjectIds: string[];
   lastWorkTypeByProject?: Record<string, string>;
+  normFor: NormForDay;
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onCommitDescription?: (rowKey: string, dayIso: string, text: string) => void;
@@ -39,6 +41,7 @@ export const DayView = ({
   workTypes,
   recentProjectIds,
   lastWorkTypeByProject,
+  normFor,
   loading,
   onCellCommit,
   onCommitDescription,
@@ -50,7 +53,7 @@ export const DayView = ({
     [rowList, dayIndex],
   );
   const dayTotal = visible.reduce((s, r) => s + r.hoursByDay[dayIndex], 0);
-  const norm = day.isWeekend ? 0 : DAILY_NORM_HOURS;
+  const norm = normFor(day.iso, day.isWeekend); // T2 SSOT: норма дня из календаря
   const color = loadColor(loadLevel(dayTotal, norm || DAILY_NORM_HOURS));
 
   return (
@@ -104,9 +107,9 @@ export const DayView = ({
         >
           {fmtTotal(dayTotal)}
         </span>
-        {!day.isWeekend && (
+        {norm > 0 && (
           <span style={{ color, fontSize: 12, fontWeight: 600 }}>
-            {loadHint(dayTotal, DAILY_NORM_HOURS)}
+            {loadHint(dayTotal, norm)}
           </span>
         )}
       </div>

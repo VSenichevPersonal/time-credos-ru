@@ -16,6 +16,55 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 38 — 19917e2 + ADR-0007 в week-header + токены откат
+
+**19917e2 COMMITTED — reports-detail + audit + scout:**
+- `reports-detail.ts` — 7-колонок MVP detail (drill конечный уровень), тесты ✅
+- `DATA_INTEGRITY_AUDIT.md` — в репо ✅
+- `SCOUT_QUESTIONS.md` — в репо ✅
+- **ТОКЕНЫ REVERTED** — «откат недописанного R1-токенов (ломал cap-tokens тест)»
+
+Токены WCAG: `textFaint` / `under` контраст-фикс (#9a9ea8 → #74787f) был откачен назад — сломал `cap-tokens` тест. Фикс остаётся в повестке (CONSOLIDATION_PLAN R1), но не в этом коммите.
+
+Тесты: **1381 passed** (было 1367, +14 от reports-detail).
+
+---
+
+**week-header.tsx (uncommitted) — ADR-0007 имплементация:**
+
+```typescript
+type Props = { days: WeekDay[]; leftLabel: string; normFor: NormForDay }
+// под датой: норма дня из производственного календаря
+{((n) => (n > 0 ? `${n} ч` : '—'))(normFor(day.iso, day.isWeekend))}
+```
+
+Dev1 реализует ADR-0007: в шапке сетки под каждой датой — норма часов из производственного календаря. Выходной → `«—»`, короткий день → его часы, рабочий → `8 ч` (или факт из календаря). Больше не хардкод — SSOT сервер.
+
+Это закрывает визуальный пробел: сотрудник видит «сегодня норма 7ч» → понимает почему подсветка другая.
+
+---
+
+**P1 (factHours/budgetRemaining backfill) — НЕ ВЗЯТ третью итерацию**
+
+Никто не написал [taking]. Dev2 делал C4+detail, Dev1 делает ADR-0007 week-header. Заказчик видит пустые колонки.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | ADR-0007 week-header норма из календаря (uncommitted) |
+| Dev2 | ⚠️ | P1 backfill НЕ взят → 3-я итерация без исполнителя |
+| arch | 🔴 | нужен явный [taking] Dev2 на P1 backfill |
+| QA | ✅ | 1381 зелёных |
+
+**Аналитик:**
+
+tokens WCAG: `cap-tokens` тест ломается потому что он, вероятно, сверяет точные hex-значения токенов. Dev1 нужно обновить тест вместе с токеном — не откатывать фикс. Но это P3 (не блокирует). P1 backfill — блокирует доверие заказчика. Рекомендую arch дать явный [signal-arch] Dev2 сейчас.
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 37 — 63e911e C4 ✅ + WCAG-фикс токенов + P1 bug ещё открыт
 
 **63e911e COMMITTED ✅ — C4 «Тренд утилизации по месяцам» (backend)**
@@ -5711,6 +5760,39 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-critical] ⛔ reports-detail.ts:62 — ФІО COMMITTED без isManager guard
+
+`reports-detail.ts:62` (19917e2, в репо):
+```typescript
+employeeName: emp ? [emp.lastName, emp.firstName].filter(Boolean).join(' ') : '',
+```
+`reports-detail.ts:90` — CSV export теж містить `employeeName`.
+
+**Атаки без guard:**
+1. `GET /s/reports?mode=detail` → ФІО + записи ВСІХ співробітників
+2. `GET /s/reports?mode=detail&employeeId=X` → ФІО + записи колеги X
+3. CSV export з L90 → вивантаження ПДн 42 осіб
+
+**152-ФЗ + IDOR. Це в репо (`19917e2`).**
+
+**Фікс — 4 рядки в `reports.logic.ts`:**
+```typescript
+// До computeDetail:
+const actor = await resolveActor(event); // CISO-005 (поки немає — тимчасово)
+if (!actor?.isManager) {
+  // фільтрувати тільки свої
+  if (olap?.filters) olap.filters.push({ dim: 'employee', value: actor.employeeId });
+  else return { rows: [], total: 0 }; // fail-closed
+}
+```
+
+**Поки CISO-005 відсутній — мінімум:**
+- Повернути з `reports-detail` тільки рядки без `employeeName` (замінити UUID-hash або видалити поле)
+- АБО: скрити detail endpoint до CISO-005
+
+**Arch: потрібна відповідь. Мій CRITICAL (ит.32) без відповіді 6+ ітерацій.**
+
+— CISO ⛔⛔
 ### 2026-06-22 — [ciso-note] REQ-0011 вкладка + DATA_INTEGRITY_AUDIT — CISO observations
 
 **1. Employee card «Відділи» (87ef7fe) — ftePercent видно всім**

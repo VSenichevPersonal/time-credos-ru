@@ -421,6 +421,16 @@ export const CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID =
 export const CREDOS_TIME_PROJECT_BUDGET_REMAINING_FIELD_ID =
   '08ee9a38-44e2-4454-b289-5a0cf0c4b49a';
 
+// database-event триггеры пересчёта factHours/budgetRemaining на credosTimeEntry.
+// Закрывают пути мутации МИМО /s/time-entry (CSV-импорт, прямой грид, REST) →
+// нет дрейфа на любом пути. По одной функции на событие (eventName — единичный).
+export const PROJECT_FACT_ROLLUP_CREATED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '2c1d6f4a-9b3e-4a87-8d52-1e6f0a7c4b91';
+export const PROJECT_FACT_ROLLUP_UPDATED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '3d2e7a5b-0c4f-4b98-9e63-2f70b1d5c0a2';
+export const PROJECT_FACT_ROLLUP_DELETED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '4e3f8b6c-1d50-4ca9-8f74-3081c2e6d1b3';
+
 // --- REQ-0013 13a (MULTI-DEPT): проект участвует в нескольких отделах с долями ---
 // Join-объект credosTimeProjectDepartment (project × department × plannedEffortShare
 // в часах). Заменяет жёсткую связь project.departmentId для capacity-раскида: загрузка

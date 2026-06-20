@@ -1,9 +1,8 @@
 import { T } from 'src/front-components/grid/tokens';
 import type { WeekDay } from 'src/front-components/grid/use-week';
-import { WEEKLY_NORM_HOURS } from 'src/constants/labels';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 import { GRID_TEMPLATE } from 'src/front-components/grid/week-header';
 import {
-  DAILY_NORM_HOURS,
   fmtTotal,
   loadColor,
   loadHint,
@@ -11,12 +10,15 @@ import {
 } from 'src/front-components/grid/format';
 
 // Подвал: «Итого за день» (незаполненные будни подсвечены) + недельный итог
-// vs норма (одна строка-индикатор, цвет: недобор/норма/переработка).
+// vs норма (одна строка-индикатор, цвет: недобор/норма/переработка). T2 SSOT:
+// норма дня/недели из произв. календаря (праздники не считаются «недобором»).
 
-type Props = { days: WeekDay[]; dayTotals: number[]; weekTotal: number };
+type Props = { days: WeekDay[]; dayTotals: number[]; weekTotal: number; normFor: NormForDay };
 
-export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
-  const weekColor = loadColor(loadLevel(weekTotal, WEEKLY_NORM_HOURS));
+export const FooterTotals = ({ days, dayTotals, weekTotal, normFor }: Props) => {
+  // Недельная норма = Σ норм дней календаря (а не плоские 40 ч).
+  const weekNorm = days.reduce((s, d) => s + normFor(d.iso, d.isWeekend), 0);
+  const weekColor = loadColor(loadLevel(weekTotal, weekNorm));
 
   return (
     <div>
@@ -41,7 +43,7 @@ export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
         </div>
         {days.map((day, i) => {
           // Незаполненный будний день (ниже нормы) — мягкая подсветка «дыры».
-          const gap = !day.isWeekend && dayTotals[i] < DAILY_NORM_HOURS;
+          const gap = dayTotals[i] < normFor(day.iso, day.isWeekend);
           return (
             <div
               key={day.iso}
@@ -94,10 +96,10 @@ export const FooterTotals = ({ days, dayTotals, weekTotal }: Props) => {
           color: T.textMuted,
         }}
       >
-        <span>План на неделю: {WEEKLY_NORM_HOURS} ч</span>
+        <span>План на неделю: {fmtTotal(weekNorm)} ч</span>
         <span style={{ color: T.textFaint }}>·</span>
         <span style={{ color: weekColor, fontWeight: 600 }}>
-          {loadHint(weekTotal, WEEKLY_NORM_HOURS)}
+          {loadHint(weekTotal, weekNorm)}
         </span>
       </div>
     </div>
