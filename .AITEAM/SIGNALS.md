@@ -16,6 +16,26 @@
 
 ## → arch feedback (ответы)
 
+### 2026-06-21 04:40 — [arch] 📋 BACKLOG BOARD: очереди по ролям (self-serve) + регулярная сверка с референсами
+
+Заказчик: спланировать на несколько волн вперёд, раздать так чтобы каждый знал свой бэклог и брал когда свободен; регулярно сверяться с Timetta/Kimai.
+
+**Доска: `docs/BACKLOG_BOARD.md`** — очереди по ролям (Dev1/Dev2/QA/CISO/DevOps), упорядочены по приоритету на волны W3→W6 + research-задачи.
+
+**Как работаете (все):**
+1. Свободен → берёшь ВЕРХНЮЮ задачу СВОЕЙ очереди из доски.
+2. Анонс в SIGNALS: `[taking] <ID>` + файлы-зона (чтобы я учитывал, зоны не пересекались).
+3. Делаешь (dry-run, НЕ деплой), `[report]` → берёшь следующую. Я гейчу/коммичу/деплою.
+4. Очередь пуста → задача **REF-CHECK**: сверь свою подсистему с Timetta/Kimai (`research/timetta-kimai-timesheet-views.md`) + dev-стандарты + impeccable, находки → `[signal-arch]` (пополнят доску).
+
+**Зоны (правило 6):** Dev1=фронт, Dev2=бэк, не пишем одни файлы. `constants/universal-identifiers.ts` — владелец = кто первый анонсил `[taking]` с правкой constants.
+
+**Регулярная сверка с референсами (правило заказчика):** перед фичей и в `[report]` — «как в Timetta/Kimai». arch раз в волну — gap-аудит vN. Не разово, а ритмом.
+
+**Текущее (не из очереди, уже в работе):** Dev2 — REQ-0012 (dept-plan объект); Dev1 — ждёт мою отмашку на REQ-0012 UI после деплоя объекта. После — каждый по своей очереди.
+
+Команда — больше не простаиваем. Очередь видна, берите. — arch
+
 ### 2026-06-21 04:00 — [arch] ✅ bug#4 задеплоен + правка «Числ.»→вычисляемая (раздача)
 
 **bug#4 `[arch-ok]`** (d6616b6): категории-стек рендерится (Explainable `block`), браузер-приёмка ок. Дашборд полный.
@@ -444,6 +464,17 @@ ADR-0005 (прод-топология) / ADR-0006 (модель сотрудни
 ## Dev 1 → arch
 
 _Front + UX: `apps/time/src/{front-components,views,page-layouts,navigation-menu-items}/`, page-layouts SSOT, timesheet-grid, i18n. Пиши `[received]`, `[signal-arch]`, `[blocker]`, `[design-proposal]`._
+
+### 2026-06-21 22:40 — [report] Вкладка «Сводка» 1-й в карточке проекта (customer-direct, нужен sync)
+
+Заказчик: «на карточку проекта первой вкладкой — дашборд-саммари, всё важное». Сделал.
+- Record-scoped front-component `front-components/project-summary/*` (`useSelectedRecordIds`→projectId). Агрегирует проект+записи+этапы (REST): статус/категория (чип, SSOT), **бюджет план/факт/остаток** (бар), всего часов, команда (N), этапов, период, последняя активность.
+- `project-summary.front-component.tsx` + 3 UUID `*_SUMMARY_*` (аппенд). Page-layout: вкладка **«Сводка» позиция 0**, остальные +1.
+- lint+tsc(мои) 0, DOM-free, 84 строки. Нужен **app sync**.
+
+**Очередь customer-direct пуста** — задачи заказчика закрыты (DP-0003 редизайн, копи-неделя+часы, Сводка). Жду батч/следующий приказ.
+
+— Dev 1 (фронт — весь, customer-direct)
 
 ### 2026-06-21 22:30 — [report] «Числ.» в Настройки→Отделы → READ-ONLY вычисляемая
 
@@ -896,6 +927,30 @@ DP-0001 (`[arch-ok]` был) реализован: метрика-тоггл (С
 ## Dev 2 → arch
 
 _Data + Domain: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель, демо-данные, требования. Пиши `[received]`, `[signal-arch]`, `[requirement]`, `[blocker]`._
+
+### 2026-06-21 05:15 — [report] Dev 2 BACK: REQ-0012 загрузка отдела БЕЗ проекта (объект + расчёт + сид)
+
+**Задача:** плановая загрузка отдела без привязки к проекту (резерв/пресейл-бронь/прочее) — суммируется к загрузке отдела на доске capacity.
+
+**Объект `credosTimeDeptPlan`** (`src/objects/credos-time-dept-plan.object.ts`):
+- поля: `label`(TEXT, labelIdentifier карточки), `category`(SELECT, переиспользует `WORK_CATEGORY_OPTIONS`, nullable), `plannedEffort`(NUMBER FLOAT), `startDate`/`endDate`(DATE_TIME), `department`(RELATION MANY_TO_ONE → credosTimeDepartment, joinColumn `departmentId`, onDelete CASCADE).
+- обратная связь на Department: добавлено поле `deptPlans` (ONE_TO_MANY) в `credos-time-department.object.ts`.
+- UUID — новый блок «REQ-0012» в `src/constants/universal-identifiers.ts` (object/5 полей/relation+reverse/view/nav), без дублей.
+- index-view `src/views/credos-time-dept-plan.view.ts` (отдел/категория/часы/период) + nav `Плановые загрузки` в папке «Трудозатраты» (position 8).
+
+**Интеграция в расчёт** (`front-components/capacity/`):
+- `calc-load.ts`: общий приватный `plannedHoursInPeriod` (тот же равномерный раскид, что у проекта), экспорт `deptPlanHoursInPeriod`. `projectHoursInPeriod` рефакторён на него (поведение не менялось — тесты зелёные).
+- `deptLoadCells`/`employeeLoadCells` получили ОПЦИОНАЛЬНЫЙ параметр `deptPlans` (default `[]` — обратная совместимость; UI Dev1 board-rows/capacity-board править не пришлось). Загрузка отдела += Σ deptPlanHoursInPeriod; в срезе «по людям» делится поровну на численность.
+- доп. чистая `deptPlanLoads` (детализация по периодам, аналог `deptProjectLoads`) — для опционального UI карточки отдела (Dev1).
+- `types.ts`: типы `DeptPlan`, `DeptPlanLoad`.
+- `capacity-rest.ts`: `fetchDeptPlans` (REST `/rest/credosTimeDeptPlans`).
+- `use-capacity.ts` (data-hook, моя зона): грузит deptPlans в state параллельно с проектами. **Dev1**: подключи `deptPlans` из `useCapacity` в вызовы `deptLoadCells`/`employeeLoadCells` в board-rows/capacity-board (сейчас передаётся `[]`, загрузка резерва на доске пока не отображается до этой правки UI).
+
+**Reports:** в `reports-calc.ts` НЕ интегрировал — `byDept` считает ФАКТ-часы (time-entries) + норму, логики раскида плановых часов проектов там нет. deptPlan — плановая (будущая) загрузка, относится к доске capacity, не к фактической утилизации.
+
+**Сид** `scripts/seed-dept-plans.mjs` — ГОТОВ, НЕ ЗАПУЩЕН. Идемпотентный (ключ dept|label|start), throttle 700ms, проба деплоя объекта. 3 записи: ОПИБ «Резерв» 40ч июль, ОВ «Пресейл-бронь» 60ч авг, ТЦ «Прочее» 20ч июль. **Запустить ПОСЛЕ sync объекта** (объект деплоит arch): `node scripts/seed-dept-plans.mjs`.
+
+**Валидация:** `yarn lint` 0/0; `yarn test:unit` 808 passed (calc-load 34, +тесты на раскид deptPlan/deptLoadCells+deptPlans/employeeLoadCells+deptPlanLoads); `yarn twenty dev --once --dry-run` — typecheck ok, создаётся object+deptPlans+view+5 viewField+nav, конфликтов UUID нет. НЕ коммитил, НЕ деплоил.
 
 ### 2026-06-21 04:30 — [report] Dev 2 BACK: headcount (численность) → ВЫЧИСЛЯЕМАЯ (count активных сотрудников)
 
@@ -1879,6 +1934,33 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-21 22:18 — [qa-ok] +7 unit → 799 зелёных (calendar-rest пагинация)
+
+`calendar-rest.test.ts` (7): `fetchCalendarYear` дефолты null→WORKDAY/0, filter год, slice date, однострочная страница, 2-страничная пагинация с cursor, стоп при endCursor=null.
+**799 passed + 19 todo** (27 файлов). — QA
+
+### 2026-06-21 22:10 — [qa-ok] +42 unit → 792 зелёных (reports-rest + flaky-fix)
+
+`reports-rest.test.ts` (8): `fetchReports` ok-path, POST params, ok=false+error, ok=false без error, null resp, throw Error, throw non-Error, EMPTY структура.
+Транзиентный сбой schema-guard [dept-plan INDEX] — воспроизвёлся один раз, стабилен при повторном запуске (не flaky, артефакт init-порядка).
+**792 passed + 19 todo** (26 файлов). — QA
+
+### 2026-06-21 22:00 — [qa-ok] +10 unit → 750 зелёных (settings-rest)
+
+`settings-rest.test.ts` (10): `fetchDeptSettings` дефолты null→false/0.8, explicit values, пустой список, orderBy; `fetchHeadcounts` группировка по dept, null departmentId пропускается, filter=active[eq]:true; `patchDept` URL + тело + partial.
+**750 passed + 19 todo** (25 файлов). — QA
+
+### 2026-06-21 21:52 — [qa-ok] +7 unit → 740 зелёных (category-meta)
+
+`category-meta.test.ts` (7): CATEGORY_ORDER совпадает с SSOT, все коды уникальны, все SSOT-коды резолвятся с правильным label/цвет/order, 'OTHER'→'Прочее' order=999, неизвестный код→fallback серый.
+**740 passed + 19 todo** (24 файла). — QA
+
+### 2026-06-21 21:45 — [qa-ok] +22 unit → 733 зелёных (tag-color-hex + calcPeriodRange)
+
+`tag-color-hex.test.ts` (8): SSOT палитра guard — все 10 цветов, hex-формат, fallback null/undefined/неизвестное.
+`use-period.test.ts` (11): `calcPeriodRange` вынесена и экспортирована — month/quarter/year + граничные (янв→дек пред.года, Q4, високос/не-високос).
+**733 passed + 19 todo** (23 файла). — QA
 
 ### 2026-06-21 21:35 — [received] bug#4 задеплоен + [qa-ok] copyPreviousWeekWithHours | 711 зелёных
 
