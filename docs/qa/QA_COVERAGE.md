@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **679 + 19 todo** (18 файлов, все зелёные) |
+| unit-тестов | **711 + 19 todo** (21 файлов, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -37,7 +37,11 @@
 | `front-components/grid/tokens.ts` | дизайн-токены + `cellFill` alpha | ✅ covered | `front-components/grid/tokens.test.ts` |
 | `front-components/reports/report-tokens.ts` | `fmtUtil`/`fmtHrs`/`fmtUnder`/`underTone`/`utilTone` | ✅ covered | `front-components/reports/report-tokens.test.ts` |
 | `front-components/capacity/capacity-rest.ts` | `resolveSelfIsManager` (byRef + fallback) | ✅ covered + 1 todo [bug]#3 | `front-components/capacity/capacity-rest.test.ts` |
-| **SSOT-guard категорий** | `domain-types → select-options → tag-color-hex → category-meta` | ✅ 13 тестов + 3 todo | `__tests__/ssot-categories.test.ts` |
+| **SSOT-guard категорий** | `domain-types → select-options → tag-color-hex → category-meta` | ✅ 13 тестов + 2 todo | `__tests__/ssot-categories.test.ts` |
+| `front-components/reports/category-bar.ts` | `toSegments` — порядок/ширина/цвет/фильтрация ([bug]#4 регресс-guard) | ✅ 7 тестов | `front-components/reports/category-bar.test.ts` |
+| `front-components/reports/bar.ts` | `pctOfNorm` — форматирование % (null/0/over-100) | ✅ 8 тестов | `front-components/reports/bar.test.ts` |
+| `front-components/capacity/cap-tokens.ts` | `loadTone`/`formatPct`/`formatCell` — тон ёмкости/метрики | ✅ 15 тестов | `front-components/capacity/cap-tokens.test.ts` |
+| `front-components/grid/use-timesheet-actions.ts` | `calcCopyWithHours` — копирование недели со часами (Timetta UX) | ✅ 9 тестов | `front-components/grid/use-timesheet-actions.test.ts` |
 | `logic-functions/approval.logic.ts` | RBAC runSubmit/runResolve + SoD (CISO-002) | ✅ covered | `logic-functions/approval.logic.test.ts` |
 | `logic-functions/time-entry-api.logic.ts` | security-регресс CISO-005/006/007/008 | 🟦 todo-спека | `logic-functions/time-entry-api.logic.test.ts` |
 | `front-components/grid/use-week.ts` | дата-логика недели | 🟡 в хуке — нужен вынос (Dev 1) | — |

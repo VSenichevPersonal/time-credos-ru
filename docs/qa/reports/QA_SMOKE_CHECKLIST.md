@@ -134,6 +134,7 @@ done
 | [bug]#1 | P1 | `op:delete` → 400 PERMISSION_DENIED (нужен `canDestroyObjectRecords`) | `roles/default-role.ts` | ❌ ждёт arch |
 | [bug]#2 | P3 | `calc-month.ts`: NaN month-index (crash вместо skip) | `calendar/calc-month.ts:19` | ⚠️ `it.todo` |
 | [bug]#3 | P2 | Кнопка «Планировать» не видна: `resolveSelfIsManager(null)` fallback `orderBy=isManager[DescNullsLast]` не работает для boolean custom-field → всегда false | `capacity/capacity-rest.ts:resolveSelfIsManager` | ✅ Fix Dev 1: `filter=isManager[eq]:true` — browser-smoke pending |
+| [bug]#4 | P1 | Регрессия DP-0003: колонка «Категории» пустая (stacked-bar 0px) — `Explainable` без `block` → `inline-flex` → `CategoryBar width:100%` = нулевой контейнер | `reports/breakdown-table.tsx`, `shared/explainable.tsx` | ✅ Fix Dev 1: проп `block` — browser-smoke pending |
 
 ## Блокеры выполнения (актуально)
 1. **chrome-devtools --isolated** — ждёт apply от arch/пользователя в `~/.claude/settings.json`. Обходной: сериализовать (один UI-агент за раз).

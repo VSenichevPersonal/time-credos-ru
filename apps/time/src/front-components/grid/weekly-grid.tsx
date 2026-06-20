@@ -113,6 +113,15 @@ export const WeeklyGrid = () => {
             ? () => setExtraRowKeys((prev) => [...new Set([...prev, ...actions.copyPreviousWeek()])])
             : undefined
         }
+        onCopyWeekHours={
+          mode === 'week'
+            ? () => {
+                const { rowKeys, inputs } = actions.copyPreviousWeekWithHours();
+                setExtraRowKeys((prev) => [...new Set([...prev, ...rowKeys])]);
+                void data.upsertMany(inputs);
+              }
+            : undefined
+        }
         copyDisabled={data.loading}
       />
 

@@ -20,7 +20,7 @@ const base = (): ReportsInput => ({
     { id: 'p-int', name: 'Внутр', code: 'OV-2', category: 'INTERNAL', departmentId: 'd1', plannedEffort: null },
   ],
   employees: [{ id: 'e1', firstName: 'Иван', lastName: 'Иванов', departmentId: 'd1' }],
-  departments: [{ id: 'd1', code: 'OV', capacityFactor: 1, headcount: 1 }],
+  departments: [{ id: 'd1', code: 'OV', capacityFactor: 1 }],
   calendar: [
     { hours: 8, dayType: 'WORKDAY' },
     { hours: 7, dayType: 'SHORT' },
@@ -53,7 +53,7 @@ describe('computeReports — базовый', () => {
 
   it('норма = Σ часов рабочих дней (8+7=15) × capacityFactor', () => {
     expect(res.byEmployee[0].norm).toBe(15);
-    expect(res.byDept[0].norm).toBe(15); // headcount=1, factor=1
+    expect(res.byDept[0].norm).toBe(15); // headcount(вычисл.)=1 актив. сотр., factor=1
   });
   it('утилизация = client/fact = 6/8', () => {
     expect(res.totals.util).toBe(0.75);
@@ -116,7 +116,7 @@ describe('computeReports — edge', () => {
 
   it('capacityFactor 0.8 применяется к личной норме', () => {
     const inp = base();
-    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 0.8, headcount: 1 }];
+    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 0.8 }];
     const res = computeReports(inp, PERIOD);
     expect(res.byEmployee[0].norm).toBe(12); // 15 × 0.8
   });
@@ -140,9 +140,15 @@ describe('computeReports — util семантика + группировки (Q
     expect(res.totals.util).toBe(0); // client=0, fact>0 → 0, не null
   });
 
-  it('норма отдела учитывает headcount: baseNorm(15) × headcount(3) × factor(1) = 45', () => {
+  it('норма отдела = baseNorm(15) × headcount(3 актив. сотр.) × factor(1) = 45', () => {
     const inp = base();
-    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 1, headcount: 3 }];
+    // headcount ВЫЧИСЛЯЕМЫЙ: 3 активных сотрудника отдела → множитель 3.
+    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 1 }];
+    inp.employees = [
+      { id: 'e1', firstName: 'И', lastName: 'И', departmentId: 'd1' },
+      { id: 'e2', firstName: 'П', lastName: 'П', departmentId: 'd1' },
+      { id: 'e3', firstName: 'С', lastName: 'С', departmentId: 'd1' },
+    ];
     const res = computeReports(inp, PERIOD);
     expect(res.byDept[0].norm).toBe(45);
     expect(res.byEmployee[0].norm).toBe(15); // личная норма headcount НЕ множит
@@ -151,8 +157,8 @@ describe('computeReports — util семантика + группировки (Q
   it('группировка по 2 отделам: факт распределён, Σ byDept == totals', () => {
     const inp = base();
     inp.departments = [
-      { id: 'd1', code: 'OV', capacityFactor: 1, headcount: 1 },
-      { id: 'd2', code: 'OIB', capacityFactor: 1, headcount: 1 },
+      { id: 'd1', code: 'OV', capacityFactor: 1 },
+      { id: 'd2', code: 'OIB', capacityFactor: 1 },
     ];
     inp.employees = [
       { id: 'e1', firstName: 'И', lastName: 'И', departmentId: 'd1' },
@@ -265,7 +271,7 @@ describe('computeReports — отсутствия→норма (F-D)', () => {
       { id: 'e1', firstName: 'И', lastName: 'И', departmentId: 'd1' },
       { id: 'e2', firstName: 'П', lastName: 'П', departmentId: 'd1' },
     ];
-    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 1, headcount: 2 }];
+    inp.departments = [{ id: 'd1', code: 'OV', capacityFactor: 1 }];
     inp.absences = [
       { employeeId: 'e2', startDate: '2026-03-02T00:00:00.000Z', endDate: '2026-03-03T23:59:59.000Z' },
     ];

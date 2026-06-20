@@ -43,7 +43,9 @@ import {
  *   - norm   — нормо-часы периода из credosTimeWorkdayCalendar:
  *              базовая норма = Σ hours рабочих дней периода (dayType WORKDAY|SHORT).
  *              · employee: личная норма = базовая норма × capacityFactor отдела.
- *              · dept:     Σ норм сотрудников отдела (база × headcount × capacityFactor).
+ *              · dept:     Σ норм сотрудников отдела (база × headcount × capacityFactor),
+ *                          где headcount = число АКТИВНЫХ сотрудников отдела (вычисляется,
+ *                          не ручное поле credosTimeDepartment.headcount).
  *              · project:  норма не определена (norm = null, under = null).
  *   - under  — недогруз = norm − fact (положит. = недозагрузка, отриц. = перегруз;
  *              null где norm == null).

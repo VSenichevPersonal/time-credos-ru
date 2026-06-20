@@ -2,15 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 
 import {
   fetchDeptSettings,
+  fetchHeadcounts,
   patchDept,
   type DeptPatch,
 } from 'src/front-components/settings/settings-rest';
-import type { DeptSettings } from 'src/front-components/settings/types';
+import type { DeptSettings, Headcounts } from 'src/front-components/settings/types';
 
 type State = {
   loading: boolean;
   error: string | null;
   depts: DeptSettings[];
+  headcounts: Headcounts; // вычисляемая численность: deptId → активных сотрудников
   saving: boolean;
 };
 
@@ -20,14 +22,17 @@ export const useSettings = () => {
     loading: true,
     error: null,
     depts: [],
+    headcounts: {},
     saving: false,
   });
 
   useEffect(() => {
     let alive = true;
-    fetchDeptSettings()
-      .then((depts) => {
-        if (alive) setState({ loading: false, error: null, depts, saving: false });
+    Promise.all([fetchDeptSettings(), fetchHeadcounts()])
+      .then(([depts, headcounts]) => {
+        if (alive) {
+          setState({ loading: false, error: null, depts, headcounts, saving: false });
+        }
       })
       .catch((e: unknown) => {
         if (alive) {

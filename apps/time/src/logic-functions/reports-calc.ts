@@ -30,11 +30,13 @@ export type RawEmployee = {
   lastName: string | null;
   departmentId: string | null;
 };
+// headcount (численность) — НЕ ручное поле: вычисляется как число активных
+// сотрудников отдела (count credosTimeEmployee where department=X, active=true).
+// Поле credosTimeDepartment.headcount в расчёте нормы/ёмкости НЕ используется.
 export type RawDepartment = {
   id: string;
   code: string | null;
   capacityFactor: number | null;
-  headcount: number | null;
 };
 // date нужен для пересечения дней календаря с периодом отсутствия (F-D phase2).
 // Если date == null — день учитывается в базовой норме, но НЕ может быть вычтен
@@ -127,6 +129,15 @@ export const computeReports = (
   const deptById = new Map(departments.map((d) => [d.id, d]));
   const empById = new Map(employees.map((e) => [e.id, e]));
 
+  // Вычисляемая численность отдела (headcount) = число активных сотрудников.
+  // employees сюда приходят уже отфильтрованными по active=true (см. reports.logic),
+  // поэтому простой count по departmentId = численность для ёмкости/нормы.
+  // REQ-0011 (FTE-взвешивание) — отдельная задача, здесь не делаем.
+  const headcountByDept = new Map<string, number>();
+  for (const e of employees) {
+    if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+  }
+
   // Часы отсутствий сотрудника = Σ часов рабочих дней календаря, попадающих в
   // период любого его отсутствия [startDate, endDate] (по дню, включительно).
   // Период отчёта уже ограничен (календарь грузится только за [from, to]) →
@@ -161,9 +172,11 @@ export const computeReports = (
   const empName = (e: RawEmployee): string =>
     [e.lastName, e.firstName].filter(Boolean).join(' ') || e.id;
   // Норма отдела = база × headcount × factor − часы отсутствий сотрудников отдела.
+  // headcount — ВЫЧИСЛЯЕМЫЙ (число активных сотрудников отдела), не ручное поле.
   // Вычет не опускает норму ниже 0 (защита от переучёта отсутствий).
   const deptNorm = (d: RawDepartment): number => {
-    const base = baseNorm * (d.headcount ?? 0) * (d.capacityFactor ?? 1);
+    const headcount = headcountByDept.get(d.id) ?? 0;
+    const base = baseNorm * headcount * (d.capacityFactor ?? 1);
     return Math.max(0, base - (absenceHoursByDept.get(d.id) ?? 0));
   };
   // Личная норма = база × factor отдела − часы отсутствий сотрудника (не ниже 0).

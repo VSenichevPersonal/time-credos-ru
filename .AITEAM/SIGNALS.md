@@ -445,6 +445,35 @@ ADR-0005 (прод-топология) / ADR-0006 (модель сотрудни
 
 _Front + UX: `apps/time/src/{front-components,views,page-layouts,navigation-menu-items}/`, page-layouts SSOT, timesheet-grid, i18n. Пиши `[received]`, `[signal-arch]`, `[blocker]`, `[design-proposal]`._
 
+### 2026-06-21 22:30 — [report] «Числ.» в Настройки→Отделы → READ-ONLY вычисляемая
+
+Выполнил правку из `## → arch feedback` (04:00). Заказчик: численность не заносим — считаем.
+
+**Что сделал:**
+- Убрал ручной ввод «Числ.»: был редактируемый `NumField`, привязанный к полю `dept.headcount`. Заменён на read-only бейдж `HeadcountBadge` (tabular-nums, `T.panelBg`, центрированный, title «Активные сотрудники отдела (вычисляется)»).
+- **Источник count:** `fetchHeadcounts()` в `settings-rest.ts` — `GET /rest/credosTimeEmployees?filter=active[eq]:true&limit=500`, группировка по `departmentId` → `Headcounts = Record<deptId, number>`. Считаются только активные (фильтр на сервере).
+- `use-settings.ts`: грузит депты + headcounts параллельно (`Promise.all`), отдаёт `headcounts` наружу.
+- Из `DeptSettings`/`DeptPatch` удалил `headcount` (больше не ручное поле). Тип `Headcounts` добавлен в `types.ts`.
+- «Согласование» (тоггл) и «Коэф. ёмкости» (NumField) — НЕ тронуты, остаются редактируемыми.
+- Подпись секции «Отделы» обновил: «…Численность вычисляется по активным сотрудникам отдела».
+
+**Файлы:** `settings/{settings.tsx, dept-section.tsx, settings-rest.ts, use-settings.ts, types.ts}`. Все <200 строк, русский.
+
+**Валидация:** `yarn lint` → 0 warnings / 0 errors. `yarn twenty dev --once --dry-run` → typecheck ok, чисто (updated frontComponent — мой виджет; нет ошибок). НЕ коммитил, НЕ деплоил.
+
+**Заметка arch:** поле `headcount` на объекте `credosTimeDepartment` оставил как есть (не моя зона) — из settings-UI оно больше не правится. Если Dev 2 переключил capacity на count активных (как в задаче) — ручное поле можно депрекейтить позже. Зоны capacity/ не трогал.
+
+### 2026-06-21 21:20 — [report] Копировать неделю «с часами» (customer-direct, нужен sync)
+
+Заказчик: «в таймшите есть копировать неделю, но нет вставить». По практике Timetta (`copyLinesWithHours`) добавил **второй вариант** копирования прошлой недели.
+- Было: «Копировать неделю» = только строки (проект·вид работ), часы заполняешь заново.
+- Стало: + кнопка **«…с часами»** — переносит строки И часы прошлой недели на те же дни недели. **Не перетирает** заполненные ячейки, **не льёт в выходные**.
+- Файлы: `grid/use-timesheet-actions.ts` (`copyPreviousWeekWithHours` — чистая calc, @QA готов к unit), `toolbar.tsx` (кнопка), `weekly-grid.tsx` (проводка + `upsertMany`). lint+tsc(мои) 0, DOM-free.
+
+Нужен app sync (фронт-компонент main-page). **В очереди (customer-direct):** дашборд-саммари 1-й вкладкой карточки проекта.
+
+— Dev 1 (фронт — весь, customer-direct)
+
 ### 2026-06-21 21:10 — [signal-arch] процесс: заказчик даёт задачи Dev 1 НАПРЯМУЮ — уведомляю для учёта
 
 @arch — по твоему правилу-6 (только arch-раздача). Заказчик **прямым приказом** решил: фронт один (я), задачи даёт мне **напрямую**, его приказ > раздачи. По его же указанию — **уведомляю тебя для учёта** (не self-claim, а customer-direct).
@@ -867,6 +896,33 @@ DP-0001 (`[arch-ok]` был) реализован: метрика-тоггл (С
 ## Dev 2 → arch
 
 _Data + Domain: `apps/time/src/{objects,fields,logic-functions,roles,constants}/`, модель, демо-данные, требования. Пиши `[received]`, `[signal-arch]`, `[requirement]`, `[blocker]`._
+
+### 2026-06-21 04:30 — [report] Dev 2 BACK: headcount (численность) → ВЫЧИСЛЯЕМАЯ (count активных сотрудников)
+
+**Задача (от arch, заказчик):** «численность не заносим, считаем». headcount отдела теперь = count(credosTimeEmployee where department=X, active=true), а не ручное поле `credosTimeDepartment.headcount`. FTE-взвешивание = REQ-0011, НЕ сейчас.
+
+**Где был headcount (2 потребителя, оба читали ручное поле):**
+- `logic-functions/reports-calc.ts` → `deptNorm` множил норму на `d.headcount` (норма отдела /s/reports).
+- `front-components/capacity/calc-load.ts` → `deptCapacity`/`employeeLoadCells` множат на `dept.headcount` (ёмкость доски планирования), значение приходило из `capacity-rest.fetchDepartments`.
+
+**Как теперь считается:**
+- **reports-calc.ts:** убрал `headcount` из типа `RawDepartment`. В `computeReports` строю `headcountByDept` = count по `departmentId` из массива `employees` (он уже фильтруется `active[eq]:true` в reports.logic). `deptNorm` берёт вычисленный headcount. Личная норма сотрудника — без изменений (headcount её НЕ множит).
+- **capacity-rest.ts (моя зона данных):** `fetchDepartments` теперь параллельно тянет активных сотрудников (с пагинацией Core REST по 60) и подставляет count в `DeptRef.headcount`. Чистые функции `calc-load.ts` и `DeptRef`-тип НЕ трогал — источник данных сменился, формула та же. dept-row.tsx «N чел» теперь показывает вычисленное значение.
+- `settings`-зону (Dev 1, «Настройки→Отделы», колонка «Числ.» read-only) НЕ трогал.
+- Поле объекта `credos-time-department.object.ts:headcount` оставил (его удаление = миграция схемы, не моя зона). Просто больше нигде не используется в расчётах.
+
+**Числа по отделам (GET /rest/credosTimeEmployees, count активных по departmentId):**
+| Отдел | active (вычисл.) | ручной headcount (старый) |
+|---|---|---|
+| ОПИБ (OPIB) | 9 | 9 ✅ |
+| ОИБ (OIB) | 11 | 11 ✅ |
+| ТЦ (TC) | 6 | 6 ✅ |
+| ОВ (OV) | **12** | 11 ⚠️ расхождение |
+| ОПР (OPR) | 5 | 5 ✅ |
+
+Всего 43 сотрудника, все active=true, без сотрудников вне отдела. **ОВ: ручное поле было устаревшим (11), реально 12 активных** — ровно тот случай, ради которого заказчик просил «считать, а не заносить». Норма/ёмкость/недогруз ОВ теперь опираются на 12.
+
+**Валидация:** `yarn lint` 0/0; `yarn test:unit` 702 passed (reports-calc 33, capacity-rest 6, calc-load 25 — все зелёные, фикстуры departments переведены с ручного `headcount` на count сотрудников); `yarn twenty dev --once --dry-run` чисто (4 updated: reports logicFunction + 3 front-component, без изменений схемы/объектов). НЕ коммитил, НЕ деплоил.
 
 ### 2026-06-21 03:25 — [report] Dev 2 BACK: закрыл [ssot-bug]#1 (QA) + ПДн в скриптах (DevOps)
 
@@ -1823,6 +1879,25 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-21 21:35 — [received] bug#4 задеплоен + [qa-ok] copyPreviousWeekWithHours | 711 зелёных
+
+**[received]** bug#4 d6616b6 → задеплоен, arch браузер-приёмка ✅.
+
+**@Dev 1 «Копировать неделю с часами»:** принял запрос @QA.
+Вынес логику в экспортированную чистую функцию `calcCopyWithHours(days, entries)` в `use-timesheet-actions.ts`. `useCallback` теперь делегирует ей. Typecheck 0 ошибок.
+
+`use-timesheet-actions.test.ts` (9 тестов): пустые entries, перенос Пн→Пн, выходной прошлой недели → пропуск, не перетирает заполненные, несколько проектов, hours=0 пропускается, null projectId пропускается, один rowKey для нескольких дней, id=undefined.
+
+**711 passed + 19 todo** (21 файл). — QA
+
+### 2026-06-21 21:25 — [qa-ok] +23 unit → 702 зелёных (bar + cap-tokens)
+
+Пока ждём [synced] от arch — расширяю покрытие:
+- `reports/bar.test.ts` (8): `pctOfNorm` — null/0/отрицат. max → '—', 65% округление, перегрузка честно >100%
+- `capacity/cap-tokens.test.ts` (15): `loadTone` — null/перегруз/#fbe4dd/порог 0.02/зелёный alpha; `formatPct` — null/''/100%/round; `formatCell` — все 3 метрики (pct/plan/free), capacity=0→''
+
+**702 passed + 19 todo** (20 файлов). — QA
 
 ### 2026-06-21 21:15 — [qa-ok] [bug]#4 FIXED (Dev 1) | 679 зелёных + 7 новых тестов
 

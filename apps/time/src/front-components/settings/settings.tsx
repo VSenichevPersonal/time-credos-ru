@@ -22,7 +22,7 @@ const SectionTitle = ({ children, hint }: { children: string; hint?: string }) =
 );
 
 export const CredosSettings = () => {
-  const { loading, error, depts, saving, update } = useSettings();
+  const { loading, error, depts, headcounts, saving, update } = useSettings();
 
   return (
     <div
@@ -42,7 +42,7 @@ export const CredosSettings = () => {
         </span>
       </div>
 
-      <SectionTitle hint="Согласование трудозатрат, коэффициент ёмкости и численность для расчёта планирования.">
+      <SectionTitle hint="Согласование трудозатрат и коэффициент ёмкости. Численность вычисляется по активным сотрудникам отдела.">
         Отделы
       </SectionTitle>
 
@@ -53,7 +53,7 @@ export const CredosSettings = () => {
       ) : depts.length === 0 ? (
         <Center>Нет отделов</Center>
       ) : (
-        <DeptSection depts={depts} onUpdate={update} />
+        <DeptSection depts={depts} headcounts={headcounts} onUpdate={update} />
       )}
 
       <SectionTitle hint="Справочники модуля управляются на отдельных страницах.">

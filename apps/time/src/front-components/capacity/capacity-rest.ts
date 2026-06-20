@@ -22,21 +22,58 @@ type RawDept = {
   id: string;
   name: string;
   code?: string | null;
-  headcount?: number | null;
   capacityFactor?: number | null;
 };
 
+// headcount (численность) — НЕ ручное поле credosTimeDepartment.headcount, а
+// ВЫЧИСЛЯЕМОЕ значение: число активных сотрудников отдела (count credosTimeEmployee
+// where department=X, active=true). Поэтому fetchDepartments параллельно считает
+// активных сотрудников и подставляет их количество в headcount каждого отдела.
+// REQ-0011 (FTE-взвешивание) — отдельная задача, тут простой count.
 export const fetchDepartments = async (): Promise<DeptRef[]> => {
-  const resp = await client().get<ListResp<RawDept>>('/rest/credosTimeDepartments', {
-    query: { limit: '50', orderBy: 'name[AscNullsFirst]' },
-  });
-  return pickList(resp, 'credosTimeDepartments').map((d) => ({
+  const c = client();
+  const [deptResp, headcountByDept] = await Promise.all([
+    c.get<ListResp<RawDept>>('/rest/credosTimeDepartments', {
+      query: { limit: '50', orderBy: 'name[AscNullsFirst]' },
+    }),
+    activeHeadcountByDept(c),
+  ]);
+  return pickList(deptResp, 'credosTimeDepartments').map((d) => ({
     id: d.id,
     name: d.name,
     code: d.code ?? null,
-    headcount: d.headcount ?? 0,
+    headcount: headcountByDept.get(d.id) ?? 0,
     capacityFactor: d.capacityFactor ?? 0.8,
   }));
+};
+
+type RawActiveEmp = { id: string; departmentId?: string | null };
+
+// Вычисляемый headcount: число активных сотрудников по отделам (с пагинацией Core
+// REST: max 60 записей/страницу, иначе крупные отделы недосчитаются).
+const activeHeadcountByDept = async (
+  c: RestApiClient,
+): Promise<Map<string, number>> => {
+  const counts = new Map<string, number>();
+  let cursor: string | null = null;
+  for (let i = 0; i < 500; i++) {
+    const query: Record<string, string> = { filter: 'active[eq]:true', limit: '60' };
+    if (cursor) query.starting_after = cursor;
+    const resp = await c.get<
+      ListResp<RawActiveEmp> & {
+        data: { pageInfo?: { hasNextPage?: boolean; endCursor?: string } };
+        pageInfo?: { hasNextPage?: boolean; endCursor?: string };
+      }
+    >('/rest/credosTimeEmployees', { query });
+    const recs = pickList(resp, 'credosTimeEmployees');
+    for (const e of recs) {
+      if (e.departmentId) counts.set(e.departmentId, (counts.get(e.departmentId) ?? 0) + 1);
+    }
+    const pi = resp.pageInfo ?? resp.data?.pageInfo;
+    if (!pi?.hasNextPage || recs.length === 0 || !pi.endCursor) break;
+    cursor = pi.endCursor;
+  }
+  return counts;
 };
 
 type RawProject = {

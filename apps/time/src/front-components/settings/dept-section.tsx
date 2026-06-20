@@ -2,15 +2,37 @@ import { T } from 'src/front-components/grid/tokens';
 import { departmentLabel } from 'src/constants/labels';
 import { NumField } from 'src/front-components/settings/num-field';
 import type { DeptPatch } from 'src/front-components/settings/settings-rest';
-import type { DeptSettings } from 'src/front-components/settings/types';
+import type { DeptSettings, Headcounts } from 'src/front-components/settings/types';
 
 // Таблица отделов: согласование (тоггл) · коэффициент ёмкости · численность.
-// Inline-правка → PATCH (оптимистично). Влияет на approval и расчёт ёмкости.
+// Согласование/коэффициент — inline-правка → PATCH (оптимистично). Численность —
+// read-only (вычисляется по активным сотрудникам, не заносится вручную).
 
 type Props = {
   depts: DeptSettings[];
+  headcounts: Headcounts; // deptId → активных сотрудников (вычислено)
   onUpdate: (id: string, patch: DeptPatch) => void;
 };
+
+// Read-only бейдж численности (вычислено по сотрудникам), tabular-nums.
+const HeadcountBadge = ({ value }: { value: number }) => (
+  <span
+    title="Активные сотрудники отдела (вычисляется)"
+    style={{
+      minWidth: 40,
+      textAlign: 'center',
+      padding: '3px 8px',
+      fontSize: 12.5,
+      fontWeight: 600,
+      fontVariantNumeric: 'tabular-nums',
+      borderRadius: 6,
+      color: T.textMuted,
+      background: T.panelBg,
+    }}
+  >
+    {value}
+  </span>
+);
 
 const COLS = '1fr 132px 120px 96px';
 
@@ -48,13 +70,18 @@ const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
   </button>
 );
 
-export const DeptSection = ({ depts, onUpdate }: Props) => (
+export const DeptSection = ({ depts, headcounts, onUpdate }: Props) => (
   <div>
     <div style={head}>
       <span style={{ paddingLeft: 6 }}>Отдел</span>
       <span>Согласование</span>
       <span>Коэф. ёмкости</span>
-      <span style={{ textAlign: 'right', paddingRight: 8 }}>Числ.</span>
+      <span
+        title="Активные сотрудники отдела (вычисляется)"
+        style={{ textAlign: 'right', paddingRight: 8 }}
+      >
+        Числ.
+      </span>
     </div>
     {depts.map((d) => (
       <div
@@ -76,8 +103,8 @@ export const DeptSection = ({ depts, onUpdate }: Props) => (
         </span>
         <Toggle on={d.approvalRequired} onClick={() => onUpdate(d.id, { approvalRequired: !d.approvalRequired })} />
         <NumField value={d.capacityFactor} min={0} width={76} onCommit={(v) => onUpdate(d.id, { capacityFactor: v })} />
-        <span style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 4 }}>
-          <NumField value={d.headcount} min={0} width={72} onCommit={(v) => onUpdate(d.id, { headcount: v })} />
+        <span style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 8 }}>
+          <HeadcountBadge value={headcounts[d.id] ?? 0} />
         </span>
       </div>
     ))}

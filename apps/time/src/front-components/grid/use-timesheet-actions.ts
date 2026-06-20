@@ -19,6 +19,46 @@ type Args = {
 
 const isoDay = (date: string): string => date.slice(0, 10);
 
+// Чистая calc: копирование прошлой недели со часами (без side-effects, тестируема).
+// days[0].iso = Пн текущей недели. Записи прошлой недели → тот же день-недели текущей.
+// Не перетирает filled (уже есть запись тек.нед), не льёт в выходные.
+export const calcCopyWithHours = (
+  days: WeekDay[],
+  entries: ApiEntry[],
+): { rowKeys: string[]; inputs: UpsertInput[] } => {
+  const prevStartDay =
+    Math.floor(new Date(`${days[0].iso}T00:00:00Z`).getTime() / 86400000) - 7;
+  const curDates = new Set(days.map((d) => d.iso));
+  const filled = new Set<string>();
+  for (const e of entries) {
+    const d = isoDay(e.date);
+    if (curDates.has(d) && e.projectId && e.workTypeId && e.hours) {
+      filled.add(`${e.projectId}|${e.workTypeId}|${d}`);
+    }
+  }
+  const rowKeys = new Set<string>();
+  const inputs: UpsertInput[] = [];
+  for (const e of entries) {
+    if (!e.projectId || !e.workTypeId || !e.hours || e.hours <= 0) continue;
+    const off =
+      Math.floor(new Date(`${isoDay(e.date)}T00:00:00Z`).getTime() / 86400000) -
+      prevStartDay;
+    if (off < 0 || off > 6) continue;
+    const target = days[off];
+    if (!target || target.isWeekend) continue;
+    if (filled.has(`${e.projectId}|${e.workTypeId}|${target.iso}`)) continue;
+    rowKeys.add(`${e.projectId}|${e.workTypeId}`);
+    inputs.push({
+      id: undefined,
+      date: target.iso,
+      hours: e.hours,
+      projectId: e.projectId,
+      workTypeId: e.workTypeId,
+    });
+  }
+  return { rowKeys: Array.from(rowKeys), inputs };
+};
+
 export const useTimesheetActions = ({
   rowList,
   days,
@@ -81,46 +121,14 @@ export const useTimesheetActions = ({
     return Array.from(pairs);
   }, [days, entries]);
 
-  // Копировать прошлую неделю СО ЧАСАМИ: переносит записи прошлой недели на тот же
+    // Копировать прошлую неделю СО ЧАСАМИ: переносит записи прошлой недели на тот же
   // день недели текущей (Timetta «строки и часы из предыдущего»). НЕ перетирает уже
   // заполненные ячейки и не льёт в выходные. Возвращает строки (для добавления в
   // сетку) + upsert-входы (для записи часов одним пакетом).
-  const copyPreviousWeekWithHours = useCallback((): {
-    rowKeys: string[];
-    inputs: UpsertInput[];
-  } => {
-    const prevStartDay =
-      Math.floor(new Date(`${days[0].iso}T00:00:00Z`).getTime() / 86400000) - 7;
-    const curDates = new Set(days.map((d) => d.iso));
-    const filled = new Set<string>();
-    for (const e of entries) {
-      const d = isoDay(e.date);
-      if (curDates.has(d) && e.projectId && e.workTypeId && e.hours) {
-        filled.add(`${e.projectId}|${e.workTypeId}|${d}`);
-      }
-    }
-    const rowKeys = new Set<string>();
-    const inputs: UpsertInput[] = [];
-    for (const e of entries) {
-      if (!e.projectId || !e.workTypeId || !e.hours || e.hours <= 0) continue;
-      const off =
-        Math.floor(new Date(`${isoDay(e.date)}T00:00:00Z`).getTime() / 86400000) -
-        prevStartDay;
-      if (off < 0 || off > 6) continue;
-      const target = days[off];
-      if (!target || target.isWeekend) continue;
-      if (filled.has(`${e.projectId}|${e.workTypeId}|${target.iso}`)) continue;
-      rowKeys.add(`${e.projectId}|${e.workTypeId}`);
-      inputs.push({
-        id: undefined,
-        date: target.iso,
-        hours: e.hours,
-        projectId: e.projectId,
-        workTypeId: e.workTypeId,
-      });
-    }
-    return { rowKeys: Array.from(rowKeys), inputs };
-  }, [days, entries]);
+  const copyPreviousWeekWithHours = useCallback(
+    () => calcCopyWithHours(days, entries),
+    [days, entries],
+  );
 
   return { commitCell, bulkFill, copyPreviousWeek, copyPreviousWeekWithHours };
 };
