@@ -32,12 +32,28 @@ const shortDate = (iso: string | null): string => {
 };
 
 // Число часов: запятая→точка, отрицательные/нечисло отбрасываем (null = очистить).
-const parseEffort = (raw: string): number | null | undefined => {
+export const parseEffort = (raw: string): number | null | undefined => {
   const s = raw.trim().replace(',', '.');
   if (s === '') return null;
   const n = Number(s);
   if (!Number.isFinite(n) || n < 0) return undefined; // невалидно — не сохраняем
   return Math.round(n * 100) / 100;
+};
+
+// Решение строки по сырому вводу: что сохранять в plannedEffort.
+//  undefined → ввод невалиден, ничего не сохраняем (revert).
+//  null      → очистить план (пустой ввод ИЛИ 0 — «снять план», нет часов).
+//  number>0  → объём плана.
+// Семантика 0 = очистка: 0-часовой план бессмыслен (раскид по дням = 0) и раньше
+// порождал лишний авто-startDate + REST-патч на каждый «0» (источник ошибки у
+// заказчика). Возвращаем sentinel-объект, чтобы отличить «не сохранять» (skip)
+// от «сохранить null».
+export const planEffortFromInput = (
+  raw: string,
+): { skip: true } | { skip: false; effort: number | null } => {
+  const parsed = parseEffort(raw);
+  if (parsed === undefined) return { skip: true };
+  return { skip: false, effort: parsed === 0 ? null : parsed };
 };
 
 const inputStyle = {
@@ -66,15 +82,17 @@ export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread
   const empty = project.plannedEffort == null && !project.endDate;
 
   const commitHours = () => {
-    const parsed = parseEffort(hours);
-    if (parsed === undefined) {
+    const decision = planEffortFromInput(hours);
+    if (decision.skip) {
       setHours(project.plannedEffort != null ? String(project.plannedEffort) : '');
       return;
     }
-    if (parsed === project.plannedEffort) return;
+    const { effort } = decision; // 0 → null (снять план), см. planEffortFromInput
+    if (effort === project.plannedEffort) return;
     // Без даты начала план не попадёт в горизонт — проставляем сегодня (UTC).
-    const patch: ProjectPatch = { plannedEffort: parsed };
-    if (parsed != null && !project.startDate) patch.startDate = new Date().toISOString().slice(0, 10);
+    // Только для реального плана (>0); при очистке (null) дату не трогаем.
+    const patch: ProjectPatch = { plannedEffort: effort };
+    if (effort != null && !project.startDate) patch.startDate = new Date().toISOString().slice(0, 10);
     void onSave(project.id, patch);
   };
 
@@ -87,12 +105,12 @@ export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread
   };
 
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>, commit: () => void) => {
-    if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+    if (e.key === 'Enter') e.currentTarget.blur(); // target.blur() недоступен в Remote DOM
     if (e.key === 'Escape') {
       commit === commitHours
         ? setHours(project.plannedEffort != null ? String(project.plannedEffort) : '')
         : setEnd(isoToDate(project.endDate));
-      (e.target as HTMLInputElement).blur();
+      e.currentTarget.blur();
     }
   };
 

@@ -1659,3 +1659,68 @@ describe('планирование до сотрудника (employeeLoadCells 
     expect(employeePersonalHoursInPeriod('e1', undefined, jan, spread)).toBe(0);
   });
 });
+
+// =============================================================================
+// Стыковка слотов с plannedEffort / пресейлом: граничные кейсы (баг-регресс).
+// UI: «Σ раскид = N ч · план M ч» + чекмарк ✓/≠ в project-plan-panel.
+// =============================================================================
+
+describe('sumSlotHours — граничные кейсы стыковки с plannedEffort', () => {
+  const slot = (periodMonth: string, plannedHours: number | null): PlanSlot => ({
+    projectId: 'p1', departmentId: null, employeeId: null, periodMonth, plannedHours,
+  });
+
+  it('слот с plannedHours=0 НЕ суммируется (0 = удалить, контракт /s/plan-slots)', () => {
+    // Контракт: plannedHours<=0 → сервер удаляет слот при upsert.
+    // sumSlotHours пропускает 0 — корректно, не считаем "удалённое".
+    expect(sumSlotHours([slot('2026-01', 0), slot('2026-02', 40)])).toBe(40);
+  });
+
+  it('слот с plannedHours=null не суммируется (пустое поле)', () => {
+    expect(sumSlotHours([slot('2026-01', null), slot('2026-02', 30)])).toBe(30);
+  });
+
+  it('все слоты 0 → sum=0 (нет распланированных часов)', () => {
+    expect(sumSlotHours([slot('2026-01', 0), slot('2026-02', 0)])).toBe(0);
+  });
+});
+
+describe('slotsVsPlannedEffort — стыковка с пресейлом/плановой трудоёмкостью', () => {
+  const slot = (m: string, h: number | null): PlanSlot => ({
+    projectId: 'p1', departmentId: null, employeeId: null, periodMonth: m, plannedHours: h,
+  });
+
+  it('plannedEffort=0 + слоты=0 → gap=0, matches=true', () => {
+    const r = slotsVsPlannedEffort([slot('2026-01', 0)], 0);
+    expect(r).toEqual({ sum: 0, gap: 0, matches: true });
+  });
+
+  it('plannedEffort=0 + слоты>0 → gap>0, matches=false (перераспределили больше)', () => {
+    const r = slotsVsPlannedEffort([slot('2026-01', 40)], 0);
+    expect(r.gap).toBe(40);
+    expect(r.matches).toBe(false);
+  });
+
+  it('Σ слотов == plannedEffort с погрешностью ≤0.01 → matches=true', () => {
+    const r = slotsVsPlannedEffort([slot('2026-01', 99.995)], 100);
+    expect(r.matches).toBe(true);
+  });
+
+  it('Σ слотов > plannedEffort на 0.02 → matches=false (за допуском)', () => {
+    const r = slotsVsPlannedEffort([slot('2026-01', 100.02)], 100);
+    expect(r.matches).toBe(false);
+  });
+
+  it('нет слотов (undefined) + plannedEffort задан → всё нераспланировано, gap отрицательный', () => {
+    const r = slotsVsPlannedEffort(undefined, 160);
+    expect(r.sum).toBe(0);
+    expect(r.gap).toBe(-160);
+    expect(r.matches).toBe(false);
+  });
+
+  it('нет слотов + plannedEffort=null → gap=null (нечего сверять — пресейл без объёма)', () => {
+    const r = slotsVsPlannedEffort(undefined, null);
+    expect(r.gap).toBeNull();
+    expect(r.matches).toBe(true); // нет объёма = индикатор не показывается
+  });
+});

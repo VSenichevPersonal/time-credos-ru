@@ -114,7 +114,9 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
 
   const preview = useMemo(
     () =>
-      spread?.hoursByDay && !rangeError && effort
+      // effort != null (а не truthy): объём 0 — валидный «нет часов», превью с
+      // нулевым раскидом должно показываться, а не молча исчезать (0 falsy ломал).
+      spread?.hoursByDay && !rangeError && effort != null
         ? computePreview(effort, start, end, spread.hoursByDay, loadCtx ?? dept)
         : null,
     [spread, rangeError, effort, start, end, loadCtx, dept],
@@ -218,8 +220,10 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
         if (slotsOk && rowOk) close();
         return;
       }
+      // EVEN: объём 0 трактуем как «снять план» (null) — консистентно со строкой
+      // проекта. 0-часовой EVEN-план не несёт смысла (раскид = 0); храним null.
       const ok = await onSave(project.id, {
-        plannedEffort: effort,
+        plannedEffort: effort === 0 ? null : effort,
         startDate: start || null,
         endDate: end || null,
         planMethod: 'EVEN',

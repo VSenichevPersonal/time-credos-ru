@@ -134,6 +134,16 @@ describe('computePreview', () => {
     expect(res.total).toBe(0);
   });
 
+  it('объём 0 → превью без ошибки, раскид 0 (баг «0 в строке = ОШИБКА»)', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 60);
+    // Панель раньше прятала превью при effort=0 (0 falsy); сам расчёт безопасен —
+    // 0 даёт нулевой раскид, не throw/NaN. Фикс — гейт effort != null в панели.
+    const res = computePreview(0, '2026-07-01', '2026-07-31', cal, dept);
+    expect(res.total).toBe(0);
+    expect(res.rows.every((r) => r.hours === 0 && !r.over)).toBe(true);
+    expect(res.overCount).toBe(0);
+  });
+
   it('overCount считает периоды с овербукингом (W3B.21)', () => {
     const cal = buildWeekdayCalendar('2026-07-01', 60);
     const res = computePreview(2000, '2026-07-01', '2026-07-31', cal, dept);
@@ -367,6 +377,17 @@ describe('reconcileSlots (WI-47 Σ-сверка)', () => {
 
   it('объём не задан (null) → не ok, target 0', () => {
     expect(reconcileSlots([{ plannedHours: 40 }], null)).toEqual({ sum: 40, target: 0, ok: false });
+  });
+
+  it('объём 0 (задан явно) → сверка с 0, пустые слоты ok (без ошибки)', () => {
+    // target=0 — валидный «нет часов» (не путать с null «не задан»). Σ слотов 0
+    // совпадает → ok; не должно валить сверку при объёме 0.
+    expect(reconcileSlots([{ plannedHours: 0 }, { plannedHours: null }], 0)).toEqual({
+      sum: 0,
+      target: 0,
+      ok: true,
+    });
+    expect(reconcileSlots([], 0)).toEqual({ sum: 0, target: 0, ok: true });
   });
 });
 
