@@ -4,6 +4,7 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import { validDateParam } from './params-validate';
+import { computeProjectsPlanFact, type RawProjectPlan } from './projects-plan-fact';
 import { computeDetail, detailToCsv } from './reports-detail';
 import { buildTimesheetGrid, gridToCsv } from './reports-timesheet-grid';
 import {
@@ -269,6 +270,27 @@ const run = async (event: RoutePayload) => {
     workTypes,
     assignments,
   };
+
+  // REPORTS_COMPLETENESS P1: «Проекты — план/факт/остаток» (часы) для РП.
+  // groupBy=projects-plan-fact → по проектам plannedEffort vs Σ факт за период +
+  // остаток (план−факт) + флаг перерасхода (overrun). [[no-billable-concept]] —
+  // только часы, без денег. Проекты не ПДн → redaction не нужен. Опц. фильтры
+  // status/departmentId сравниваются в памяти (инъекции нет). Факт из записей (не
+  // хранимый factHours) → корректно работает с period-фильтром.
+  if (params.groupBy === 'projects-plan-fact') {
+    // projects загружены как RawProject (без status/дат); REST отдаёт полные
+    // записи, поля присутствуют в runtime — приводим к RawProjectPlan.
+    const planProjects = projects as unknown as RawProjectPlan[];
+    return computeProjectsPlanFact(
+      { projects: planProjects, entries },
+      {
+        from,
+        to,
+        status: params.status ?? null,
+        departmentId: params.departmentId ?? null,
+      },
+    );
+  }
 
   // C4: тренд утилизации по месяцам. mode=timeseries (или groupBy=month) →
   // массив точек [{month, fact, client, norm, util, under}] за период, опц. фильтр отдела.
