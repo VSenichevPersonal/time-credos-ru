@@ -31,6 +31,9 @@ import {
   CREDOS_TIME_PROJECT_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -254,11 +257,39 @@ export default definePageLayout({
         },
       ],
     },
+    // 5f. Брони — резервы ресурсов под проект (обратная связь bookings).
+    // REQ-0016 follow-up. FIELDS на card-view с relation bookings (ONE_TO_MANY) →
+    // ядро рендерит брони ТЕКУЩЕГО проекта инлайн-таблицей (кто / тип SOFT-HARD /
+    // часы / период), кликабельно в карточку брони. Сверка: Timetta — брони видны
+    // в карточке проекта.
+    {
+      universalIdentifier:
+        CREDOS_TIME_PROJECT_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER,
+      title: 'Брони',
+      position: 8,
+      icon: 'IconCalendarPin',
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
+          title: 'Брони ресурсов проекта',
+          type: 'FIELDS',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_PROJECT_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: false,
+          },
+        },
+      ],
+    },
     // 5e. Документы — нативные attachments проекта (FILES).
     {
       universalIdentifier: CREDOS_TIME_PROJECT_RP_TAB_DOCS_UNIVERSAL_IDENTIFIER,
       title: 'Документы',
-      position: 8,
+      position: 9,
       icon: 'IconPaperclip',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [

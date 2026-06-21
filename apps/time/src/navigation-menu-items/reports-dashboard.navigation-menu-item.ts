@@ -4,18 +4,18 @@ import {
 } from 'twenty-sdk/define';
 
 import {
-  CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
   REPORTS_NAV_UNIVERSAL_IDENTIFIER,
   REPORTS_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
+import { FOLDER_REPORTS_NAV_UNIVERSAL_IDENTIFIER } from 'src/navigation-menu-items/folder-reports.navigation-menu-item';
 
-// Пункт «Отчёты» внутри папки «Трудозатраты» -> дашборд утилизации/загрузки.
+// Пункт «Отчёты» внутри папки «Отчёты» -> дашборд утилизации/загрузки.
 export default defineNavigationMenuItem({
   universalIdentifier: REPORTS_NAV_UNIVERSAL_IDENTIFIER,
   name: 'Отчёты',
   icon: 'IconChartPie',
-  position: 2,
+  position: 0,
   type: NavigationMenuItemType.PAGE_LAYOUT,
   pageLayoutUniversalIdentifier: REPORTS_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER,
-  folderUniversalIdentifier: CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
+  folderUniversalIdentifier: FOLDER_REPORTS_NAV_UNIVERSAL_IDENTIFIER,
 });

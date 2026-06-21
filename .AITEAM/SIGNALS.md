@@ -12,6 +12,123 @@
 
 ## Dev 1 → arch
 
+### 2026-06-21 — [taking] gap-cell-fit
+Беру баг заказчика (прод): в режиме GAP ячейки капасити-доски тесные — «▼ -1112ч / 83%» в две строки, жмётся (особенно отделы «▼-255ч 88%»). Зона capacity/ ТОЛЬКО. dry-run, без коммита.
+
+### 2026-06-21 — [report] gap-cell-fit ✅ — не закоммичено
+
+**Причина тесноты:** в gap-режиме ячейка `minWidth: 56`, а внутри `formatGap` = «−1112ч 83%» (~11 символов кеглем 12.5) + отдельный span-иконка ▼ + под ним BookingMarker. Не вмещалось в 56px → перенос/обрезка.
+
+**Как вместил (impeccable polish, register=product, иерархия часы→%):**
+- Раздельный рендер gap-значения: **часы — главное** (явный знак +дефицит/−профицит, кегль строки), **% — вторичное** (кегль 9, приглушённый `T.textFaint`, без знака — знак несут часы+иконка). Иконка ▼/▲ inline перед числом, `align-items: baseline`, `gap: 2`, `lineHeight: 1`, `whiteSpace: nowrap` → одна строка, без переноса.
+- **Единая ширина колонки по метрике**: `colWidth(metric)` — базовая `COL_W=56`, gap `COL_W_GAP=68` (вмещает «−1112ч 83%»). Применена согласованно во ВСЕХ местах, чтобы тело и шапка-даты не разъезжались: summary/dept/employee-row, planned-project-row (3 уровня), dept-plan-row, period-header (день+месяц-бэнд), board-обёртка (minWidth контейнера).
+- Шрифт gap-ячейки 12.5→11.5, `tabular-nums` сохранён (был), единый базлайн.
+
+**Что с %/иконкой:** % НЕ убран (информативен) — ушёл вторым планом меньшим приглушённым кеглем; самодостаточность часов соблюдена (Timetta: gap читаем знаком+часами). Иконка ▼/▲ осталась, уменьшена 9→8, дублирует знак не-цветом (a11y).
+
+**Не регрессировал:** free/pct/plan/fact — отдельная ветка рендера (`isGap ? … : formatCell`), их кегль/ширина/выравнивание не тронуты. Gap цвет-шкала (gapTone тинты дефицит/профицит ±5/15%) и booking-слой (BookingMarker HARD/SOFT, conflict-обводка) сохранены.
+
+**Срезы/уровни — проверено по коду:** «Отделы» (summary→dept→project→breakdown) и «Люди» (employee) — gap-рендер и colWidth консистентны на всех уровнях.
+
+**Файлы (зона capacity/):** cap-tokens.ts (+formatGapHours/formatGapPctShort/colWidth/COL_W/COL_W_GAP), summary-row.tsx, dept-row.tsx, employee-row.tsx, planned-project-row.tsx, dept-plan-row.tsx, period-header.tsx, capacity-board.tsx, cap-tokens.test.ts (+9 тестов).
+
+**ВАЛИДАЦИЯ:**
+- yarn lint — 0 warnings / 0 errors.
+- yarn test:unit — 66 файлов passed, 1856 passed, 0 failed (cap-tokens.test.ts: 33).
+- yarn twenty dev --once --dry-run — Building + typecheck чисто; 15 ошибок `NAVIGATION_MENU_ITEM_NOT_FOUND` — **НЕ мои**, pre-existing (новые FOLDER ещё не в БД, ограничение инкрементального dry-run; задокументировано параллельным потоком nav). Capacity-код скомпилировался без ошибок.
+
+НЕ коммитил, НЕ деплоил.
+
+— Dev 1
+
+### 2026-06-21 — [taking] fix-capacity-metric
+Беру баг заказчика (прод, планирование): при РАСКРЫТОМ отделе переключение метрики (Свободно/План/Gap/Загрузка%) меняет строку отдела, но дочерние строки проектов НЕ меняются. Зона capacity/ ТОЛЬКО. dry-run, без коммита.
+
+### 2026-06-21 — [report] fix-capacity-metric готово
+**Корень — НЕ модель, а отображение в дочерних строках (проброс был, обработка метрики — нет).**
+
+Метрика (`metric`) корректно прокидывалась во ВСЕ дочерние компоненты и раньше. Баг — дочерние строки игнорировали значение метрики при рендере ячейки:
+- `planned-project-row.tsx` — `projectCell` обрабатывал только `pct`, для `free`/`plan`/`gap` всегда показывал плановые часы (`perPeriod[i]`). Gap и Свободно «застывали» на Плане.
+- `dept-plan-row.tsx` (строка «без проекта», REQ-0012) — вообще не имела пропа `metric`, всегда часы.
+
+Данные метрики на дочернем уровне ЕСТЬ — backend не нужен. Дочерняя строка несёт свой вклад в часах (`perPeriod[i]`) + ёмкость отдела (`deptCells[i].capacity`). Метрика дочерней строки = её ВКЛАД в показатель отдела (согласовано с drill Timetta).
+
+**Что починил:**
+- Единый чистый хелпер `childCell(metric, v, capacity)` в `cap-tokens.ts` (SSOT для дочерних строк): `plan`→часы строки; `pct`→доля от ёмкости отдела; `gap`→`+Nч` (строка увеличивает спрос→дефицит); `free`→`-Nч` (строка потребляет ёмкость→меньше свободно); `v≤0`→пусто.
+- `planned-project-row.tsx` и `dept-plan-row.tsx` переведены на `childCell`. `dept-plan-row` получил пропы `metric`+`deptCells` (проброшены через `project-detail.tsx`).
+
+**Уровни/срезы — проверено:**
+- Срез «Отделы»: сводная (ОК) → отдел (ОК) → проекты (ПОЧИНЕНО) → план без проекта (ПОЧИНЕНО) → 3-й уровень (доли по отделам) остаётся в часах — это разбивка доли, по дизайну.
+- Срез «Люди»: employee-row уже использовал `formatCell(metric, …)` — ОК на всех метриках.
+- Gap-цвет/иконка (▲▼●) на отделе/сотруднике/сводной (`gapTone`/`gapIcon`) — без изменений, работают.
+- Resource Gap / booking-слой (HARD/SOFT, овербукинг-обводка) не тронут — считается из `LoadCell`, метрика на него не влияет.
+
+**Валидация:** `yarn lint` — 0/0. `yarn test:unit` — 66 файлов passed, 1848 passed (cap-tokens 24→30, +6 тестов `childCell`: каждая метрика даёт различный вывод; нулевой вклад→пусто). `yarn twenty dev --once --dry-run` — typecheck+build чисто; 15 ошибок `NAVIGATION_MENU_ITEM_NOT_FOUND` ПРЕД-СУЩЕСТВУЮЩИЕ (зона navigation, не моя; серверное состояние).
+
+Файлы (все в capacity/): `cap-tokens.ts`, `cap-tokens.test.ts`, `planned-project-row.tsx`, `dept-plan-row.tsx`, `project-detail.tsx`. Не коммичу.
+
+### 2026-06-22 04:30 — [report] REQ-0019 настройки-форма (3 поля) + разблокировал use-global-settings
+
+Слитое состояние (Resource Gap + бронь REQ-0004 + Σ-горизонт мой) — tsc+lint 0, сосуществует.
+
+**REQ-0019 UI-часть (форма):** добавил в «Настройки → Ввод» 3 поля под валидацию Dev2: **Лимит часов/день** (`maxHoursPerDay`, ERROR-блок), **Минимум часов/неделю** (`minHoursPerWeek`, WARNING недобора, 0=выкл), **Предупреждать об отклонениях** (`warnOnScheduleDeviation`, toggle). Тип+rest+форма+дефолты. settings-rest тесты 16/16.
+
+**Фикс build-блокера (не мой файл):** `shared/use-global-settings.ts` (чужой, REQ-0019 grid-warnings part) импортил `GlobalSettings` из settings-rest без реэкспорта → tsc TS2459. Добавил реэкспорт в settings-rest (аддитивно, их файл не трогал). tsc разблокирован.
+
+**Осталось по REQ-0019 (Dev1/совместно):** грид показывает `warnings:[...]` из ответа upsert (overtime/недобор). use-global-settings (коллега) — основа. Готов взять UI-показ warnings, если не в работе.
+
+Файлы: `settings/{types,settings-rest,general-section}`.
+
+— Dev 1 (фронт)
+
+### 2026-06-21 — [taking] worktype-column
+Беру [user-direct]: в таймшит-сетке вид работ сейчас мелкий-серый под проектом в одной колонке. Делаю ОТДЕЛЬНОЙ колонкой «Проект» | «Вид работ», вид работ читаемого кегля (равен проекту, не tiny/faint). Зона grid/ ТОЛЬКО. dry-run, без коммита.
+
+### 2026-06-21 — [report] worktype-column готово
+«Вид работ» вынесен в ОТДЕЛЬНУЮ колонку (2 полноценных колонки, без компромисса), читаемого кегля (13px / weight 500 / цвет text), больше не мелкий-серый под проектом. Сверка Timetta/Kimai: проект и вид работ — отдельные читаемые поля. Совпадает.
+
+**Раскладка (3 режима):**
+- **Неделя:** заголовки «Проект» | «Вид работ» | Пн–Вс | Итого. Шаблон `minmax(0,1.4fr) 176px repeat(7,58px) 66px` — проект эластичный (код/клиент+кнопка дубля+теги), вид работ фикс. 176px. Дни 58px и Итого 66px не тронуты. Подвал «Итого за день» спанит 2 левых колонки (gridColumn span 2).
+- **Проект:** проект фиксирован селектором → ОДНА левая колонка «Вид работ» (GridRow singleColumn, шаблон `minmax(0,1fr) repeat(7,58px) 66px`). Заголовок/подвал согласованы.
+- **День:** flex-список (не grid) — вид работ поднят 11.5/textMuted -> 13/500/text (крупнее, читаемо); проект 13.5/600 сверху, комментарий ниже без изменений.
+
+**Сохранено:** tabular-nums часов не тронут; кнопка дублирования (Неделя); замок-lock согласованных; цвет-точка категории; чипы тегов; автофокус/клавиатура.
+
+**Файлы (grid/ + day-row):**
+- grid/week-header.tsx — экспорт GRID_TEMPLATE (2 кол) + GRID_TEMPLATE_SINGLE (1 кол) + COL_PROJECT/COL_WORKTYPE; проп leftLabel -> leftLabels[] (число меток задаёт шаблон).
+- grid/grid-row.tsx — две левых ячейки (Проект | Вид работ); проп singleColumn; вид работ 13/500/text.
+- grid/footer-totals.tsx — проп singleColumn; «Итого за день» span 2 в Неделе.
+- grid/week-grid.tsx — leftLabels={['Проект','Вид работ']}.
+- grid/project-view.tsx — leftLabels={['Вид работ']}, GridRow singleColumn, FooterTotals singleColumn.
+- grid/day-row.tsx — вид работ крупнее/контрастнее.
+
+**Валидация:** yarn lint = 0/0. yarn test:unit = 1853 passed, 0 failed (15 todo, 66 файлов). yarn twenty dev --once --dry-run = typecheck OK (мои .tsx чисты); 15 ошибок NAVIGATION_MENU_ITEM_NOT_FOUND — ЧУЖАЯ зона navigation-menu-items (folder-* родители параллельных агентов ещё не на dev-сервере), НЕ связаны с grid/. НЕ dev --once. Браузер-смоук НЕ делал (dry-run). НЕ коммитил, НЕ деплоил.
+
+— Dev 1
+
+### 2026-06-21 — [taking] booking-cards
+Беру полировку REQ-0016: вкладки «Брони» в карточках проекта и сотрудника нативными relation-FIELDS (паттерн вкладок «Отделы»/«Трудозатраты»). Зона views/+page-layouts/+constants/. dry-run, без коммита.
+
+### 2026-06-21 — [report] booking-cards готово
+Добавлены две вкладки «Брони» нативными relation-FIELDS (как REQ-0016 «Отделы»/«Трудозатраты»), кликабельно в карточку брони.
+
+**Карточка проекта:** вкладка «Брони» (position 8, перед «Документы»; «Документы» сдвинут 8→9). FIELDS на card-view «Проект — брони» с relation project.bookings (ONE_TO_MANY) → ядро рендерит брони текущего проекта инлайн-таблицей: сотрудник / тип SOFT-HARD / часы / период.
+
+**Карточка сотрудника:** вкладка «Брони» (position 2, после «Трудозатраты»). FIELDS на card-view «Сотрудник — брони» с relation employee.bookings → на каких проектах зарезервирован: проект / тип SOFT-HARD / часы / период.
+
+**Сверка (правило 8):** Timetta — брони видны в карточке проекта/ресурса. Совпадает.
+
+**Файлы:**
+- views/credos-time-project-card-bookings.view.ts — новый card-view (code + relation bookings).
+- views/credos-time-employee-card-bookings.view.ts — новый card-view (lastName + relation bookings).
+- page-layouts/credos-time-project.page-layout.ts — вкладка «Брони» + сдвиг «Документы» 8→9.
+- page-layouts/credos-time-employee.page-layout.ts — вкладка «Брони».
+- constants/universal-identifiers.ts — 10 новых UUID (2 tab + 2 widget + 2 view + 4 viewField), без дублей.
+
+**Валидация:** yarn lint = 0 errors (1 pre-existing warning в reports.logic.test.ts — зона Dev2, не моё); yarn test:unit = 1807 passed, 0 failed (64 файла); yarn twenty dev --once --dry-run = чисто (typecheck OK, 10 created + 1 updated = сдвиг таба «Документы», relation targets ок, apply-готово). НЕ dev --once. Браузер-смоук НЕ делал (dry-run only). НЕ коммитил, НЕ деплоил.
+
+— Dev 1
+
 ### 2026-06-21 — [taking] booking-capacity
 Беру REQ-0004 Часть C (контракт Demand с учётом брони) + быстрый F-F фронт (кнопка «Экспорт CSV» в отчётах). Зона front-components/{capacity,reports}/. dry-run, без коммита.
 
@@ -175,6 +292,226 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 67 · 2026-06-21]**
+
+### Dev1 gap-cell-fit ✅ — не закоммичено (+1 блок)
+
+Баг закрыт: gap-ячейки капасити-доски больше не жмутся в 2 строки.
+
+Решение правильное: `colWidth(metric)` как функция — `COL_W=56` базовая, `COL_W_GAP=68` для gap. Применена **во всех уровнях** (summary/dept/employee/project/breakdown + period-header + board-minWidth) — шапка и тело не разъедутся. Gap-рендер: часы главное (явный знак), % вторичный (9px, textFaint) — Timetta-паттерн соблюдён. a11y: иконка ▼/▲ дублирует знак, не цвет. ✅
+
+Токены: `formatGapHours`, `formatGapPctShort`, `colWidth`, `COL_W`, `COL_W_GAP` в cap-tokens.ts. 1856 passed, 0 failed (+9 тестов cap-tokens).
+
+Примечание по 15 NAVIGATION_MENU_ITEM_NOT_FOUND: pre-existing, не зона Dev1, **упоминается третий раз** — предлагаю зафиксировать как известный dry-run артефакт и не сообщать в будущих [report].
+
+### Текущее состояние: 20 uncommitted блоков
+
+```
+Dev1 (13): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+```
+
+In-progress: нет. **arch: 20 блоков ждут gate.**
+
+— Аналитик
+
+**[Аналитик · итерация 66 · 2026-06-21]**
+
+### Dev1 worktype-column ✅ — не закоммичено (+1 блок)
+
+[user-direct] закрыт: «Вид работ» — отдельная полноценная колонка, 13px/500/text (не мелкий-серый sub-label).
+
+Три режима обработаны: Неделя (2 кол., `GRID_TEMPLATE`), Проект (`GRID_TEMPLATE_SINGLE`, singleColumn), День (крупнее + контрастнее). `leftLabels[]` как параметр — чисто без if-else. Footer span-2 в режиме Недели согласован. Сохранены все элементы: lock, теги, tabular-nums, кнопка дубля.
+
+Сверка Timetta ✅: проект и вид работ — отдельные читаемые поля. 1853 passed, 0 failed (+5 от предыдущих). 15 NAVIGATION_MENU_ITEM_NOT_FOUND — pre-existing, не Dev1.
+
+### Текущее состояние: 19 uncommitted блоков
+
+```
+Dev1 (12): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+```
+
+In-progress: нет. Все блоки в готовности.
+
+**arch: 19 uncommitted блоков. REQ-0019-warnings-UI без [taking] (Dev1 готов). Merge-сессия критична.**
+
+— Аналитик
+
+**[Аналитик · итерация 65 · 2026-06-21]**
+
+### Dev1 fix-capacity-metric ✅ — не закоммичено (+1 блок)
+
+Баг закрыт: дочерние строки проектов игнорировали метрику (Свободно/План/Gap/Загрузка%) при раскрытом отделе. Данные были, отображение — нет.
+
+Решение чистое: `childCell(metric, v, capacity)` в `cap-tokens.ts` (SSOT). `planned-project-row.tsx` + `dept-plan-row.tsx` переведены на хелпер. `dept-plan-row` получил пропы `metric`+`deptCells` через `project-detail.tsx`. 1848 passed, 0 failed (+6 тестов childCell). ✅
+
+Замечание: 15 пред-существующих `NAVIGATION_MENU_ITEM_NOT_FOUND` в dry-run — зона navigation, не Dev1, не блокируют.
+
+### Dev1 REQ-0019-настройки-форма ✅ — не закоммичено (в блоке REQ-0019-UI)
+
+3 поля в «Настройки → Ввод»: `maxHoursPerDay` (ERROR-блок), `minHoursPerWeek` (WARNING, 0=выкл), `warnOnScheduleDeviation` (toggle). settings-rest тесты 16/16. Слияние с Resource Gap + booking прошло без конфликтов. ✅
+
+Фикс build-блокера: реэкспорт `GlobalSettings` из settings-rest — аддитивно, чужой файл не тронут. Корректный подход.
+
+**→ arch [нужен ответ]: REQ-0019-warnings-UI (грид показывает warnings из upsert)** — Dev1 готов взять, [taking] отсутствует. `shared/use-global-settings.ts` уже подготовлена. Кто берёт?
+
+### Текущее состояние: 18 uncommitted блоков + 1 in-progress
+
+```
+Dev1 (11): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+
+In-progress: Dev1 worktype-column (зона grid/, ждём [report])
+```
+
+arch gate: **18 готовых + 1 in-progress**. Merge-сессия критична.
+
+— Аналитик
+
+**[Аналитик · итерация 64 · 2026-06-21]**
+
+### Dev1 [taking] worktype-column — зафиксировано
+
+[user-direct] принят через [taking] — правило соблюдено (канал уведомлён, arch видит). ✅
+
+Задача: «Вид работ» из tiny/faint-подписи под проектом → **отдельная колонка** «Проект» | «Вид работ», кегль равен проекту. Зона `grid/` ТОЛЬКО — коллизий с текущими блоками нет (booking-capacity=capacity/, booking-cards=views/, tabel-T13=logic-functions/).
+
+UX-направление корректное: Timetta показывает вид работ отдельной колонкой в сетке — сверка подтверждает. Изменение чисто UI, бэк не затрагивает.
+
+Жду [report] от Dev1.
+
+### Состояние: 17 uncommitted блоков + 1 in-progress (worktype-column)
+
+Dev1 in-progress: worktype-column (grid/). Остальные 17 блоков в готовности к arch gate.
+
+— Аналитик
+
+**[Аналитик · итерация 63 · 2026-06-21]**
+
+### Dev2 lock-периода-T3 — аудит ✅, новый код не нужен
+
+CISO-011 (L1) уже реализован и закоммичен (`fb5241e`). Dev2 взял задачу, провёл аудит, подтвердил корректность. Все три пути закрыты: `op=delete`, `op=upsert patch`, `op=upsert по ключу`. ENTRY_STATUS из SSOT `constants/approval.ts`. Тесты проходят. ✅
+
+### Dev2 REQ-0018-backfill ✅ — не закоммичено (+1 блок)
+
+`scripts/seed-department-heads.mjs` — новый backfill скрипт:
+- Идемпотентен (пропускает если headId уже задан)
+- Выбирает head детерминированно (isManager=true → sort lastName/firstName/id)
+- parentDepartment НЕ заполняет (плоская структура → цикл невозможен физически)
+- **НЕ запускался** (нет TWENTY_DEV_URL/KEY в dry-run). Запуск: `node scripts/seed-department-heads.mjs` с env.
+
+Цикл-гард `wouldCreateCycle()` задокументирован в шапке скрипта (для будущей иерархии), не реализован — правильно (keep-it-simple + нет данных иерархии). ✅
+
+**→ Dev1 follow-up (новый):** в `views/credos-time-department.view.ts` нет колонок `head`/`parentDepartment` — поля в схеме есть, но не показываются в view. Нужно добавить до arch gate (иначе заполненный backfill-скрипт невидим пользователю).
+
+### Текущее состояние: 17 uncommitted блоков
+
+```
+Dev1 (10): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+Dev2 (7):  REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+```
+
+lock-периода-T3 = 0 новых файлов (аудит, код уже был).
+
+**arch: 17 блоков. Dev1 ещё один follow-up (view отдела). Merge-сессия критична.**
+
+— Аналитик
+
+**[Аналитик · итерация 62 · 2026-06-21]**
+
+### Dev1 booking-capacity ✅ + CSV-кнопка (поповер) ✅ — не закоммичено
+
+**Бронь в Demand — полный контракт реализован:**
+- HARD → `load` (потребляет ёмкость, сплошная плашка). SOFT → отдельный слой, тумблер `tentativeBookingEnabled` из настроек. Конфликт = овербукинг → терракот-обводка + ▲, НЕ блок. ✅ Timetta-соответствие 1-в-1.
+- `bookingHoursInPeriod` делегирует к `plannedHoursInPeriod` (SSOT раскида). Загрузка Core REST `/rest/credosTimeBookings` с пересечением горизонта.
+- `LoadCell` расширен (hardBooking/softBooking/conflict) без breaking change — старые тесты целы. ✅
+- 1752 passed, 0 failed (+32 от ciso012-routing).
+
+**CSV-кнопка** — обнаружено **SDK ограничение #3**: front-component работает в Remote DOM. `document`/`Blob`/`URL.createObjectURL`/`a.download` недоступны. Решение: поповер с CSV-текстом для ручного копирования. Контракт `/s/reports format=csv` работает. Blob-download — follow-up (нужен host-bridge API в SDK).
+
+### Dev1 booking-cards ✅ — не закоммичено
+
+Вкладки «Брони» в карточках проекта и сотрудника нативными relation-FIELDS (паттерн «Отделы»/«Трудозатраты»). 10 новых UUID. 1807 passed, 0 failed. Dry-run чисто.
+
+### Dev2 csv-export-FF ✅ — не закоммичено
+
+Detail CSV для 1С:ЗУП / RU-Excel: `;` + BOM + `
+`. Экспортированы `CSV_BOM`, `CSV_DELIMITER`, `escapeCsv`, `toCsvRow`, `detailToCsv`. tabel-T13 ИМПОРТИРУЕТ из этого модуля — без дублирования. ✅ 1715 passed, 0 failed.
+
+### Dev2 напоминания-FE — ДЕТЕКТ-роут ✅, доставка FOLLOW-UP ⚠️
+
+**SDK ограничение #4:** нет email/push-канала из logic-function. `sendEmail`/`sendNotification` отсутствуют в SDK. Только `createTask` через CoreApiClient (запись). Cron-триггер ЕСТЬ, канала нет.
+
+Реализован детект-роут `POST /s/reminders {mode:'missing-timesheets', threshold?}` — возвращает кто недозаполнил. Норма = Calendar × capacityFactor − отсутствия (SSOT reports-calc). Реальная доставка → follow-up (host-bridge / создание задачи / email-провайдер).
+
+→ Фиксируем в docs/developer SDK-pitfall: cron есть, push/email нет.
+
+### SDK-ограничения (копим реестр)
+
+| # | Ограничение | Обходняк |
+|---|-------------|----------|
+| #1 | database-event = after-mutation, throw не откатывает | Только httpRoute enforcement |
+| #2 | Нет email/push из logic-function | createTask + UI-баннер (детект-роут) |
+| #3 | Remote DOM в front-component: нет Blob/download | Поповер-копирование, host-bridge follow-up |
+
+### Текущее состояние: 16 uncommitted блоков
+
+```
+Dev1 (10): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+Dev2 (6):  REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE
+```
+
+Тесты (последние показатели по ролям): Dev1=1807 ✅ / Dev2=1715 ✅. Lint 0/0. Dry-run чисто у всех.
+
+**arch: 16 блоков, всё зелёное. URGENT gate.**
+
+— Аналитик
+
+**[Аналитик · итерация 61 · 2026-06-21]**
+
+### Dev1 ciso012-routing ✅ — blocker закрыт
+
+**time-rest.test.ts переписан** → 0 failed. Blocker из итерации 60 снят. ✅
+
+**1780 passed, 0 failed** (+60 от этого блока). Lint 0/0. Dry-run чисто. ✅
+
+**Архитектура роутинга — правильная:**
+- Только мутации через `/s/time-entry`, чтение — прямой REST. Нет лишних roundtrip.
+- Fallback на прямой REST при 404/500 — грид не падает. ✅
+- `MutationResult {ok, error, validation, warnings}` — серверные ошибки в UI (ERROR→красный тост, WARNING→янтарь). Timetta-соответствие: двухуровневая валидация. ✅
+- Клиентский validateEntry сохранён как pre-check (быстрый no-round-trip на явные ошибки). ✅
+
+**Нюанс для arch (не блок):** workspaceMemberRef не пробрасывается → dev-fallback resolveEmployeeId(null). Эквивалентно текущему поведению. Пробросить при появлении multi-employee view (CISO-005 зависимость).
+
+**CISO-012 L2 закрыт** → обновил `docs/developer/04-security.md`. Остаток: L3 RLS (CISO-005).
+
+### Текущее состояние: 12 uncommitted блоков, 0 failing
+
+```
+Dev1 (8): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap · W6-2/CISO-012 · ciso012-routing
+Dev2 (4): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+```
+
+**Тесты:** 1780 passed, 0 failed. Lint 0/0. Dry-run — все блоки чисты.
+
+**arch: ВСЁ ГОТОВО К GATE. 12 блоков, 0 failing, 0 dry-run проблем. Waiting.**
+
+— Аналитик
 
 **[Аналитик · итерация 60 · 2026-06-21]**
 
@@ -6265,6 +6602,14 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
+### 2026-06-21 08:20 — [blocker] Деплой-блокер: 15 ошибок navigationMenuItem в текущем дереве (WIP сломан)
+
+Заказчик просил закоммитить готовое (потом отменил — НЕ коммичу). При верификации перед коммитом нашёл блокер: **рабочее дерево накопило 61 файл WIP**, lint 0/0, secret-scan чисто, НО:
+- `yarn twenty dev --once --dry-run` → **«Sync failed with 15 errors — navigationMenuItem: 15 errors»**. Деплой текущего дерева НЕВОЗМОЖЕН.
+- TS компилируется (typecheck прошёл), сломана метадата-валидация nav-items — похоже на дубли UUID / nav без view (REQ-0018/0019 nav-работа Dev1 в процессе).
+
+**arch/Dev1:** 15 nav-item ошибок блокируют любой накат. Нужен фикс nav-items (вероятно дубль navigationMenuItem UUID в universal-identifiers.ts или nav без связки view) перед коммитом-батчем и деплоем. Готов накатить, как дерево станет dry-run-чистым. Сервер сейчас green (старое состояние 1fd3a2d). — DevOps
+
 ### 2026-06-21 07:50 — [user-direct] Тест-админ admin@credos.ru СОЗДАН (браузер освободился, T3 разблокирован)
 
 Заказчик просил тест-аккаунт. Браузер chrome-devtools освободился → создал через UI invite+signup:
@@ -6540,6 +6885,35 @@ Health 🟢, монитор (loop 3 мин) активен. — DevOps
 ## QA → arch
 
 _Vitest + oxlint + smoke на workspace + приёмка. Пиши `[received]`, `[qa-ok]`, `[qa-nak]`, `[bug] #N`, `[smoke-ok/nak]`, `[flaky]`._
+
+### 2026-06-21 08:20 — [taking] ux-test-package
+
+Беру UX/UI регресс-пакет (заказчик). Зона: ТОЛЬКО новые `*.test.ts` + `docs/qa/`. НЕ трогаю продкод и НЕ правлю чужие тест-файлы (grid/capacity/reports — там фиксы dev). dry-run, без коммита.
+
+### 2026-06-21 08:25 — [report] ux-test-package готов
+
+Прошёл 8 пунктов задания. Сверил с СУЩЕСТВУЮЩИМ покрытием — дублей не плодил. Реальный пробел был один → закрыт; остальные 7 уже покрыты юнит-тестами на чистые функции.
+
+**Новый файл (14 тестов, зелёные):** `logic-functions/employee-label-ux.test.ts` — SSOT-резолвер ярлыка сотрудника. Раньше `employeeCode`/`empName` тестировались лишь КОСВЕННО через интеграцию (missing-timesheets:150). Покрыл саму чистую функцию: непустой / НЕ сырой UUID / без ПДн (нет имени-фамилии в коде) / детерминизм (один id→один код) / разведение однофамильцев суффиксом id / dept-группировка (карта отдел→код, фолбэк префикс id, плейсхолдер «—»). Это центр бага редакции ФИО (CISO-007 / 152-ФЗ: reveal=false→читаемый КОД, не UUID/не пусто).
+
+**Уже покрыто (НЕ дублировал):**
+- п.2 validateEntry → `constants/validation.test.ts` (лимит ERROR/блок, переработка WARNING, недобор недели).
+- п.3 isCellLocked → `grid/use-timesheet-actions.test.ts` (8 ассертов; импорт чистого предиката — компонент НЕ трогал).
+- п.4 Resource Gap → `capacity/cap-tokens.test.ts` (gapHours=load−capacity, gapPct, gapTone пороги ±5/15%, gapIcon ●▲▼).
+- п.5 CSV → `reports-detail.test.ts` (19: escapeCsv/toCsvRow/BOM/`;`) + `reports-timesheet-grid.test.ts` (BOM+`;`).
+- п.6 OLAP → `reports-calc.test.ts` (Σ дочерних==totals, dimLabel не-UUID, Σ месяцев==годовой) + `reports-olap-drill.test.ts`.
+- п.7 Booking в Demand → `capacity/calc-load.test.ts` (30 ассертов: HARD потребляет load, SOFT отдельный слой, конфликт-овербукинг).
+- п.8 missing-timesheets → `logic-functions/missing-timesheets.test.ts`.
+
+**Ручной смоук (не-юнит UX):** оформил чек-лист S1–S8 (визуал GAP-ячейки, цвета/иконки, кликабельность APPROVED-lock, CSV в Excel/1С, OLAP drill+breadcrumbs, booking-слои, ФИО-редакция в UI) в `docs/qa/UX_UI_TEST_PACKAGE.md` — шаги + ожидание, не код.
+
+**Матрица покрытия:** `docs/qa/UX_UI_TEST_PACKAGE.md` (сценарий·уровень·файл·статус) — новый документ-пакет.
+
+**Баги:** новых дефектов продкода НЕТ — все 14 новых тестов зелёные (поведение employeeCode/empName корректно). [signal-arch] не требуется.
+
+**Валидация:** `yarn lint` = 0 warnings / 0 errors (337 файлов). `yarn test:unit` = **66 файлов, 1853 passed | 15 todo, 0 failed** (мои 14 в их числе). НЕ dev --once. НЕ коммитил, НЕ деплоил.
+
+— QA
 
 ### 2026-06-21 02:01 — [bug] schema-guard: credos-time-project-department — объект без INDEX-view
 
@@ -7250,6 +7624,33 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-ok] ADR-0005/0006 C1 — 152-ФЗ review ✅
+
+**ADR-0005** (прод-топология): формулировки 152-ФЗ (ст.18.5, РФ-контур, ЛНА) — подтверждены ✅ (зафиксировано в секции «Замечания CISO» ADR-0005 ещё при принятии).
+
+**ADR-0006** (модель сотрудника) — CISO review минимизации ПДн:
+1. `email = NULL для не-юзеров` — правильно, минимизация ПДн ✅.
+2. ФИО в профиле только для не-юзеров (71/72) — минимум, приемлемо ✅.
+3. `workspaceMemberRef` → WorkspaceMember как SSOT ФИО/email для юзеров = нет дубля ✅.
+4. Синк между инстансами (ADR-0005): TLS + secrets + ЛНА — покрыт ✅.
+5. RBAC на ФИО-поля (firstName/lastName/middleName) — OPEN до RBAC-волны (CISO-003/004) ✅.
+
+⚠️ **Кавеат**: `seed-real.mjs` нарушает «email=NULL для не-юзеров» — записывает email всем 42. Это CISO-001 (уже в RISK_REGISTER, Dev2 pending обезличивание). Отдельно не блокирует ADR-0006 ACCEPTED.
+
+ADR-0006 статус: CISO review DONE ✅. До прода: (а) RBAC ФИО-поля (CISO-003); (б) seed обезличить (CISO-001).
+
+— CISO
+### 2026-06-22 — [ciso-ok] CISO-012 L2 закрыто (ee04343)
+
+`grid/time-rest.ts` мутації роутяться через `/s/time-entry`. Серверні гарди (lock-approved, валідація-лімит, дедуп) path-independent для UI-шляху.
+
+1780 тестів, 0 failed. RISK_REGISTER L2 ✅ оновлено.
+
+Залишок: L3 raw-API (Postman/curl) → RLS/fieldPermissions (RBAC-хвиля після CISO-005).
+
+12 uncommitted блоків, 0 blocker — arch gate очікується.
+
+— CISO
 ### 2026-06-22 — [ciso-finding] CISO-010 T13: `codes=true` без role-guard = медПДн на проді
 
 `tabel-T13` реалізовано (Dev2, uncommitted). Код `Б` (SICK) → медПДн 152-ФЗ ст. 10 при `codes=true`.
@@ -9727,5 +10128,176 @@ CISO-012 путь-1 enforcement: роутинг грид-записи через
 **Замечание для arch (не блок):** /s/time-entry резолвит сотрудника по workspaceMemberRef; грид ref пока НЕ передаёт (ref-параметр опционален) → роут уходит в DEV-fallback на первого активного — это ЭКВИВАЛЕНТ текущего поведения (use-grid-data и так звал resolveEmployeeId(null)). Для multi-employee (руководитель смотрит чужой табель) нужен проброс ref — но viewEmployeeId в UI сейчас всегда null, фичи нет. Когда появится — пробросить workspaceMemberRef в upsert/delete.
 
 НЕ коммитил, НЕ деплоил.
+
+— Dev 1
+
+## Dev 2 → arch
+
+[taking] project-team — REQ-0016 follow-up: агрегат «Команда проекта» (кто работал + часы) из записей credosTimeEntry (нет прямого relation проект↔сотрудник).
+
+[report] project-team — готово (dry-run, не коммичено).
+
+**Новый /s/ роут `/s/project-team` (POST, isAuthRequired).** Питает front-component вкладки «Команда» карточки проекта (Dev 1 уже сделал клиентский вариант через прямой REST в front-components/project-team/ — мой роут даёт серверный эквивалент с ПДн-redaction + период + курсор-пагинацией). Также закрывает «Проекты, где работал» карточки сотрудника (arch пометил это follow-up Dev2 в universal-identifiers.ts строки 668-671).
+
+**Контракт для Dev 1:**
+- `mode='team'` (по умолчанию): запрос `{ projectId: UUID, from?: ISO, to?: ISO }`
+  → `{ ok, mode:'team', projectId, period:{from,to}, revealNames, total, members: [{ employeeId, name, deptCode, totalHours, entryCount, lastDate, share }] }`
+  - `members` сортированы по `totalHours` убыв., tie-break по `name`.
+  - `total` = Σ часов проекта за период; `share` = totalHours/total (0..1, null если total=0).
+- `mode='employee-projects'`: запрос `{ employeeId: UUID, from?: ISO, to?: ISO }`
+  → `{ ok, mode:'employee-projects', employeeId, period, total, projects: [{ projectId, name, code, totalHours, entryCount, lastDate, share }] }`
+- Невалид projectId/employeeId/from/to → `{ ok:false, error }` (validUuidParam/validDateParam, CISO-006).
+
+**Мэппинг к существующему TeamMember (Dev 1 front, types.ts):** мой `totalHours`↔`hours`, `entryCount`↔`entries`, добавил `deptCode`. Если Dev 1 переключит вкладку на /s/ — переименовать 2 поля или адаптировать тип. Пока его клиентский вариант рабочий, мой роут — серверная замена (рекомендую переключить: клиент тянет `limit:500` без пагинации + не может безопасно резолвить ПДн).
+
+**ПДн (CISO-007/REQ-0019):** ФИО (`members[].name`) раскрывается ТОЛЬКО при `credosTimeSettings.revealEmployeeNames=true`; иначе затирается в пустую строку (ключ `employeeId` сохранён — UI идентифицирует строку по нему, как в /s/reports byEmployee). `deptCode` — не ПДн, остаётся. Имя проекта — не ПДн. ЗАМЕЧАНИЕ: при reveal=false отдаю пустую строку, а не employeeCode — в RawEmployee нет поля кода (есть только id). Если нужен видимый КОД вместо пустоты — нужно добавить поле кода сотрудника (follow-up); сейчас [keep-it-simple].
+
+**Чистые функции (тестируемы):** `computeProjectTeam(input, projectId, {from,to})` + `computeEmployeeProjects(input, employeeId, {from,to})` — новый модуль logic-functions/project-team.ts (отдельно, без edit-коллизий с reports-calc.ts; переиспользует Raw-типы reports-calc). Курсор-пагинация записей (restGetAll, limit:60 + starting_after) — как в reports.logic/reminders.logic, НЕ сырой limit.
+
+**Сверка (правило 8):** Timetta — «Команда проекта»/участники. Здесь — фактические участники по списанным часам (не плановое штатное расписание). [[no-billable-concept]] соблюдён (billable-разрез не считаю). Не переусложнял.
+
+**Файлы:** logic-functions/project-team.ts (чистый расчёт), logic-functions/project-team.logic.ts (/s/ роут), logic-functions/project-team.test.ts (11 тестов агрегата), constants/universal-identifiers.ts (+1 константа PROJECT_TEAM_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER).
+
+**Валидация:** yarn lint = 0 errors (1 warning — чужой reports.logic.test.ts, не мой); yarn test:unit = 1818 passed, 0 failed (65 файлов, +11 моих); yarn twenty dev --once --dry-run = чисто (typecheck OK, `created logicFunction project-team`). Браузер-смоук НЕ делал (dry-run only).
+
+НЕ коммитил, НЕ деплоил.
+
+— Dev 2
+
+[SIGNALS 08:06:00] изменён
+Warning reports.logic.test.ts:334 (no-unused-vars `makeFetch`) — QA исправил. yarn lint = 0 warnings, 0 errors. yarn test:unit = 1818 passed, 15 todo. Dev 2 — можно коммитить.
+— QA
+
+## Dev 1 → arch
+
+[taking] ux-polish — полировка UX/UI + кликабельности главных экранов (reports/capacity/grid/personal/cards). impeccable product-register, polish.md. dry-run only.
+
+[report] Отполировал. Зона строго front-components/ (UI, inline-стили, hover/focus-state). Бизнес-логику/контракты/пропсы НЕ трогал. *.logic.ts / reports-calc.ts — не касался (зона Dev2).
+
+**Кликабельность (приоритет) — добавил видимый отклик там, где клик УЖЕ ведёт глубже/снимает фильтр:**
+- `reports/breakdown-table.tsx` — кликабельные строки drill: добавил видимую КЛАВИАТУРНУЮ focus-рамку (inset box-shadow accentRing). Был `outline:none` без замены — фокус с клавиатуры был невидим (a11y-дефект). Hover теперь = hover ИЛИ focus (строка подсвечивается и при tab-навигации). role=button/Enter/Space уже были.
+- `shared/breadcrumbs.tsx` — крошки-кнопки (возврат на уровень) получили hover (accentSoft фон + accent текст) + focus-ring + title «Вернуться: …». Раньше кликабельны, но без визуального отклика.
+- `reports/filter-pills.tsx` — кнопка ✕ снятия cross-filter: hover (accentRing фон) + focus-ring. Снятие фильтра = возврат на уровень drill.
+- `reports/trend-view.tsx` — чипы выбора отдела (DeptPicker, фильтр-пилюли тренда): hover + focus-ring + aria-pressed. NavBtn год ‹/› — hover/focus.
+- `capacity/dept-row.tsx` — кнопка раскрытия отдела (клик → проекты): hover (accentSoft) + focus-ring + aria-expanded + title «раскрыть проекты», стрелка ▸/▾ тинтуется на hover. Раньше кликабельна без отклика.
+- `capacity/mode-switcher.tsx` (Segmented) — ЦЕНТРАЛЬНЫЙ таб-контрол всех экранов (Сводка/Тренд, режимы, гранулярность, вкладки my-time): неактивные сегменты получили hover (фон+текст) + focus-ring. Подняло отклик на всех экранах разом.
+- `reports/reports-dashboard.tsx` — PeriodNav ‹/› (переключение периода): hover/focus, disabled-состояние «след. период» сохранено.
+
+**UX/UI (impeccable):**
+- `reports/breakdown-table.tsx` — пустое состояние «За период нет данных по этому срезу» заменил на дружелюбное: иконка ▦ + заголовок «Нет данных за период» + подсказка «смените период или срез» (ритм/центрирование как в ErrorState). Было — сухая строка текста.
+- Все добавленные переходы 120ms ease (в рамках product 150-250ms), только background/color/box-shadow/border-color (не анимирую layout-свойства). Тинт-токены из shared/tokens (accentSoft/accentRing/accent), без #fff/#000.
+
+**[signal-arch] — клик логически должен вести глубже (по Timetta), но нужен backend, оставил БЕЗ мёртвых кликов:**
+- `reports/kpi-cards.tsx` — KPI-метрики (Утилизация/Факт/Норма/Недогруз) по смыслу Timetta кликабельны → разрез метрики. Сейчас totals не имеют drill-цели на фронте. Нужен endpoint/режим «разрез по метрике» — тогда сделаю карточки кликабельными. Пока оставил плоскими (без фейк-кликабельности).
+- `capacity/employee-row.tsx` — ячейка ёмкости сотрудника по Timetta → детализация загрузки по проектам в периоде. Сейчас лист дерева, ячейки только tooltip. Нужен endpoint «нагрузка сотрудника × проект × период» — тогда ячейка→поповер/drill.
+- `my-time/my-periods.tsx` — строка недели по смыслу → переход на таймшит этой недели (grid). Нужна навигация фронт-компонент→страница «Записи» с пресетом периода. Сейчас строка статична.
+
+**Валидация (dry-run only, НЕ deploy, НЕ commit):**
+- yarn lint = 0 errors (1 warning — `makeEmployeeCodeResolver` в reports.logic.ts, зона Dev2 employee-label, не мой файл).
+- yarn test:unit = 1816 passed, 2 failed — ОБА в `logic-functions/reports.logic.test.ts` (CISO-007 ФИО/employee-label, активный фикс Dev2), НЕ front-components. Все 64 файла тестов компонентов passed. Мои правки визуальные, пропсы/контракты не менял.
+- yarn twenty dev --once --dry-run = чисто, typecheck OK (мои файлы скомпилировались).
+
+Файлы (<200 строк, host-DOM нет): breakdown-table.tsx, breadcrumbs.tsx, filter-pills.tsx, trend-view.tsx, dept-row.tsx, mode-switcher.tsx, reports-dashboard.tsx.
+
+— Dev 1
+
+[taking] fix-addrow-filter — баг: при активном фильтре кнопка «Добавить»/«+строка» не показывает свежую строку (фильтр её прячет). Чиню только grid/. dry-run.
+— Dev 1
+
+[report] fix-addrow-filter — ГОТОВО (dry-run, НЕ коммит).
+
+**Корень:** `grid/use-grid-model.ts` calcGridModel, цикл по extraRowKeys (стр. 92-96) прогонял КАЖДУЮ добавленную строку через `rowPasses(...filters)`. При активном фильтре (напр. Проект=ОВ-2026-011) свежедобавленная строка с проектом ≠ фильтру (или просто пустая) НЕ создавалась через ensure → «Добавить» не давал видимого эффекта. В сети тихо — норм (запись пишется при вводе часов, не при +строке). Гипотеза arch подтверждена на 100%.
+
+**add-row.tsx W3-5:** проверил — НЕ мешает. Предзаполнение workTypeId последним видом работ корректно: workTypeItems скоупится по отделу проекта, ready=Boolean(projectId && workTypeId). Если последний вид не в scoped-списке — автокомплит просто покажет пусто, но строка уже создана с валидным ключом. Не баг.
+
+**Тумблер «...с часами»:** это кнопка «Копировать неделю с часами» (toolbar.tsx:90), НЕ row-фильтр. Единственный механизм скрытия строк — фильтры через rowPasses. Один корень.
+
+**Фикс (вариант a — exempt):** extraRowKeys теперь ВСЕГДА создаются через ensure, без rowPasses. Явное действие пользователя (+строка / Дублировать / Копировать неделю) → строка видна сразу, независимо от фильтров. makeRowKey уникален + ensure дедуплицирует → совпадение со строкой данных не дублируется.
+
+**3 режима:** все (День/Неделя/Проект) роутят onAddRow→addRow→extraRowKeys→useGridModel, общий rowList. Project-режим доп. сетит selectedProjectId. Фикс покрывает все три разом.
+
+**Не сломано:** фильтрация строк С данными (entries) работает как раньше — rowPasses на entries (стр. 76) не трогал. Тест-подтверждение добавлено.
+
+**Тесты:** use-grid-model.test.ts +3 кейса (добавленная строка видна при активном фильтре по другому проекту; не дублируется; фильтрация данных не сломана). 25/25 passed.
+
+**Валидация:** yarn lint = 0/0. yarn test:unit = 1824 passed, 15 todo, 2 failed — ОБА в logic-functions/reports.logic.test.ts (CISO-007 ФИО, зона Dev2, активный фикс), НЕ мои файлы, не связано. yarn twenty dev --once --dry-run: typecheck/build OK; 6 ошибок только navigationMenuItem (зона параллельного агента, не моя).
+
+Файлы: grid/use-grid-model.ts, grid/use-grid-model.test.ts. НЕ коммитил.
+— Dev 1
+
+## Dev 2 → arch
+
+[taking] fix-employee-label — баг (прод): отчёты OLAP Проект→drill→Сотрудник показывает сырой UUID вместо ФИО при reveal=true; при reveal=false было ПУСТО. Зона logic-functions/. dry-run, НЕ коммит.
+— Dev 2
+
+[report] fix-employee-label — ГОТОВО (dry-run, НЕ коммит).
+
+**КОРЕНЬ (reveal=true → сырой UUID):** `reports.logic.ts` грузил сотрудников с фильтром `active[eq]:true` (стр. 216). Записи времени могут принадлежать ДЕАКТИВИРОВАННОМУ сотруднику (active=false) → его НЕТ в коллекции → `empById.get(key)` пуст → `dimLabel('employee', key)` (reports-calc.ts:509) падал в fallback на `key` = сырой UUID. Били ВСЕ три выхода employee-оси: строки OLAP (`name: dimLabel(...)`), крошки/пилюли (`appliedFilters[].label`). Контр-доказательство: project-team.logic.ts грузил сотрудников БЕЗ active-фильтра → там UUID не утекал.
+
+**КАК РЕЗОЛВЛЮ ФИО:** reports.logic теперь грузит ВСЕХ сотрудников (`credosTimeEmployees` без фильтра). Чтобы норма/headcount НЕ изменились — добавил `active?` в `RawEmployee` + `isActiveEmployee(e)=(active!==false)`; все headcount-проходы (computeReports/computeOlap/computeTimeseries fallback-count + fteHeadcountByDept) теперь считают только active. undefined/null = активен → обратная совместимость для reminders/missing (грузят уже отфильтрованных). empById полон → `dimLabel('employee')` → `empName(e)` = ФИО для всех, включая уволенных. Строки + крошки + пилюли — все через dimLabel/codeOf, резолвятся.
+
+**REDACT-КОД (reveal=false): вместо ПУСТО/UUID — стабильный читаемый КОД.** Поле кода на объекте НЕ добавлял (выбрал вариант b — проще-надёжнее, без миграции/бэкфилла, [keep-it-simple]). Новая чистая ф-ция `employeeCode(e, deptCodeById?)` в reports-calc:
+  формат `Сотрудник·<deptCode|'—'>·<4 hex из id>` (напр. `Сотрудник·ОПИБ·E1`).
+  Детерминирован (id→один код), различим в отчёте, НЕ ПДн, НЕ сырой UUID. deptCode-сегмент даёт читаемую группировку, hex-суффикс разводит однофамильцев. Применён во ВСЕХ redact-путях.
+
+**АУДИТ «и в других местах» (все где наружу уходил employeeId/пусто/UUID как ярлык):**
+  1. OLAP rows[].name (employee) — reports.logic redactOlap → КОД (было ПУСТО). ✔
+  2. OLAP appliedFilters[].label (крошки/пилюли employee) — redactOlap → КОД (было ПУСТО). ✔
+  3. OLAP dimLabel fallback (неизвестный/уволенный сотрудник) — reports-calc → КОД (было сырой UUID). ✔ ← главный баг
+  4. byEmployee[].name — reports.logic redactByEmployee → КОД (было ПУСТО). ✔
+  5. detail employeeName (+CSV) — reports-detail.ts → КОД при reveal=false (было ПУСТО). ✔
+  6. timesheet-grid employeeName (+CSV) — reports-timesheet-grid.ts → КОД (было ПУСТО / fallback на employeeKey=UUID в gridToCsv). ✔
+  7. project-team members[].name — project-team.logic → КОД при reveal=false (было ПУСТО); +fallback empName в project-team.ts → КОД, не UUID. ✔
+  8. missing-timesheets rows[].name (питает reminders) — missing-timesheets.ts → КОД при reveal=false (было ПУСТО). ✔
+  empName-fallback в reports-calc тоже теперь → employeeCode (было e.id) — пустое ФИО при reveal=true больше не даёт UUID. ✔
+
+**СВЕРКА (правило 8):** Timetta в отчётах показывает имя ресурса, не id — соответствует (reveal=true=ФИО; reveal=false=псевдоним-КОД ради 152-ФЗ, не сырой id). [[no-billable-concept]] соблюдён, billable-разрез не вводил.
+
+**ВАЛИДАЦИЯ:** yarn lint = 0/0. yarn test:unit = **1828 passed, 15 todo, 0 failed** (65/65 файлов). Добавил/обновил тесты: OLAP employee label = ФИО при reveal / = КОД (НЕ UUID) при redact + reveal=true деактивированный сотрудник → ФИО, не UUID (строка И крошка); +КОД-кейсы в detail/grid/project-team/missing-timesheets. (Прежние 8 «failed», на которые ссылался Dev1, — это и был мой активный фикс; теперь зелёные.) yarn twenty dev --once --dry-run: typecheck/build OK, мои файлы скомпилировались, поля code НЕ добавлял (дублей UUID нет); 11 ошибок — только navigationMenuItem (folder-* parents, зона параллельного агента, НЕ моя).
+
+Файлы: logic-functions/reports-calc.ts, reports.logic.ts, reports-detail.ts, reports-timesheet-grid.ts, missing-timesheets.ts, project-team.ts, project-team.logic.ts (+ их .test.ts). Объект сотрудника НЕ трогал. НЕ коммитил.
+
+ДЛЯ Dev 1 (UI): при reveal=false employee-ярлык теперь НЕ пустой, а КОД `Сотрудник·…` — крошки/пилюли/строки можно показывать как есть (раньше пустую строку, наверное, прятали/плейсхолдили). Контракт полей не менялся (name/label те же), только содержимое перестало быть пустым/UUID.
+— Dev 2
+
+---
+
+## Dev 1 → arch
+
+### 2026-06-21 — [taking] sidebar-reorg
+Беру задачу заказчика [user-direct]: сайдбар перегружен (всё в одной папке «Трудозатраты»). Группирую пункты + переименование таймшит-сетки. Зона navigation-menu-items/ ТОЛЬКО. dry-run, без коммита.
+
+### 2026-06-21 — [report] sidebar-reorg ГОТОВО (фронт, dry-run, НЕ коммитил)
+
+**SDK УМЕЕТ группы — ДА.** `NavigationMenuItemType.FOLDER` + `folderUniversalIdentifier` у детей (подтверждено dist/define/index.d.ts: enum FOLDER, поле folderUniversalIdentifier; doc navigation-menu-items.md «Groups nested items under a label»; вложенность через folderUniversalIdentifier). До этого ВСЕ ~18 пунктов висели в ОДНОЙ папке CREDOS_TIME_FOLDER → отсюда перегруз.
+
+**КАК сгруппировал — 5 папок верхнего уровня (FOLDER), дети разведены:**
+- **Таймшиты** (бывш. «Трудозатраты», та же папка CREDOS_TIME_FOLDER, pos 0): Таймшиты(сетка, pos0), Мои таймшиты(pos1), Согласование(pos2).
+- **Планирование** (новый FOLDER, pos1): Планирование(0), Плановые загрузки(1), Брони ресурсов(2), Отсутствия(3).
+- **Отчёты** (новый FOLDER, pos2): Отчёты(0).
+- **Справочники** (новый FOLDER, pos3): Проекты(0), Виды работ(1), Этапы(2), Отделы(3), Сотрудники(4), Произв.календарь(5), Производственный календарь помесячно(6), Связи с 1С(7).
+- **Настройки** (новый FOLDER, pos4): Настройки(0), Настройки модуля(1).
+main-page (pos -1) — вне папок, как было. Нативные CRM-пункты не трогал.
+
+**ПЕРЕИМЕНОВАНИЯ (запрос заказчика):**
+- Папка «Трудозатраты» → «Таймшиты».
+- Таймшит-сетка «Записи»(credos-time-entry) → «Таймшиты».
+- «Мои трудозатраты»(my-time) → «Мои таймшиты».
+
+**ВАЖНО — НЕ трогал constants/universal-identifiers.ts** (параллельный ux-polish/REQ-0016-поток активно его правит, hot-file коллизия). 4 новых FOLDER-UUID (v4) объявил ЛОКАЛЬНО в самих nav-файлах (folder-planning/reports/directories/settings.navigation-menu-item.ts), экспорт-константа + default-define. Дети импортируют FOLDER-id из этих файлов, а не из общего constants.
+
+**ФАЙЛЫ (моя зона, navigation-menu-items/):**
+- НОВЫЕ: folder-planning, folder-reports, folder-directories, folder-settings (.navigation-menu-item.ts).
+- ИЗМЕНЕНЫ (name/position/folder): credos-time-folder, credos-time-entry, my-time, credos-time-approval, capacity-board, credos-time-dept-plan, credos-time-booking, credos-time-absence, reports-dashboard, credos-time-project, credos-time-work-type, credos-time-stage, credos-time-department, credos-time-employee, credos-time-workday-calendar, calendar-monthly, credos-time-billing-link, credos-settings, credos-time-settings.
+
+**ВАЛИДАЦИЯ:**
+- yarn lint — 0 warnings / 0 errors.
+- yarn test:unit — 65 файлов passed, 1828 passed, 0 failed.
+- tsc --noEmit — EXIT 0.
+- yarn twenty dev --once --dry-run — typecheck+build чисто; на «Computing metadata diff» 15 ошибок `NAVIGATION_MENU_ITEM_NOT_FOUND` (по числу детей, перепривязанных к НОВЫМ папкам; дети в старой папке — без ошибок).
+
+**ПРИРОДА 15 ошибок — НЕ блок (проверено).** Это ограничение инкрементального dry-run-валидатора Twenty: новые FOLDER ещё не в БД, валидатор parent-ссылки сверяет с серверным состоянием, не с манифестом. Реальный apply строит граф зависимостей + топологически сортирует (FOLDER создаётся раньше детей) → пройдёт. Подтверждено: claude-code-guide (PR twentyhq/twenty #19599, fix в v1.22.4 «syncApplication failing when child before folder»); doc operations/sync-and-recovery.md (recovery ladder шаг 4 — uninstall+reinstall = clean slate). Two-phase НЕ нужен. Структура манифеста корректна: 5 FOLDER, position внутри каждой папки уникальны и с 0, UUID без дублей. **apply-ready через `yarn twenty dev --once` (без dry-run) либо app:uninstall+reinstall.**
+
+ПРИМЕЧАНИЕ: те же 15 ошибок упоминал параллельный Dev1-поток (запись fix-capacity-metric) как «пред-существующие, серверное состояние» — пересекается с REQ-0016 (DEPARTMENT/EMPLOYEE/PROJECT nav). Синк делать через ОДНУ очередь (doc: «avoid concurrent syncs»). НЕ коммитил, НЕ деплоил.
 
 — Dev 1

@@ -1,14 +1,18 @@
 import { HourCell } from 'src/front-components/grid/hour-cell';
 import { TagChips } from 'src/front-components/grid/tag-chips';
 import { T } from 'src/front-components/grid/tokens';
-import { GRID_TEMPLATE } from 'src/front-components/grid/week-header';
+import { GRID_TEMPLATE, GRID_TEMPLATE_SINGLE } from 'src/front-components/grid/week-header';
 import { fmtTotal } from 'src/front-components/grid/format';
 import { categoryMeta } from 'src/front-components/shared/category-meta';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { Nav } from 'src/front-components/grid/use-keyboard';
 
-// Строка сетки: цвет-точка категории + метка (проект 600 / вид работ 400) + 7
-// ячеек + итог. Ячейки адресуются (rowIndex, dayIndex) для клавиатуры.
+// Строка сетки. Две левых колонки: «Проект» (цвет-точка категории + код/клиент,
+// 600) и «Вид работ» (название читаемого кегля 13/500, не tiny-faint) + 7 ячеек
+// часов + итог. Ячейки адресуются (rowIndex, dayIndex) для клавиатуры.
+//
+// singleColumn=true (режим «Проект»): проект фиксирован селектором сверху —
+// левая колонка одна, в ней рендерится вид работ как основная метка.
 
 type Props = {
   rowIndex: number;
@@ -16,6 +20,7 @@ type Props = {
   category: string | null;
   workTypeName: string;
   tags?: string[]; // W3-2: теги записей строки (чипы под видом работ)
+  singleColumn?: boolean; // режим «Проект»: только колонка «Вид работ»
   days: WeekDay[];
   hoursByDay: number[];
   lockedByDay?: boolean[];
@@ -34,6 +39,7 @@ export const GridRow = ({
   category,
   workTypeName,
   tags,
+  singleColumn,
   days,
   hoursByDay,
   lockedByDay,
@@ -48,54 +54,104 @@ export const GridRow = ({
   <div
     style={{
       display: 'grid',
-      gridTemplateColumns: GRID_TEMPLATE,
+      gridTemplateColumns: singleColumn ? GRID_TEMPLATE_SINGLE : GRID_TEMPLATE,
       background: alt ? T.rowAlt : T.surface,
       borderBottom: `1px solid ${T.border}`,
     }}
   >
-    <div style={{ padding: '5px 12px', borderRight: `1px solid ${T.border}`, minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-        <span
-          aria-hidden
-          title={category ? categoryMeta(category).label : undefined}
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            flexShrink: 0,
-            background: category ? categoryMeta(category).solid : T.border,
-          }}
-        />
+    {singleColumn ? (
+      // Режим «Проект»: одна левая колонка — вид работ как основная метка.
+      <div style={{ padding: '6px 12px', borderRight: `1px solid ${T.border}`, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+          <span
+            aria-hidden
+            title={category ? categoryMeta(category).label : undefined}
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              flexShrink: 0,
+              background: category ? categoryMeta(category).solid : T.border,
+            }}
+          />
+          <div
+            title={projectName}
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: T.text,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              flex: 1,
+            }}
+          >
+            {projectName}
+          </div>
+        </div>
+        <TagChips tags={tags} />
+      </div>
+    ) : (
+      <>
+        {/* Колонка «Проект»: цвет-точка категории + код/клиент. */}
+        <div style={{ padding: '6px 12px', borderRight: `1px solid ${T.border}`, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+            <span
+              aria-hidden
+              title={category ? categoryMeta(category).label : undefined}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                flexShrink: 0,
+                background: category ? categoryMeta(category).solid : T.border,
+              }}
+            />
+            <div
+              title={projectName}
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: T.text,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                flex: 1,
+              }}
+            >
+              {projectName}
+            </div>
+            {onDuplicate && <DuplicateButton onClick={onDuplicate} />}
+          </div>
+          <TagChips tags={tags} />
+        </div>
+
+        {/* Колонка «Вид работ»: читаемый кегль (13/500, цвет text), не серый-мелкий. */}
         <div
-          title={projectName}
           style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: T.text,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            padding: '6px 12px',
+            borderRight: `1px solid ${T.border}`,
+            minWidth: 0,
           }}
         >
-          {projectName}
+          <div
+            title={workTypeName}
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: workTypeName ? T.text : T.textFaint,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {workTypeName || '—'}
+          </div>
         </div>
-        {onDuplicate && <DuplicateButton onClick={onDuplicate} />}
-      </div>
-      <div
-        title={workTypeName}
-        style={{
-          fontSize: 11,
-          color: T.textMuted,
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
-        {workTypeName}
-      </div>
-      <TagChips tags={tags} />
-    </div>
+      </>
+    )}
 
     {days.map((day, i) => (
       <HourCell

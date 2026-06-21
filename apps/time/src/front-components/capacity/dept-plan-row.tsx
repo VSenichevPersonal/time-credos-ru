@@ -1,19 +1,20 @@
-import { T } from 'src/front-components/capacity/cap-tokens';
-import type { DeptPlanLoad, Period } from 'src/front-components/capacity/types';
+import { T, childCell, colWidth } from 'src/front-components/capacity/cap-tokens';
+import type { CellMetric, DeptPlanLoad, LoadCell, Period } from 'src/front-components/capacity/types';
 
 // REQ-0012: строка плановой загрузки отдела БЕЗ проекта в детализации отдела.
 // Визуально отличима от проектов — курсив + тег «без проекта», тёплый акцент.
-// Часы по периодам — tabular-nums (как у проектов).
-
-const cellNum = (v: number): string => (v > 0 ? String(Math.round(v)) : '');
+// Часы по периодам — tabular-nums (как у проектов). Метрика согласована со строкой
+// отдела и проектами через childCell (вклад строки в показатель отдела).
 
 type Props = {
   load: DeptPlanLoad;
   nameWidth: number;
   periods: Period[];
+  metric?: CellMetric;
+  deptCells?: LoadCell[];
 };
 
-export const DeptPlanRow = ({ load, nameWidth, periods }: Props) => (
+export const DeptPlanRow = ({ load, nameWidth, periods, metric = 'plan', deptCells }: Props) => (
   <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
     <div
       style={{
@@ -62,7 +63,7 @@ export const DeptPlanRow = ({ load, nameWidth, periods }: Props) => (
         key={p.key}
         style={{
           flex: 1,
-          minWidth: 56,
+          minWidth: colWidth(metric),
           height: 32,
           display: 'flex',
           alignItems: 'center',
@@ -74,7 +75,7 @@ export const DeptPlanRow = ({ load, nameWidth, periods }: Props) => (
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {cellNum(load.perPeriod[i])}
+        {childCell(metric, load.perPeriod[i], deptCells?.[i]?.capacity)}
       </div>
     ))}
   </div>

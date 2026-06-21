@@ -86,7 +86,7 @@ export const ProjectView = ({
       ) : (
         <>
           <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-            <WeekHeader days={days} leftLabel="Вид работ" normFor={normFor} />
+            <WeekHeader days={days} leftLabels={['Вид работ']} normFor={normFor} />
             {loading && rows.length === 0 ? (
               <Center>Загрузка…</Center>
             ) : rows.length === 0 ? (
@@ -99,6 +99,7 @@ export const ProjectView = ({
                   projectName={row.workTypeName}
                   category={null}
                   workTypeName=""
+                  singleColumn
                   days={days}
                   hoursByDay={row.hoursByDay}
                   lockedByDay={row.lockedByDay}
@@ -111,7 +112,7 @@ export const ProjectView = ({
               ))
             )}
           </div>
-          <FooterTotals days={days} dayTotals={dayTotals} weekTotal={total} normFor={normFor} />
+          <FooterTotals days={days} dayTotals={dayTotals} weekTotal={total} normFor={normFor} singleColumn />
           <AddWorkTypeRow
             workTypes={scopedWorkTypes}
             onAdd={(wid) => onAddRow(makeRowKey(selectedProjectId, wid))}

@@ -11,6 +11,9 @@ import {
   CREDOS_TIME_EMPLOYEE_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Карточка сотрудника (RECORD_PAGE) — вкладка «Отделы» (REQ-0011 follow-up).
@@ -86,6 +89,34 @@ export default definePageLayout({
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_EMPLOYEE_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: false,
+          },
+        },
+      ],
+    },
+    // REQ-0016 follow-up. Брони — резервы сотрудника под проекты (обратная связь
+    // bookings). FIELDS на card-view с relation bookings (ONE_TO_MANY) → ядро
+    // рендерит брони ТЕКУЩЕГО сотрудника инлайн-таблицей (на каких проектах
+    // зарезервирован / тип SOFT-HARD / часы / период), кликабельно в карточку
+    // брони. Сверка: Timetta — брони видны в карточке ресурса.
+    {
+      universalIdentifier:
+        CREDOS_TIME_EMPLOYEE_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER,
+      title: 'Брони',
+      position: 2,
+      icon: 'IconCalendarPin',
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier:
+            CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
+          title: 'Брони сотрудника',
+          type: 'FIELDS',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_EMPLOYEE_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
           },
         },

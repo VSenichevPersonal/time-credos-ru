@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1780 + 15 todo** (56 файл, все зелёные) |
+| unit-тестов | **1853 + 15 todo** (57 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -68,6 +68,7 @@
 | `front-components/my-time/period-status.ts` | `aggregateStatus` (vacuous-truth фикс) + `summarizeWeeks` (round2, weekBoundaries) | ✅ 10 тестов | `front-components/my-time/period-status.test.ts` |
 | `front-components/my-time/use-my-hours.ts` | `buildProjectHours` — sum/sort/fallback/null/round2 | ✅ 7 тестов (incl. round2 guard) | `front-components/my-time/use-my-hours.test.ts` |
 | `front-components/my-time/status-meta.ts` | `statusMeta` — метка/тон 4 статусов + fallback + SSOT-guard | ✅ 6 тестов | `front-components/my-time/status-meta.test.ts` |
+| `front-components/my-time/reminders-rest.ts` | `fetchReminders` — ok/err/null/throw + POST body | ✅ 7 тестов | `front-components/my-time/reminders-rest.test.ts` |
 | `logic-functions/reports-detail.ts` | `computeDetail` drill-down фильтры+маппинг + `detailToCsv` RFC 4180 | ✅ 14 тестов | `logic-functions/reports-detail.test.ts` |
 | `logic-functions/reports-timesheet-grid.ts` | `enumerateDays`/`buildTimesheetGrid`/`gridToCsv` (tabель-Т13) | ✅ 18 тестов (Dev 2) | `logic-functions/reports-timesheet-grid.test.ts` |
 | `logic-functions/project-fact-rollup-events.ts` | `onEntryCreated/Updated/Deleted` + `wrapEvent` catch | ✅ 11 тестов | `logic-functions/project-fact-rollup-events.test.ts` |

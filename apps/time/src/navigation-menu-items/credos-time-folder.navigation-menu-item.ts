@@ -5,11 +5,13 @@ import {
 
 import { CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
-// Раздел-папка сайдбара «Трудозатраты». Дочерние VIEW-пункты ссылаются на неё
-// через folderUniversalIdentifier.
+// Раздел-папка сайдбара «Таймшиты» (бывш. «Трудозатраты»). Дочерние пункты
+// (Все записи / таймшит-сетка, Мои таймшиты, Согласование) ссылаются на неё
+// через folderUniversalIdentifier. Остальные группы — отдельные FOLDER-файлы:
+// folder-planning, folder-reports, folder-directories, folder-settings.
 export default defineNavigationMenuItem({
   universalIdentifier: CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
-  name: 'Трудозатраты',
+  name: 'Ввод времени',
   icon: 'IconClock',
   position: 0,
   type: NavigationMenuItemType.FOLDER,

@@ -60,11 +60,13 @@ describe('computeDetail', () => {
     });
   });
 
-  // CISO-007 (152-ФЗ): по умолчанию (revealNames=false) ФИО НЕ отдаём — пустая строка.
-  it('CISO-007: по умолчанию employeeName пустой (ФИО не утекает)', () => {
+  // CISO-007 (152-ФЗ): по умолчанию (revealNames=false) ФИО НЕ отдаём — вместо
+  // пусто/UUID отдаём стабильный читаемый КОД сотрудника (различимость строк).
+  it('CISO-007: по умолчанию employeeName = КОД (ФИО не утекает, не сырой UUID)', () => {
     const rows = computeDetail(base);
     expect(rows).toHaveLength(1);
-    expect(rows[0].employeeName).toBe('');
+    expect(rows[0].employeeName).not.toBe('');
+    expect(rows[0].employeeName).toMatch(/^Сотрудник·/);
     // остальные поля (не ПДн) на месте
     expect(rows[0].date).toBe('2026-06-10');
     expect(rows[0].projectName).toBe('PA-001 — Проект А');

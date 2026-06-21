@@ -1,7 +1,7 @@
 import { T } from 'src/front-components/grid/tokens';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
-import { GRID_TEMPLATE } from 'src/front-components/grid/week-header';
+import { GRID_TEMPLATE, GRID_TEMPLATE_SINGLE } from 'src/front-components/grid/week-header';
 import {
   fmtTotal,
   loadColor,
@@ -13,9 +13,17 @@ import {
 // vs норма (одна строка-индикатор, цвет: недобор/норма/переработка). T2 SSOT:
 // норма дня/недели из произв. календаря (праздники не считаются «недобором»).
 
-type Props = { days: WeekDay[]; dayTotals: number[]; weekTotal: number; normFor: NormForDay };
+type Props = {
+  days: WeekDay[];
+  dayTotals: number[];
+  weekTotal: number;
+  normFor: NormForDay;
+  // Сколько левых колонок занимает метка «Итого за день»: 2 в режиме «Неделя»
+  // (Проект | Вид работ), 1 в режиме «Проект» (только Вид работ).
+  singleColumn?: boolean;
+};
 
-export const FooterTotals = ({ days, dayTotals, weekTotal, normFor }: Props) => {
+export const FooterTotals = ({ days, dayTotals, weekTotal, normFor, singleColumn }: Props) => {
   // Недельная норма = Σ норм дней календаря (а не плоские 40 ч).
   const weekNorm = days.reduce((s, d) => s + normFor(d.iso, d.isWeekend), 0);
   const weekColor = loadColor(loadLevel(weekTotal, weekNorm));
@@ -25,13 +33,14 @@ export const FooterTotals = ({ days, dayTotals, weekTotal, normFor }: Props) => 
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: GRID_TEMPLATE,
+          gridTemplateColumns: singleColumn ? GRID_TEMPLATE_SINGLE : GRID_TEMPLATE,
           background: T.headerBg,
           borderTop: `1px solid ${T.borderStrong}`,
         }}
       >
         <div
           style={{
+            gridColumn: singleColumn ? undefined : 'span 2',
             padding: '7px 12px',
             fontSize: 12,
             fontWeight: 600,

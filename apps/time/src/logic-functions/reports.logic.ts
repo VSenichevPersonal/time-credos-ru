@@ -10,6 +10,7 @@ import {
   computeOlap,
   computeReports,
   computeTimeseries,
+  employeeCode,
   type OlapDimension,
   type OlapFilter,
   type OlapSort,
@@ -174,21 +175,42 @@ const readRevealEmployeeNames = async (): Promise<boolean> => {
   }
 };
 
-// byEmployee: затираем ФИО (name) до пустой строки, ключ (employeeId) сохраняем.
-const redactByEmployee = <T extends { name: string }>(rows: T[], reveal: boolean): T[] =>
-  reveal ? rows : rows.map((r) => ({ ...r, name: '' }));
+// Резолвер стабильного КОДа сотрудника по его id (employeeId = key/value во всех
+// срезах). Строит карты отдел→код и сотрудник→отдел из загруженных коллекций.
+// При reveal=false КОД ЗАМЕНЯЕТ ФИО — читаемый, стабильный, НЕ ПДн, НЕ сырой UUID.
+const makeEmployeeCodeResolver = (
+  employees: RawEmployee[],
+  departments: RawDepartment[],
+): ((employeeId: string) => string) => {
+  const deptCodeById = new Map(departments.map((d) => [d.id, d.code ?? null]));
+  const deptOfEmp = new Map(employees.map((e) => [e.id, e.departmentId]));
+  return (id: string) =>
+    employeeCode({ id, departmentId: deptOfEmp.get(id) ?? null }, deptCodeById);
+};
 
-// OLAP: ось/фильтр employee несёт ФИО в name/label — затираем (только dim employee).
+// byEmployee: при reveal=false ФИО (name) → стабильный КОД (не пусто/UUID).
+const redactByEmployee = <T extends { key: string; name: string }>(
+  rows: T[],
+  reveal: boolean,
+  codeOf: (id: string) => string,
+): T[] => (reveal ? rows : rows.map((r) => ({ ...r, name: codeOf(r.key) })));
+
+// OLAP: ось/фильтр employee несёт ФИО в name/label. При reveal=false → стабильный
+// КОД (key/value = employeeId), а не пусто/UUID. Прочие оси не трогаем.
 const redactOlap = (
   result: ReturnType<typeof computeOlap>,
   reveal: boolean,
+  codeOf: (id: string) => string,
 ): ReturnType<typeof computeOlap> => {
   if (reveal) return result;
   return {
     ...result,
-    rows: result.groupBy === 'employee' ? result.rows.map((r) => ({ ...r, name: '' })) : result.rows,
+    rows:
+      result.groupBy === 'employee'
+        ? result.rows.map((r) => ({ ...r, name: codeOf(r.key) }))
+        : result.rows,
     appliedFilters: result.appliedFilters.map((f) =>
-      f.dim === 'employee' ? { ...f, label: '' } : f,
+      f.dim === 'employee' ? { ...f, label: codeOf(f.value) } : f,
     ),
   };
 };
@@ -213,7 +235,12 @@ const run = async (event: RoutePayload) => {
   ] = await Promise.all([
     restGetAll<RawEntry>('credosTimeEntries', { filter: `date[gte]:${from},date[lte]:${to}` }),
     restGetAll<RawProject>('credosTimeProjects', {}),
-    restGetAll<RawEmployee>('credosTimeEmployees', { filter: 'active[eq]:true' }),
+    // ФИО-РЕЗОЛВ (фикс «сырой UUID в OLAP employee»): грузим ВСЕХ сотрудников, не
+    // только active=true. Записи времени могут принадлежать ДЕАКТИВИРОВАННОМУ
+    // сотруднику — без него в коллекции empById.get(id) пуст → dimLabel падал в
+    // сырой UUID (ось/крошка/пилюля). Норма/headcount считаются по active!==false
+    // (см. isActiveEmployee в reports-calc) → расчёт нормы не меняется.
+    restGetAll<RawEmployee>('credosTimeEmployees', {}),
     restGetAll<RawDepartment>('credosTimeDepartments', {}),
     restGetAll<RawCalendarDay>('credosTimeWorkdayCalendars', {
       filter: `date[gte]:${from},date[lte]:${to}`,
@@ -321,14 +348,15 @@ const run = async (event: RoutePayload) => {
 
   // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.
   // CISO-007: затираем ФИО в OLAP employee-срезе/фильтре.
+  const codeOf = makeEmployeeCodeResolver(employees, departments);
   if (olap) {
-    return redactOlap(computeOlap(input, { from, to }, olap), reveal);
+    return redactOlap(computeOlap(input, { from, to }, olap), reveal, codeOf);
   }
-  // CISO-007: затираем ФИО в byEmployee (раскрывал имена всех сотрудников).
+  // CISO-007: при reveal=false ФИО в byEmployee → стабильный КОД (не пусто/UUID).
   const result = computeReports(input, { from, to });
   return {
     ...result,
-    byEmployee: redactByEmployee(result.byEmployee, reveal),
+    byEmployee: redactByEmployee(result.byEmployee, reveal, codeOf),
     groupBy: params.groupBy ?? null,
   };
 };

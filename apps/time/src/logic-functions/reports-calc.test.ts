@@ -6,6 +6,7 @@ import {
   computeOlap,
   computeReports,
   computeTimeseries,
+  employeeCode,
   finalize,
   fteHeadcountByDept,
   util,
@@ -558,6 +559,28 @@ describe('computeOlap — dimLabel', () => {
     expect(rows.find((r) => r.key === null)).toBeUndefined();
     expect(rows.map((r) => r.key)).not.toContain(null);
   });
+
+  // ГЛАВНЫЙ БАГ-фикс: запись от сотрудника, которого НЕТ в коллекции employees
+  // (напр. деактивирован и не загружен) → раньше dimLabel падал в сырой UUID.
+  // Теперь fallback = стабильный КОД (НЕ сырой UUID) — и в строке, и в крошке.
+  it('groupBy=employee → неизвестный сотрудник = стабильный КОД, НЕ сырой UUID', () => {
+    const inp = olapBase();
+    inp.entries.push({ hours: 3, projectId: 'p-cli', employeeId: 'ghost-uuid-1234' });
+    const { rows } = computeOlap(inp, PERIOD, { groupBy: 'employee' });
+    const ghost = rows.find((r) => r.key === 'ghost-uuid-1234');
+    expect(ghost).toBeDefined();
+    expect(ghost?.name).not.toBe('ghost-uuid-1234'); // НЕ сырой UUID
+    expect(ghost?.name).toMatch(/^Сотрудник·/);
+  });
+
+  it('appliedFilters employee → label известного = ФИО, неизвестного = КОД (не UUID)', () => {
+    const known = olap({ groupBy: 'project', filters: [{ dim: 'employee', value: 'e1' }] });
+    expect(known.appliedFilters.find((f) => f.dim === 'employee')?.label).toBe('Иванов Иван');
+    const unknown = olap({ groupBy: 'project', filters: [{ dim: 'employee', value: 'ghost-9999' }] });
+    const lbl = unknown.appliedFilters.find((f) => f.dim === 'employee')?.label;
+    expect(lbl).not.toBe('ghost-9999');
+    expect(lbl).toMatch(/^Сотрудник·/);
+  });
 });
 
 describe('WORKDAY_TYPES — SSOT рабочих дней', () => {
@@ -783,5 +806,38 @@ describe('computeTimeseries — тренд по месяцам', () => {
     const res = computeTimeseries(ts(), YEAR);
     const keys = res.months.map((m) => m.month);
     expect(keys).toEqual([...keys].sort());
+  });
+});
+
+// ─── employeeCode (CISO-007: стабильный псевдоним без ПДн) ───────────────────
+
+describe('employeeCode', () => {
+  const deptMap = new Map([['d1', 'OPIB'], ['d2', null]]);
+
+  it('формат: Сотрудник·DEPT·HEX4', () => {
+    const code = employeeCode({ id: 'aabbccdd-0000-4000-8000-001122334455', departmentId: 'd1' }, deptMap);
+    expect(code).toBe('Сотрудник·OPIB·4455');
+  });
+
+  it('dept=null в map → fallback на slice departmentId', () => {
+    const code = employeeCode({ id: 'aabb0000-0000-4000-8000-001122334466', departmentId: 'd2' }, deptMap);
+    expect(code).toMatch(/^Сотрудник·d2·/);
+  });
+
+  it('без deptMap → slice departmentId', () => {
+    const code = employeeCode({ id: 'aaaa0000-0000-4000-8000-001122334477', departmentId: 'dept-xyz' });
+    expect(code).toMatch(/^Сотрудник·dept·/);
+  });
+
+  it('без departmentId → —', () => {
+    const code = employeeCode({ id: 'cccc0000-0000-4000-8000-aabbccdd1234', departmentId: null });
+    expect(code).toMatch(/^Сотрудник·—·/);
+  });
+
+  it('НЕ содержит UUID в полном виде (не утекает id)', () => {
+    const id = 'aaaa1111-bbbb-4000-cccc-ddeeff012345';
+    const code = employeeCode({ id, departmentId: 'd1' }, deptMap);
+    expect(code).not.toContain(id);
+    expect(code.length).toBeLessThan(30);
   });
 });

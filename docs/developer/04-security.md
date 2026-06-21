@@ -21,7 +21,7 @@ Owner: CISO. Полный реестр: `docs/security/RISK_REGISTER.md`.
 | CISO-009 | P3 | OPEN | `seed-real.mjs` содержит реальные наименования клиентов/заказчиков | Dev2: синтетические названия клиентов в сиде |
 | CISO-010 | P2 | OPEN (pre-impl) | Будущий CSV-экспорт: медПДн (код «Б») в файле; нет role-guard; интеграция 1С = новый канал ПДн | Dev2: role-guard экспорта; SICK→«Н» для не-HR; аудит-лог |
 | CISO-011 | P2 | MITIGATING | APPROVED-записи не блокируются: delete/upsert в `time-entry-api.logic.ts` не проверял `status !== APPROVED` | Уже закрыт на уровне L1 в logic function; прямой REST PATCH — закроется RBAC-волной |
-| CISO-012 | P2 | MITIGATING | APPROVED-ячейки редактируемы через UI: Core REST доступен в обход server-guard из фронта | L1 UI: `isCellLocked()` + `notifyLocked()`, все commit-пути заблокированы (Dev1 W6-2). L2: роутить `grid/time-rest.ts` через `/s/time-entry` → срабатывает существующий `cannot_modify_approved` гард — Dev1 follow-up. L3 RLS: нужен CISO-005 (server-actor). DB-event veto НЕВОЗМОЖЕН: Twenty SDK = after-mutation only, throw не откатывает |
+| CISO-012 | P2 | MITIGATING | APPROVED-ячейки редактируемы через UI: Core REST доступен в обход server-guard из фронта | L1 ✅ UI: `isCellLocked()` + `notifyLocked()` (Dev1 W6-2). L2 ✅ Роутинг: все мутации грида через `/s/time-entry` → `cannot_modify_approved` гард (Dev1 ciso012-routing). L3 RLS: нужен CISO-005 (server-actor). DB-event veto НЕВОЗМОЖЕН в SDK |
 
 ---
 

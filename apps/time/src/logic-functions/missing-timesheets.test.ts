@@ -147,9 +147,13 @@ describe('computeMissingTimesheets', () => {
     expect(r.rows[0].norm).toBe(24); // 40 − 16
   });
 
-  it('CISO-007: ФИО скрыто по умолчанию, раскрывается при revealNames', () => {
+  it('CISO-007: ФИО скрыто по умолчанию → стабильный КОД (не пусто/UUID), раскрывается при revealNames', () => {
     const hidden = computeMissingTimesheets(input({ employees: [emp('e1')] }), WEEK);
-    expect(hidden.rows[0].name).toBe('');
+    // reveal=false: имя НЕ ФИО, НЕ пусто, НЕ сырой UUID — стабильный КОД сотрудника.
+    expect(hidden.rows[0].name).not.toBe('');
+    expect(hidden.rows[0].name).not.toBe('e1');
+    expect(hidden.rows[0].name).not.toBe('Фам-e1 Имя');
+    expect(hidden.rows[0].name).toMatch(/^Сотрудник·/);
     const shown = computeMissingTimesheets(input({ employees: [emp('e1')] }), WEEK, {
       revealNames: true,
     });

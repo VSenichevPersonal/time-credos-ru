@@ -89,10 +89,14 @@ export const calcGridModel = (
     row.rowTotal += e.hours;
   }
 
+  // Свежедобавленные строки (+строка / Дублировать / Копировать неделю) — это
+  // явное действие пользователя: показываем ВСЕГДА, не прогоняя через фильтры.
+  // Иначе строка с проектом ≠ активному фильтру создаётся в ensure, но тут же
+  // отсекается rowPasses → «Добавить» не даёт видимого эффекта (баг прод).
+  // Timetta/Kimai: добавленная строка таймшита видна сразу.
   for (const key of extraRowKeys) {
     const [projectId, workTypeId] = key.split('|');
-    if (projectId && workTypeId && rowPasses(projectId, workTypeId, projMap, filters))
-      ensure(projectId, workTypeId);
+    if (projectId && workTypeId) ensure(projectId, workTypeId);
   }
 
   const rowList = Array.from(rows.values()).sort((a, b) =>

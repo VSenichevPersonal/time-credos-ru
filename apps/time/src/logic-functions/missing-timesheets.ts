@@ -23,6 +23,7 @@
 // fallback 1 (полная ставка). Сотрудники без отдела → фактор 1.
 
 import {
+  employeeCode,
   WORKDAY_TYPES,
   type RawAbsence,
   type RawCalendarDay,
@@ -104,6 +105,7 @@ export const computeMissingTimesheets = (
   const reveal = opts.revealNames === true;
 
   const deptById = new Map(input.departments.map((d) => [d.id, d]));
+  const deptCodeById = new Map(input.departments.map((d) => [d.id, d.code ?? null]));
 
   // Рабочие дни недели (WORKDAY|SHORT) и часы по дню — для нормы и вычета отсутствий.
   const hoursByDay = new Map<string, number>();
@@ -154,7 +156,10 @@ export const computeMissingTimesheets = (
     const fact = factByEmp.get(emp.id) ?? 0;
     // Порог: попадаем, если факт < норма × (1 − threshold).
     if (fact >= norm * (1 - threshold)) continue;
-    const name = reveal ? [emp.lastName, emp.firstName].filter(Boolean).join(' ') : '';
+    // CISO-007: ФИО при reveal, иначе стабильный КОД сотрудника (не пусто/UUID).
+    const name = reveal
+      ? [emp.lastName, emp.firstName].filter(Boolean).join(' ')
+      : employeeCode({ id: emp.id, departmentId: emp.departmentId }, deptCodeById);
     rows.push({
       employeeId: emp.id,
       name,

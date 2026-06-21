@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadTone, formatPct, formatCell, gapHours, gapPct, gapTone, gapIcon, formatGap } from './cap-tokens';
+import { loadTone, formatPct, formatCell, gapHours, gapPct, gapTone, gapIcon, formatGap, formatGapHours, formatGapPctShort, colWidth, COL_W, COL_W_GAP, childCell } from './cap-tokens';
 import type { LoadCell } from './types';
 
 const cell = (capacity: number, load: number): LoadCell => ({
@@ -150,5 +150,65 @@ describe('formatGap', () => {
     expect(formatGap(cell(160, 200))).toBe('+40ч 25%');
     expect(formatGap(cell(160, 80))).toBe('-80ч 50%');
     expect(formatGap(cell(0, 0))).toBe('');
+  });
+});
+
+// ─── Раздельный gap (вмещение ячейки: часы — главное, % — вторичное) ─────────
+describe('formatGapHours / formatGapPctShort', () => {
+  it('часы со знаком (+дефицит / −профицит), без %', () => {
+    expect(formatGapHours(cell(160, 200))).toBe('+40ч');
+    expect(formatGapHours(cell(160, 80))).toBe('-80ч');
+    expect(formatGapHours(cell(0, 0))).toBe('');
+  });
+  it('% без знака (знак несут часы/иконка)', () => {
+    expect(formatGapPctShort(cell(160, 200))).toBe('25%');
+    expect(formatGapPctShort(cell(160, 80))).toBe('50%');
+    expect(formatGapPctShort(cell(0, 0))).toBe('');
+  });
+});
+
+// ─── colWidth (gap-режим шире — вмещает «−1112ч 83%» одной строкой) ──────────
+describe('colWidth', () => {
+  it('gap → расширенная, прочие → базовая', () => {
+    expect(colWidth('gap')).toBe(COL_W_GAP);
+    expect(colWidth('free')).toBe(COL_W);
+    expect(colWidth('pct')).toBe(COL_W);
+    expect(colWidth('plan')).toBe(COL_W);
+    expect(COL_W_GAP).toBeGreaterThan(COL_W);
+  });
+});
+
+// ─── childCell (метрика на ДОЧЕРНЕМ уровне — баг заказчика) ──────────────────
+// Дочерняя строка (проект / план без проекта) должна СОГЛАСОВАННО менять значение
+// при переключении метрики (Свободно / План / Gap / Загрузка %), а не «застывать»
+// на плановых часах. v = плановые часы строки за период, capacity = ёмкость отдела.
+describe('childCell (метрика проекта/плана внутри раскрытого отдела)', () => {
+  it('plan → плановые часы строки', () => {
+    expect(childCell('plan', 40, 160)).toBe('40');
+  });
+
+  it('pct → доля от ёмкости отдела', () => {
+    expect(childCell('pct', 40, 160)).toBe('25%');
+    expect(childCell('pct', 40, 0)).toBe(''); // нет ёмкости
+    expect(childCell('pct', 40, undefined)).toBe('');
+  });
+
+  it('gap → +ч (строка увеличивает спрос → дефицит)', () => {
+    expect(childCell('gap', 40, 160)).toBe('+40');
+  });
+
+  it('free → -ч (строка потребляет ёмкость → меньше свободно)', () => {
+    expect(childCell('free', 40, 160)).toBe('-40');
+  });
+
+  it('каждая метрика даёт РАЗНЫЙ вывод для одних данных (не застывает)', () => {
+    const outs = (['plan', 'pct', 'gap', 'free'] as const).map((m) => childCell(m, 40, 160));
+    expect(new Set(outs).size).toBe(4); // все четыре различны
+  });
+
+  it('нулевой вклад → пусто на любой метрике', () => {
+    for (const m of ['plan', 'pct', 'gap', 'free'] as const) {
+      expect(childCell(m, 0, 160)).toBe('');
+    }
   });
 });

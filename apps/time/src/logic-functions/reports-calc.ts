@@ -41,7 +41,17 @@ export type RawEmployee = {
   firstName: string | null;
   lastName: string | null;
   departmentId: string | null;
+  // Активность сотрудника. Нужна, чтобы /s/reports мог грузить ВСЕХ сотрудников
+  // (для резолва ФИО/кода даже деактивированных, у кого есть записи в периоде —
+  // иначе их UUID утекал сырым в OLAP-ось/крошку/пилюлю employee), а норму/
+  // headcount считать ТОЛЬКО по активным (active !== false). Опционально: если
+  // коллекция уже отфильтрована active=true на загрузке (reminders/missing) и поле
+  // не пришло — undefined трактуется как активный (обратная совместимость).
+  active?: boolean | null;
 };
+// Активен ли сотрудник для расчёта нормы/headcount. undefined/null → активен
+// (коллекция уже могла быть отфильтрована на загрузке). Только active===false исключает.
+const isActiveEmployee = (e: RawEmployee): boolean => e.active !== false;
 // headcount (численность) — НЕ ручное поле: вычисляется как число активных
 // сотрудников отдела (count credosTimeEmployee where department=X, active=true).
 // Поле credosTimeDepartment.headcount в расчёте нормы/ёмкости НЕ используется.
@@ -134,6 +144,25 @@ export const finalize = (row: Row): Row => ({
 const dayKey = (iso: string | null | undefined): string | null =>
   iso ? iso.slice(0, 10) : null;
 
+// ФИО сотрудника (ПДн). Fallback на стабильный КОД, если имя/фамилия пусты.
+export const empName = (e: RawEmployee): string =>
+  [e.lastName, e.firstName].filter(Boolean).join(' ') || employeeCode(e);
+
+// Стабильный читаемый КОД сотрудника — НЕ ПДн, НЕ сырой UUID. Используется как
+// ярлык при reveal=false (152-ФЗ минимизация) и как fallback, когда ФИО пусто.
+// Формат: «Сотрудник·<deptCode|'—'>·<4 hex-символа из id>». Детерминирован
+// (один id → один код), различим в отчёте, не раскрывает личность. deptCode
+// (если знаем отдел) даёт читаемую группировку; суффикс id разводит однофамильцев.
+export const employeeCode = (
+  e: Pick<RawEmployee, 'id' | 'departmentId'>,
+  deptCodeById?: Map<string, string | null>,
+): string => {
+  const dept =
+    (e.departmentId && deptCodeById?.get(e.departmentId)) || e.departmentId?.slice(0, 4) || '—';
+  const suffix = e.id.replace(/[^0-9a-fA-F]/g, '').slice(-4).toUpperCase() || e.id.slice(0, 4);
+  return `Сотрудник·${dept}·${suffix}`;
+};
+
 // REQ-0011: численность отделов = Σ FTE назначений, активных в окне [from, to]
 // (включительно по дню). Назначение активно: startDate ≤ to И (endDate пуст ИЛИ
 // endDate ≥ from). ftePercent пуст = 100%. Fallback: сотрудник без единой записи
@@ -162,6 +191,7 @@ export const fteHeadcountByDept = (
   }
   for (const e of employees) {
     if (hasAssignment.has(e.id) || !e.departmentId) continue;
+    if (!isActiveEmployee(e)) continue; // деактивированные не входят в headcount/норму
     counts.set(e.departmentId, (counts.get(e.departmentId) ?? 0) + 1);
   }
   return counts;
@@ -202,7 +232,8 @@ export const computeReports = (
   const headcountByDept = fteHeadcount ?? new Map<string, number>();
   if (!fteHeadcount) {
     for (const e of employees) {
-      if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+      if (e.departmentId && isActiveEmployee(e))
+        headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
     }
   }
 
@@ -237,8 +268,6 @@ export const computeReports = (
       absenceHoursByDept.set(e.departmentId, (absenceHoursByDept.get(e.departmentId) ?? 0) + h);
   }
 
-  const empName = (e: RawEmployee): string =>
-    [e.lastName, e.firstName].filter(Boolean).join(' ') || e.id;
   // Норма отдела = база × headcount × factor − часы отсутствий сотрудников отдела.
   // headcount — ВЫЧИСЛЯЕМЫЙ (число активных сотрудников отдела), не ручное поле.
   // Вычет не опускает норму ниже 0 (защита от переучёта отсутствий).
@@ -466,9 +495,9 @@ export const computeOlap = (
   const deptById = new Map(departments.map((d) => [d.id, d]));
   const empById = new Map(employees.map((e) => [e.id, e]));
   const wtById = new Map(workTypes.map((w) => [w.id, w]));
+  // Карта отдел→код — для стабильного КОДа сотрудника (employeeCode) в dimLabel.
+  const deptCodeById = new Map(departments.map((d) => [d.id, d.code ?? null]));
 
-  const empName = (e: RawEmployee): string =>
-    [e.lastName, e.firstName].filter(Boolean).join(' ') || e.id;
   const deptOfEntry = (e: RawEntry): string | null => {
     const fromEmp = e.employeeId ? empById.get(e.employeeId)?.departmentId : null;
     if (fromEmp) return fromEmp;
@@ -508,7 +537,9 @@ export const computeOlap = (
         return deptById.get(key)?.code ?? key;
       case 'employee': {
         const e = empById.get(key);
-        return e ? empName(e) : key;
+        // Известный сотрудник → ФИО. Неизвестный (нет в коллекции — напр.
+        // деактивирован и не загружен) → стабильный КОД, НЕ сырой UUID.
+        return e ? empName(e) : employeeCode({ id: key, departmentId: null }, deptCodeById);
       }
       case 'project': {
         const p = projById.get(key);
@@ -568,7 +599,8 @@ export const computeOlap = (
   const headcountByDept = fteHeadcount ?? new Map<string, number>();
   if (!fteHeadcount)
     for (const e of employees)
-      if (e.departmentId) headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
+      if (e.departmentId && isActiveEmployee(e))
+        headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
   const absByDept = new Map<string, number>();
   for (const e of employees) {
     const h = absByEmp.get(e.id) ?? 0;
@@ -750,7 +782,7 @@ export const computeTimeseries = (
   const headcountByDept = fteHeadcount ?? new Map<string, number>();
   if (!fteHeadcount)
     for (const e of employees)
-      if (e.departmentId)
+      if (e.departmentId && isActiveEmployee(e))
         headcountByDept.set(e.departmentId, (headcountByDept.get(e.departmentId) ?? 0) + 1);
 
   const pFrom = dayKey(period.from);

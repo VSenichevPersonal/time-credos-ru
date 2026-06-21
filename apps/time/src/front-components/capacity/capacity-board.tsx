@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-import { T, FONT, SIGMA_W } from 'src/front-components/capacity/cap-tokens';
+import { T, FONT, SIGMA_W, colWidth } from 'src/front-components/capacity/cap-tokens';
 import { Center } from 'src/front-components/grid/center';
 import { BoardToolbar } from 'src/front-components/capacity/board-toolbar';
 import { BoardLegend } from 'src/front-components/capacity/board-legend';
@@ -126,8 +126,8 @@ export const CapacityBoard = () => {
             title="Не удалось показать доску планирования"
             resetKeys={[effectiveAxis, metric, granularity]}
           >
-          <div style={{ minWidth: NAME_WIDTH + periods.length * 56 + SIGMA_W }}>
-            <PeriodHeader periods={periods} nameWidth={NAME_WIDTH} granularity={granularity} />
+          <div style={{ minWidth: NAME_WIDTH + periods.length * colWidth(metric) + SIGMA_W }}>
+            <PeriodHeader periods={periods} nameWidth={NAME_WIDTH} granularity={granularity} metric={metric} />
 
             <SummaryRow cells={summary} periods={periods} nameWidth={NAME_WIDTH} metric={metric} />
 

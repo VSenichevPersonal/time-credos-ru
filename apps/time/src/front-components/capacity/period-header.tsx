@@ -1,5 +1,5 @@
-import { T, SIGMA_W } from 'src/front-components/capacity/cap-tokens';
-import type { Period } from 'src/front-components/capacity/types';
+import { T, SIGMA_W, colWidth } from 'src/front-components/capacity/cap-tokens';
+import type { CellMetric, Period } from 'src/front-components/capacity/types';
 
 // Ячейка фиксированной ширины Σ-горизонта (выравнивание со строками).
 const sigmaCell = (height: number, content: React.ReactNode, faint = false) => (
@@ -24,7 +24,7 @@ const sigmaCell = (height: number, content: React.ReactNode, faint = false) => (
 // Шапка: для недель — 2 строки (месяц-бэнд → день), для месяцев — одна строка.
 // Колонка 0 = текущий период (горизонт начинается «сегодня») — тонкий тик «сейчас».
 
-type Props = { periods: Period[]; nameWidth: number; granularity: 'week' | 'month' };
+type Props = { periods: Period[]; nameWidth: number; granularity: 'week' | 'month'; metric: CellMetric };
 
 const MONTHS_FULL = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -42,6 +42,19 @@ const monthBands = (periods: Period[]): Band[] => {
     else bands.push({ key, label: MONTHS_FULL[p.from.getUTCMonth()], span: 1 });
   }
   return bands;
+};
+
+// R3 (DP-0006): индексы периодов, открывающих новый месяц — для усиленного
+// разделителя на строке дней (иначе недели сливаются, месяцы неотличимы).
+const monthStartIdx = (periods: Period[]): Set<number> => {
+  const out = new Set<number>();
+  let prev = '';
+  periods.forEach((p, i) => {
+    const key = `${p.from.getUTCFullYear()}-${p.from.getUTCMonth()}`;
+    if (i > 0 && key !== prev) out.add(i);
+    prev = key;
+  });
+  return out;
 };
 
 const cornerStyle = (nameWidth: number, height: number) =>
@@ -65,7 +78,10 @@ const cornerStyle = (nameWidth: number, height: number) =>
 const nowEdge = (i: number) =>
   i === 0 ? { boxShadow: `inset 2px 0 0 ${T.accentRing}` } : null;
 
-export const PeriodHeader = ({ periods, nameWidth, granularity }: Props) => (
+export const PeriodHeader = ({ periods, nameWidth, granularity, metric }: Props) => {
+  const colW = colWidth(metric);
+  const monthStart = granularity === 'week' ? monthStartIdx(periods) : new Set<number>();
+  return (
   <div style={{ position: 'sticky', top: 0, zIndex: 2, background: T.headerBg }}>
     {granularity === 'week' && (
       <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
@@ -77,12 +93,12 @@ export const PeriodHeader = ({ periods, nameWidth, granularity }: Props) => (
             key={b.key}
             style={{
               flex: b.span,
-              minWidth: b.span * 56,
+              minWidth: b.span * colW,
               height: 22,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              borderRight: `1px solid ${T.border}`,
+              borderRight: `2px solid ${T.borderStrong}`,
               fontSize: 11,
               fontWeight: 600,
               color: T.textMuted,
@@ -105,12 +121,13 @@ export const PeriodHeader = ({ periods, nameWidth, granularity }: Props) => (
           key={p.key}
           style={{
             flex: 1,
-            minWidth: 56,
+            minWidth: colW,
             height: 30,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             borderRight: `1px solid ${T.border}`,
+            borderLeft: monthStart.has(i) ? `2px solid ${T.borderStrong}` : undefined,
             fontSize: 11.5,
             color: i === 0 ? T.text : T.textMuted,
             fontWeight: i === 0 ? 600 : 400,
@@ -123,4 +140,5 @@ export const PeriodHeader = ({ periods, nameWidth, granularity }: Props) => (
       {sigmaCell(30, 'Σ гор.')}
     </div>
   </div>
-);
+  );
+};

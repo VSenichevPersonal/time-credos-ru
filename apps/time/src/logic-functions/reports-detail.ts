@@ -6,7 +6,7 @@
 // (из 40+ в Timetta берём минимум). Фильтры deptId/projectId/employeeId — для
 // drill-down с агрегатных срезов в лист.
 
-import type { ReportsInput, RawEntry } from './reports-calc';
+import { employeeCode, type ReportsInput, type RawEntry } from './reports-calc';
 
 // RawEntry не типизирует status (REST его отдаёт) — расширяем локально.
 type DetailEntry = RawEntry & { status?: string | null };
@@ -47,6 +47,7 @@ export const computeDetail = (
   const projById = new Map(input.projects.map((p) => [p.id, p]));
   const empById = new Map(input.employees.map((e) => [e.id, e]));
   const deptById = new Map(input.departments.map((d) => [d.id, d]));
+  const deptCodeById = new Map(input.departments.map((d) => [d.id, d.code ?? null]));
   const wtById = new Map((input.workTypes ?? []).map((w) => [w.id, w]));
 
   const deptOfEntry = (e: DetailEntry): string | null => {
@@ -70,8 +71,17 @@ export const computeDetail = (
 
     rows.push({
       date: raw.date ?? '',
-      // CISO-007: ФИО только при revealNames (доверенный руководитель). Иначе пусто.
-      employeeName: revealNames && emp ? [emp.lastName, emp.firstName].filter(Boolean).join(' ') : '',
+      // CISO-007: ФИО только при revealNames (доверенный руководитель). Иначе —
+      // стабильный КОД сотрудника (не пусто/UUID), чтобы строки были различимы.
+      employeeName:
+        revealNames && emp
+          ? [emp.lastName, emp.firstName].filter(Boolean).join(' ')
+          : raw.employeeId
+            ? employeeCode(
+                { id: raw.employeeId, departmentId: emp?.departmentId ?? deptId },
+                deptCodeById,
+              )
+            : '',
       deptName: dept?.code ?? '',
       projectName: proj ? (proj.code ? `${proj.code} — ${proj.name}` : proj.name ?? '') : '',
       workTypeName: wt?.name ?? '',

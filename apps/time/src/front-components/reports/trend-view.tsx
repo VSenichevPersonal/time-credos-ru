@@ -29,27 +29,79 @@ const NavBtn = ({
   disabled?: boolean;
   onClick?: () => void;
   ariaLabel: string;
-}) => (
-  <button
-    type="button"
-    aria-label={ariaLabel}
-    onClick={disabled ? undefined : onClick}
-    disabled={disabled}
-    style={{
-      width: 28,
-      height: 28,
-      border: `1px solid ${T.border}`,
-      borderRadius: 7,
-      background: T.surface,
-      color: disabled ? T.textFaint : T.textMuted,
-      cursor: disabled ? 'default' : 'pointer',
-      fontFamily: 'inherit',
-      fontSize: 14,
-    }}
-  >
-    {label}
-  </button>
-);
+}) => {
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const live = !disabled && (hover || focus);
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      style={{
+        width: 28,
+        height: 28,
+        border: `1px solid ${live ? T.accentRing : T.border}`,
+        borderRadius: 7,
+        background: !disabled && hover ? T.accentSoft : T.surface,
+        color: disabled ? T.textFaint : live ? T.accent : T.textMuted,
+        cursor: disabled ? 'default' : 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 14,
+        outline: 'none',
+        boxShadow: !disabled && focus ? `0 0 0 2px ${T.accentRing}` : undefined,
+        transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease',
+      }}
+    >
+      {label}
+    </button>
+  );
+};
+
+const DeptChip = ({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) => {
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      style={{
+        padding: '5px 11px',
+        fontFamily: 'inherit',
+        fontSize: 12.5,
+        borderRadius: 7,
+        cursor: active ? 'default' : 'pointer',
+        border: `1px solid ${active || hover || focus ? T.accent : T.border}`,
+        background: active ? T.accentSoft : hover ? T.accentSoft : T.surface,
+        color: active || hover ? T.accentHover : T.textMuted,
+        fontWeight: active ? 600 : 400,
+        outline: 'none',
+        boxShadow: focus ? `0 0 0 2px ${T.accentRing}` : undefined,
+        transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease',
+      }}
+    >
+      {label}
+    </button>
+  );
+};
 
 const DeptPicker = ({
   options,
@@ -61,32 +113,11 @@ const DeptPicker = ({
   onChange: (id: string | null) => void;
 }) => {
   if (options.length === 0) return null;
-  const chip = (active: boolean) =>
-    ({
-      padding: '5px 11px',
-      fontFamily: 'inherit',
-      fontSize: 12.5,
-      borderRadius: 7,
-      cursor: 'pointer',
-      border: `1px solid ${active ? T.accent : T.border}`,
-      background: active ? T.accentSoft : T.surface,
-      color: active ? T.accentHover : T.textMuted,
-      fontWeight: active ? 600 : 400,
-    }) as const;
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-      <button type="button" onClick={() => onChange(null)} style={chip(value === null)}>
-        Все отделы
-      </button>
+      <DeptChip active={value === null} label="Все отделы" onClick={() => onChange(null)} />
       {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          onClick={() => onChange(o.id)}
-          style={chip(value === o.id)}
-        >
-          {o.label}
-        </button>
+        <DeptChip key={o.id} active={value === o.id} label={o.label} onClick={() => onChange(o.id)} />
       ))}
     </div>
   );

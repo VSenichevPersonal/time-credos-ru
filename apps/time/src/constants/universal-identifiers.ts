@@ -711,3 +711,38 @@ export const CREDOS_TIME_EMPLOYEE_BOOKINGS_FIELD_ID =
   '0cd5f16c-dbb3-4da9-8fe2-1e80cf249d8b';
 export const CREDOS_TIME_PROJECT_BOOKINGS_FIELD_ID =
   '5dd2ba93-7ac9-4571-a49d-b61aa36bc8c1';
+
+// REQ-0016 follow-up — HTTP-роут /s/project-team (mode=team|employee-projects):
+// агрегат «Команда проекта» (кто работал + часы) и «Проекты сотрудника» из записей
+// credosTimeEntry (нет прямого relation проект↔сотрудник). ПДн ФИО — по
+// revealEmployeeNames (CISO-007). Курсор-пагинация записей. Контракт — Dev 1.
+export const PROJECT_TEAM_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  'c1a7f3e2-9b48-4d05-8e16-7a2c5f9d3b80';
+
+// REQ-0016 follow-up (полировка): вкладки «Брони» в карточках проекта/сотрудника
+// нативными relation-FIELDS (паттерн вкладок «Отделы»/«Трудозатраты»). Card-view
+// показывает обратный relation bookings (ONE_TO_MANY) → ядро рендерит брони
+// текущего родителя инлайн-таблицей (тип SOFT/HARD, часы, период), кликабельно
+// в карточку брони. Сверка: Timetta — брони видны в карточке проекта/ресурса.
+// — Проект: вкладка «Брони» (project.bookings).
+export const CREDOS_TIME_PROJECT_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER =
+  'a24b0c59-4d41-46fc-ba3d-65cea5ad6bff';
+export const CREDOS_TIME_PROJECT_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER =
+  '18c4ff1f-bd52-44f6-aaba-c78cf44c465a';
+export const CREDOS_TIME_PROJECT_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER =
+  'b3aa5214-faea-49bc-9f30-1c6beeccdcfe';
+export const CREDOS_TIME_PROJECT_CARD_VF_8 =
+  '136a287f-76af-4817-97b5-02e33adbe313';
+export const CREDOS_TIME_PROJECT_CARD_VF_9 =
+  '63452850-4ae9-4290-99f0-6f6b9ccf1e50';
+// — Сотрудник: вкладка «Брони» (employee.bookings).
+export const CREDOS_TIME_EMPLOYEE_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER =
+  '7cd4354f-25e8-4942-b790-0c1132331f7c';
+export const CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER =
+  '2d976bca-b490-47ec-b687-e3abbbd4f4c2';
+export const CREDOS_TIME_EMPLOYEE_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER =
+  'e3f31c12-d9f7-4094-a85a-7277f98b4cb5';
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_6 =
+  'd9c9cbf6-8288-44bc-a1a7-ca91d8474076';
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_7 =
+  '58bdbaad-e268-41aa-9046-956f9bf8e8b9';

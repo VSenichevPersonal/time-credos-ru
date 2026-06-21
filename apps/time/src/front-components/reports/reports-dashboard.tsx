@@ -34,6 +34,48 @@ type View = 'summary' | 'trend';
 // Дашборд «Отчёты»: утилизация + загрузка/недогруз по периоду и срезу
 // (отдел/проект/человек). Данные — /s/reports. Светлая тема, тинт-нейтрали.
 
+const NavBtn = ({
+  ariaLabel,
+  glyph,
+  disabled,
+  onClick,
+}: {
+  ariaLabel: string;
+  glyph: string;
+  disabled: boolean;
+  onClick?: () => void;
+}) => {
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
+  return (
+    <button
+      aria-label={ariaLabel}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      style={{
+        width: 28,
+        height: 28,
+        border: `1px solid ${!disabled && (hover || focus) ? T.accentRing : T.border}`,
+        borderRadius: 7,
+        background: !disabled && hover ? T.accentSoft : T.surface,
+        color: disabled ? T.textFaint : hover || focus ? T.accent : T.textMuted,
+        cursor: disabled ? 'default' : 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 14,
+        outline: 'none',
+        boxShadow: !disabled && focus ? `0 0 0 2px ${T.accentRing}` : undefined,
+        transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease',
+      }}
+    >
+      {glyph}
+    </button>
+  );
+};
+
 const PeriodNav = ({
   label,
   isCurrent,
@@ -44,46 +86,23 @@ const PeriodNav = ({
   isCurrent: boolean;
   onPrev: () => void;
   onNext: () => void;
-}) => {
-  const btn = (disabled: boolean) =>
-    ({
-      width: 28,
-      height: 28,
-      border: `1px solid ${T.border}`,
-      borderRadius: 7,
-      background: T.surface,
-      color: disabled ? T.textFaint : T.textMuted,
-      cursor: disabled ? 'default' : 'pointer',
-      fontFamily: 'inherit',
-      fontSize: 14,
-    }) as const;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <button aria-label="Предыдущий период" onClick={onPrev} style={btn(false)}>
-        ‹
-      </button>
-      <span
-        style={{
-          minWidth: 130,
-          textAlign: 'center',
-          fontSize: 13,
-          fontWeight: 600,
-          color: T.text,
-        }}
-      >
-        {label}
-      </span>
-      <button
-        aria-label="Следующий период"
-        onClick={isCurrent ? undefined : onNext}
-        disabled={isCurrent}
-        style={btn(isCurrent)}
-      >
-        ›
-      </button>
+}) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+    <NavBtn ariaLabel="Предыдущий период" glyph="‹" disabled={false} onClick={onPrev} />
+    <span
+      style={{
+        minWidth: 130,
+        textAlign: 'center',
+        fontSize: 13,
+        fontWeight: 600,
+        color: T.text,
+      }}
+    >
+      {label}
     </span>
-  );
-};
+    <NavBtn ariaLabel="Следующий период" glyph="›" disabled={isCurrent} onClick={onNext} />
+  </span>
+);
 
 const pickRows = (
   groupBy: GroupBy,

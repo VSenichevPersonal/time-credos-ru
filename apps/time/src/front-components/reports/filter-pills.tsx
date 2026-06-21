@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { T } from 'src/front-components/reports/report-tokens';
 import { dimLabel } from 'src/front-components/reports/drill-axis';
 import type { OlapFilter } from 'src/front-components/reports/olap-types';
@@ -9,6 +11,43 @@ import type { OlapFilter } from 'src/front-components/reports/olap-types';
 type Props = {
   filters: { filter: OlapFilter; label: string }[];
   onRemove: (index: number) => void;
+};
+
+// Кнопка ✕ снятия фильтра: hover-усиление + видимый клавиатурный focus-ring.
+const RemoveButton = ({ ariaLabel, onClick }: { ariaLabel: string; onClick: () => void }) => {
+  const [active, setActive] = useState(false);
+  const [focus, setFocus] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      onClick={onClick}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      style={{
+        width: 18,
+        height: 18,
+        flexShrink: 0,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        border: 'none',
+        background: active ? T.accentRing : 'transparent',
+        color: active || focus ? T.accentHover : T.textMuted,
+        cursor: 'pointer',
+        borderRadius: 9,
+        fontSize: 13,
+        lineHeight: 1,
+        fontFamily: 'inherit',
+        boxShadow: focus ? `0 0 0 2px ${T.accentRing}` : undefined,
+        transition: 'background 120ms ease, color 120ms ease',
+      }}
+    >
+      ✕
+    </button>
+  );
 };
 
 export const FilterPills = ({ filters, onRemove }: Props) => {
@@ -36,29 +75,10 @@ export const FilterPills = ({ filters, onRemove }: Props) => {
           <span style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>
             {label}
           </span>
-          <button
-            type="button"
-            aria-label={`Снять фильтр «${dimLabel(filter.dim)}: ${label}»`}
+          <RemoveButton
+            ariaLabel={`Снять фильтр «${dimLabel(filter.dim)}: ${label}»`}
             onClick={() => onRemove(i)}
-            style={{
-              width: 18,
-              height: 18,
-              flexShrink: 0,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: 'none',
-              background: 'transparent',
-              color: T.textMuted,
-              cursor: 'pointer',
-              borderRadius: 9,
-              fontSize: 13,
-              lineHeight: 1,
-              fontFamily: 'inherit',
-            }}
-          >
-            ✕
-          </button>
+          />
         </span>
       ))}
     </div>

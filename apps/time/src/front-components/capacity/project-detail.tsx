@@ -150,7 +150,14 @@ export const ProjectDetail = ({
       ))}
 
       {deptPlans.map((load) => (
-        <DeptPlanRow key={load.plan.id} load={load} nameWidth={nameWidth} periods={periods} />
+        <DeptPlanRow
+          key={load.plan.id}
+          load={load}
+          nameWidth={nameWidth}
+          periods={periods}
+          metric={metric}
+          deptCells={deptCells}
+        />
       ))}
 
       {unplanned.length > 0 && (

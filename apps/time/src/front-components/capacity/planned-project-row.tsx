@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { T } from 'src/front-components/capacity/cap-tokens';
+import { T, childCell, colWidth } from 'src/front-components/capacity/cap-tokens';
 import { projectDeptShareLoads } from 'src/front-components/capacity/calc-load';
 import { departmentLabel } from 'src/constants/labels';
 import type {
@@ -20,14 +20,9 @@ import type {
 
 const title = (p: CapProject): string => p.name; // UX-5: name уже «КОД · Клиент · Название»
 const cellNum = (v: number): string => (v > 0 ? String(Math.round(v)) : '');
-
-// Значение ячейки проекта в выбранной метрике: Загрузка % = доля от ёмкости
-// отдела; иначе — плановые часы (План ч / Свободно ч на уровне проекта = его
-// вклад в часах). Breakdown по отделам всегда в часах (это разбивка доли).
-const projectCell = (v: number, capacity: number | undefined, metric: CellMetric): string => {
-  if (metric === 'pct') return capacity && capacity > 0 && v > 0 ? `${Math.round((v / capacity) * 100)}%` : '';
-  return cellNum(v);
-};
+// Значение ячейки проекта в выбранной метрике — вклад проекта в показатель отдела
+// (childCell: метрика согласована на всех уровнях, как drill в Timetta).
+// Breakdown по отделам (3-й уровень) всегда в часах — это разбивка доли проекта.
 
 const deptCrumb = (id: string | null, deptById?: Map<string, DeptRef>): string => {
   const dept = id ? deptById?.get(id) : undefined;
@@ -58,6 +53,7 @@ export const PlannedProjectRow = ({
 }: Props) => {
   const { project, perPeriod } = load;
   const [open, setOpen] = useState(false);
+  const colW = colWidth(metric);
   const breakdown = projectDeptShareLoads(project, periods, sharesByProject);
   const drillable = breakdown.length > 1; // ≥2 отдела — есть что детализировать
   // Σ проект по периодам (для строки-итога мульти-отдел: видно, что доли сходятся).
@@ -112,7 +108,7 @@ export const PlannedProjectRow = ({
             key={p.key}
             style={{
               flex: 1,
-              minWidth: 56,
+              minWidth: colW,
               height: 32,
               display: 'flex',
               alignItems: 'center',
@@ -123,7 +119,7 @@ export const PlannedProjectRow = ({
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {projectCell(perPeriod[i], deptCells?.[i]?.capacity, metric)}
+            {childCell(metric, perPeriod[i], deptCells?.[i]?.capacity)}
           </div>
         ))}
       </div>
@@ -161,7 +157,7 @@ export const PlannedProjectRow = ({
                     key={p.key}
                     style={{
                       flex: 1,
-                      minWidth: 56,
+                      minWidth: colW,
                       height: 28,
                       display: 'flex',
                       alignItems: 'center',
@@ -206,7 +202,7 @@ export const PlannedProjectRow = ({
                 key={p.key}
                 style={{
                   flex: 1,
-                  minWidth: 56,
+                  minWidth: colW,
                   height: 26,
                   display: 'flex',
                   alignItems: 'center',

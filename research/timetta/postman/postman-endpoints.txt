@@ -1,285 +1,285 @@
-POST 
-POST 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-GET 
-POST 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-POST 
-DELETE 
-PATCH 
-POST 
-DELETE 
-GET 
-GET 
-PATCH 
-GET 
-GET 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-PATCH 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-GET 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-PATCH 
-DELETE 
-POST 
-GET 
-POST 
-POST 
-GET 
-PUT 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PUT 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PUT 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-POST 
-PATCH 
-DELETE 
-GET 
-GET 
-GET 
-GET 
-POST 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-PATCH 
-GET 
-GET 
-GET 
-GET 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-GET 
-PUT 
-PATCH 
-DELETE 
-GET 
-GET 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-POST 
-GET 
-POST 
-POST 
-POST 
-GET 
-POST 
-POST 
-POST 
-GET 
-PUT 
-PATCH 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-GET 
-GET 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-POST 
-GET 
-GET 
-POST 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-GET 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-GET 
-GET 
-GET 
-GET 
-GET 
-POST 
-GET 
-PUT 
-GET 
-POST 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-POST 
-GET 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-GET 
-POST 
-GET 
-PUT 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-GET 
-PATCH 
-DELETE 
-GET 
-POST 
-POST 
-POST 
-POST 
-GET 
-GET 
-GET 
-GET 
-GET 
-GET 
-GET 
-GET 
+POST     https://auth.timetta.com/connect/token  # Get Access Token
+POST     https://auth.timetta.com/connect/token  # Refresh Access Token
+POST     https://api.timetta.com/odata/Users  # Create User
+GET      https://api.timetta.com/odata/Users(d6f80a47-2983-44f3-8be3-691499ae6b2f)?$select=*  # Get User
+PATCH    https://api.timetta.com/odata/Users(e22bf891-4857-4284-966b-0271db3bd1e7)  # Patch User
+DELETE   https://api.timetta.com/odata/Users(c38b9a63-490f-4382-ab94-1f971a26df48)  # Delete User
+GET      https://api.timetta.com/odata/Users?$select=id,name,email,code&$expand=supervisor($select=id,name)&$select=id,name,code,email  # Query Users
+POST     https://api.timetta.com/odata/Users(c21a25f4-70b6-40a9-9be5-dc25f72a3206)/UpdateUserRoles  # Update User Roles
+POST     https://api.timetta.com/odata/Users(b19bc720-62d1-442e-acbc-8e36abfbff05)/WP.RestorePassword  # Restore Password
+POST     https://api.timetta.com/odata/UserCostValues  # Create User Cost Value
+GET      https://api.timetta.com/odata/UserCostValues(f0cd3a4a-ea43-4287-8b39-5af18caf24da)  # Get User Cost Value
+PUT      https://api.timetta.com/odata/UserCostValues(32e2cfc3-0ff1-4b91-85d2-31c69336ddc9)  # Update User Cost Value
+DELETE   https://api.timetta.com/odata/UserCostValues(f0cd3a4a-ea43-4287-8b39-5af18caf24da)  # Delete User Cost Value
+GET      https://api.timetta.com/odata/UserCostValues?$filter=userId eq f0cd3a4a-ea43-4287-8b39-5af18caf24da  # Query User Cost Values
+POST     https://api.timetta.com/odata/Users(b19bc720-62d1-442e-acbc-8e36abfbff05)/WP.UpdateSchedules  # Update User Schedules
+GET      https://api.timetta.com/odata/Users(340f1a48-0f90-4552-865a-6180caf15e51)/Schedules?$expand=schedule($select=id,name)  # Get User Schedules
+POST     https://api.timetta.com/odata/Users(bcd753cc-0b80-47ae-a471-6ff7f06010e1)/UpdatePermissionSets  # Update User Permission Sets
+GET      https://api.timetta.com/odata/Users(ab28da8b-f1e3-46d2-bfa6-96f04e3dbc41)/PermissionSets?$select=id&$expand=permissionSet($select=id,roleName)  # Get User Permission Sets
+POST     https://api.timetta.com/odata/Groups  # Create Group
+GET      https://api.timetta.com/odata/Groups(8462c74e-e9f0-470d-aa9e-3fd70ce0de59)  # Get Group
+PATCH    https://api.timetta.com/odata/Groups(315d56d9-11e1-4dd3-a874-699bf723e70f)  # Update Group
+DELETE   https://api.timetta.com/odata/Groups(8462c74e-e9f0-470d-aa9e-3fd70ce0de59)  # Delete Group
+GET      https://api.timetta.com/odata/Groups  # Query Groups
+POST     https://api.timetta.com/odata/Users(21d5d33d-ae39-4f78-a9de-72938982a570)/UpdateProducts  # Update User Products
+GET      https://api.timetta.com/odata/Users(21d5d33d-ae39-4f78-a9de-72938982a570)/Products  # Get User Products
+POST     https://api.timetta.com/odata/UserSkills  # Add User Skill
+DELETE   https://api.timetta.com/odata/UserSkills(408fb697-7560-414c-84f1-742c1b4ee2bf)  # Delete User Skill
+PATCH    https://api.timetta.com/odata/UserSkills(f73030ea-cf57-4108-8078-d20323b2123a)  # Update User Skill
+POST     https://api.timetta.com/odata/UserGroups  # Create User Group
+DELETE   https://api.timetta.com/odata/UserGroups(a29945cf-c90f-4600-8f56-376ad9ab2bf7)  # Delete User Group
+GET      https://api.timetta.com/odata/UserGroups  # Query User Groups
+GET      https://api.timetta.com/odata/UserSettings({{userId}})  # Get User Settings
+PATCH    https://api.timetta.com/odata/UserSettings({{userId}})  # Patch User Settings
+GET      https://api.timetta.com/odata/GetCultures  # Get Cultures
+GET      https://api.timetta.com/odata/TimeZones  # Get TimeZones
+GET      https://api.timetta.com/odata/GetLanguages  # Get Languages
+POST     https://api.timetta.com/odata/Projects  # Create Project
+GET      https://api.timetta.com/odata/Projects(c53b560c-6d47-4b48-a479-10acf973f223)?$expand=manager($select=id,name)&$select=id,name  # Get Project
+PATCH    https://api.timetta.com/odata/Projects(2fa44ea0-df3b-47f0-bc62-fea3554c6c3c)  # Update Project
+DELETE   https://api.timetta.com/odata/Projects(c53b560c-6d47-4b48-a479-10acf973f223)  # Delete Project
+GET      https://api.timetta.com/odata/Projects?$select=id,modified,name&$expand=manager($select=id,name)&$top=10  # Query Projects
+POST     https://api.timetta.com/odata/Projects(667dd715-baa7-4149-8bc6-e7768ea033dc)/SetState  # Set Project State
+PATCH    https://api.timetta.com/odata/Projects(2fa44ea0-df3b-47f0-bc62-fea3554c6c3c)  # Set Project State (Legacy)
+POST     https://api.timetta.com/odata/ProjectTasks  # Create Project Task
+GET      https://api.timetta.com/odata/ProjectTasks(3fa44ea0-df3b-47f0-bc62-fea3554c6c4c)  # Get Project Task
+PATCH    https://api.timetta.com/odata/ProjectTasks(11344c3a-b577-451c-ae62-02c4ed95e80a)  # Update Project Task
+DELETE   https://api.timetta.com/odata/ProjectTasks(3fa44ea0-df3b-47f0-bc62-fea3554c6c4c)  # Delete Project Task
+GET      https://api.timetta.com/odata/ProjectTasks?$expand=project($select=id,name)&$top=5&$select=id,name  # Query Project Tasks
+GET      https://api.timetta.com/odata/Projects(2fa44ea0-df3b-47f0-bc62-fea3554c6c3c)/ProjectTasks?$select=name, id&$expand=projectTaskAssignments($select=id;$expand=projectTeamMember($select=id;$expand=resource($select=name)))  # Get Tasks By Project
+GET      https://api.timetta.com/odata/Projects(3fa44ea0-df3b-47f0-bc62-fea3554c6c4c)/GetTasks?$select=id,name,description,number,indent,leadTaskId,allowTimeEntry,startDate,endDate,estimatedCost,estimatedHours,plannedCost,plannedHours,actualCost,actualHours,isActive,rowVersion,projectId&$expand=projectTaskAssignments($select=id,isAllTeamRole,projectTeamMemberId)  # Get Tasks
+POST     https://api.timetta.com/odata/ProjectTeamMembers  # Create Team Member
+GET      https://api.timetta.com/odata/ProjectTeamMembers(5499e19f-e601-47f0-935b-b0724f21f744)  # Get Project Team Member
+PATCH    https://api.timetta.com/odata/ProjectTeamMembers(40b1ede8-a823-4773-b51d-e3cb0483050d)  # Patch Team Member
+DELETE   https://api.timetta.com/odata/ProjectTeamMembers(40b1ede8-a823-4773-b51d-e3cb0483050d)  # Delete Team Member
+GET      https://api.timetta.com/odata/Projects(2fa44ea0-df3b-47f0-bc62-fea3554c6c3c)/ProjectTeamMembers?$expand=resource($select=name)&$expand=role($select=name)  # Query Project Team Members
+POST     https://api.timetta.com/odata/Generics  # Create Generic Resource
+PATCH    https://api.timetta.com/odata/Generics(3cd95053-a28b-489a-a93d-ae4ad690c244)  # Patch Generic Resource
+DELETE   https://api.timetta.com/odata/Generics(3cd95053-a28b-489a-a93d-ae4ad690c244)  # Delete Generic Resource
+POST     https://api.timetta.com/odata/Projects(3fa44ea0-df3b-47f0-bc62-fea3554c6c4c)/UpdateResourcePlan  # Update Resource Plan
+GET      https://api.timetta.com/odata/Projects(ea011860-07cf-4bfe-81fa-f3ba4274bc32)/GetResourcePlan(scale=WP.PlanningScale'Day',from=2022-11-01,to=2022-11-30,isForecast=false)  # Get Resource Plan
+POST     https://api.timetta.com/odata/Projects(b7dacf32-8f50-4a74-ac65-7f63a21579d5)/ClearResourcePlan  # Clear Resource Plan
+POST     https://api.timetta.com/odata/ProjectRevenueEstimates  # Create Project Revenue Estimates
+GET      https://api.timetta.com/odata/ProjectRevenueEstimates(907aacab-b5bc-4e59-82a9-0bb2b103a621)  # Get Project Revenue Estimate
+PUT      https://api.timetta.com/odata/ProjectRevenueEstimates(cba72d2d-588c-4775-a60d-78fbc74e8743)  # Update Project Revenue Estimates
+PATCH    https://api.timetta.com/odata/ProjectRevenueEstimates(cba72d2d-588c-4775-a60d-78fbc74e8743)  # Patch Project Revenue Estimate
+DELETE   https://api.timetta.com/odata/ProjectRevenueEstimates(cba72d2d-588c-4775-a60d-78fbc74e8743)  # Delete Project Revenue Estimate
+GET      https://api.timetta.com/odata/ProjectRevenueEstimates?$filter=projectId eq 2fa44ea0-df3b-47f0-bc62-fea3554c6c3c  # Query Project Revenue Estimates
+POST     https://api.timetta.com/odata/ProjectExpenseEstimates  # Create ProjectExpenseEstimate
+GET      https://api.timetta.com/odata/ProjectExpenseEstimates(4d08bc42-656c-4107-93c7-62d905a54f53)  # Get Project Expense Estimate
+PUT      https://api.timetta.com/OData/ProjectExpenseEstimates(876f01b3-68cb-4e95-b195-58c2cd82c751)  # Update Project Expense Estimate
+PATCH    https://api.timetta.com/OData/ProjectExpenseEstimates(876f01b3-68cb-4e95-b195-58c2cd82c751)  # Update Project Expense Estimate
+DELETE   https://api.timetta.com/odata/ProjectExpenseEstimates(bea24c40-6169-4344-8221-a8ffbc9b739e)  # Delete ProjectExpenseEstimate
+GET      https://api.timetta.com/odata/ProjectExpenseEstimates?$filter=projectId eq 6ce1f7e7-b88c-4106-8833-d4ac30d6ba15  # Query Project Expense Estimates
+POST     https://api.timetta.com/odata/ProjectBillingEstimates  # Create Billing Estimate
+GET      https://api.timetta.com/odata/ProjectBillingEstimates(18822e58-7b8e-408e-925f-2578f96c65d9)  # Get Billing Estimate
+PUT      https://api.timetta.com/odata/ProjectBillingEstimates(3e2c947c-ddc2-4043-a372-5b974f131b55)  # Update Billing Estimate
+PATCH    https://api.timetta.com/odata/ProjectBillingEstimates(3e2c947c-ddc2-4043-a372-5b974f131b55)  # Update Billing Estimate
+DELETE   https://api.timetta.com/odata/ProjectBillingEstimates(3e2c947c-ddc2-4043-a372-5b974f131b55)  # Delete Billing Estimate
+GET      https://api.timetta.com/OData/ProjectBillingEstimates?$filter=projectId eq c50c312d-ffae-4f05-a30d-4e897a3a9061&$expand=projectTask  # Query Project Billing Estimates
+POST     https://api.timetta.com/odata/Projects(c3fa1819-b894-4f90-8393-6e18d74a98b3)/UpdateCoManagers  # Update Project Co-managers
+GET      https://api.timetta.com/odata/Projects(c3fa1819-b894-4f90-8393-6e18d74a98b3)/CoManagers?$expand=user($select=id,name)  # Query Project Co-managers
+POST     https://api.timetta.com/odata/ProjectTariffs  # Create Project Tariff
+PATCH    https://api.timetta.com/odata/ProjectTariffs(1b139a85-82dc-4eea-9f09-0622f3dec84c)  # Patch Project Tariff
+DELETE   https://api.timetta.com/odata/ProjectTariffs(1b139a85-82dc-4eea-9f09-0622f3dec84c)  # Delete Project Tariff
+GET      https://api.timetta.com/odata/ProjectTariffs(1b139a85-82dc-4eea-9f09-0622f3dec84c)  # Get Project Tariff
+GET      https://api.timetta.com/odata/Projects(05447958-b069-4978-b918-ee614f322944)/ProjectTariffs  # Query Project Tariffs by Project
+GET      https://api.timetta.com/odata/ProjectBillingTypes  # Query Project Billing Types
+GET      https://api.timetta.com/odata/Lifecycles?$filter=entityType eq 'Project'&expand=states  # Query Project Lifecycle States
+POST     https://api.timetta.com/odata/Programs(08bccbdb-c2d4-4833-95e3-4eb3cc3ea3fc)/WP.IncludeProject  # Include Project
+POST     https://api.timetta.com/odata/ProjectVersions/CreateVersion  # Create Project Version
+GET      https://api.timetta.com/odata/ProjectVersions(9064ec3c-4dff-4a4a-9bda-728983f0c3e8)?$expand=status  # Get Project Version
+PATCH    https://api.timetta.com/odata/ProjectVersions(9064ec3c-4dff-4a4a-9bda-728983f0c3e8)  # Update Project Version
+DELETE   https://api.timetta.com/odata/ProjectVersions(9064ec3c-4dff-4a4a-9bda-728983f0c3e8)  # Delete Project Version
+GET      https://api.timetta.com/odata/ProjectVersions?$filter=mainProject/id eq fe6ea8e8-1720-4431-acce-b47c9b356ecb&$expand=status  # Query Project Versions
+PATCH    https://api.timetta.com/odata/ProjectVersions(9064ec3c-4dff-4a4a-9bda-728983f0c3e8)  # Make Version As Project Baseline
+GET      https://api.timetta.com/odata/ProjectVersions(bf4d854b-9cb4-463f-96fc-76a9c606384c)/GetTasks?$select=id,name,description,number,indent,leadTaskId,allowTimeEntry,startDate,endDate,estimatedCost,estimatedHours,plannedCost,plannedHours,actualCost,actualHours,isActive,rowVersion,projectId&$expand=projectTaskAssignments($select=id,isAllTeamRole,projectTeamMemberId)  # Get Version Tasks
+GET      https://api.timetta.com/odata/Organizations?$top=5  # Query Organizations
+GET      https://api.timetta.com/odata/TimeAllocations?$select=id,duration,comments,projectId,projectTaskId&$filter=modified ge 2021-01-01&$expand=timesheet($select=id;$expand=state($select=id,code,name)),project($select=id,name),projectTask($select=name,id,description)&$top=10  # Get Time Allocations
+GET      https://api.timetta.com/odata/TimeSheets/GetIdForPeriod(date=2021-03-22,userId=e22bf891-4857-4284-966b-0271db3bd1e7)  # Get TimeSheet Id For Period
+GET      https://api.timetta.com/odata/TimeSheets(00d44ecd-c005-450c-b910-dcdc4aecc463)?$expand=timeSheetLines($orderBy=orderNumber;$select=id,orderNumber,projectId,projectTaskId,activityId,roleId;$expand=timeAllocations($select=id,date,duration,comments)),approvalStatus($select=id,name),user($select=id,name)&$select=id,dateFrom,dateTo,rowVersion  # Get TimeSheet
+PUT      https://api.timetta.com/odata/TimeSheets(00d44ecd-c005-450c-b910-dcdc4aecc463)  # Update TimeSheet
+DELETE   https://api.timetta.com/odata/TimeSheets(00d44ecd-c005-450c-b910-dcdc4aecc463)  # Delete TimeSheet
+GET      https://api.timetta.com/odata/TimeSheets?$filter=dateFrom ge 2022-01-01 and dateTo le 2022-12-31&$top=10  # Query TimeSheets
+POST     https://api.timetta.com/odata/TimeSheets(8680bc35-3d73-4f72-8fc4-50529204bae2)/SetState  # Set TimeSheet State
+POST     https://api.timetta.com/odata/TimeSheets(5a7b6c8b-866a-47a2-a6a3-e9a73f97ea94)/StartWorkflow  # Start TimeSheet Workflow
+POST     https://api.timetta.com/odata/TrackTime  # Track Time
+POST     https://api.timetta.com/odata/TimeOffRequests  # Create Time Off Request
+GET      https://api.timetta.com/odata/TimeOffRequests(129714b6-95c5-4de7-8c64-7e50adb49a43)?$select=id,name&$expand=timeOffType($select=id,code,name), approvalStatus($select=id,code,name)  # Get Time Off Request
+PATCH    https://api.timetta.com/OData/TimeOffRequests(f93ade59-0b78-4e85-b2db-30ac20fae6c2)  # Update Time Off Request
+DELETE   https://api.timetta.com/odata/TimeOffRequests(129714b6-95c5-4de7-8c64-7e50adb49a43)  # Delete Time Off Request
+GET      https://api.timetta.com/odata/TimeOffRequests?$top=5&$select=id,name&$expand=timeOffType($select=id,code,name),state($select=id,code,name)  # Query Time Off Requests
+POST     https://api.timetta.com/odata/TimeOffRequests(143e3281-657f-4611-9e3c-e44076a22583)/SetState  # Set Time Off Request State
+POST     https://api.timetta.com/odata/TimeOffRequests(143e3281-657f-4611-9e3c-e44076a22583)/StartWorkflow  # Start Time Off Request Workflow
+POST     https://api.timetta.com/OData/TimeOffBalanceEntries  # Create Time Off Balance Entry
+GET      https://api.timetta.com/OData/TimeOffBalanceEntries(110afc54-323c-4ccf-89a3-db446c970e62)  # Get Time Off Balance Entry
+PUT      https://api.timetta.com/OData/TimeOffBalanceEntries(611b11f8-2dbc-4c7a-a607-7e2dbc17a7d1)  # Update Time Off Balance Entry
+PATCH    https://api.timetta.com/OData/TimeOffBalanceEntries(611b11f8-2dbc-4c7a-a607-7e2dbc17a7d1)  # Update Time Off Balance Entry
+DELETE   https://api.timetta.com/OData/TimeOffBalanceEntries(110afc54-323c-4ccf-89a3-db446c970e62)  # Delete Time Off Balance Entry
+GET      https://api.timetta.com/odata/TimeOffBalanceEntries?$select=id,amount,number,date&$expand=timeOffType($select=id,name;$expand=unit($select=id,name)),user($select=id,name),type($select=id,name,code),mode($select=id,name)&$orderby=date  # Query Time Off Balance Entries
+GET      https://api.timetta.com/odata/UserTotals(userId)/GetTimeOffBalance(from=2023-01-01,to=2023-12-31)  # Get User Time Off Balance
+POST     https://api.timetta.com/odata/ExpenseRequests  # Create Expense Request
+GET      https://api.timetta.com/odata/ExpenseRequests(2056087d-2e8c-4e5b-970c-1d3024b4ea72)?$select=id,name,date,description&$expand=lines($select=id,description,amount;$expand=account($select=id,code,name),projectTask($select=id,name) ), approvalStatus($select=id,code,name),project($select=id,code,name)  # Get Expense Request
+PUT      https://api.timetta.com/odata/ExpenseRequests(6850904e-4f37-431b-8c3c-7daead75ae99)  # Update Expense Request
+DELETE   https://api.timetta.com/odata/ExpenseRequests(7979d62d-5236-491d-8d09-9cece6dfee29)  # Delete Expense Request
+GET      https://api.timetta.com/odata/ExpenseRequests?$top=5&$select=id,name&$expand=lines($select=id,description,amount;$expand=account($select=id,code,name)), approvalStatus($select=id,code,name),project($select=id,code,name)  # Query Expense Requests
+POST     https://api.timetta.com/odata/Projects(31db2084-03c6-45f7-b46b-8f59ab197db9)/TrackExpenses  # Track Expenses
+POST     https://api.timetta.com/odata/ExpenseRequests(ea946ac6-b467-452e-a7e8-c18672845ae8)/SetState  # Set Expense Request State
+GET      https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/GetComments?$expand=attachments($select=id,%20commentId,%20fileName,%20fileExt),modifiedBy($select=id,name)  # Get Comments
+POST     https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/AddComment  # Add Comment
+POST     https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/EditComment  # Edit Comment
+POST     https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/DeleteComment  # Delete Comment
+GET      https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/GetCommentAttachment(attachmentId=eaaab902-9752-4f2d-be08-601ce2f15776)  # Get Comment Attachment
+POST     https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/UploadCommentAttachment  # Upload Comment Attachment
+POST     https://api.timetta.com/odata/ActsOfAcceptance(2a2c8579-10e6-4d96-b62f-712e0582942a)/DeleteCommentAttachment  # Delete Comment Attachment
+POST     https://api.timetta.com/odata/ActsOfAcceptance  # Create Act Of Acceptance
+GET      https://api.timetta.com/odata/ActsOfAcceptance(e2331acb-62f8-457b-8d94-5d55b0adca47)?$expand=lines  # Get Act Of Acceptance
+PUT      https://api.timetta.com/odata/ActsOfAcceptance(aa0f59f5-08ff-4d1f-b57d-08023b05b94d)  # Update Act Of Acceptance
+PATCH    https://api.timetta.com/odata/ActsOfAcceptance(0e8f1aa5-c8f5-4df8-ae3b-ad1c228f1b28)  # Patch Act Of Acceptance
+DELETE   https://api.timetta.com/odata/ActsOfAcceptance(78ae87a0-51fa-48f4-a151-27d3a86d02f2)  # Delete Act Of Acceptance
+GET      https://api.timetta.com/odata/ActsOfAcceptance?$filter=projectId eq 7fc3aa0c-9d61-4f42-90aa-9a5430cc6ca6  # Query Acts Of Acceptance
+POST     https://api.timetta.com/odata/ActsOfAcceptance(3bd3a7a8-ae71-4c22-930d-f5a667807770)/SetState  # Set Act Of Acceptance State
+POST     https://api.timetta.com/OData/ActsOfAcceptance(914774a2-e0c5-4d1f-8de1-debd677a1bfb)/SetState  # Set Act Of Acceptance State (with additional properties)
+POST     https://api.timetta.com/odata/Invoices/Insert  # Create Invoice
+GET      https://api.timetta.com/OData/Invoices(57b37d45-62cb-4b4d-adb0-82a615891500)  # Get Invoice
+PUT      https://api.timetta.com/OData/Invoices(57b37d45-62cb-4b4d-adb0-82a615891500)  # Update Invoice (with custom lines)
+DELETE   https://api.timetta.com/OData/Invoices(57b37d45-62cb-4b4d-adb0-82a615891500)  # Delete Invoice
+GET      https://api.timetta.com/OData/Invoices?$expand=lines  # Query Invoices
+POST     https://api.timetta.com/odata/Invoices(c756f794-3d1a-45da-8f9b-1ef21a655bf0)/SetState  # Set State
+POST     https://api.timetta.com/odata/Invoices(c756f794-3d1a-45da-8f9b-1ef21a655bf0)/SetState  # Set State (with transition form)
+POST     https://api.timetta.com/odata/Issues  # Create Issue
+GET      https://api.timetta.com/odata/Issues(6c4c48e3-abe1-44f1-8c31-c1e41d601bb9)  # Get Issue
+PATCH    https://api.timetta.com/odata/Issues(6c4c48e3-abe1-44f1-8c31-c1e41d601bb9)  # Patch Issue
+DELETE   https://api.timetta.com/odata/Issues(6c4c48e3-abe1-44f1-8c31-c1e41d601bb9)  # Delete Issue
+GET      https://api.timetta.com/odata/Issues?select=*  # Query Issues
+POST     https://api.timetta.com/odata/Issues(3bd3a7a8-ae71-4c22-930d-f5a667807770)/SetState  # Set Issue State
+POST     https://api.timetta.com/odata/AccountingPeriods  # Create Accounting Period
+GET      https://api.timetta.com/odata/AccountingPeriods(8c851919-dea4-4069-8eb9-2330721ad4fc)  # Get Accounting Period
+PATCH    https://api.timetta.com/odata/AccountingPeriods(64f3236b-00e0-41cf-84d2-f9c63565a1f1)  # Patch Accounting Period
+DELETE   https://api.timetta.com/odata/AccountingPeriods(8c851919-dea4-4069-8eb9-2330721ad4fc)  # Delete Accounting Period
+GET      https://api.timetta.com/odata/AccountingPeriods?$select=id,name,isActive,created,start,end&$top=50  # Query Accounting Periods
+GET      https://api.timetta.com/odata/GetAllocationData?$filter=project/id eq 7ce1f7e7-b88c-4106-8833-d4ac30d6ba15&$top=5  # Get Allocation Data
+GET      https://api.timetta.com/odata/FinancialAccounts  # Get Financial Accounts
+POST     https://api.timetta.com/odata/AccountingEntries  # Create Accounting Entry
+GET      https://api.timetta.com/odata/AccountingEntries(32251cb6-6839-4233-8b00-dab98412640b)?$expand=project($select=id,name),projectTask($select=id,name,indent,leadTaskId,structNumber),account($select=id,name;$expand=type($select=id,name,code)),mode($select=id,name)  # Get Accounting Entry
+PUT      https://api.timetta.com/odata/AccountingEntries(2ae1dfbb-1911-4afb-99fe-7558df658c84)  # Update Accounting Entry
+DELETE   https://api.timetta.com/odata/AccountingEntries(32251cb6-6839-4233-8b00-dab98412640b)  # Delete Accounting Entry
+GET      https://api.timetta.com/odata/AccountingEntries?$select=id,amount,number,date,description&$top=50&$expand=project($select=id,name),projectTask($select=id,name),account($select=id,name;$expand=type($select=id,name,code))  # Query Accounting Entries
+POST     https://api.timetta.com/odata/ResourceRequests  # Create Resource Request
+GET      https://api.timetta.com/odata/ResourceRequests(aaed9389-def0-42ba-ae49-75b2d7a53ba0)?$expand=preferredResources  # Get Resource Request
+PUT      https://api.timetta.com/odata/ResourceRequests(aaed9389-def0-42ba-ae49-75b2d7a53ba0)  # Update Resource Request
+DELETE   https://api.timetta.com/odata/ResourceRequests(aaed9389-def0-42ba-ae49-75b2d7a53ba0)  # Delete Resource Request
+GET      https://api.timetta.com/odata/ResourceRequests?$select=id,name,from,to,requestedHours&$expand=project($select=id,name),role($select=id,name),assigned($select=id,name),state($select=id,name,code)&$orderby=name  # Query Resource Requests
+POST     https://api.timetta.com/odata/ResourceRequests(3bd3a7a8-ae71-4c22-930d-f5a667807770)/SetState  # Set Resource Request State
+POST     https://api.timetta.com/odata/BookingEntries/Create  # Create Booking Entry
+GET      https://api.timetta.com/odata/BookingEntries(ffa95ae7-deb1-4f85-add5-ecc2927041fe)?$expand=detailEntries  # Get Booking Entry
+GET      https://api.timetta.com/odata/BookingEntries(1fa6618f-d355-499b-b787-f75b19a65f09)/GetDetails(scale=WP.PlanningScale'Day')  # Get Booking Entry Details
+POST     https://api.timetta.com/odata/BookingEntries(0e71fe60-4c7a-4489-ab62-10cb9fc877e7)/UpdateWithScaling  # Update Booking Entry
+DELETE   https://api.timetta.com/OData/BookingEntries(9eba43c3-06df-44f0-b237-2eea3aebd631)  # Delete Booking Entry
+GET      https://api.timetta.com/odata/BookingEntries?$select=id,rowVersion,requiredHours,bookedHours,resourceId,type,from,to,planningMethod,editAllowed,isTimeOff&$expand=detailEntries($select=date,hours),project($select=id,name),resourceRequest($select=id,name)  # Query Booking Entries
+POST     https://api.timetta.com/odata/BookingEntries(086813ef-d548-4b5d-9299-67523fb88634)/SwitchToSoft  # Switch Booking Entry Type To Soft
+POST     https://api.timetta.com/odata/BookingEntries(086813ef-d548-4b5d-9299-67523fb88634)/SwitchToHard  # Switch Booking Entry Type To Hard
+POST     https://api.timetta.com/OData/ResourcePools  # Create Resource Pool
+GET      https://api.timetta.com/OData/ResourcePools(a13ae88b-ad44-4326-839c-ff3181b7f5a4)  # Get Resource Pool
+PATCH    https://api.timetta.com/OData/ResourcePools(4bd158c7-85cf-4ac7-8df5-dc1d4dc4a4a5)  # Update Resource Pool
+DELETE   https://api.timetta.com/OData/ResourcePools(3439a617-a136-48f3-9c6a-e9122d8f94d5)  # Delete Resource Pool
+GET      https://api.timetta.com/odata/ResourcePools  # Query Resource Pools
+GET      https://api.timetta.com/odata/ActualDataEntries?$apply=filter(month eq 2022-09-01 and approvalStatus/code eq 'Approved')/groupby((project/id, role/id), aggregate(hoursNormalized with sum as hours, costNormalized with sum as cost))  # Get Actual Data Entries
+GET      https://api.timetta.com/odata/Activities  # Query Activities
+POST     https://api.timetta.com/odata/Roles  # Create Role
+GET      https://api.timetta.com/odata/Roles(0919504c-ec8d-46f7-8004-dd0b1a390ec8)  # Get Role
+PATCH    https://api.timetta.com/odata/Roles(4fc29759-fa7e-4024-aab3-f3b3082624ad)  # Update Role
+DELETE   https://api.timetta.com/odata/Roles(ecd394e5-611f-43ff-920a-6b150bf7cade)  # Delete Role
+GET      https://api.timetta.com/odata/Roles?$select=id,name,isActive,isDefault,description&$top=50&$orderby=name  # Query Roles
+POST     https://api.timetta.com/odata/Departments  # Create Department
+GET      https://api.timetta.com/odata/Departments(51deec6c-4daa-4c50-b595-2173b1f1422f)  # Get Department
+PATCH    https://api.timetta.com/odata/Departments(32805139-610f-46a6-8c2c-a6ffcd32bb2b)  # Patch Department
+DELETE   https://api.timetta.com/odata/Departments(51deec6c-4daa-4c50-b595-2173b1f1422f)  # Delete Department
+GET      https://api.timetta.com/odata/Departments?$top=5  # Query Departments
+POST     https://api.timetta.com/OData/Grades  # Create Grade
+GET      https://api.timetta.com/OData/Grades(a5e98ca7-1cc6-4b86-8a1c-1679dbf61d7b)  # Get Grade
+PATCH    https://api.timetta.com/OData/Grades(5c7b9470-ae16-426b-a3ae-1a7d69fe861b)  # Update Grade
+DELETE   https://api.timetta.com/OData/Grades(a5e98ca7-1cc6-4b86-8a1c-1679dbf61d7b)  # Delete Grade
+GET      https://api.timetta.com/odata/Grades  # Query Grades
+POST     https://api.timetta.com/odata/Levels  # Create Level
+GET      https://api.timetta.com/odata/Levels(2a245854-882d-40ff-a736-0af3da2e8d3d)  # Get Level
+PATCH    https://api.timetta.com/odata/Levels(2a245854-882d-40ff-a736-0af3da2e8d3d)  # Update Level
+DELETE   https://api.timetta.com/odata/Levels(2a245854-882d-40ff-a736-0af3da2e8d3d)  # Delete  Level
+GET      https://api.timetta.com/odata/Levels  # Query Levels
+GET      https://api.timetta.com/odata/Lifecycles  # Query Lifecycles
+GET      https://api.timetta.com/odata/Lifecycles(3ac6515b-aa58-44a7-84d9-943233914c2a)?$expand=states  # Get Lifecycle
+GET      https://api.timetta.com/odata/ActsOfAcceptance(c5f6bde1-2ac4-4657-884f-a9b72375c615)/GetLifeCycleInfo  # Get Entity Lifecycle Info
+GET      https://api.timetta.com/OData/States  # Query States
+GET      https://api.timetta.com/OData/States(91efee63-b594-4f2d-93e8-d5ea8ca4a239)  # Get State
+POST     https://api.timetta.com/OData/Schedules  # Create Schedule
+GET      https://api.timetta.com/OData/Schedules(bb6cba16-c330-4a13-891d-6477caa5951c)?$expand=patternDays  # Get Schedule
+PUT      https://api.timetta.com/OData/Schedules(af458849-92de-4bf6-9a4a-208b7d8fc36f)  # Update Schedule
+GET      https://api.timetta.com/OData/Schedules  # Query Schedules
+POST     https://api.timetta.com/OData/Schedules(09d725de-5c30-4072-88be-4d7989777407)/WP.SetAsDefault  # Set Schedule As Default
+POST     https://api.timetta.com/odata/ScheduleExceptions  # Create Schedule Exception
+GET      https://api.timetta.com/odata/ScheduleExceptions(b0edad22-9d8b-4992-9fb2-326ab4e773cb)?$expand=exceptionDays($orderby=date)  # Get Schedule Exception
+PUT      https://api.timetta.com/odata/ScheduleExceptions(b0edad22-9d8b-4992-9fb2-326ab4e773cb)  # Update Schedule Exception
+DELETE   https://api.timetta.com/odata/ScheduleExceptions(b0edad22-9d8b-4992-9fb2-326ab4e773cb)  # Delete Schedule Exception
+GET      https://api.timetta-test.com/odata/ScheduleExceptions?$select=id,name,description,isActive&$top=50  # Query Schedule Exceptions
+POST     https://api.timetta.com/OData/Locations  # Create Location
+GET      https://api.timetta.com/OData/Locations(e68952c9-c2d7-4394-8401-b8d0d5fe0c71)  # Get Location
+PATCH    https://api.timetta.com/OData/Locations(e68952c9-c2d7-4394-8401-b8d0d5fe0c71)  # Update Location
+DELETE   https://api.timetta.com/OData/Locations(e68952c9-c2d7-4394-8401-b8d0d5fe0c71)  # Delete Location
+GET      https://api.timetta.com/OData/Locations?$select=id,name,isActive,created,description,isDefault&$top=50  # Query Locations
+POST     https://api.timetta.com/OData/Locations(e68952c9-c2d7-4394-8401-b8d0d5fe0c71)/SetAsDefault  # Set Location As Default
+POST     https://api.timetta.com/odata/FinancialAccounts  # Create Financial Account
+GET      https://api.timetta.com/odata/FinancialAccounts(21db2084-03c6-45f7-b46b-8f59ab197db9)  # Get Financial Account
+GET      https://api.timetta.com/odata/FinancialAccounts  # Query Financial Accounts
+POST     https://api.timetta.com/odata/TimeOffTypes  # Create Time Off Type
+GET      https://api.timetta.com/odata/TimeOffTypes(22c1f067-6bb8-41fc-92f9-c6e52aa4e719)  # Get Time Off Type
+PATCH    https://api.timetta.com/odata/TimeOffTypes(cb70aa4e-5edb-4c2a-b5fe-5da9b093f0e8)  # Patch Time Off Type
+DELETE   https://api.timetta.com/odata/TimeOffTypes(22c1f067-6bb8-41fc-92f9-c6e52aa4e719)  # Delete Time Off Type
+GET      https://api.timetta.com/odata/TimeOffTypes  # Query Time Off Types
+POST     https://api.timetta.com/OData/Currencies  # Create Currency
+GET      https://api.timetta.com/OData/Currencies(9dce5641-2006-4619-bdae-81f08148f106)  # Get Currency
+PATCH    https://api.timetta.com/odata/Currencies(81b1f64b-9454-42cb-8f84-a3a54025bb6e)  # Update Currency
+DELETE   https://api.timetta.com/odata/Currencies(81b1f64b-9454-42cb-8f84-a3a54025bb6e)  # Delete Currency
+GET      https://api.timetta.com/odata/Currencies?$select=id,name,isActive,created&$orderby=name  # Query Currencies List
+POST     https://api.timetta.com/odata/CurrencyExchangeRates  # Create Exchange Rate
+GET      https://api.timetta.com/odata/CurrencyExchangeRates(97d1037e-6a5a-4665-a493-bb50eab0cab4)  # Get Exchange Rate
+PATCH    https://api.timetta.com/odata/CurrencyExchangeRates(9a27873c-a049-4c1a-8ca6-ecaef25d568e)  # Update Exchange Rate
+DELETE   https://api.timetta.com/odata/CurrencyExchangeRates(ffb1e756-ba31-467d-aa50-b7b146738fa0)  # Delete Exchange Rate
+GET      https://api.timetta.com/odata/CurrencyExchangeRates?$select=id,date,exchangeRate&$filter=currencyId eq 9fbe660d-fc6b-4d8f-b7f5-6c1e29db8fd9&$orderby=date desc  # Query Exchange Rates For Currency
+GET      https://api.timetta.com/odata/Currencies(a5f5cd68-2c70-4637-ad82-3144733eed2e)/GetExchangeRate(date=2023-04-10)  # Get Exchange Rate For Date
+POST     https://api.timetta.com/odata/PermissionSets  # Create Permission Set
+GET      https://api.timetta.com/odata/PermissionSets(c255066d-7b1c-4beb-9b70-33cc0caf32cf)?$expand=PermissionSetDetails  # Get Permission Set
+PUT      https://api.timetta.com/odata/PermissionSets(c255066d-7b1c-4beb-9b70-33cc0caf32cf)  # Update Permission Set
+DELETE   https://api.timetta.com/odata/PermissionSets(c255066d-7b1c-4beb-9b70-33cc0caf32cf)  # Delete Permission Set
+GET      https://api.timetta.com/odata/PermissionSets?$select=id,name,roleName,description  # Query Permission Sets
+POST     https://api.timetta.com/odata/Skill  # Create Skill
+GET      https://api.timetta.com/odata/Skills(2a245854-882d-40ff-a736-0af3da2e8d3d)  # Get Skill
+PATCH    https://api.timetta.com/odata/Skills(2a245854-882d-40ff-a736-0af3da2e8d3d)  # Update Skill
+DELETE   https://api.timetta.com/odata/Skills(2a245854-882d-40ff-a736-0af3da2e8d3d)  # Delete Skill
+GET      https://api.timetta.com/odata/Skills  # Query Skills
+POST     https://api.timetta.com/odata/LegalEntities  # Create Legal Entity
+GET      https://api.timetta.com/odata/LegalEntities(540ba299-c5ad-43fb-971e-8c40fbee764f)?$select=*  # Get Legal Entity
+PATCH      # Patch Legal Entity
+DELETE   https://api.timetta.com/odata/LegalEntities(540ba299-c5ad-43fb-971e-8c40fbee764f)  # Delete Legal Entity
+GET      https://api.timetta.com/odata/LegalEntities?$select=*  # Query Legal Entities
+POST     https://api.timetta.com/OData/DirectoryEntries  # Create Directory Entry
+GET      https://api.timetta.com/OData/DirectoryEntries(d6ccf245-49c3-4aff-a247-9f8805ac5a9e)  # Get Directory Entry
+PATCH    https://api.timetta.com/OData/DirectoryEntries(d6ccf245-49c3-4aff-a247-9f8805ac5a9e)  # Update Directory Entry
+DELETE   https://api.timetta.com/OData/DirectoryEntries(d6ccf245-49c3-4aff-a247-9f8805ac5a9e)  # Delete Directory Entry
+GET      https://api.timetta.com/OData/DirectoryEntries?$filter=(directoryId eq 89d93d01-1d02-49ab-a840-7b8f6636d894)&$select=id,code,name,description,isActive  # Query Directory Entries
+POST     https://api.timetta.com/OData/Directories  # Create Directory
+GET      https://api.timetta.com/OData/Directories(b197424c-7f26-49f5-8c90-a8bd1c5c9245)  # Get Directory
+PATCH    https://api.timetta.com/OData/Directories(89d93d01-1d02-49ab-a840-7b8f6636d894)  # Update Directory
+DELETE   https://api.timetta.com/OData/Directories(b197424c-7f26-49f5-8c90-a8bd1c5c9245)  # Delete Directory
+GET      https://api.timetta.com/OData/Directories  # Query Directories
+POST     https://api.timetta.com/odata/Certificates(2a2c8579-10e6-4d96-b62f-712e0582942a)/AddComment  # Add Comment
+POST     https://api.timetta.com/odata/Certificates(2a2c8579-10e6-4d96-b62f-712e0582942a)/DeleteComment  # Delete Comment
+POST     https://api.timetta.com/odata/Certificates(2a2c8579-10e6-4d96-b62f-712e0582942a)/UploadCommentAttachment  # Upload Comment Attachment
+POST     https://api.timetta.com/odata/Certificates(2a2c8579-10e6-4d96-b62f-712e0582942a)/DeleteCommentAttachment  # Delete Comment Attachment
+GET      https://api.timetta.com/odata/Files/GetFilesMetadata(entityId=4257c2a5-da96-4887-af28-ba7a1c2ee2a0)  # Get Files Metadata
+GET      https://api.timetta.com/odata/Files/GetFile(fileKey=a51d1125-7dc8-4e28-a18e-61d00ff86644)  # Get File
+GET      https://reporting.timetta.com/OData  # Query Reporting Sources
+GET      https://reporting.timetta.com/OData/ResourcePlan?$expand=project($select=id,name),projectTask($select=id,name)  # Get Resource Plan Report
+GET      https://reporting.timetta.com/OData  # Query Reporting Sources
+GET      https://reporting.timetta.com/OData/Users  # Get Users Report
+GET      https://reporting.timetta.com/OData/ResourcePlan?$expand=project($select=id,name),projectTask($select=id,name)  # Get Resource Plan Report
+GET      https://reporting.timetta.com/OData/Tasks?$expand=Entity,EntityLifecycle  # Get Tasks Report

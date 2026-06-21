@@ -9,11 +9,12 @@ import {
   MY_TIME_PAGE_LAYOUT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
-// Пункт «Мои трудозатраты» в папке «Трудозатраты» (REQ-0014): личный кабинет
-// текущего юзера. Рядом с «Записи» — связка «внёс → посмотрел свои часы/периоды».
+// Пункт «Мои таймшиты» (бывш. «Мои трудозатраты») в папке «Таймшиты»
+// (REQ-0014): личный кабинет текущего юзера. Рядом с «Таймшиты» (сетка) —
+// связка «внёс → посмотрел свои часы/периоды».
 export default defineNavigationMenuItem({
   universalIdentifier: MY_TIME_NAV_UNIVERSAL_IDENTIFIER,
-  name: 'Мои трудозатраты',
+  name: 'Мои таймшиты',
   icon: 'IconUserClock',
   position: 1,
   type: NavigationMenuItemType.PAGE_LAYOUT,

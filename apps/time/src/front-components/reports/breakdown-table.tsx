@@ -75,6 +75,7 @@ export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }:
   const maxFact = Math.max(1, ...rows.map((r) => r.fact));
   const { key: sortKey, dir, toggle, sort } = useSortable<SortKey>('fact');
   const [hover, setHover] = useState<string | null>(null);
+  const [focused, setFocused] = useState<string | null>(null);
 
   const canDrill = (r: ReportRow): boolean =>
     !!onDrill && (drillable ? drillable(r) : true);
@@ -108,8 +109,28 @@ export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }:
 
   if (rows.length === 0) {
     return (
-      <div style={{ padding: 24, fontSize: 13, color: T.textMuted, textAlign: 'center' }}>
-        За период нет данных по этому срезу.
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          minHeight: 140,
+          height: '100%',
+          padding: 24,
+          textAlign: 'center',
+        }}
+      >
+        <span aria-hidden style={{ fontSize: 24, lineHeight: 1, color: T.textFaint }}>
+          ▦
+        </span>
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: T.text }}>
+          Нет данных за период
+        </span>
+        <span style={{ fontSize: 12, color: T.textMuted, maxWidth: 320, lineHeight: 1.5 }}>
+          По этому срезу за выбранный период списаний нет. Смените период или срез группировки.
+        </span>
       </div>
     );
   }
@@ -153,7 +174,8 @@ export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }:
           const rest = isProject && p.plannedEffort ? p.plannedEffort - r.fact : null;
           const under = underTone(r.under);
           const clickable = canDrill(r);
-          const isHover = clickable && hover === r.key;
+          const isFocus = clickable && focused === r.key;
+          const isHover = clickable && (hover === r.key || isFocus);
           return (
             <div
               key={r.key}
@@ -164,6 +186,8 @@ export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }:
               onKeyDown={clickable ? onRowKey(r) : undefined}
               onMouseEnter={clickable ? () => setHover(r.key) : undefined}
               onMouseLeave={clickable ? () => setHover(null) : undefined}
+              onFocus={clickable ? () => setFocused(r.key) : undefined}
+              onBlur={clickable ? () => setFocused(null) : undefined}
               style={{
                 display: 'grid',
                 gridTemplateColumns: COLS,
@@ -172,8 +196,10 @@ export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }:
                 background: isHover ? T.accentSoft : i % 2 === 1 ? T.rowAlt : 'transparent',
                 fontSize: 12.5,
                 cursor: clickable ? 'pointer' : 'default',
-                transition: 'background 120ms ease',
+                transition: 'background 120ms ease, box-shadow 120ms ease',
                 outline: 'none',
+                // Видимая клавиатурная фокус-рамка (inset, не ломает grid-высоту).
+                boxShadow: isFocus ? `inset 0 0 0 2px ${T.accentRing}` : undefined,
               }}
             >
               <span style={{ ...cell(), fontWeight: 500, gap: 6 }} title={rowTitle(groupBy, r)}>

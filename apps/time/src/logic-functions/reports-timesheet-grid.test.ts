@@ -92,14 +92,16 @@ describe('buildTimesheetGrid', () => {
     expect(grid.rows).toHaveLength(0); // нет строк — все часы вне окна
   });
 
-  it('CISO-007: reveal=false → имя пустое, ключ сохранён', () => {
+  it('CISO-007: reveal=false → имя = стабильный КОД (не пусто/UUID), ключ сохранён', () => {
     const grid = buildTimesheetGrid(
       input({ entries: [entry()], projects: [project], employees: [emp1], departments: [dept] }),
       PERIOD,
       {},
       false,
     );
-    expect(grid.rows[0].employeeName).toBe('');
+    // reveal=false: имя НЕ ФИО, НЕ пусто, НЕ сырой UUID — стабильный КОД сотрудника.
+    expect(grid.rows[0].employeeName).not.toBe('');
+    expect(grid.rows[0].employeeName).toMatch(/^Сотрудник·/);
     expect(grid.rows[0].employeeKey).toBe('emp1');
   });
 
@@ -266,7 +268,9 @@ describe('gridToCsv', () => {
       false,
     );
     const cols = gridToCsv(g).split('\r\n')[2].split(';');
-    expect(cols[0]).toBe('emp1');
+    // Стабильный КОД сотрудника, НЕ ФИО и НЕ сырой UUID.
+    expect(cols[0]).not.toBe('emp1');
+    expect(cols[0]).toMatch(/^Сотрудник·/);
   });
 
   it('withCodes → ячейка «Я 8» и код отсутствия', () => {

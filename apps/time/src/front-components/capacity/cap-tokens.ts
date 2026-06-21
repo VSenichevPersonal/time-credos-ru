@@ -78,6 +78,34 @@ export const formatGap = (cell: LoadCell): string => {
   return `${sign}${h}ч${pctTxt}`;
 };
 
+// Раздельные части gap для компактного рендера в ячейке (вмещение, impeccable):
+// часы — главное (знак=знак gap), % — вторичное (приглушённый меньший кегль).
+// Знак-иконка ▼/▲ рисуется отдельно (gapIcon). Часы — самодостаточны (Timetta:
+// gap читаем в ячейке знаком+часами), % уходит вторым планом и НЕ переносит строку.
+export const formatGapHours = (cell: LoadCell): string => {
+  if (cell.capacity <= 0) return '';
+  const h = Math.round(gapHours(cell));
+  // Часы — главный носитель: явный знак (+дефицит / −профицит), иконка ▼/▲ дублирует
+  // не-цветом (a11y). «−» из Math.round уже есть, «+» добавляем для дефицита.
+  const sign = h > 0 ? '+' : '';
+  return `${sign}${h}ч`;
+};
+
+export const formatGapPctShort = (cell: LoadCell): string => {
+  if (cell.capacity <= 0) return '';
+  const pct = gapPct(cell);
+  return pct === null ? '' : `${Math.abs(Math.round(pct * 100))}%`;
+};
+
+// Мин-ширина колонки-периода. Gap-режим несёт самую длинную подпись
+// (знак-иконка + «−1112ч» + «83%»), поэтому ему нужна ширина больше базовой —
+// иначе данные жмутся/переносятся. Едина для обёртки доски, шапки и строк,
+// чтобы колонки тела и заголовков-дат не разъезжались.
+export const COL_W = 56; // базовая (free/pct/plan/fact)
+export const COL_W_GAP = 68; // gap (вмещает «−1112ч 83%» одной строкой)
+export const colWidth = (metric: CellMetric): number =>
+  metric === 'gap' ? COL_W_GAP : COL_W;
+
 // DP-0006 §3: средняя загрузка за горизонт (по периодам с ёмкостью) — одна цифра
 // на строку вместо чтения всех колонок. null = нет ёмкости ни в одном периоде.
 export const SIGMA_W = 72; // ширина колонки «Σ горизонт» (фикс, не flex)
@@ -110,6 +138,26 @@ export const bookingParts = (
 // Обводка конфликта (овербукинг) — inset-тень, поверх любой заливки. '' если нет.
 export const conflictShadow = (cell: LoadCell): string =>
   cell.conflict ? `inset 0 0 0 1.5px ${CONFLICT_RING}` : '';
+
+// Значение ДОЧЕРНЕЙ строки (проект / план без проекта) в выбранной метрике.
+// Метрика согласована на всех уровнях (как drill в Timetta): дочерняя строка
+// показывает свой ВКЛАД в показатель отдела.
+//   v        — плановые часы строки за период (≥0, её вклад в Demand);
+//   capacity — ёмкость отдела за период (для метрики «Загрузка %»).
+// plan → часы; pct → доля ёмкости отдела; gap → +ч (увеличивает дефицит);
+// free → -ч (потребляет ёмкость → меньше свободно). v ≤ 0 → пусто.
+export const childCell = (
+  metric: CellMetric,
+  v: number,
+  capacity: number | undefined,
+): string => {
+  if (v <= 0) return '';
+  const h = Math.round(v);
+  if (metric === 'pct') return capacity && capacity > 0 ? `${Math.round((v / capacity) * 100)}%` : '';
+  if (metric === 'gap') return `+${h}`;
+  if (metric === 'free') return `-${h}`;
+  return String(h); // plan
+};
 
 // Значение ячейки по выбранной метрике. Свободно — со знаком (+можно взять / −перегруз).
 export const formatCell = (metric: CellMetric, cell: LoadCell): string => {

@@ -255,20 +255,24 @@ describe('reports.logic — CISO-007: ФИО не утекает', () => {
       return emptyPage(p);
     });
 
-  it('byEmployee: name затёрт, ключ (employeeId) сохранён', async () => {
+  it('byEmployee: name = стабильный КОД (не ФИО/пусто/UUID), ключ (employeeId) сохранён', async () => {
     vi.stubGlobal('fetch', mockFetch(withEmployee()));
     const result = (await handler(event())) as { byEmployee: Array<{ key: string; name: string }> };
     expect(result.byEmployee.length).toBeGreaterThan(0);
     expect(result.byEmployee[0].key).toBe('emp1');
-    expect(result.byEmployee[0].name).toBe('');
+    // reveal=false: имя = КОД, НЕ ФИО, НЕ пусто, НЕ сырой UUID.
+    expect(result.byEmployee[0].name).not.toBe('');
+    expect(result.byEmployee[0].name).not.toBe('emp1');
+    expect(result.byEmployee[0].name).toMatch(/^Сотрудник·/);
     expect(JSON.stringify(result)).not.toContain(PII);
   });
 
-  it('groupBy=detail: employeeName пуст, ФИО нет в ответе', async () => {
+  it('groupBy=detail: employeeName = КОД, ФИО нет в ответе', async () => {
     vi.stubGlobal('fetch', mockFetch(withEmployee()));
     const result = (await handler(event({ groupBy: 'detail' }))) as { rows: Array<{ employeeName: string }> };
     expect(result.rows.length).toBeGreaterThan(0);
-    expect(result.rows[0].employeeName).toBe('');
+    expect(result.rows[0].employeeName).not.toBe('');
+    expect(result.rows[0].employeeName).toMatch(/^Сотрудник·/);
     expect(JSON.stringify(result)).not.toContain(PII);
   });
 
@@ -278,14 +282,69 @@ describe('reports.logic — CISO-007: ФИО не утекает', () => {
     expect(result.csv).not.toContain(PII);
   });
 
-  it('mode=olap groupBy=employee: ФИО в rows[].name затёрт', async () => {
+  it('mode=olap groupBy=employee: ФИО в rows[].name → КОД (не пусто/UUID)', async () => {
     vi.stubGlobal('fetch', mockFetch(withEmployee()));
     const result = (await handler(event({ mode: 'olap', groupBy: 'employee' }))) as {
       rows: Array<{ key: string; name: string }>;
     };
     expect(result.rows.length).toBeGreaterThan(0);
-    expect(result.rows[0].name).toBe('');
+    expect(result.rows[0].key).toBe('emp1');
+    // reveal=false: ось employee несёт КОД, НЕ ФИО, НЕ пусто, НЕ сырой UUID.
+    expect(result.rows[0].name).not.toBe('');
+    expect(result.rows[0].name).not.toBe('emp1');
+    expect(result.rows[0].name).toMatch(/^Сотрудник·/);
     expect(JSON.stringify(result)).not.toContain(PII);
+  });
+
+  // ГЛАВНЫЙ БАГ (прод): при reveal=TRUE OLAP employee показывал сырой UUID вместо
+  // ФИО, если запись принадлежит ДЕАКТИВИРОВАННОМУ сотруднику (active=false), —
+  // раньше его не грузили (active[eq]:true) → empById пуст → fallback на UUID.
+  // Теперь грузим всех → ФИО резолвится. Проверяем строку И крошку-фильтр.
+  it('reveal=true OLAP employee: ФИО резолвится даже для деактивированного (НЕ UUID)', async () => {
+    const pages = ALL_PLURALS.map((p) => {
+      if (p === 'credosTimeEntries')
+        return {
+          data: {
+            credosTimeEntries: [
+              { id: 'e1', date: '2026-06-10', hours: 8, projectId: null, employeeId: 'empDead', workTypeId: null, tags: [] },
+            ],
+          },
+          pageInfo: { hasNextPage: false, endCursor: null },
+        };
+      if (p === 'credosTimeEmployees')
+        // Деактивированный сотрудник — раньше отфильтровывался на загрузке.
+        return {
+          data: {
+            credosTimeEmployees: [
+              { id: 'empDead', firstName: 'Пётр', lastName: 'Уволенный', departmentId: null, active: false },
+            ],
+          },
+          pageInfo: { hasNextPage: false, endCursor: null },
+        };
+      if (p === 'credosTimeSettings')
+        return {
+          data: { credosTimeSettings: [{ id: 's1', revealEmployeeNames: true }] },
+          pageInfo: { hasNextPage: false, endCursor: null },
+        };
+      return emptyPage(p);
+    });
+    vi.stubGlobal('fetch', mockFetch(pages));
+    // Строка среза.
+    const rows = (await handler(event({ mode: 'olap', groupBy: 'employee' }))) as {
+      rows: Array<{ key: string; name: string }>;
+    };
+    expect(rows.rows[0].key).toBe('empDead');
+    expect(rows.rows[0].name).toBe('Уволенный Пётр'); // ФИО, НЕ UUID
+    expect(rows.rows[0].name).not.toBe('empDead');
+    // Крошка-фильтр (appliedFilters[].label) — тоже ФИО, не UUID. Свежий стаб:
+    // mockFetch-счётчик общий на инстанс → перед вторым handler() пере-стабим.
+    vi.stubGlobal('fetch', mockFetch(pages));
+    const filtered = (await handler(
+      event({ mode: 'olap', groupBy: 'project', filters: [{ dim: 'employee', value: 'empDead' }] }),
+    )) as { appliedFilters: Array<{ dim: string; value: string; label: string }> };
+    const ef = filtered.appliedFilters.find((f) => f.dim === 'employee');
+    expect(ef?.label).toBe('Уволенный Пётр');
+    expect(ef?.label).not.toBe('empDead');
   });
 });
 
@@ -305,5 +364,62 @@ describe('reports.logic — ошибки fetch', () => {
     const result = await handler(event());
     expect(result).toMatchObject({ ok: false });
     expect((result as Record<string, string>).error).toContain('400');
+  });
+});
+
+// ─── reports.logic — groupBy=timesheet-grid (REQ-0006 п.4) ───────────────────
+
+describe('reports.logic — groupBy=timesheet-grid', () => {
+  const entry = (over: Record<string, unknown> = {}) => ({
+    id: 'en1',
+    date: '2026-06-10',
+    hours: 8,
+    status: 'DRAFT',
+    workspaceMemberRef: { id: 'wm1' },
+    projectId: 'p1',
+    workTypeId: 'wt1',
+    tags: [],
+    ...over,
+  });
+
+  const employee = { id: 'e1', name: 'Иванов Иван', active: true, departmentId: 'd1', workspaceMemberRef: { id: 'wm1' }, code: 'IVA' };
+  const project  = { id: 'p1', code: 'PA-001', name: 'Проект А', departmentId: 'd1', plannedEffort: null, startDate: null, endDate: null, category: 'CLIENT', statusValue: 'ACTIVE' };
+  const dept     = { id: 'd1', name: 'ОПИБ', code: 'OPIB', approvalRequired: false, capacityFactor: 0.8 };
+  const workType = { id: 'wt1', name: 'Разработка', group: 'PRODUCTION' };
+
+  const timesheetEvent = (extra: Record<string, string> = {}) =>
+    event({}, { groupBy: 'timesheet-grid', from: '2026-06-01', to: '2026-06-30', ...extra });
+
+  const fullFetch = () => mockFetch(
+    ALL_PLURALS.map((p) => ({
+      data: { [p]: p === 'credosTimeEntries' ? [entry()] : p === 'credosTimeEmployees' ? [employee] : p === 'credosTimeProjects' ? [project] : p === 'credosTimeDepartments' ? [dept] : p === 'credosTimeWorkTypes' ? [workType] : p === 'credosTimeSettings' ? [{ id: 'gs1', revealEmployeeNames: false }] : [] },
+      pageInfo: { hasNextPage: false, endCursor: null },
+    })),
+  );
+
+  it('возвращает ok:true + groupBy=timesheet-grid + dates + rows', async () => {
+    vi.stubGlobal('fetch', fullFetch());
+    const result = await handler(timesheetEvent()) as Record<string, unknown>;
+    expect(result.ok).toBe(true);
+    expect(result.groupBy).toBe('timesheet-grid');
+    expect(Array.isArray(result.dates)).toBe(true);
+    expect(Array.isArray(result.rows)).toBe(true);
+  });
+
+  it('format=csv → ok:true + csv + mimeType + filename', async () => {
+    vi.stubGlobal('fetch', fullFetch());
+    const result = await handler(timesheetEvent({ format: 'csv' })) as Record<string, unknown>;
+    expect(result.ok).toBe(true);
+    expect(result.format).toBe('csv');
+    expect(typeof result.csv).toBe('string');
+    expect(result.mimeType).toContain('text/csv');
+    expect((result.filename as string)).toContain('timesheet-grid');
+  });
+
+  it('CISO-007: без revealEmployeeNames строки не содержат ФИО', async () => {
+    vi.stubGlobal('fetch', fullFetch());
+    const result = await handler(timesheetEvent()) as Record<string, unknown>;
+    const rows = result.rows as Array<{ label: string }>;
+    expect(rows.every((r) => !r.label.includes('Иванов'))).toBe(true);
   });
 });

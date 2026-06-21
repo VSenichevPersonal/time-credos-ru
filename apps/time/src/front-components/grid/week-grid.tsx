@@ -91,7 +91,7 @@ export const WeekGrid = ({
   return (
     <>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }} onKeyDown={onContainerKeyDown}>
-        <WeekHeader days={days} leftLabel="Проект / вид работ" normFor={normFor} />
+        <WeekHeader days={days} leftLabels={['Проект', 'Вид работ']} normFor={normFor} />
         {loading && rowList.length === 0 ? (
           <Center>Загрузка…</Center>
         ) : rowList.length === 0 ? (

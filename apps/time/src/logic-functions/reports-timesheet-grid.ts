@@ -13,7 +13,7 @@
 // CISO-007 (152-ФЗ): ФИО только при revealNames (настройка revealEmployeeNames,
 // REQ-0019). Иначе — КОД сотрудника (employeeId).
 
-import type { ReportsInput, RawEntry, RawAbsence } from './reports-calc';
+import { employeeCode, type ReportsInput, type RawEntry, type RawAbsence } from './reports-calc';
 import { CSV_BOM, CSV_DELIMITER, toCsvRow } from './reports-detail';
 
 // Т-13 буквенные коды явки/неявки. Маппинг типов отсутствия (UPPER_CASE как на
@@ -111,6 +111,7 @@ export const buildTimesheetGrid = (
   const empById = new Map(input.employees.map((e) => [e.id, e]));
   const projById = new Map(input.projects.map((p) => [p.id, p]));
   const deptById = new Map(input.departments.map((d) => [d.id, d]));
+  const deptCodeById = new Map(input.departments.map((d) => [d.id, d.code ?? null]));
 
   // Отдел записи = отдел сотрудника (приоритет), fallback — отдел проекта
   // (зеркало deptOfEntry в reports-calc / reports-detail).
@@ -194,7 +195,11 @@ export const buildTimesheetGrid = (
     });
     rows.push({
       employeeKey: empId,
-      employeeName: revealNames && emp ? [emp.lastName, emp.firstName].filter(Boolean).join(' ') : '',
+      // CISO-007: ФИО при reveal, иначе стабильный КОД сотрудника (не пусто/UUID).
+      employeeName:
+        revealNames && emp
+          ? [emp.lastName, emp.firstName].filter(Boolean).join(' ')
+          : employeeCode({ id: empId, departmentId: emp?.departmentId ?? a.deptId }, deptCodeById),
       deptName: dept?.code ?? '',
       cells,
       total: Number(a.total.toFixed(2)),

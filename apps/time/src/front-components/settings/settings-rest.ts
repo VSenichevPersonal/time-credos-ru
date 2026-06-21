@@ -6,6 +6,9 @@ import type {
   Headcounts,
 } from 'src/front-components/settings/types';
 
+// Реэкспорт для потребителей, импортящих тип отсюда (shared/use-global-settings).
+export type { GlobalSettings } from 'src/front-components/settings/types';
+
 // Чтение/правка настроек отделов. Бэк готов (Dev 2): поля на credosTimeDepartment,
 // PATCH /rest/credosTimeDepartments/{id} под app-ролью без 400.
 
@@ -67,6 +70,8 @@ const GLOBAL_FALLBACK: Omit<GlobalSettings, 'id'> = {
   fillTemplateHours: 8,
   overtimeWarnHours: 12,
   maxHoursPerDay: 24,
+  minHoursPerWeek: 0,
+  warnOnScheduleDeviation: true,
   weekStartsOn: 'MONDAY',
   planningHorizonWeeks: 16,
   defaultCapacityFactor: 0.8,
@@ -99,6 +104,8 @@ export const fetchGlobalSettings = async (): Promise<GlobalSettings | null> => {
     fillTemplateHours: num(row.fillTemplateHours, f.fillTemplateHours),
     overtimeWarnHours: num(row.overtimeWarnHours, f.overtimeWarnHours),
     maxHoursPerDay: num(row.maxHoursPerDay, f.maxHoursPerDay),
+    minHoursPerWeek: num(row.minHoursPerWeek, f.minHoursPerWeek),
+    warnOnScheduleDeviation: bool(row.warnOnScheduleDeviation, f.warnOnScheduleDeviation),
     weekStartsOn: str(row.weekStartsOn, f.weekStartsOn),
     planningHorizonWeeks: num(row.planningHorizonWeeks, f.planningHorizonWeeks),
     defaultCapacityFactor: num(row.defaultCapacityFactor, f.defaultCapacityFactor),

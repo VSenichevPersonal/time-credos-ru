@@ -1,4 +1,4 @@
-import { T, loadTone, formatCell, formatPct, avgRatio, SIGMA_W, gapTone, gapPct, gapIcon, conflictShadow } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow } from 'src/front-components/capacity/cap-tokens';
 import type { CellMetric, LoadCell, Period } from 'src/front-components/capacity/types';
 
 // Сводная строка «Все отделы»: суммарная загрузка компании по периодам.
@@ -50,24 +50,34 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
           title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${isGap ? ` · gap ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ' · ⚠ овербукинг' : ''}`}
           style={{
             flex: 1,
-            minWidth: 56,
+            minWidth: colWidth(metric),
             height: 34,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: isGap ? 'baseline' : 'center',
             justifyContent: 'center',
-            gap: 3,
+            gap: isGap ? 2 : 3,
             borderRight: `1px solid ${T.border}`,
             background: tone.bg,
             color: tone.fg,
-            fontSize: 12.5,
+            fontSize: isGap ? 11.5 : 12.5,
             fontWeight: 700,
             fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap',
             boxShadow,
           }}
         >
-          {icon && <span aria-hidden style={{ fontSize: 9 }}>{icon}</span>}
-          {cell.conflict && <span aria-hidden title="Овербукинг" style={{ fontSize: 9, color: T.over }}>▲</span>}
-          {formatCell(metric, cell)}
+          {icon && <span aria-hidden style={{ fontSize: isGap ? 8 : 9, alignSelf: 'center' }}>{icon}</span>}
+          {cell.conflict && <span aria-hidden title="Овербукинг" style={{ fontSize: isGap ? 8 : 9, alignSelf: 'center', color: T.over }}>▲</span>}
+          {isGap ? (
+            <>
+              <span style={{ fontWeight: 700 }}>{formatGapHours(cell)}</span>
+              {formatGapPctShort(cell) && (
+                <span style={{ fontSize: 9, fontWeight: 600, color: T.textFaint }}>{formatGapPctShort(cell)}</span>
+              )}
+            </>
+          ) : (
+            formatCell(metric, cell)
+          )}
         </div>
       );
     })}

@@ -95,15 +95,16 @@ export const DayRow = ({
         <div
           title={workTypeName}
           style={{
-            fontSize: 11.5,
-            color: T.textMuted,
-            marginTop: 1,
+            fontSize: 13,
+            fontWeight: 500,
+            color: workTypeName ? T.text : T.textFaint,
+            marginTop: 2,
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
           }}
         >
-          {workTypeName}
+          {workTypeName || '—'}
         </div>
         {onCommitDescription && hours > 0 &&
           (editDesc ? (

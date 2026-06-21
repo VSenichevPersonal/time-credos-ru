@@ -24,6 +24,8 @@ export type GlobalSettings = {
   fillTemplateHours: number;
   overtimeWarnHours: number;
   maxHoursPerDay: number; // жёсткий лимит часов/день (ERROR при превышении)
+  minHoursPerWeek: number; // минимум часов/неделю (WARNING недобора; 0 = выкл)
+  warnOnScheduleDeviation: boolean; // показывать предупреждения переработки/недобора
   // Планирование
   weekStartsOn: string;
   planningHorizonWeeks: number;

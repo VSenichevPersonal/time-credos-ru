@@ -144,6 +144,51 @@ describe('calcGridModel — extraRowKeys', () => {
     expect(rowList[0].rowTotal).toBe(0);
     expect(rowList[0].hoursByDay).toEqual([0, 0, 0, 0, 0, 0, 0]);
   });
+
+  // Баг прод: при активном фильтре «Добавить» строку не давал видимого эффекта —
+  // свежедобавленная пустая строка отсекалась rowPasses. Фикс: extraRowKeys exempt.
+  it('свежедобавленная строка видна при активном фильтре по ДРУГОМУ проекту', () => {
+    const filterByP1: FilterState = { ...NO_FILTERS, project: new Set(['p1']) };
+    const { rowList } = calcGridModel(
+      [entry('p1', 'w1', '2026-06-22', 8)], // строка с данными по p1
+      [proj('p1', 'Проект А'), proj('p2', 'Проект Б')],
+      [wt('w1', 'Разработка'), wt('w2', 'Тестирование')],
+      DAYS,
+      ['p2|w2'], // пользователь добавил строку по p2 (НЕ проходит фильтр project=p1)
+      filterByP1,
+    );
+    const keys = rowList.map((r) => r.key);
+    expect(keys).toContain('p2|w2'); // добавленная строка видна несмотря на фильтр
+    expect(keys).toContain('p1|w1'); // существующая строка с данными не сломана
+  });
+
+  it('добавленная строка не дублируется, если совпадает со строкой данных', () => {
+    const { rowList } = calcGridModel(
+      [entry('p1', 'w1', '2026-06-22', 8)],
+      [proj('p1', 'Проект А')],
+      [wt('w1', 'Разработка')],
+      DAYS,
+      ['p1|w1'], // тот же ключ, что у записи
+      NO_FILTERS,
+    );
+    expect(rowList.filter((r) => r.key === 'p1|w1')).toHaveLength(1);
+    expect(rowList[0].rowTotal).toBe(8); // данные сохранены
+  });
+
+  it('активный фильтр всё ещё прячет строки С данными (фильтрация не сломана)', () => {
+    const filterByP1: FilterState = { ...NO_FILTERS, project: new Set(['p1']) };
+    const { rowList } = calcGridModel(
+      [entry('p1', 'w1', '2026-06-22', 8), entry('p2', 'w2', '2026-06-22', 5)],
+      [proj('p1', 'Проект А'), proj('p2', 'Проект Б')],
+      [wt('w1', 'Разработка'), wt('w2', 'Тестирование')],
+      DAYS,
+      [], // ничего не добавляли
+      filterByP1,
+    );
+    const keys = rowList.map((r) => r.key);
+    expect(keys).toContain('p1|w1');
+    expect(keys).not.toContain('p2|w2'); // p2 отфильтрован — фильтрация работает
+  });
 });
 
 describe('calcGridModel — проект/вид не в справочнике', () => {

@@ -83,8 +83,17 @@ export const GeneralSection = ({ settings: s, onUpdate }: Props) => (
       <Row label="Норма часов в день" hint="Базовая дневная норма (fallback расчёта загрузки).">
         <NumField value={s.normHoursPerDay} min={0} onCommit={(v) => onUpdate({ normHoursPerDay: v })} />
       </Row>
-      <Row label="Порог переработки (ч/день)" hint="Выше — предупреждение в таймшите.">
+      <Row label="Лимит часов в день" hint="Жёсткий предел — ввод выше блокируется (ошибка целостности табеля).">
+        <NumField value={s.maxHoursPerDay} min={0} onCommit={(v) => onUpdate({ maxHoursPerDay: v })} />
+      </Row>
+      <Row label="Порог переработки (ч/день)" hint="Выше — предупреждение в таймшите (не блокирует).">
         <NumField value={s.overtimeWarnHours} min={0} onCommit={(v) => onUpdate({ overtimeWarnHours: v })} />
+      </Row>
+      <Row label="Минимум часов в неделю" hint="Ниже — предупреждение о недоборе. 0 = выключено.">
+        <NumField value={s.minHoursPerWeek} min={0} onCommit={(v) => onUpdate({ minHoursPerWeek: v })} />
+      </Row>
+      <Row label="Предупреждать об отклонениях" hint="Показывать предупреждения переработки/недобора (лимит-ошибка активна всегда).">
+        <Toggle on={s.warnOnScheduleDeviation} onChange={(v) => onUpdate({ warnOnScheduleDeviation: v })} />
       </Row>
       <Row label="Часы шаблона заполнения" hint="Заполняет день при «авто-заполнении».">
         <NumField value={s.fillTemplateHours} min={0} onCommit={(v) => onUpdate({ fillTemplateHours: v })} />
