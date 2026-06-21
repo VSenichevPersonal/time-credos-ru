@@ -10,6 +10,7 @@ import {
   fetchProjects,
 } from 'src/front-components/capacity/capacity-rest';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
+import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
 import {
   buildAbsenceCtx,
   buildPeriods,
@@ -29,14 +30,29 @@ import type {
 
 export type Granularity = 'week' | 'month';
 
-// Горизонт: недели = 16 (~4 мес), месяцы = 6. Якорь — текущая дата (UTC).
+// Горизонт ПО УМОЛЧАНИЮ: недели = 16 (~4 мес), месяцы = 6. Якорь — текущая дата (UTC).
+// REQ-0019: реальное число недель — из credosTimeSettings.planningHorizonWeeks
+// (хук читает и передаёт в horizonRange/buildPeriods, fallback HORIZON.week).
 export const HORIZON: Record<Granularity, number> = { week: 16, month: 6 };
+
+// Кол-во недель горизонта в разумных границах (≥1, ≤52). null/невалид → дефолт 16.
+export const clampHorizonWeeks = (weeks: number | null | undefined): number => {
+  if (typeof weeks !== 'number' || !Number.isFinite(weeks) || weeks < 1) return HORIZON.week;
+  return Math.min(Math.round(weeks), 52);
+};
 
 // Чистая функция: диапазон дат для загрузки данных доски (REST-запросы).
 // from = начало месяца anchor; to = конец (months) месяцев включительно.
-export const horizonRange = (anchor: Date, g: Granularity): { from: string; to: string } => {
+// weekCount — настраиваемое число недель горизонта (REQ-0019); окно расширяем до
+// ceil(weeks/4)+1 месяцев, чтобы покрыть все колонки. Дефолт 16 → months=5 как
+// раньше (back-compat date-range).
+export const horizonRange = (
+  anchor: Date,
+  g: Granularity,
+  weekCount: number = HORIZON.week,
+): { from: string; to: string } => {
   const from = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
-  const months = g === 'month' ? HORIZON.month + 1 : 5;
+  const months = g === 'month' ? HORIZON.month + 1 : Math.ceil(weekCount / 4) + 1;
   const to = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() + months, 0));
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
 };
@@ -61,6 +77,11 @@ export const useCapacity = (granularity: Granularity) => {
   // Заменяет прежний форс isManager:true всем (TODO(rbac) снят). Гейт «Планировать»
   // теперь по реальной роли. TODO(ciso-005): UX-гейт, защита — на сервере.
   const { isManager } = useSelfEmployee();
+  // REQ-0019: горизонт недель — из глобальных настроек (fallback HORIZON.week=16).
+  // Месяцы оставлены фиксированными (HORIZON.month) — отдельной настройки нет.
+  const settings = useGlobalSettings();
+  const weekCount = clampHorizonWeeks(settings?.planningHorizonWeeks);
+  const periodCount = granularity === 'week' ? weekCount : HORIZON.month;
   const [state, setState] = useState<State>({
     loading: true,
     error: null,
@@ -78,7 +99,7 @@ export const useCapacity = (granularity: Granularity) => {
 
   useEffect(() => {
     let alive = true;
-    const range = horizonRange(anchor, granularity);
+    const range = horizonRange(anchor, granularity, weekCount);
     Promise.all([
       fetchDepartments(),
       fetchEmployees(),
@@ -110,7 +131,7 @@ export const useCapacity = (granularity: Granularity) => {
     return () => {
       alive = false;
     };
-  }, [anchor, granularity, nonce]);
+  }, [anchor, granularity, nonce, weekCount]);
 
   const reloadProjects = useCallback(async () => {
     const projects = await fetchProjects();
@@ -130,8 +151,8 @@ export const useCapacity = (granularity: Granularity) => {
   }, []);
 
   const periods: Period[] = useMemo(
-    () => buildPeriods(anchor, state.calendar, granularity, HORIZON[granularity]),
-    [anchor, state.calendar, granularity],
+    () => buildPeriods(anchor, state.calendar, granularity, periodCount),
+    [anchor, state.calendar, granularity, periodCount],
   );
 
   // W3-1: контекст вычета отсутствий из ёмкости — собирается один раз, передаётся

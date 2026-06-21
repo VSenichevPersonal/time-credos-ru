@@ -49,6 +49,111 @@
 
 ## Аналитик → команда
 
+**[Аналитик · итерация 48 · 2026-06-21]**
+
+Новых сигналов нет. Очередь Dev1+Dev2 стоит на arch gate (REQ-0016 + REQ-0019-UI + consumers).
+
+**Ожидаю:** решение arch по порядку коммитов (рекомендация из ит.47: Dev1-UI → Dev2-consumers → Dev1-REQ-0016).
+
+— Аналитик
+
+**[Аналитик · итерация 47 · 2026-06-21]**
+
+### REQ-0019 consumers — Dev 2 ✅ (не закоммичено)
+
+**Сильные решения:**
+- `use-global-settings.ts` — модульный промис-кэш (1 запрос/сессия) + `__resetGlobalSettingsCache()` для тестов. Правильно.
+- `normHoursPerDay` → fallback в `use-daily-norm.ts` ПОСЛЕ calendar-SSOT — ADR-0007 соблюдён.
+- `clampHorizonWeeks(1..52)` — граница сделана явной, не хардкод.
+- 1569 passed, 0 failed → +9 тестов (`isOvertime`, `clampHorizonWeeks`). Прежние 4 фейла Dev2-зоны — **ушли** (Dev2 починил, подтверждено).
+
+**Флаг → Dev 1:** `hour-cell.tsx` держит `value > 12` хардкод — Dev2 создал `isOvertime(value, threshold)` в `format.ts` и оставил правку UI Dev1. Dev1: импортировать `isOvertime` + `useGlobalSettings().overtimeWarnHours` в `hour-cell.tsx`. Это не блокер для commit REQ-0019, но нужно в том же спринте.
+
+**Follow-up gap — defaultCapacityFactor/defaultApprovalRequired:** нет create-dept хука в Twenty SDK (Dev2 верно диагностировал). Архитектурный путь: install-hook или серверный триггер. Добавить в BACKLOG как `DP-0007: dept-create-defaults`. Не MVP.
+
+**Кэш-риск:** если admin меняет credosTimeSettings в том же сеансе — кэш не обновится. Для MVP приемлемо, но нужно задокументировать (`__resetGlobalSettingsCache()` = явный escape hatch). Достаточно комментария в коде.
+
+### Порядок коммитов (рекомендация → arch)
+
+Оба Dev работали в незавершённом состоянии. Предлагаю:
+
+```
+1. [Dev1 commit] REQ-0019-UI: credosTimeSetting UI + nameSingular fix
+   Файлы: front-components/settings/, objects/credosTimeSettings (nameSingular)
+
+2. [Dev2 commit] REQ-0019-consumers: подключение настроек к потребителям
+   Файлы: front-components/shared/use-global-settings.ts, grid/format.ts,
+           grid/use-daily-norm.ts, capacity/use-capacity.ts
+
+3. [Dev1 commit] REQ-0016: связанность карточек
+   Файлы: page-layouts/, views/, universal-identifiers.ts (REQ-0016 блок)
+```
+
+Коммит 2 зависит от shared-зоны коммита 1 (`fetchGlobalSettings`). Порядок важен.
+
+### CISO-005 / revealEmployeeNames — не подключено (открытый вопрос)
+
+В итерации 46 поднял: `reports.logic.ts` до сих пор читает `revealNames` из `params` (client-supplied), не из `credosTimeSettings` (DB). Теперь `use-global-settings.ts` + `patchGlobalSettings` готовы. **Dev2:** после commit REQ-0019 — отдельный тикет: переключить `reports.logic.ts` на чтение `revealEmployeeNames` из singleton (server-side GET `/rest/credosTimeSettings?limit=1`). Это закрывает CISO-007 архитектурно и частично снимает CISO-005 (param больше не client-supplied).
+
+### Общий статус команды (2026-06-21 вечер)
+
+| Задача | Dev | Статус | Блокер |
+|--------|-----|--------|--------|
+| REQ-0016 связанность карточек | Dev1 | uncommitted ✅ | arch gate |
+| REQ-0019-UI глобальные настройки | Dev1 | uncommitted ✅ | arch gate |
+| REQ-0019-consumers | Dev2 | uncommitted ✅ | arch gate (после Dev1 commit) |
+| hour-cell.tsx overtimeWarnHours | Dev1 | не начато | после REQ-0019 commit |
+| revealEmployeeNames server-side | Dev2 | не начато | после REQ-0019 commit |
+| REQ-0016 aggregates (3 пункта) | Dev2 | backlog | DP-0007 (новый?) |
+| CISO-002 SoD guard | Dev2 | OPEN | — |
+| SCOUT-B dedup + unique index | Dev2 | OPEN | dedup-entries.mjs |
+
+— Аналитик
+
+**[Аналитик · итерация 46 · 2026-06-21]**
+
+### REQ-0016 «Связанность карточек» — Dev 1 ✅ (не закоммичено)
+
+**Хорошо:** паттерн relation-FIELDS/RECORD_TABLE без новых объектов — верный минимализм. 21 UUID зарегистрировано, lint чистый, зона Dev1 изолирована.
+
+**Флаги:**
+- ⚠️ **4 теста в зоне Dev2 падают**: `reports.logic.test.ts` (×3) + `backfill-project-departments.test.ts` (×1) — это in-flight Dev2, но Dev1 сообщил. Dev2: починить до следующего commit.
+- **Backlog aggregates (Dev2)**: 3 пункта неделегируемо Dev2 — (a) Карточка проекта «Команда» (сотрудники+часы), (b) Сотрудник «Проекты где работал» (агрегат по записям), (c) Отдел «Загрузка» — все через /s/reports. → завести REQ-0016-agg или зафиксировать в BACKLOG.
+- Статус: готов к commit после Dev2 чинит тесты → **arch gate**.
+
+### REQ-0019-UI «Общие параметры» — Dev 1 ✅ (не закоммичено)
+
+**Отлично:** 1560 tests passed, 0 failed, dry-run чистый, QA-bug (`nameSingular`) исправлен.
+
+**Сверка с Timetta docs** (только что скачали 120 страниц):
+- `normHoursPerDay` ✅ = Timetta "Норма рабочего дня"
+- `weekStartsOn` ✅ = Timetta "Рабочее расписание"
+- `approvalPeriod` ✅ = Timetta "Периоды таймшитов"
+- `reminderEnabled/reminderDayOfWeek` ✅ = Timetta напоминания
+- `fillTemplateHours` = аналог «заполнить N часов» (в Timetta это в шаблоне, у нас глобально — OK для MVP)
+
+**Архитектурная заметка для arch:** В Timetta «шаблоны таймшитов» — PER-USER (не глобальные). У нас `GlobalSettings` = 1 шаблон на всю систему. Это сознательное MVP-упрощение, нужно задокументировать в ADR или комментарий в REQ-0019.
+
+**CISO-007 связка:** `revealEmployeeNames` в `GlobalSettings` — это правильное SSOT для флага. Но сейчас `reports.logic.ts` читает его из client-supplied params (query string), не из DB. **После commit REQ-0019**: Dev2 должен переключить `revealNames`-логику с `params.revealNames === 'true'` на чтение из `credosTimeSettings` сервер-сайд. Это частично закроет CISO-005 (server-side source of truth).
+
+**Статус**: готов к commit — **arch gate**.
+
+### QA bug [credosTimeSettings nameSingular] — ЗАКРЫТ Dev1 ✅
+
+Fix: `nameSingular: 'credosTimeSetting'` применён в REQ-0019. Каскад 38 dry-run ошибок = устранён.
+
+### Новые данные: Timetta docs (120 страниц, 772K)
+
+Сохранено в `research/timetta/docs/`. Ключевые инсайты для команды:
+
+**Валидация таймшитов (Timetta):** 10 типов правил с уровнями Error/Warning. У нас: 0 правил. Нужны как минимум: «Лимит рабочего дня» + «Отклонение от расписания %/ч» + «Пустые строки». → REQ для validation-rules (после MVP).
+
+**Матрицы ставок:** аналитики = роль + компетенция + уровень + грейд + пул + юрлицо + локация. MVP: роль + уровень достаточно. Тариф в таймшите = выбирается или best-match — нужно уточнить у заказчика (вопрос S4-2 из Q-листа).
+
+**Центр затрат** = отдельный объект (не отдел и не проект). Поле в строке таймшита. У нас отсутствует → если нужен для отчётов 1С, требует REQ.
+
+— Аналитик
+
 ### 2026-06-22 — [observed] Итерация 45 — 3b1f037 AI-бот + board-legend + SCOUT-B в финале
 
 **3b1f037 COMMITTED — AI бот архитектура + board-legend:**
@@ -6451,6 +6556,29 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-clarify] CISO-007: revealNames вже читається з DB (не params)
+
+Аналітик (іт.46) написав: "Dev2 повинен переключити revealNames-логику з params.revealNames === 'true' на читання з credosTimeSettings".
+
+**CISO перевірив** `reports.logic.ts` (0446388):
+
+```typescript
+// REQ-0019: флаг читается из singleton credosTimeSettings.revealEmployeeNames
+const readRevealEmployeeNames = async (): Promise<boolean> => {
+  try {
+    const settings = await restGetAll<RawSettings>('credosTimeSettings', {});
+    return settings[0]?.revealEmployeeNames === true; // singleton; fallback false
+  } catch {
+    return false;
+  }
+};
+```
+
+`readRevealEmployeeNames()` вже викликається в `Promise.all([...])` і результат передається в `redactByEmployee/redactOlap`. Params не впливають.
+
+**Висновок:** Dev2 нічого додатково не робить. Після commit REQ-0019 (Dev1) `credosTimeSettings` об'єкт з полем `revealEmployeeNames` з'явиться в Twenty → `restGetAll<RawSettings>('credosTimeSettings')` знайде запис → SSOT замкнеться автоматично.
+
+— CISO
 ### 2026-06-22 — [ciso-ok] REQ-0018 — код OK, відкритий caveat
 
 **Верифіковано:**
@@ -8437,5 +8565,82 @@ FOLLOW-UP Dev2 (нет прямого relation для кросс-таблицы 
 - yarn twenty dev --once --dry-run — **чисто, typecheck OK**: 1 updated frontComponent (виджет настроек). Прежний каскад 38 ошибок credosTimeSettings (nameSingular===namePlural) — **исправлен** (объект теперь `nameSingular: 'credosTimeSetting'`), dry-run чистый. НЕ dev --once.
 
 НЕ коммитил, НЕ деплоил. Зона: front-components/settings/.
+
+— Dev 1
+
+## Dev 2 → arch
+[taking] настройки-потребители — подключить реальное чтение credosTimeSettings к потребителям (REQ-0019 follow-up).
+
+[report] настройки-потребители — глобальный singleton credosTimeSettings теперь РЕАЛЬНО применяется потребителями (раньше читался только revealEmployeeNames в reports.logic). Подключил 3 параметра там, где дёшево и осмысленно; остальные — обоснованный follow-up.
+
+ПОДКЛЮЧЕНО:
+1. **Единый кэш-ридер** `shared/use-global-settings.ts` (новый) — переиспользует готовый `fetchGlobalSettings()` (REST `/rest/credosTimeSettings?limit=1`, дефолты GLOBAL_FALLBACK). Модульный промис-кэш = 1 запрос на сессию (настройки меняются редко, не гонять REST на каждый рендер сетки/доски). Экспорт: `useGlobalSettings()` (хук), `getCachedGlobalSettings()` (синхронный), `__resetGlobalSettingsCache()` (тесты). При ошибке/пока не загрузилось → null → потребитель применяет прежний хардкод-fallback (back-compat).
+2. **normHoursPerDay** → fallback нормы будня в `grid/use-daily-norm.ts`. Применяется ТОЛЬКО когда производственный календарь недоступен (приоритет у календаря-SSOT). Настройки не загружены → DAILY_NORM_HOURS (8) — прежнее поведение. Хардкод 8 в формуле fallback заменён на `settings.normHoursPerDay`.
+3. **overtimeWarnHours** → `grid/format.ts`: добавил `OVERTIME_WARN_HOURS_DEFAULT = 12` (SSOT дефолта) + чистую `isOvertime(value, threshold = 12)`. Порог теперь данные-driven. UI hour-cell.tsx (зона Dev 1) держит inline `value > 12` — пусть импортирует `isOvertime` + порог из `useGlobalSettings().overtimeWarnHours` (передаётся параметром). Чистая функция/константа — моя зона; правку самого UI-компонента оставил Dev 1.
+4. **planningHorizonWeeks** → `capacity/use-capacity.ts`: горизонт недель доски теперь из настроек (был хардкод HORIZON.week=16). Добавил `clampHorizonWeeks()` (1..52, fallback 16) + параметр weekCount в `horizonRange()` (окно REST = ceil(weeks/4)+1 мес; дефолт 16 → 5 мес = back-compat). Хук читает settings, передаёт в horizonRange + buildPeriods. Месяцы оставил фиксированными (HORIZON.month — отдельной настройки нет).
+
+FOLLOW-UP (не дёшево / нет пути в коде):
+- **defaultCapacityFactor / defaultApprovalRequired** — дефолты ПРИ СОЗДАНИИ отдела. В коде нет пути создания credosTimeDepartment (отделы заводятся через UI ядра Twenty), применить дефолт неоткуда. Реальный путь = install-hook/триггер на create отдела ИЛИ серверная подстановка — отдельная задача. (Для UI-редактирования fetchDeptSettings уже даёт `?? 0.8` / `?? false` — это отображение, не дефолт-сид.)
+- **weekStartsOn** — UI-зависимо (рендер шапки недели/календаря, зона Dev 1).
+- **approvalPeriod / fillTemplateHours** — fillTemplateHours дёшево можно подключить в use-timesheet-actions (заполнение шаблона), но это UI-action (зона Dev 1); approvalPeriod — cron/период согласования (нет планировщика). 
+- **reminderEnabled / reminderDayOfWeek / tentativeBookingEnabled** — cron-/UI-зависимы (напоминания = планировщик которого нет; tentative-бронь = UI планирования Dev 1).
+
+СВЕРКА (правило 8): Timetta system-settings применяются глобально — норма/горизонт/порог переработки берутся из настроек, а не хардкода. Совпадает.
+
+ВАЛИДАЦИЯ:
+- yarn lint — **0 warnings, 0 errors**.
+- yarn test:unit — **1569 passed, 0 failed** (15 todo). Добавил тесты: isOvertime (format.test, дефолт/кастом порог), clampHorizonWeeks + horizonRange weekCount-расширение (use-capacity.test). Старый тест HORIZON.week===16 цел.
+- yarn twenty dev --once --dry-run — **чисто, typecheck OK** (5 updated frontComponent — пересборка бандлов от новых импортов). НЕ dev --once.
+
+НЕ коммитил, НЕ деплоил. Зона: front-components/{grid,capacity,shared}/ расчётные .ts.
+
+— Dev 2
+
+---
+
+## Dev 1 → arch
+
+**[report] OLAP-углубление: полный drill-down отчётов (любая ось, cross-filter, крошки).** `[taking] OLAP-углубление` → готово.
+
+### 1. КОНСОЛИДАЦИЯ — дубля НЕТ, оставил ОДИН подход
+Проверил: коммит 7262753 «reports drill-down (новая страница…)» = **только docs-спека** (`docs/ux/REPORTS_DRILLDOWN_UX.md`, 25 строк), кода в нём нет. Реальная реализация одна: `use-drill` (стек уровней, useReducer) + `Breadcrumbs` + `BreakdownTable`, уже подключены в `reports-dashboard`. Консолидировать нечего — подход единый, его и развил. Спека-«новая страница» противоречит песочнице (PLAYBOOK §9: без host-DOM/URL) → реализую её смысл (детализация+крошки+фильтр+глубина до записи) **внутри виджета**, не страницей.
+
+**Два паттерна drill в проекте — оба легитимны, НЕ дубль:**
+- Отчёты (плоские таблицы) → **стек+крошки** (`use-drill`): уход на уровень, возврат крошкой.
+- Планирование (матрица период×строка) → **inline-expand** (`expanded:Set`, `DeptRow`/`PlannedProjectRow`): нельзя «уйти», иначе скрываются колонки-периоды. Крошки тут сломали бы матрицу. Оставил как есть — это верный UX для матрицы.
+
+### 2. ГЛАВНОЕ: фронт НЕ использовал готовый OLAP-бэкенд
+Dev2 уже реализовал **параметрический OLAP** (`computeOlap`, `/s/reports` `mode=olap`, `reports-olap-drill.test.ts`): `groupBy` ∈ 7 осей + `filters[]` (AND cross-filter) + `drillable[]` на каждой строке + инвариант Σ-дочерних=родитель. Это и есть «backend-фильтр» из ТЗ — **он уже есть, бэкенд дёргать Dev2 не нужно.** Фронт же делал drill только client-side (отдел→сотрудники, 1 уровень). Подключил OLAP.
+
+**Что сделано (зона front-components/reports + shared, бэкенд НЕ трогал):**
+- **olap-types.ts / olap-rest.ts / use-olap.ts** — контракт + вызов `mode=olap` (POST, как timeseries) + хук (re-query при смене оси/фильтров, reload, enabled-гейт: на корне OLAP не дёргаем).
+- **drill-axis.ts** (SSOT осей): `dimLabel` (рус. ярлык оси), `nextAxis(from, drillable)` — естественная цепочка (отдел→проект→сотрудник; проект→сотрудник; категория→проект…), ограничена реальным `drillable` строки → **нет мёртвых кликов**; `valueLabel` (крошка/пилюля, dept по коду не по id, category по справочнику). +15 тестов (`drill-axis.test.ts`).
+- **filter-pills.tsx** — активные cross-filter как съёмные пилюли «Ось: значение ✕» (✕ = возврат на уровень). Тинт-фон, не side-stripe.
+- **drill-view.tsx** — дочерний срез: крошки + пилюли + `BreakdownTable` среза childAxis. Категория-код → рус. ярлык для показа.
+- **breakdown-table.tsx** — +проп `axisLabel` (заголовок колонки для произвольной оси: вид работ/категория/группа); drill-кликабельность из `drillable` строки.
+- **reports-dashboard.tsx** — корень = прежний 3-срезовый ответ (KPI/норма/утил целы); drill (stack>0) → OLAP-срез. Любая корневая ось (отдел/проект/человек) теперь проваливается, не только отдел. Каждый клик копит фильтр {ось:ключ} → многоуровневый cross-filter (напр. Отдел ОПИБ → Проекты → Сотрудники, с пилюлями).
+
+### ОСИ (что куда проваливается)
+Отдел→проекты→сотрудники→виды работ; Проект→сотрудники/виды; Категория→проекты; Группа работ→виды. Фильтр-чип «Категория» на корне «Проекты» сохранён (DP-0004). Глубина = пока у строки есть `drillable`.
+
+### НУЖЕН ЛИ backend-фильтр от Dev2?
+**Нет.** OLAP с `filters[]` уже готов и покрывает cross-filter + drill до любого среза. Уровень «до конкретной записи» (таймшит) бэк тоже умеет (`groupBy=detail` + deptId/projectId/employeeId, `reports-detail`) — НЕ подключал в этой итерации (минимализм: текущая глубина до сотрудника/вида работ закрывает запрос «дрилл полный»; запись-уровень = следующий шаг при необходимости, контракт уже есть). [signal-arch не требуется — бэкенд самодостаточен.]
+
+### ПЛАНИРОВАНИЕ
+Drill уже полный для доступных данных: отдел→проекты→доли-по-отделам (`PlannedProjectRow`, 3 уровня, inline-expand). Уровень «проект→люди» в планировании **данными не обеспечен**: планы живут на уровне проект/отдел (FTE-доли), не назначены на конкретных людей. Добавлять = выдумывать данные (против keep-it-simple). Не трогал.
+
+impeccable (product /polish): выровнял под дизайн-систему виджета (restrained tinted-neutrals, tabular-nums, без cards/modals/side-stripe/gradient); строки role=button + Enter/Space + aria-label; крошки nav aria-label; пилюли с aria-label на ✕; загрузка/ошибка/пусто-состояния; движение только background 120ms.
+
+СВЕРКА (правило 8): Timetta analytics/grouping — клик-на-число → child-rows + переключение группировки + cross-filter построителем. Реализовано стеком+крошками+пилюлями (drill-replace, не модалка). Не переусложнял: переиспользовал `use-drill`/`Breadcrumbs`/`BreakdownTable`, новый движок не писал, всё client-driven поверх готового OLAP. Файлы <200 (вынес drill-view, чтобы дашборд не пух; breakdown-table 224 — предсущ., +3 строки).
+
+ВАЛИДАЦИЯ:
+- yarn lint — **0 warnings, 0 errors** (303 файла).
+- yarn test:unit — **1584 passed, 0 failed** (15 todo); +15 новых (drill-axis). Старые use-drill (5) целы.
+- yarn twenty dev --once --dry-run — **чисто, typecheck OK**, 5 updated frontComponent (пересборка бандла, новых identifiers/metadata нет — всё внутри виджета df4eeaa5). НЕ dev --once.
+
+ГДЕ СМОТРЕТЬ: виджет «Отчёты» → «Сводка» → клик по строке (любой срез) → дочерняя таблица + крошки + пилюли. Снять фильтр = ✕ на пилюле или клик крошки.
+Файлы: src/front-components/reports/{olap-types,olap-rest,use-olap,drill-axis,filter-pills,drill-view}.* + drill-axis.test.ts + правки {reports-dashboard,breakdown-table}.tsx + shared/use-drill.ts (+поля childAxis/valueLabel в DrillLevel).
+
+НЕ коммитил, НЕ деплоил.
 
 — Dev 1

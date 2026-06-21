@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { HORIZON, horizonRange } from './use-capacity';
+import { HORIZON, clampHorizonWeeks, horizonRange } from './use-capacity';
 
 const utc = (y: number, m: number, d: number) => new Date(Date.UTC(y, m, d));
 
@@ -11,6 +11,37 @@ describe('HORIZON', () => {
 
   it('month = 6 колонок', () => {
     expect(HORIZON.month).toBe(6);
+  });
+});
+
+describe('clampHorizonWeeks (REQ-0019 planningHorizonWeeks)', () => {
+  it('валидное значение — округление', () => {
+    expect(clampHorizonWeeks(24)).toBe(24);
+    expect(clampHorizonWeeks(12.4)).toBe(12);
+  });
+  it('null/невалид/слишком мало → дефолт 16', () => {
+    expect(clampHorizonWeeks(null)).toBe(16);
+    expect(clampHorizonWeeks(undefined)).toBe(16);
+    expect(clampHorizonWeeks(0)).toBe(16);
+    expect(clampHorizonWeeks(Number.NaN)).toBe(16);
+  });
+  it('верхняя граница 52', () => {
+    expect(clampHorizonWeeks(100)).toBe(52);
+  });
+});
+
+describe('horizonRange — настраиваемый горизонт недель', () => {
+  it('дефолт 16 нед → окно 5 мес (back-compat)', () => {
+    const { to } = horizonRange(utc(2026, 0, 15), 'week');
+    expect(to).toBe('2026-05-31'); // янв + 5 мес
+  });
+  it('расширенный горизонт (24 нед) → окно ceil(24/4)+1=7 мес', () => {
+    const { to } = horizonRange(utc(2026, 0, 15), 'week', 24);
+    expect(to).toBe('2026-07-31'); // янв + 7 мес
+  });
+  it('weekCount не влияет на granularity=month', () => {
+    const { to } = horizonRange(utc(2026, 0, 15), 'month', 24);
+    expect(to).toBe('2026-07-31'); // HORIZON.month+1 = 7 мес независимо
   });
 });
 

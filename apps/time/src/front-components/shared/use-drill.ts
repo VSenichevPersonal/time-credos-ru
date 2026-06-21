@@ -6,8 +6,10 @@ import { useReducer } from 'react';
 
 export type DrillLevel = {
   dim: string; // измерение, по которому провалились (напр. 'dept')
-  value: string; // ключ-фильтр дочернего среза (напр. deptName)
+  value: string; // ключ-фильтр дочернего среза (напр. deptId)
   label: string; // крошка («Отдел: ОПИБ»)
+  valueLabel?: string; // только значение без оси («ОПИБ») — для cross-filter-пилюль
+  childAxis?: string; // ось дочернего среза, показываемого ПОСЛЕ этого провала
 };
 
 export type DrillState = {

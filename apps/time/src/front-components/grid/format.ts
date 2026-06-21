@@ -5,6 +5,19 @@ import { WEEKLY_NORM_HOURS } from 'src/constants/labels';
 
 export const DAILY_NORM_HOURS = WEEKLY_NORM_HOURS / 5; // 8 ч/будний день
 
+// REQ-0019: порог «мягкого» предупреждения о переработке (ч/день). Дефолт = 12;
+// реальное значение — из настроек credosTimeSettings.overtimeWarnHours (UI читает
+// через useGlobalSettings и передаёт в isOvertime). Сверка: Timetta помечает
+// аномально длинный день. Константа — fallback и SSOT дефолта.
+export const OVERTIME_WARN_HOURS_DEFAULT = 12;
+
+// Превышает ли значение дня порог переработки. Чистая функция: порог можно
+// подставить из настроек (fallback OVERTIME_WARN_HOURS_DEFAULT).
+export const isOvertime = (
+  value: number,
+  threshold: number = OVERTIME_WARN_HOURS_DEFAULT,
+): boolean => value > threshold;
+
 // Часы → строка: пусто для 0, без хвостовых нулей («8», «2.5», «0.25»).
 export const fmtHours = (n: number): string => {
   if (!n) return '';

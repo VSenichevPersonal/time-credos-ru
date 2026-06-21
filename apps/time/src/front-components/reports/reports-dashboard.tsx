@@ -9,13 +9,20 @@ import { usePeriod, type PeriodGran } from 'src/front-components/reports/use-per
 import { useReports } from 'src/front-components/reports/use-reports';
 import { FilterChip, type Option } from 'src/front-components/grid/filter-chip';
 import { WORK_CATEGORY_OPTIONS } from 'src/constants/select-options';
-import type { EmployeeRow, GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
+import type { GroupBy, ProjectRow, ReportRow } from 'src/front-components/reports/report-types';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
-import { Breadcrumbs } from 'src/front-components/shared/breadcrumbs';
-import { useDrill } from 'src/front-components/shared/use-drill';
+import { useDrill, type DrillLevel } from 'src/front-components/shared/use-drill';
 import { TrendView, type DeptOption } from 'src/front-components/reports/trend-view';
+import { useOlap } from 'src/front-components/reports/use-olap';
+import { DrillView } from 'src/front-components/reports/drill-view';
+import { dimLabel, nextAxis, valueLabel } from 'src/front-components/reports/drill-axis';
+import type { OlapDim, OlapFilter, OlapRow } from 'src/front-components/reports/olap-types';
 import { departmentLabel } from 'src/constants/labels';
+
+// Все оси (кроме stage — нет справочника этапов на фронте). Для первого провала из
+// легаси-строки корня (у неё нет drillable) считаем следующую ось из полного набора.
+const ALL_DIMS: OlapDim[] = ['dept', 'project', 'employee', 'category', 'workTypeGroup', 'workType'];
 
 const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
@@ -94,13 +101,24 @@ export const ReportsDashboard = () => {
   const [groupBy, setGroupBy] = useState<GroupBy>('dept');
   const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
   const { stack, drillInto, goToLevel, reset } = useDrill();
-  // Базовый запрос отдаёт все 3 среза разом — drill «Отдел → Сотрудники»
-  // делается client-side (EmployeeRow.dept = код отдела). Backend не дёргаем.
+  // Корень: 3-срезовый ответ (KPI + норма/утил по периоду). Backend не дёргаем
+  // на корне за drill. Drill (stack>0) → параметрический OLAP-срез (ниже).
   const { loading, error, data, reload } = useReports(period.from, period.to, groupBy);
 
-  // Drill активен только из среза «Отдел» (в нём строки → сотрудники отдела).
-  // Смена среза/периода сбрасывает стек.
-  const drilledDept = groupBy === 'dept' && stack.length > 0 ? stack[0].value : null;
+  const rootAxis = groupBy as OlapDim; // GroupBy ⊂ OlapDim (dept/project/employee)
+  const drilled = stack.length > 0;
+  // Накопленные cross-filter (AND) = весь путь drill. childAxis последнего уровня
+  // = ось дочернего среза, которую сейчас показываем.
+  const olapFilters: OlapFilter[] = stack.map((l) => ({ dim: l.dim as OlapDim, value: l.value }));
+  const childAxis = (stack[stack.length - 1]?.childAxis as OlapDim | undefined) ?? rootAxis;
+  const { loading: olapLoading, error: olapError, data: olapData, reload: reloadOlap } = useOlap(
+    period.from,
+    period.to,
+    childAxis,
+    olapFilters,
+    drilled,
+  );
+
   const switchGroupBy = (g: GroupBy) => {
     reset();
     setGroupBy(g);
@@ -123,14 +141,28 @@ export const ReportsDashboard = () => {
       ? rows.filter((r) => catFilter.has((r as ProjectRow).category ?? ''))
       : rows;
 
-  // Сотрудники отдела (drill «Отдел → Сотрудники»): EmployeeRow.dept = код отдела
-  // (= byDept[].name). Backend-фильтр не нужен — режем уже загруженный byEmployee.
-  const employeesOfDept = (dept: string): EmployeeRow[] =>
-    (data?.byEmployee ?? []).filter((e) => e.dept === dept);
-  // Отдел кликабелен, только если у него есть сотрудники в срезе (без мёртвых кликов).
-  const deptHasEmployees = (r: ReportRow): boolean => employeesOfDept(r.name).length > 0;
-  const onDrillDept = (r: ReportRow) =>
-    drillInto({ dim: 'dept', value: r.name, label: `Отдел: ${departmentLabel(r.name, { short: true }) || r.name}` });
+  // --- Drill-down (полный, через OLAP-бэкенд) ---
+  // Провал строки: следующая ось из drillable строки (OLAP-строки несут drillable;
+  // легаси-строки корня — нет, fallback набор). Накапливаем фильтр {ось: ключ}.
+  const drillRow = (fromAxis: OlapDim, fallbackDims: OlapDim[]) => (r: ReportRow) => {
+    const dims = (r as OlapRow).drillable ?? fallbackDims;
+    const child = nextAxis(fromAxis, dims);
+    if (!child) return; // тупик — без мёртвых кликов
+    const lbl = valueLabel(fromAxis, r.key, r.name);
+    const level: DrillLevel = {
+      dim: fromAxis,
+      value: r.key,
+      label: `${dimLabel(fromAxis)}: ${lbl}`,
+      valueLabel: lbl,
+      childAxis: child,
+    };
+    drillInto(level);
+  };
+  // Кликабельность: есть ли куда проваливаться. Корень (легаси-строки) — по полному
+  // набору осей; OLAP-строки — по их drillable.
+  const rootDrillable = (): boolean => nextAxis(rootAxis, ALL_DIMS) !== null;
+  const olapRowDrillable = (r: ReportRow): boolean =>
+    nextAxis(childAxis, (r as OlapRow).drillable ?? []) !== null;
 
   // Опции отдела для фильтра тренда: byDept[].key = id отдела, name = код.
   // Тренд шлёт departmentId (id), пользователь видит русское название отдела.
@@ -222,44 +254,46 @@ export const ReportsDashboard = () => {
       ) : (
         <ErrorBoundary
           title="Не удалось показать отчёт"
-          resetKeys={[groupBy, period.from, period.to, drilledDept ?? '']}
+          resetKeys={[groupBy, period.from, period.to, stack.length]}
         >
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
             <KpiCards totals={data.totals} />
-            {stack.length > 0 && (
-              <div style={{ padding: '0 14px 8px' }}>
-                <Breadcrumbs
-                  rootLabel="Все отделы"
-                  stack={stack}
-                  onRoot={reset}
-                  onLevel={goToLevel}
-                />
-              </div>
-            )}
-            <div
-              style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                minHeight: 0,
-                margin: '0 14px 14px',
-                border: `1px solid ${T.border}`,
-                borderRadius: 10,
-                overflow: 'hidden',
-                background: T.surface,
-              }}
-            >
-              {drilledDept ? (
-                <BreakdownTable groupBy="employee" rows={employeesOfDept(drilledDept)} />
-              ) : (
+            {!drilled ? (
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  minHeight: 0,
+                  margin: '0 14px 14px',
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 10,
+                  overflow: 'hidden',
+                  background: T.surface,
+                }}
+              >
                 <BreakdownTable
                   groupBy={groupBy}
                   rows={filterRows(pickRows(groupBy, data))}
-                  onDrill={groupBy === 'dept' ? onDrillDept : undefined}
-                  drillable={groupBy === 'dept' ? deptHasEmployees : undefined}
+                  onDrill={rootDrillable() ? drillRow(rootAxis, ALL_DIMS) : undefined}
+                  drillable={rootDrillable() ? () => true : undefined}
                 />
-              )}
-            </div>
+              </div>
+            ) : (
+              <DrillView
+                rootAxis={rootAxis}
+                childAxis={childAxis}
+                stack={stack}
+                loading={olapLoading}
+                error={olapError}
+                data={olapData}
+                onReload={reloadOlap}
+                onDrillRow={drillRow(childAxis, ALL_DIMS)}
+                rowDrillable={olapRowDrillable}
+                onRoot={reset}
+                onLevel={goToLevel}
+              />
+            )}
           </div>
         </ErrorBoundary>
       )}

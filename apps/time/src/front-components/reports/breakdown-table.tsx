@@ -64,10 +64,14 @@ type Props = {
   // мёртвых кликов). Не задан onDrill → таблица плоская (виджет «Бюджет» и т.п.).
   onDrill?: (row: ReportRow) => void;
   drillable?: (row: ReportRow) => boolean;
+  // OLAP-drill: заголовок колонки имени для произвольной оси (вид работ/категория/
+  // группа), когда срез выходит за dept/project/employee. Не задан → по groupBy.
+  axisLabel?: string;
 };
 
-export const BreakdownTable = ({ groupBy, rows, onDrill, drillable }: Props) => {
+export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }: Props) => {
   const isProject = groupBy === 'project';
+  const nameHeader = axisLabel ?? (isProject ? 'Проект' : groupBy === 'dept' ? 'Отдел' : 'Сотрудник');
   const maxFact = Math.max(1, ...rows.map((r) => r.fact));
   const { key: sortKey, dir, toggle, sort } = useSortable<SortKey>('fact');
   const [hover, setHover] = useState<string | null>(null);
@@ -129,7 +133,7 @@ export const BreakdownTable = ({ groupBy, rows, onDrill, drillable }: Props) => 
           }}
         >
           <span style={cell()}>
-            <SortHeader label={isProject ? 'Проект' : groupBy === 'dept' ? 'Отдел' : 'Сотрудник'} active={sortKey === 'name'} dir={dir} onSort={() => toggle('name')} />
+            <SortHeader label={nameHeader} active={sortKey === 'name'} dir={dir} onSort={() => toggle('name')} />
           </span>
           <span style={cell()}>{isProject ? 'Бюджет' : 'Загрузка'}</span>
           <span style={cell()}>{isProject ? 'Категория' : 'Категории'}</span>

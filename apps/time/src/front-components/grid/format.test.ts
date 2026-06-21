@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DAILY_NORM_HOURS,
+  OVERTIME_WARN_HOURS_DEFAULT,
   fmtHours,
   fmtTotal,
+  isOvertime,
   loadColor,
   loadHint,
   loadLevel,
@@ -14,6 +16,21 @@ import { T } from 'src/front-components/grid/tokens';
 describe('DAILY_NORM_HOURS', () => {
   it('= недельная норма / 5 = 8 ч', () => {
     expect(DAILY_NORM_HOURS).toBe(8);
+  });
+});
+
+describe('isOvertime (REQ-0019 overtimeWarnHours)', () => {
+  it('дефолтный порог = 12', () => {
+    expect(OVERTIME_WARN_HOURS_DEFAULT).toBe(12);
+  });
+  it('строго больше дефолтного порога → true', () => {
+    expect(isOvertime(12.5)).toBe(true);
+    expect(isOvertime(12)).toBe(false); // ровно порог — не переработка
+    expect(isOvertime(8)).toBe(false);
+  });
+  it('кастомный порог из настроек подменяет дефолт', () => {
+    expect(isOvertime(9, 8)).toBe(true);
+    expect(isOvertime(9, 10)).toBe(false);
   });
 });
 
