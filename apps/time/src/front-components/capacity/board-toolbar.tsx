@@ -99,7 +99,7 @@ export const BoardToolbar = ({
           cursor: 'pointer',
           borderRadius: 8,
           border: `1px solid ${planning ? T.accent : T.border}`,
-          color: planning ? '#fff' : T.accent,
+          color: planning ? T.onAccent : T.accent,
           background: planning ? T.accent : T.surface,
         }}
       >

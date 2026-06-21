@@ -560,6 +560,12 @@ export const CREDOS_TIME_EMPLOYEE_CARD_VF_5 =
 export const BACKFILL_PROJECT_DEPARTMENTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   '81b054aa-ce6a-4059-aab2-cb0401030b8d';
 
+// F-E — HTTP-роут /s/reminders (mode=missing-timesheets): детект «кто не заполнил
+// таймшит за текущую неделю» для UI-баннера/дайджеста. Доставка push/email —
+// follow-up (SDK песочницы без нативных уведомлений).
+export const REMINDERS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  'c7e4b2a1-6f3d-4a90-bb15-2e8d4c9f7a36';
+
 // --- REQ-0019: глобальный singleton настроек модуля (credosTimeSettings) ---
 // Объект + 12 полей + index-view (для существования; правка в UI настроек, Dev1)
 // + nav-menu-item. Сид 1 записи дефолтов — в общем post-install handler (миграция 3).

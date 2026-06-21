@@ -75,7 +75,7 @@ export const DeptRow = ({
         {!hasCapacity ? (
           <span style={{ color: T.textFaint }}>ёмкость не задана</span>
         ) : freeFrom ? (
-          <span style={{ color: '#15803d' }}>свободен с {freeFrom}</span>
+          <span style={{ color: T.ok }}>свободен с {freeFrom}</span>
         ) : (
           <span style={{ color: T.textFaint }}>нет окна в горизонте</span>
         )}

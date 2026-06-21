@@ -64,7 +64,7 @@ export const ErrorState = ({
             fontFamily: 'inherit',
             fontSize: 13,
             fontWeight: 600,
-            color: '#ffffff',
+            color: T.onAccent,
             background: hover ? T.accentHover : T.accent,
             border: 'none',
             borderRadius: 8,

@@ -119,7 +119,7 @@ export const ApprovalBar = ({
             ...btnBase,
             marginLeft: 'auto',
             border: 'none',
-            color: '#fff',
+            color: T.onAccent,
             background: busy ? T.accentRing : T.accent,
             opacity: busy ? 0.7 : 1,
           }}
@@ -157,7 +157,7 @@ export const ApprovalBar = ({
               ...btnBase,
               border: 'none',
               background: busy ? T.okSoft : T.ok,
-              color: '#fff',
+              color: T.onAccent,
               opacity: busy ? 0.7 : 1,
             }}
             onMouseEnter={(e) => !busy && (e.currentTarget.style.opacity = '0.9')}
