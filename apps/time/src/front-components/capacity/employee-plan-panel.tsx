@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { T } from 'src/front-components/capacity/cap-tokens';
+import { Autocomplete } from 'src/front-components/grid/autocomplete';
 import {
   monthsInRange,
   reconcileSlots,
@@ -245,21 +246,21 @@ export const EmployeePlanPanel = ({ employee, projects, onSaved, onOpenChange }:
                 </div>
               ) : (
                 <>
-                  {/* Проект */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-                    <span style={{ fontSize: 11, color: T.textMuted, width: 48, flexShrink: 0 }}>Проект</span>
-                    <select
+                  {/* Проект — комбобокс с поиском (печатаешь → фильтрует, ↑↓, Enter).
+                      Длинный список проектов → нативный select неудобен (нет
+                      substring-поиска). Реюз grid/autocomplete (DOM-free). */}
+                  <div style={{ marginBottom: 12 }}>
+                    <span style={{ display: 'block', fontSize: 11, color: T.textMuted, marginBottom: 4 }}>Проект</span>
+                    <Autocomplete
+                      placeholder="Начните вводить код или клиента…"
+                      items={projects.map((p) => ({
+                        id: p.id,
+                        label: p.code ? `${p.code} · ${p.name}` : p.name,
+                      }))}
                       value={projectId}
-                      aria-label="Проект персонального плана"
-                      onChange={(e) => setProjectId(e.target.value)}
-                      style={{ ...fieldStyle, flex: 1, minWidth: 0 }}
-                    >
-                      {projects.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.code ? `${p.code} · ${p.name}` : p.name}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(id) => setProjectId(id ?? '')}
+                      width={300}
+                    />
                   </div>
 
                   {/* Период */}

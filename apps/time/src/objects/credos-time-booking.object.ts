@@ -124,13 +124,39 @@ export default defineObject({
       isNullable: true,
       defaultValue: null,
     },
+    // Booking волна-2 (DP-0005): роль ресурса для УНИВЕРСАЛЬНОГО резерва — бронь
+    // под роль без конкретного сотрудника (employee nullable). UUID inline.
+    {
+      universalIdentifier: 'dacaf114-43d1-4aa6-8974-5abeb52cdd96',
+      name: 'teamRole',
+      type: FieldType.TEXT,
+      label: 'Роль ресурса',
+      icon: 'IconUserQuestion',
+      description: 'Роль для брони без конкретного сотрудника (напр. «Аналитик ИБ»). Универсальный резерв.',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // Booking волна-2 (DP-0005): вероятность конверсии SOFT-брони (пресейл/кандидат).
+    {
+      universalIdentifier: '9923a621-1fc2-4600-ab5f-a6777d96b4fc',
+      name: 'winChance',
+      type: FieldType.NUMBER,
+      label: 'Вероятность (%)',
+      icon: 'IconPercentage',
+      description: 'Вероятность конверсии SOFT-брони в HARD (0–100). Для пресейл-кандидатов взвешивает резерв.',
+      isNullable: true,
+      defaultValue: null,
+      universalSettings: { dataType: NumberDataType.FLOAT, decimals: 0 },
+    },
     // Booking.employee -> Employee.bookings (MANY_TO_ONE, CASCADE).
+    // Волна-2: nullable — бронь под роль (универсальный резерв) без человека.
     {
       universalIdentifier: CREDOS_TIME_BOOKING_EMPLOYEE_FIELD_ID,
       name: 'employee',
       type: FieldType.RELATION,
       label: 'Сотрудник',
       icon: 'IconUser',
+      isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
         CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:

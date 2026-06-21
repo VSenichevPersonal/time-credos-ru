@@ -95,5 +95,20 @@ export default defineView({
       isVisible: true,
       size: 170,
     },
+    // Волна-2 (DP-0005 универсальный резерв): роль ресурса + вероятность конверсии.
+    {
+      universalIdentifier: 'f118359e-17ac-4056-8baf-1c0a0ad0e7d2',
+      fieldMetadataUniversalIdentifier: 'dacaf114-43d1-4aa6-8974-5abeb52cdd96',
+      position: 8,
+      isVisible: true,
+      size: 160,
+    },
+    {
+      universalIdentifier: '2fce048a-e5a6-472f-b89c-33f672adaae8',
+      fieldMetadataUniversalIdentifier: '9923a621-1fc2-4600-ab5f-a6777d96b4fc',
+      position: 9,
+      isVisible: true,
+      size: 120,
+    },
   ],
 });

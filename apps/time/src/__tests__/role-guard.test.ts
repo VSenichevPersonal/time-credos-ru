@@ -15,6 +15,8 @@ import { describe, expect, it } from 'vitest';
 import defaultRole from 'src/default-role';
 // eslint-disable-next-line import/order
 import managerRole from 'src/roles/manager.role';
+// eslint-disable-next-line import/order
+import { CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 const role = defaultRole as unknown as Record<string, unknown>;
 type ObjPerm = {
@@ -47,10 +49,17 @@ describe('default-role — security invariants (CISO-002 / [bug]#1)', () => {
     expect(perms).toHaveLength(8);
   });
 
-  it('НИ ОДИН объект не имеет canDestroyObjectRecords = true', () => {
+  // [bug]#1 (UC-TS-07): destroy разрешён ТОЛЬКО на credosTimeEntries (REST DELETE =
+  // hard-delete под app-токеном → 400 без destroy). Least-privilege: один объект,
+  // app-токен только через /s/time-entry (CISO-011 гард APPROVED), user-роль destroy:false
+  // (canDestroyAllObjectRecords=false выше). Никакой другой объект destroy не получает.
+  it('canDestroyObjectRecords = true ТОЛЬКО на credosTimeEntries (scoped op:delete)', () => {
     const perms = role.objectPermissions as ObjPerm[];
     const destroyEnabled = perms.filter((p) => p.canDestroyObjectRecords === true);
-    expect(destroyEnabled).toHaveLength(0);
+    expect(destroyEnabled).toHaveLength(1);
+    expect(destroyEnabled[0].objectUniversalIdentifier).toBe(
+      CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
+    );
   });
 
   it('ВСЕ объекты имеют canSoftDeleteObjectRecords = true', () => {

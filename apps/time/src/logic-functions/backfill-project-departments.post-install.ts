@@ -118,7 +118,7 @@ const backfillProjectFactHours = async (
   return { updated, errors };
 };
 
-type RawSettings = { id: string };
+type RawSettings = { id: string; revealEmployeeNames?: boolean | null };
 
 // REQ-0019 — сид глобального singleton credosTimeSettings. Создаёт ровно 1 запись
 // с дефолтами, если её ещё нет. Идемпотентно: при наличии любой записи — НЕ плодит
@@ -128,7 +128,23 @@ type RawSettings = { id: string };
 const seedSettings = async (): Promise<{ created: boolean; skipped: boolean; error: boolean }> => {
   const existing = await restGetAll<RawSettings>('credosTimeSettings', {});
   if (existing.length > 0) {
-    return { created: false, skipped: true, error: false }; // singleton уже есть
+    // Миграция (user-direct 2026-06-22 ‼️): ФИО в отчётах ВКЛ по умолчанию. Существующий
+    // singleton засеян revealEmployeeNames=false (CISO-007) → разворачиваем в true (иначе
+    // на проде остаются коды вместо ФИО). Флипаем ТОЛЬКО false→true; админ-off на след.
+    // апгрейде перепишется (приемлемо для «ВКЛ по умолчанию»; field-level — RBAC-волна).
+    if (existing[0].revealEmployeeNames === false) {
+      try {
+        await restPatch(`/rest/credosTimeSettings/${existing[0].id}`, { revealEmployeeNames: true });
+        // eslint-disable-next-line no-console
+        console.warn('[seed-settings] миграция: revealEmployeeNames false→true (user-direct)');
+        return { created: false, skipped: false, error: false };
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('[seed-settings] миграция revealEmployeeNames: %s', e instanceof Error ? e.message : String(e));
+        return { created: false, skipped: false, error: true };
+      }
+    }
+    return { created: false, skipped: true, error: false }; // singleton есть, ФИО уже on
   }
   try {
     await restPost('/rest/credosTimeSettings', {
@@ -142,7 +158,8 @@ const seedSettings = async (): Promise<{ created: boolean; skipped: boolean; err
       fillTemplateHours: 8,
       reminderEnabled: false,
       reminderDayOfWeek: 'FRIDAY',
-      revealEmployeeNames: false,
+      // user-direct: ФИО ВКЛ по умолчанию (152-ФЗ внутр.учёт). Разворот CISO-007.
+      revealEmployeeNames: true,
       tentativeBookingEnabled: true,
     });
     // eslint-disable-next-line no-console

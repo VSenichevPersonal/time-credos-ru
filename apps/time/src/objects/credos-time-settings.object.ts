@@ -194,11 +194,12 @@ export default defineObject({
       universalIdentifier: CREDOS_TIME_SETTINGS_REVEAL_EMPLOYEE_NAMES_FIELD_ID,
       name: 'revealEmployeeNames',
       type: FieldType.BOOLEAN,
-      // CISO-007 (152-ФЗ): показ ФИО в отчётах. Дефолт false до доверенной
-      // server-identity (CISO-005). Админ-тоггл (RBAC-волна).
+      // user-direct 2026-06-22 ‼️: ФИО в отчётах ВКЛ по умолчанию (внутр.табельный
+      // учёт = законный интерес работодателя, 152-ФЗ). Разворот CISO-007 safe-default.
+      // @CISO в RISK_REGISTER. RBAC-волна (CISO-005 закрыт) уточнит field-level.
       label: 'Показывать ФИО в отчётах',
-      icon: 'IconEyeOff',
-      defaultValue: false,
+      icon: 'IconEye',
+      defaultValue: true,
     },
   ],
 });

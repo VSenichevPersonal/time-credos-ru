@@ -134,7 +134,7 @@ export const PeriodHeader = ({ periods, nameWidth, granularity, metric }: Props)
             ...nowEdge(i),
           }}
         >
-          {granularity === 'week' ? p.from.getUTCDate() : p.label}
+          {granularity === 'week' ? `${p.from.getUTCDate()}–${p.to.getUTCDate()}` : p.label}
         </div>
       ))}
       {sigmaCell(30, 'Σ гор.')}

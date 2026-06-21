@@ -47,7 +47,12 @@ export default defineApplicationRole({
       canReadObjectRecords: true,
       canUpdateObjectRecords: true,
       canSoftDeleteObjectRecords: true,
-      canDestroyObjectRecords: false,
+      // [bug]#1 (P1, UC-TS-07): REST DELETE /rest/credosTimeEntries под app-токеном =
+      // HARD-delete (destroy), НЕ soft → 400 PERMISSION_DENIED (QA-подтв.). Выдаём
+      // destroy ТОЛЬКО на credosTimeEntries (least-privilege). Контроль: app-токен
+      // только через /s/time-entry (CISO-011 гард APPROVED) + user-роль destroy:false.
+      canDestroyObjectRecords:
+        objectUniversalIdentifier === CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
     }),
   ),
 });
