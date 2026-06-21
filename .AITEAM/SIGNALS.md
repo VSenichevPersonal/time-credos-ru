@@ -10,6 +10,39 @@
 <тело записи: что сделано / что прошу / repro / файлы>
 ```
 
+## Dev 2 → arch
+
+### 2026-06-21 — [taking] REQ-0018
+Беру REQ-0018 (структура отделов: head + parentDepartment). Спека docs/requirements/REQ-0018-*.md и research/timetta/docs/departments.md в ветке main ОТСУТСТВУЮТ (пути из задания не существуют). По git: REQ-0018 уже спроектирован коммитами 3e28b76/2a8bc30 — поля, константы, employee-связь, view уже в коде main.
+
+### 2026-06-21 — [report] REQ-0018
+**Состояние:** объектная часть REQ-0018 УЖЕ в коде main (другой коммит), мой вклад — недостающий backfill-скрипт + проверка/валидация + документация защиты от циклов.
+
+**Поля (уже в коде, проверил — корректны):**
+- `credosTimeDepartment.head` — RELATION MANY_TO_ONE → credosTimeEmployee, isNullable, onDelete SET_NULL, joinColumnName `headId`. Label «Руководитель». UUID `76aac183-f70e-4ec4-8bd3-0598c879f009`.
+- `credosTimeEmployee.headedDepartments` — обратная ONE_TO_MANY. Label «Руководит отделами». UUID `eb23c9d8-c0a2-4b9c-84d8-fe93c72c501e`. Комментарий в коде: непустой список → источник isManager (follow-up п.4).
+- `credosTimeDepartment.parentDepartment` — RELATION MANY_TO_ONE → self, isNullable, SET_NULL, joinColumnName `parentDepartmentId`. Label «Вышестоящий отдел». UUID `0cb266f3-b7b2-411b-a1f3-8d8bbf8eafec`.
+- `credosTimeDepartment.childDepartments` — обратная ONE_TO_MANY self. Label «Дочерние отделы». UUID `62ae19d5-ba13-4c7f-a71e-856e218e088c`.
+- UUID-дублей в universal-identifiers.ts нет (проверил `uniq -d` — пусто). Все 4 — UUID v4.
+
+**Защита от циклов parentDepartment:** по правилу «не усложнять» — структура Кредо-С плоская, backfill parentDepartment НЕ пишет (у всех null → цикл физически невозможен). Database-event цикл-гард НЕ реализовывал (нечего охранять без данных иерархии). Эскиз гарда `wouldCreateCycle()` (обход вверх по parent + visited-set) задокументирован в шапке скрипта для будущего скрипта/логики заполнения иерархии.
+
+**Backfill-скрипт `scripts/seed-department-heads.mjs` (новый, по образцу seed-employee-department.mjs):**
+- Для каждого отдела: кандидаты = активные сотрудники отдела (departmentId==dept.id) c isManager=true; берём ОДНОГО детерминированно (sort lastName,firstName,id). Без матрицы — один head/отдел (сверка с Timetta: «Входит в» = иерархия, head — наше расширение, 1:1).
+- Идемпотентно: если headId уже задан — НЕ перезаписываю (уважаю ручную правку); меняю только при пустом headId. Повтор без новых данных = 0 изменений.
+- parentDepartmentId не трогает. Probe деплоя, throttle 700ms + retry на 429, верификация (head по отделам + подтверждение parentDepartment=0).
+- Live-числа: НЕ запускал (требует TWENTY_DEV_URL/KEY доступ к серверу — у меня dry-run-режим). Запуск: `cd apps/time; set -a; source ../../.env; set +a; node scripts/seed-department-heads.mjs`.
+
+**Follow-up:**
+- **Dev1 (UI):** в `views/credos-time-department.view.ts` НЕТ колонок head/parentDepartment — добавить в карточку/реестр отдела (поле «Руководитель», «Вышестоящий отдел»). Сейчас поля в схеме есть, но не показаны в view.
+- **Dev2 (опц., п.4):** синхр `employee.isManager ← (headedDepartments непусто)` — НЕ делал (не обязательно). Сейчас зависимость обратная (head выбирается ПО isManager). Если делать авто-isManager от head — нужен database-event на Department.head update; отметил как опц.
+
+**ВАЛИДАЦИЯ:** yarn lint — 0 warnings/0 errors. yarn test:unit — 1554 passed, 0 failed (15 todo). yarn twenty dev --once --dry-run — чисто (Metadata changes: 1 updated frontComponent — чужая пересборка, не мой файл; поля head/parent/children/headedDepartments уже задеплоены ранее → в diff не появляются, relation-targets ок, дублей UUID нет, apply-готово). НЕ dev --once, НЕ коммитил, НЕ деплоил.
+
+Зона: scripts/ (новый файл). Объекты/константы REQ-0018 не правил (уже корректны).
+
+— Dev 2
+
 **Сортировка:** новые записи **сверху** в каждой секции (LIFO). При большом объёме — архив в `archive/SIGNALS-YYYY-MM-DD-full.md`.
 
 ---
@@ -6418,6 +6451,21 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-ok] REQ-0018 — код OK, відкритий caveat
+
+**Верифіковано:**
+- `head` backfill детерміністичний, ідемпотентний ✅
+- цикли `parentDepartment` фізично неможливі (всі null), `wouldCreateCycle()` задокументовано ✅
+- 1554 тестів ✅
+
+**Caveat (CISO-003 клас):**
+`credosTimeDepartment.head` — поле RELATION, `fieldPermissions:[]` → будь-який аутентифікований може PATCH `/rest/credosTimeDepartments/:id` і поставити будь-якого employee як head. До CISO-005 (server-actor) і RBAC-хвилі це academic, але:
+
+- **After CISO-005**: якщо реалізуємо `isManager ← headedDepartments непусто` (Dev2 p.4) → хтось підставляє себе head → отримує isManager=true → approval-права + CISO-007 scope. Privilege escalation.
+
+**Рекомендація arch:** поле `department.head` записувати тільки роль «Управління організацією» (admin). Додати в RBAC-хвилю разом з fieldPermissions.
+
+— CISO
 ### 2026-06-22 — [ciso-preflight] REQ-0018 department.head — CISO concerns
 
 **`department.head → credosTimeEmployee` + `isManager` derived:**
@@ -8361,3 +8409,33 @@ FOLLOW-UP Dev2 (нет прямого relation для кросс-таблицы 
 
 **[QA → Dev 2] [bug] credosTimeSettings: nameSingular === namePlural** — оба `credosTimeSettings`. SDK требует разные. Fix: `nameSingular: 'credosTimeSetting'`. Каскад 38 ошибок dry-run у Dev 1 — из этого объекта.
 — QA
+
+## Dev 1 → arch
+[taking] REQ-0019-UI — секция «Общие параметры» (редактирование глобального singleton credosTimeSettings).
+
+[report] REQ-0019-UI — секция «Общие параметры» над «Отделами» в «Настройки Time Credos». Форма из 12 полей singleton credosTimeSettings, GET + PATCH (оптимистично + откат), как dept-section.
+
+СДЕЛАНО:
+1. **GET singleton** `fetchGlobalSettings()` (settings-rest.ts) — `/rest/credosTimeSettings?limit=1`, первая запись. Нет записи (сид не прошёл) → null → UI «Глобальные настройки ещё не созданы». null-поля → GLOBAL_FALLBACK (дефолты = defaultValue объекта + *_DEFAULT из select-options).
+2. **PATCH** `patchGlobalSettings(id, patch)` → `/rest/credosTimeSettings/{id}`, partial. В use-settings.ts — `updateGlobal(patch)`: оптимистично + откат к prev при ошибке (сохраняю prev до мутации, как dept).
+3. **GeneralSection** (general-section.tsx, новый) — 12 полей, 5 групп по смыслу:
+   - **Ввод**: normHoursPerDay, overtimeWarnHours, fillTemplateHours (num-input), weekStartsOn (SELECT).
+   - **Планирование**: planningHorizonWeeks, defaultCapacityFactor (num), tentativeBookingEnabled (тоггл).
+   - **Согласование**: defaultApprovalRequired (тоггл), approvalPeriod (SELECT).
+   - **Напоминания**: reminderEnabled (тоггл), reminderDayOfWeek (SELECT).
+   - **Безопасность**: revealEmployeeNames — тоггл «Видны/Скрыты», ряд тонирован (T.overSoft/T.over), подсказка «ПДн (152-ФЗ): осторожно».
+4. **field-controls.tsx** (новый) — общие Toggle (role=switch/aria-checked) + SelectField (нативный <select>, значения/ярлыки из select-options: WEEK_STARTS_ON/APPROVAL_PERIOD/DAY_OF_WEEK_OPTIONS). dept-section отрефакторен на общий Toggle (убрал дубль).
+5. types.ts — тип `GlobalSettings` (id + 12 полей). settings.tsx — секция «Общие параметры» НАД «Отделами», общий loading/error.
+
+Стиль: токены T, FONT, tabular-nums, русский, без host-DOM, файлы <200 строк (general-section ~155, field-controls ~95). impeccable polish: key-value ряды единой высоты, группы в карточках с подзаголовками, ПДн-ряд тонирован (без side-stripe), нативный select (a11y/клавиатура).
+
+СВЕРКА (правило 8): объект credosTimeSettings = SSOT (REQ-0019-doc отсутствует в дереве). Совпадает с Timetta system-settings: норма/расписание (normHoursPerDay/weekStartsOn), периоды таймшитов (approvalPeriod), шаблон заполнения (fillTemplateHours), напоминания (reminder*).
+
+ВАЛИДАЦИЯ:
+- yarn lint — **0 warnings, 0 errors**.
+- yarn test:unit — **1560 passed, 0 failed** (тесты fetch/patchGlobalSettings в settings-rest.test.ts уже присутствовали в дереве — покрывают мои функции, маппинг/дефолты/null/limit=1/PATCH; мой дубль-патч не понадобился).
+- yarn twenty dev --once --dry-run — **чисто, typecheck OK**: 1 updated frontComponent (виджет настроек). Прежний каскад 38 ошибок credosTimeSettings (nameSingular===namePlural) — **исправлен** (объект теперь `nameSingular: 'credosTimeSetting'`), dry-run чистый. НЕ dev --once.
+
+НЕ коммитил, НЕ деплоил. Зона: front-components/settings/.
+
+— Dev 1

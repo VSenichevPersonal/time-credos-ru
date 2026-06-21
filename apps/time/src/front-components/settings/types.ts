@@ -13,3 +13,27 @@ export type DeptSettings = {
 
 // Вычисляемая численность: deptId → число активных сотрудников.
 export type Headcounts = Record<string, number>;
+
+// REQ-0019 — глобальные настройки модуля (singleton credosTimeSettings, 1 запись).
+// 12 параметров: ввод/норма, планирование, согласование, напоминания, безопасность.
+// SELECT-значения хранятся в UPPER_SNAKE (как в select-options), числа — как есть.
+export type GlobalSettings = {
+  id: string;
+  // Ввод / норма
+  normHoursPerDay: number;
+  fillTemplateHours: number;
+  overtimeWarnHours: number;
+  // Планирование
+  weekStartsOn: string;
+  planningHorizonWeeks: number;
+  defaultCapacityFactor: number;
+  tentativeBookingEnabled: boolean;
+  // Согласование
+  defaultApprovalRequired: boolean;
+  approvalPeriod: string;
+  // Напоминания
+  reminderEnabled: boolean;
+  reminderDayOfWeek: string;
+  // Безопасность (ПДн)
+  revealEmployeeNames: boolean;
+};

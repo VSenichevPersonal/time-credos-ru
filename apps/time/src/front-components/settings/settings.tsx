@@ -3,6 +3,7 @@ import { navigate, AppPath } from 'twenty-sdk/front-component';
 import { T, FONT } from 'src/front-components/grid/tokens';
 import { Center } from 'src/front-components/grid/center';
 import { DeptSection } from 'src/front-components/settings/dept-section';
+import { GeneralSection } from 'src/front-components/settings/general-section';
 import { useSettings } from 'src/front-components/settings/use-settings';
 
 // Подраздел Settings → «Настройки Time Credos». v1: конфигурация отделов
@@ -22,7 +23,8 @@ const SectionTitle = ({ children, hint }: { children: string; hint?: string }) =
 );
 
 export const CredosSettings = () => {
-  const { loading, error, depts, headcounts, saving, update } = useSettings();
+  const { loading, error, global, depts, headcounts, saving, update, updateGlobal } =
+    useSettings();
 
   return (
     <div
@@ -41,6 +43,20 @@ export const CredosSettings = () => {
           Сохранение…
         </span>
       </div>
+
+      <SectionTitle hint="Глобальные параметры модуля: норма, планирование, согласование, напоминания, доступ к ПДн.">
+        Общие параметры
+      </SectionTitle>
+
+      {error ? (
+        <Center>Не удалось загрузить настройки: {error}</Center>
+      ) : loading ? (
+        <Center>Загрузка настроек…</Center>
+      ) : !global ? (
+        <Center>Глобальные настройки ещё не созданы</Center>
+      ) : (
+        <GeneralSection settings={global} onUpdate={updateGlobal} />
+      )}
 
       <SectionTitle hint="Согласование трудозатрат и коэффициент ёмкости. Численность вычисляется по активным сотрудникам отдела.">
         Отделы

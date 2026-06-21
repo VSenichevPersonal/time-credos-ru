@@ -1,5 +1,6 @@
 import { T } from 'src/front-components/grid/tokens';
 import { departmentLabel } from 'src/constants/labels';
+import { Toggle } from 'src/front-components/settings/field-controls';
 import { NumField } from 'src/front-components/settings/num-field';
 import type { DeptPatch } from 'src/front-components/settings/settings-rest';
 import type { DeptSettings, Headcounts } from 'src/front-components/settings/types';
@@ -48,28 +49,6 @@ const head: React.CSSProperties = {
   color: T.textMuted,
 };
 
-const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
-  <button
-    role="switch"
-    aria-checked={on}
-    onClick={onClick}
-    style={{
-      height: 24,
-      padding: '0 10px',
-      fontSize: 11.5,
-      fontWeight: 600,
-      border: `1px solid ${on ? T.accentRing : T.borderStrong}`,
-      borderRadius: 6,
-      cursor: 'pointer',
-      fontFamily: 'inherit',
-      color: on ? T.accent : T.textMuted,
-      background: on ? T.accentSoft : T.surface,
-    }}
-  >
-    {on ? 'Включено' : 'Выключено'}
-  </button>
-);
-
 export const DeptSection = ({ depts, headcounts, onUpdate }: Props) => (
   <div>
     <div style={head}>
@@ -101,7 +80,7 @@ export const DeptSection = ({ depts, headcounts, onUpdate }: Props) => (
         >
           {d.code ? departmentLabel(d.code, { short: true }) : d.name}
         </span>
-        <Toggle on={d.approvalRequired} onClick={() => onUpdate(d.id, { approvalRequired: !d.approvalRequired })} />
+        <Toggle on={d.approvalRequired} onChange={(v) => onUpdate(d.id, { approvalRequired: v })} />
         <NumField value={d.capacityFactor} min={0} width={76} onCommit={(v) => onUpdate(d.id, { capacityFactor: v })} />
         <span style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: 8 }}>
           <HeadcountBadge value={headcounts[d.id] ?? 0} />
