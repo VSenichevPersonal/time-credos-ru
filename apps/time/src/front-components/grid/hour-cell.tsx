@@ -28,6 +28,7 @@ type Props = {
   onCommit: (hours: number) => void;
   onKey: (e: { key: string; shiftKey: boolean }) => void; // навигация (родитель)
   onSeedConsumed: () => void;
+  onLockedClick?: () => void; // WI-10: клик по 🔒-ячейке → путь отзыва согласования (не тупик)
 };
 
 export const HourCell = ({
@@ -45,6 +46,7 @@ export const HourCell = ({
   onCommit,
   onKey,
   onSeedConsumed,
+  onLockedClick,
 }: Props) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -196,10 +198,16 @@ export const HourCell = ({
     <div
       tabIndex={-1}
       aria-disabled={locked || undefined}
-      aria-label={locked ? `Согласовано, только чтение: ${fmtHours(value)} ч` : undefined}
+      aria-label={
+        locked
+          ? `Согласовано, только чтение: ${fmtHours(value)} ч${onLockedClick ? '. Нажмите, чтобы отозвать согласование для правки' : ''}`
+          : undefined
+      }
       title={
         locked
-          ? 'Согласовано — правка запрещена'
+          ? onLockedClick
+            ? 'Согласовано — нажмите, чтобы отозвать для правки'
+            : 'Согласовано — правка запрещена'
           : over
             ? 'Переработка: часов больше порога'
             : description || undefined
@@ -211,7 +219,12 @@ export const HourCell = ({
           return;
         }
         onActivate(false);
-        if (locked) return; // W6-2: согласованную не редактируем
+        if (locked) {
+          // WI-10: клик по 🔒 — не тупик. Ведём к отзыву согласования (revoke/recall),
+          // если путь доступен (onLockedClick задан); иначе остаётся read-only.
+          onLockedClick?.();
+          return; // W6-2: согласованную не редактируем
+        }
         setDraft(fmtHours(value));
         selectOnFocus.current = true; // E1.5: клик = выделить всё (Excel-паттерн)
         setEditing(true);
@@ -220,7 +233,7 @@ export const HourCell = ({
       style={{
         ...base,
         position: 'relative',
-        cursor: locked ? 'default' : 'text',
+        cursor: locked ? (onLockedClick ? 'pointer' : 'default') : 'text',
         // Read-only: тихий нейтральный фон (не цвет-сигнал), приглушённый текст.
         // E1.3: ячейка в диапазоне выделения (не активная) — лёгкая accent-подложка.
         background:

@@ -42,6 +42,10 @@ export type ApiEntry = {
   description: string | null;
   status?: string | null; // UPPER_CASE код статуса согласования
   rejectComment?: string | null; // UC-APR-05: причина отклонения (показ сотруднику)
+  // WI-56 аудит решения/отзыва. Значение = userWorkspaceId актора (UUID, server-truth),
+  // НЕ ФИО — резолв в подпись через actor-names.fetchActorNames (по employee.userWorkspaceRef).
+  resolvedBy?: string | null; // кто вынес решение (approve/reject) — показ при REJECTED
+  revokedBy?: string | null; // кто отозвал согласование (revoke) или отправку (recall)
   tags?: string[] | null; // W3-2: теги записи (MULTI_SELECT, коды EntryTag)
   projectId: string | null;
   workTypeId: string | null;

@@ -22,6 +22,7 @@ export type GridRowModel = {
   workTypeName: string;
   hoursByDay: number[]; // длина 7
   entryIdByDay: (string | null)[];
+  statusByDay: (string | null)[]; // WI-10: статус записи дня (для recall/revoke из сетки)
   descByDay: (string | null)[];
   lockedByDay: boolean[]; // W6-2: день только для чтения (запись APPROVED)
   tags: string[]; // W3-2: объединение тегов записей строки (без дублей)
@@ -58,6 +59,7 @@ export const calcGridModel = (
         workTypeName: wtName.get(workTypeId) ?? 'Без вида работ',
         hoursByDay: Array(7).fill(0),
         entryIdByDay: Array(7).fill(null),
+        statusByDay: Array(7).fill(null),
         descByDay: Array(7).fill(null),
         lockedByDay: Array(7).fill(false),
         tags: [],
@@ -83,6 +85,7 @@ export const calcGridModel = (
     const row = ensure(pid, wid);
     row.hoursByDay[idx] += e.hours;
     row.entryIdByDay[idx] = e.id;
+    row.statusByDay[idx] = e.status ?? null; // WI-10: статус дня для recall/revoke
     row.descByDay[idx] = e.description;
     if (e.status === 'APPROVED') row.lockedByDay[idx] = true; // W6-2: согласованное — read-only
     for (const t of entryTags) if (!row.tags.includes(t)) row.tags.push(t);

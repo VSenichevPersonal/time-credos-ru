@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { T } from 'src/front-components/grid/tokens';
 
@@ -34,6 +34,13 @@ type Props = {
   onDeleteRow: () => void; // убрать строку из сетки целиком (W3A.11: через confirm)
   commentDays?: CommentDay[]; // WI-01: дни строки с часами — цели комментария
   onCommitComment?: (dayIso: string, text: string) => void; // WI-01: сохранить коммент дня
+  // WI-10 отзыв согласования из строки. recall — режим действия (revoke/recall);
+  // recallDenied — текст подсказки, если прав нет (UI-гейт, серверный гард в /s/).
+  recall?: { mode: 'recall' | 'revoke'; denied: string | null } | null;
+  onRecall?: () => void; // выполнить отзыв (revoke/recall) для записей строки
+  // WI-10: внешний сигнал «открыть отзыв» (клик по 🔒-ячейке) — инкремент числа
+  // открывает меню сразу на подтверждении отзыва. Так клик по замку не тупик.
+  openRecallSignal?: number;
 };
 
 type Item = {
@@ -46,8 +53,26 @@ type Item = {
 };
 
 // Режим поповера: список действий / форма комментариев (WI-01) / подтверждение
-// удаления строки (W3A.11).
-type View = 'menu' | 'comment' | 'confirm-delete';
+// удаления строки (W3A.11) / подтверждение отзыва согласования (WI-10).
+type View = 'menu' | 'comment' | 'confirm-delete' | 'confirm-recall';
+
+// WI-10 подписи действия отзыва (revoke руководителя / recall сотрудника).
+const RECALL_LABEL: Record<'recall' | 'revoke', { item: string; hint: string; title: string; body: string; cta: string }> = {
+  revoke: {
+    item: 'Отозвать согласование для правки',
+    hint: 'вернуть согласованную запись в работу',
+    title: 'Отозвать согласование?',
+    body: 'Запись вернётся со статуса «Согласовано» на «На согласовании» — её снова можно будет править. Действие зафиксируется в аудите.',
+    cta: 'Отозвать',
+  },
+  recall: {
+    item: 'Отозвать отправку для правки',
+    hint: 'вернуть отправленную запись в черновик',
+    title: 'Отозвать отправку?',
+    body: 'Запись вернётся со статуса «На согласовании» в «Черновик» — её снова можно будет править и отправить заново.',
+    cta: 'Отозвать',
+  },
+};
 
 // WI-01: дни-цели для комментария — только с проставленными часами (без часов
 // записи нет, комментировать нечего). Чистый предикат — SSOT для пункта меню
@@ -65,6 +90,9 @@ export const RowMenu = ({
   onDeleteRow,
   commentDays,
   onCommitComment,
+  recall,
+  onRecall,
+  openRecallSignal,
 }: Props) => {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>('menu');
@@ -73,6 +101,16 @@ export const RowMenu = ({
     setOpen(false);
     setView('menu');
   };
+
+  // WI-10: клик по 🔒-ячейке (внешний сигнал) → открыть меню сразу на отзыве.
+  // Срабатывает только при наличии recall-плана (есть что отзывать).
+  useEffect(() => {
+    if (openRecallSignal && recall) {
+      setView('confirm-recall');
+      setOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRecallSignal]);
 
   const run = (fn: () => void) => () => {
     fn();
@@ -106,6 +144,18 @@ export const RowMenu = ({
     onClick: run(onDuplicate),
     hint: 'тот же проект, новый вид работ',
   });
+  // WI-10: отзыв согласования/отправки — выход из «залоченной» строки (раньше
+  // клик по 🔒 был тупиком). Доступно, когда есть APPROVED/SUBMITTED-записи.
+  // denied → пункт ведёт в подсказку (почему нельзя), не в действие.
+  if (recall) {
+    const lbl = RECALL_LABEL[recall.mode];
+    items.push({
+      label: lbl.item,
+      onClick: () => setView('confirm-recall'),
+      hint: recall.denied ? 'нужно право руководителя' : lbl.hint,
+      dividerBefore: true,
+    });
+  }
   if (!rowLocked) {
     if (hasHours)
       items.push({
@@ -234,6 +284,13 @@ export const RowMenu = ({
               onConfirm={run(onDeleteRow)}
               onBack={() => setView('menu')}
             />
+          ) : view === 'confirm-recall' ? (
+            <ConfirmRecall
+              mode={recall?.mode ?? 'recall'}
+              denied={recall?.denied ?? null}
+              onConfirm={onRecall ? run(onRecall) : () => setView('menu')}
+              onBack={() => setView('menu')}
+            />
           ) : (
             <CommentPanel
               days={targets}
@@ -323,6 +380,87 @@ const ConfirmDelete = ({
     </div>
   </div>
 );
+
+// WI-10: подтверждение отзыва согласования/отправки (revoke/recall). Не window.confirm
+// (RemDOM) — инлайн-панель. denied → показываем подсказку (почему нельзя) без CTA-действия,
+// чтобы клик по 🔒 не был тупиком: пользователь видит, кто может отозвать.
+const ConfirmRecall = ({
+  mode,
+  denied,
+  onConfirm,
+  onBack,
+}: {
+  mode: 'recall' | 'revoke';
+  denied: string | null;
+  onConfirm: () => void;
+  onBack: () => void;
+}) => {
+  const lbl = RECALL_LABEL[mode];
+  return (
+    <div
+      role="menu"
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        top: 28,
+        left: 0,
+        zIndex: 21,
+        width: 260,
+        background: T.surface,
+        border: `1px solid ${T.borderStrong}`,
+        borderRadius: 10,
+        boxShadow: '0 10px 30px rgba(29,31,38,0.16)',
+        padding: 12,
+      }}
+    >
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, marginBottom: 4 }}>
+        {denied ? 'Отозвать нельзя' : lbl.title}
+      </div>
+      <div style={{ fontSize: 11.5, color: T.textMuted, marginBottom: 10, lineHeight: 1.45 }}>
+        {denied ?? lbl.body}
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            flex: 1,
+            height: 30,
+            border: `1px solid ${T.border}`,
+            borderRadius: 7,
+            background: T.surface,
+            color: T.text,
+            cursor: 'pointer',
+            fontSize: 12,
+            fontFamily: 'inherit',
+          }}
+        >
+          {denied ? 'Понятно' : 'Отмена'}
+        </button>
+        {!denied && (
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              flex: 1,
+              height: 30,
+              border: 'none',
+              borderRadius: 7,
+              background: T.accent,
+              color: T.onAccent,
+              cursor: 'pointer',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+            }}
+          >
+            {lbl.cta}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // Склонение «запись/записи/записей» (1 запись, 2 записи, 5 записей). Чистая функция.
 export const pluralRecords = (n: number): string => {

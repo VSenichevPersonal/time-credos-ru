@@ -1,6 +1,9 @@
+import { useState } from 'react';
+
 import { HourCell } from 'src/front-components/grid/hour-cell';
 import { RowMenu } from 'src/front-components/grid/row-menu';
 import type { CommentDay } from 'src/front-components/grid/row-menu';
+import { recallPlanForCell, recallPlanForRow, type RecallPlan } from 'src/front-components/grid/recall-action';
 import { TagChips } from 'src/front-components/grid/tag-chips';
 import { T } from 'src/front-components/grid/tokens';
 import { GRID_TEMPLATE, GRID_TEMPLATE_SINGLE } from 'src/front-components/grid/week-header';
@@ -27,6 +30,10 @@ type Props = {
   days: WeekDay[];
   hoursByDay: number[];
   lockedByDay?: boolean[];
+  entryIdByDay?: (string | null)[]; // WI-10: id записей строки по дням (для отзыва)
+  statusByDay?: (string | null)[]; // WI-10: статус записей строки по дням (для отзыва)
+  isManager?: boolean; // WI-10: UI-гейт revoke (серверный гард в /s/approval)
+  onRecall?: (plan: RecallPlan) => void; // WI-10: отозвать согласование/отправку записей
   normFor?: NormForDay; // W3A.17: норма дня — бледный плейсхолдер в пустой ячейке
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   rowTotal: number;
@@ -51,6 +58,10 @@ export const GridRow = ({
   days,
   hoursByDay,
   lockedByDay,
+  entryIdByDay,
+  statusByDay,
+  isManager,
+  onRecall,
   normFor,
   overtimeThreshold,
   rowTotal,
@@ -77,6 +88,23 @@ export const GridRow = ({
   }));
   // W3A.11: счётчик записей для confirm удаления — дни с проставленными часами.
   const recordCount = hoursByDay.filter((h) => h > 0).length;
+
+  // WI-10: отзыв согласования/отправки из строки. План считается по статусам
+  // записей строки (revoke APPROVED руководителем / recall SUBMITTED владельцем).
+  // Клик по 🔒-ячейке шлёт сигнал в меню (открыть подтверждение) — не тупик.
+  const rowRecall =
+    onRecall && entryIdByDay && statusByDay
+      ? recallPlanForRow({ entryIdByDay, statusByDay }, isManager === true)
+      : null;
+  const [recallSignal, setRecallSignal] = useState(0);
+  const triggerCellRecall = (dayIndex: number) => {
+    if (!onRecall || !entryIdByDay || !statusByDay) return;
+    const plan = recallPlanForCell(entryIdByDay[dayIndex], statusByDay[dayIndex], isManager === true);
+    if (!plan) return;
+    // Поповер-подтверждение (или подсказка о правах) открывается в меню строки.
+    setRecallSignal((n) => n + 1);
+  };
+
   const menu = onDuplicate && (
     <RowMenu
       rowLocked={rowLocked}
@@ -90,6 +118,9 @@ export const GridRow = ({
       onCommitComment={
         onCommitDescription ? (dayIso, text) => onCommitDescription(dayIso, text) : undefined
       }
+      recall={rowRecall ? { mode: rowRecall.mode, denied: rowRecall.deniedReason } : null}
+      onRecall={rowRecall && onRecall ? () => onRecall(rowRecall) : undefined}
+      openRecallSignal={recallSignal}
     />
   );
   return (
@@ -217,6 +248,7 @@ export const GridRow = ({
         onCommit={(h) => onCellCommit(day.iso, h)}
         onKey={(e) => nav.handleKey(e)}
         onSeedConsumed={nav.consumeSeed}
+        onLockedClick={rowRecall ? () => triggerCellRecall(i) : undefined}
       />
     ))}
 

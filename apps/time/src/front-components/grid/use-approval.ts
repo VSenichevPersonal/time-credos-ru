@@ -2,7 +2,12 @@ import { useCallback, useMemo, useState } from 'react';
 
 import { ENTRY_STATUS, isApprovalRequired } from 'src/constants/approval';
 import type { ApiEntry, DepartmentRef, ProjectRef } from 'src/front-components/grid/types';
-import { resolveEntries, submitEntries } from 'src/front-components/grid/approval-rest';
+import {
+  recallEntries,
+  resolveEntries,
+  revokeEntries,
+  submitEntries,
+} from 'src/front-components/grid/approval-rest';
 
 // Состояние согласования периода: требуется ли вообще, агрегированный статус,
 // какие записи можно отправить/решить. Только записи проектов, где согласование
@@ -44,6 +49,26 @@ export const calcPeriodStatus = (tracked: ApiEntry[]): PeriodStatus => {
   if (tracked.some((e) => e.status === ENTRY_STATUS.SUBMITTED)) return 'SUBMITTED';
   if (tracked.every((e) => e.status === ENTRY_STATUS.APPROVED)) return 'APPROVED';
   return 'DRAFT';
+};
+
+// WI-56 подпись периода: какой актор-аудит показать в полосе согласования.
+// REJECTED-период → «отклонил» (resolvedBy последней отклонённой записи).
+// «Отозванный» период (нет approvedAt, есть revokedBy) → «отозвал». Чистая функция.
+export type PeriodAudit = { kind: 'rejected' | 'revoked'; actorId: string } | null;
+
+export const periodAuditActor = (tracked: ApiEntry[], status: PeriodStatus): PeriodAudit => {
+  if (status === 'REJECTED') {
+    const rej = tracked.find((e) => e.status === ENTRY_STATUS.REJECTED && e.resolvedBy);
+    if (rej?.resolvedBy) return { kind: 'rejected', actorId: rej.resolvedBy };
+  }
+  // Отзыв согласования возвращает запись в SUBMITTED — показываем «отозвал»,
+  // если такая запись несёт revokedBy (revoke руководителем). recall сотрудника
+  // уводит в DRAFT (его подпись здесь не нужна — это собственное действие).
+  if (status === 'SUBMITTED') {
+    const rev = tracked.find((e) => e.status === ENTRY_STATUS.SUBMITTED && e.revokedBy);
+    if (rev?.revokedBy) return { kind: 'revoked', actorId: rev.revokedBy };
+  }
+  return null;
 };
 
 export const useApproval = ({
@@ -115,6 +140,27 @@ export const useApproval = ({
     [submittedIds, wrap],
   );
 
+  // WI-10 отзыв из сетки. recall — сотрудник отзывает СВОЮ отправку (SUBMITTED→DRAFT);
+  // revoke — руководитель отзывает согласование (APPROVED→SUBMITTED). Принимают
+  // явный набор id (вызов из 🔒-ячейки/меню строки). Серверный гард — в /s/approval.
+  const recall = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      void wrap(() => recallEntries(ids));
+    },
+    [wrap],
+  );
+  const revoke = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      void wrap(() => revokeEntries(ids));
+    },
+    [wrap],
+  );
+
+  // WI-56 подпись «отклонил/отозвал» периода (actorId — userWorkspaceId, резолв в ФИО/КОД у потребителя).
+  const audit = useMemo(() => periodAuditActor(tracked, periodStatus), [tracked, periodStatus]);
+
   return {
     required,
     periodStatus,
@@ -126,5 +172,8 @@ export const useApproval = ({
     submit,
     approve,
     reject,
+    recall,
+    revoke,
+    audit,
   };
 };

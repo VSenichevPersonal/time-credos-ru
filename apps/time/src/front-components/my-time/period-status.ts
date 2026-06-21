@@ -28,6 +28,9 @@ export type WeekSummary = {
   count: number; // число записей
   status: EntryStatusCode; // агрегатный статус
   rejectComment: string | null; // UC-APR-05: причина отклонения (если неделя REJECTED)
+  // WI-56 аудит: userWorkspaceId актора (резолв в ФИО/КОД у потребителя).
+  resolvedBy: string | null; // кто отклонил (REJECTED-запись недели)
+  revokedBy: string | null; // кто отозвал согласование (revoke вернул в SUBMITTED)
 };
 
 // Понедельник недели записи по её полю date (берём дату-часть, UTC).
@@ -47,17 +50,36 @@ const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 1
 // Записи → недели (по убыванию даты: свежие сверху). После отправки период не
 // «исчезает» — он остаётся в списке со статусом SUBMITTED.
 export const summarizeWeeks = (entries: ReadonlyArray<ApiEntry>): WeekSummary[] => {
-  const byWeek = new Map<string, { hours: number; count: number; statuses: string[]; rejectComments: string[] }>();
+  type Bucket = {
+    hours: number;
+    count: number;
+    statuses: string[];
+    rejectComments: string[];
+    resolvedBy: string | null; // WI-56: кто отклонил (первая REJECTED-запись с актором)
+    revokedBy: string | null; // WI-56: кто отозвал согласование (revoke → SUBMITTED)
+  };
+  const byWeek = new Map<string, Bucket>();
   for (const e of entries) {
     if (!e.date) continue;
     const ws = weekStartOf(e.date);
-    const bucket = byWeek.get(ws) ?? { hours: 0, count: 0, statuses: [], rejectComments: [] };
+    const bucket =
+      byWeek.get(ws) ??
+      { hours: 0, count: 0, statuses: [], rejectComments: [], resolvedBy: null, revokedBy: null };
     bucket.hours += typeof e.hours === 'number' ? e.hours : 0;
     bucket.count += 1;
+    const status = (e.status ?? ENTRY_STATUS.DRAFT).toUpperCase();
     bucket.statuses.push(e.status ?? ENTRY_STATUS.DRAFT);
     // UC-APR-05: причина отклонения — только с REJECTED-записей с непустым текстом.
-    if ((e.status ?? '').toUpperCase() === ENTRY_STATUS.REJECTED && e.rejectComment) {
+    if (status === ENTRY_STATUS.REJECTED && e.rejectComment) {
       bucket.rejectComments.push(e.rejectComment);
+    }
+    // WI-56: «кто отклонил» — с REJECTED-записи; «кто отозвал» — с записи, вернувшейся
+    // в SUBMITTED отзывом (revokedBy). Берём первого найденного (стабильно).
+    if (status === ENTRY_STATUS.REJECTED && e.resolvedBy && !bucket.resolvedBy) {
+      bucket.resolvedBy = e.resolvedBy;
+    }
+    if (status === ENTRY_STATUS.SUBMITTED && e.revokedBy && !bucket.revokedBy) {
+      bucket.revokedBy = e.revokedBy;
     }
     byWeek.set(ws, bucket);
   }
@@ -69,6 +91,8 @@ export const summarizeWeeks = (entries: ReadonlyArray<ApiEntry>): WeekSummary[] 
       count: b.count,
       status: aggregateStatus(b.statuses),
       rejectComment: b.rejectComments[0] ?? null,
+      resolvedBy: b.resolvedBy,
+      revokedBy: b.revokedBy,
     }))
     .sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
 };

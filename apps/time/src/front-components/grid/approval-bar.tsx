@@ -18,6 +18,7 @@ type Props = {
   submittedCount: number;
   busy: boolean;
   weekGaps?: WeekGaps; // REQ-0015 §1: чеклист пробелов недели перед отправкой
+  auditNote?: string | null; // WI-56: «Отклонил: …» / «Отозвал: …» (ФИО или КОД по ПДн)
   onSubmit: () => void;
   onApprove: () => void;
   onReject: (comment: string) => void; // причина отклонения обязательна (Timetta)
@@ -81,6 +82,7 @@ export const ApprovalBar = ({
   submittedCount,
   busy,
   weekGaps,
+  auditNote,
   onSubmit,
   onApprove,
   onReject,
@@ -110,6 +112,11 @@ export const ApprovalBar = ({
         }}
       >
       <Badge status={status} />
+
+      {/* WI-56: кто отклонил/отозвал (resolvedBy/revokedBy → ФИО при reveal, иначе КОД). */}
+      {auditNote && (
+        <span style={{ fontSize: 11.5, color: T.textMuted, whiteSpace: 'nowrap' }}>{auditNote}</span>
+      )}
 
       {/* Сотрудник: отправить черновики на согласование (инлайн). */}
       {!isManager && canSubmit && (

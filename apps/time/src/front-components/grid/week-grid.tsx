@@ -9,6 +9,7 @@ import type { Prefill } from 'src/front-components/grid/add-row';
 import { Center } from 'src/front-components/grid/center';
 import { firstEmptyCell, keyAction, rowEdgeCol, useKeyboard } from 'src/front-components/grid/use-keyboard';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
+import type { RecallPlan } from 'src/front-components/grid/recall-action';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
 
@@ -37,6 +38,8 @@ type Props = {
   onDeleteRow: (rowKey: string) => void; // меню строки: убрать строку
   onCommitDescription: (rowKey: string, dayIso: string, text: string) => void; // комментарий к ячейке
   onAddRow: (rowKey: string) => void;
+  isManager?: boolean; // WI-10: UI-гейт revoke согласования
+  onRecall?: (plan: RecallPlan) => void; // WI-10: отозвать согласование/отправку записей
 };
 
 export const WeekGrid = ({
@@ -61,6 +64,8 @@ export const WeekGrid = ({
   onDeleteRow,
   onCommitDescription,
   onAddRow,
+  isManager,
+  onRecall,
 }: Props) => {
   const nav = useKeyboard(rowList.length, 7);
 
@@ -168,6 +173,10 @@ export const WeekGrid = ({
               days={days}
               hoursByDay={row.hoursByDay}
               lockedByDay={row.lockedByDay}
+              entryIdByDay={row.entryIdByDay}
+              statusByDay={row.statusByDay}
+              isManager={isManager}
+              onRecall={onRecall}
               descByDay={row.descByDay}
               normFor={normFor}
               overtimeThreshold={overtimeThreshold}

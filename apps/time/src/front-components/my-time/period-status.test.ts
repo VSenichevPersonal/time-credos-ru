@@ -130,4 +130,50 @@ describe('summarizeWeeks', () => {
     ]);
     expect(weeks[0].rejectComment).toBeNull();
   });
+
+  // ─── WI-56 аудит: кто отклонил / кто отозвал ────────────────────────────────
+  const audited = (
+    date: string,
+    status: string,
+    audit: { resolvedBy?: string | null; revokedBy?: string | null },
+  ): ApiEntry => ({
+    id: `${date}-au`,
+    date,
+    hours: 8,
+    description: null,
+    status,
+    projectId: 'p1',
+    workTypeId: 'w1',
+    employeeId: 'e1',
+    ...audit,
+  });
+
+  it('WI-56: resolvedBy REJECTED-записи попадает в неделю', () => {
+    const weeks = summarizeWeeks([
+      audited('2026-06-15T10:00:00.000Z', 'REJECTED', { resolvedBy: 'uw-mgr' }),
+    ]);
+    expect(weeks[0].resolvedBy).toBe('uw-mgr');
+    expect(weeks[0].revokedBy).toBeNull();
+  });
+
+  it('WI-56: revokedBy с SUBMITTED-записи (отзыв согласования) попадает в неделю', () => {
+    const weeks = summarizeWeeks([
+      audited('2026-06-15T10:00:00.000Z', 'SUBMITTED', { revokedBy: 'uw-rev' }),
+    ]);
+    expect(weeks[0].revokedBy).toBe('uw-rev');
+    expect(weeks[0].resolvedBy).toBeNull();
+  });
+
+  it('WI-56: resolvedBy берётся ТОЛЬКО с REJECTED (не с APPROVED)', () => {
+    const weeks = summarizeWeeks([
+      audited('2026-06-15T10:00:00.000Z', 'APPROVED', { resolvedBy: 'uw-appr' }),
+    ]);
+    expect(weeks[0].resolvedBy).toBeNull();
+  });
+
+  it('WI-56: без аудита поля null (обратная совместимость)', () => {
+    const weeks = summarizeWeeks([entry('2026-06-15T10:00:00.000Z', 8, 'APPROVED')]);
+    expect(weeks[0].resolvedBy).toBeNull();
+    expect(weeks[0].revokedBy).toBeNull();
+  });
 });

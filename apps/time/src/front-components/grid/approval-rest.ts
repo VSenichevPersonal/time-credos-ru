@@ -58,3 +58,21 @@ export const resolveEntries = async (
   if (route?.ok) return;
   for (const id of ids) await patchStatus(id, status, approve ? null : comment);
 };
+
+// recall (WI-10/A4.3): СОТРУДНИК отзывает СВОЮ отправку SUBMITTED → DRAFT (пока
+// руководитель не решил). Серверный гард (ownership) — в /s/approval.runRecall.
+// Фоллбэк-PATCH без actor — только когда /s/ недоступна (dev).
+export const recallEntries = async (ids: string[]): Promise<void> => {
+  const route = await callRoute({ op: 'recall', ids: ids.join(',') });
+  if (route?.ok) return;
+  for (const id of ids) await patchStatus(id, ENTRY_STATUS.DRAFT);
+};
+
+// revoke (WI-10/A4.25): РУКОВОДИТЕЛЬ отзывает выданное согласование APPROVED →
+// SUBMITTED («Reopen»). Серверный гард (isManager + SoD) — в /s/approval.runRevoke.
+// Фоллбэк-PATCH без actor/гарда — только когда /s/ недоступна (dev).
+export const revokeEntries = async (ids: string[]): Promise<void> => {
+  const route = await callRoute({ op: 'revoke', ids: ids.join(',') });
+  if (route?.ok) return;
+  for (const id of ids) await patchStatus(id, ENTRY_STATUS.SUBMITTED);
+};

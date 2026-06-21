@@ -15,6 +15,7 @@ import { useFilters, filterProjects, filterWorkTypes } from 'src/front-component
 import { calcWeekGaps } from 'src/front-components/grid/gaps';
 import { useTimesheetActions } from 'src/front-components/grid/use-timesheet-actions';
 import { useApproval } from 'src/front-components/grid/use-approval';
+import { useActorName } from 'src/front-components/grid/actor-names';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { useValidation } from 'src/front-components/grid/use-validation';
 import { ValidationToast } from 'src/front-components/grid/validation-toast';
@@ -77,7 +78,10 @@ export const WeeklyGrid = () => {
   // запись сохраняется, янтарная плашка авто-гаснет. Та же чистая validateEntry,
   // что на бэке (SSOT), пороги из useGlobalSettings.
   const validation = useValidation();
-  const overtimeThreshold = useGlobalSettings()?.overtimeWarnHours;
+  const globalSettings = useGlobalSettings();
+  const overtimeThreshold = globalSettings?.overtimeWarnHours;
+  // ПДн (CISO-007): ФИО актора-аудита показываем только при revealEmployeeNames.
+  const revealNames = globalSettings?.revealEmployeeNames === true;
 
   // Обёртки над действиями: клиентский validateEntry — быстрый pre-check (избегаем
   // лишних запросов при явном ERROR). Затем пишем через /s/time-entry (CISO-012) и
@@ -179,6 +183,25 @@ export const WeeklyGrid = () => {
     to: week.range.to,
     reload: data.reload,
   });
+
+  // WI-56 аудит-подпись полосы: «Отклонил/Отозвал: <ФИО|КОД>». actorId — userWorkspaceId
+  // (server-truth), резолв в подпись по employee.userWorkspaceRef (ПДн через reveal).
+  const auditName = useActorName(approval.audit?.actorId, revealNames);
+  const auditNote =
+    approval.audit && auditName
+      ? `${approval.audit.kind === 'rejected' ? 'Отклонил' : 'Отозвал'}: ${auditName}`
+      : null;
+
+  // WI-10: отзыв согласования/отправки из сетки. План (revoke APPROVED / recall
+  // SUBMITTED) приходит из строки; здесь маршрутизируем в use-approval (вызывает
+  // СУЩЕСТВУЮЩИЕ /s/approval recall/revoke). Серверный гард (isManager+SoD/ownership,
+  // CISO-005) — источник истины; deniedReason — лишь UI-подсказка. denied → no-op
+  // (подтверждения не было, действие не вызывается).
+  const handleRecall = (plan: { mode: 'recall' | 'revoke'; ids: string[]; deniedReason: string | null }) => {
+    if (plan.deniedReason) return;
+    if (plan.mode === 'revoke') approval.revoke(plan.ids);
+    else approval.recall(plan.ids);
+  };
 
   // Недавние проекты: из текущих записей (частые сверху автокомплита).
   const recentProjectIds = useMemo(() => {
@@ -325,6 +348,8 @@ export const WeeklyGrid = () => {
           onDeleteRow={deleteRow}
           onCommitDescription={commitDescription}
           onAddRow={addRow}
+          isManager={isManager}
+          onRecall={handleRecall}
         />
       )}
 
@@ -378,6 +403,7 @@ export const WeeklyGrid = () => {
         submittedCount={approval.submittedCount}
         busy={approval.busy}
         weekGaps={weekGaps}
+        auditNote={auditNote}
         onSubmit={approval.submit}
         onApprove={approval.approve}
         onReject={approval.reject}
