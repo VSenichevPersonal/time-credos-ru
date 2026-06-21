@@ -15,10 +15,11 @@ import { useGlobalSettings } from 'src/front-components/shared/use-global-settin
 import {
   buildAbsenceCtx,
   buildBookingCtx,
+  buildHoursByDay,
   buildPeriods,
   buildSharesByProject,
 } from 'src/front-components/capacity/calc-load';
-import type { AbsenceCtx, BookingCtx } from 'src/front-components/capacity/calc-load';
+import type { AbsenceCtx, BookingCtx, PlanSpread } from 'src/front-components/capacity/calc-load';
 import type {
   Absence,
   Booking,
@@ -194,6 +195,20 @@ export const useCapacity = (granularity: Granularity) => {
     [state.bookings, state.employees, includeSoft],
   );
 
+  // WI-05: контекст раскида плана по РАБОЧИМ дням производственного календаря.
+  //   hoursByDay — карта YYYY-MM-DD → рабочих часов дня (план «капает» только на
+  //     будни → бьётся с ёмкостью, которая тоже считается по рабочим часам).
+  //   horizonEnd — последний день последней колонки: проект без endDate тянется
+  //     до конца горизонта доски (иначе его план = 0 и он невидим).
+  // Передаётся в deptLoadCells/employeeLoadCells/deptProjectLoads/... на доске.
+  const spread: PlanSpread = useMemo(() => {
+    const last = periods[periods.length - 1];
+    return {
+      hoursByDay: buildHoursByDay(state.calendar),
+      horizonEnd: last ? last.to.toISOString().slice(0, 10) : undefined,
+    };
+  }, [state.calendar, periods]);
+
   return {
     ...state,
     isManager,
@@ -201,6 +216,7 @@ export const useCapacity = (granularity: Granularity) => {
     absenceCtx,
     sharesByProject,
     bookingCtx,
+    spread,
     includeSoft,
     anchor,
     reload,

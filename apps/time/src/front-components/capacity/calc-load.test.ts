@@ -992,3 +992,177 @@ describe('summaryCells с бронями (REQ-0004 C)', () => {
     expect(s.conflict).toBe(false);
   });
 });
+
+// ─── WI-05: раскид плана по РАБОЧИМ дням производственного календаря ───────────
+// Делитель/числитель = Σ рабочих часов (а не календарные дни). План «капает»
+// только на будни → бьётся с ёмкостью. Сверка с Timetta: «равномерно = по
+// РАБОЧИМ дням расписания». Контекст PlanSpread опционален: без него — прежнее
+// календарное поведение (back-compat, проверяется существующими тестами выше).
+describe('plannedHoursInPeriod — раскид по рабочим дням (WI-05)', () => {
+  // Календарь: пн-пт 8ч, сб/вс отсутствуют (=0). 2026-06-01 — понедельник.
+  // Неделя 1: 01-05 (5 раб. дней), вых 06-07; неделя 2: 08-12 (5 раб. дней).
+  const cal: CalendarDay[] = [];
+  for (let d = 1; d <= 12; d++) {
+    const date = new Date(Date.UTC(2026, 5, d));
+    const dow = date.getUTCDay(); // 0=вс,6=сб
+    if (dow === 0 || dow === 6) continue; // выходные не в календаре
+    cal.push({ date: date.toISOString().slice(0, 10), hours: 8 });
+  }
+  const hoursByDay = buildHoursByDay(cal);
+  const spread = { hoursByDay };
+
+  it('делит 80ч по 10 рабочим дням (2 недели) → 40ч на каждую рабочую неделю', () => {
+    // план 01-12 (вкл вых): рабочих 10 дней × 8ч = 80 раб.ч; неделя 1 overlap = 5×8=40ч.
+    const wk1 = mkPeriod('2026-06-01', '2026-06-07');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', wk1, spread)).toBeCloseTo(40);
+    const wk2 = mkPeriod('2026-06-08', '2026-06-14');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', wk2, spread)).toBeCloseTo(40);
+  });
+
+  it('инвариант Σ по периодам = plannedEffort', () => {
+    const wk1 = mkPeriod('2026-06-01', '2026-06-07');
+    const wk2 = mkPeriod('2026-06-08', '2026-06-14');
+    const sum =
+      plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', wk1, spread) +
+      plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', wk2, spread);
+    expect(sum).toBeCloseTo(80);
+  });
+
+  it('колонка целиком в выходных → 0 (план не капает в субботу/воскресенье)', () => {
+    // период = только сб-вс 06-07; в календаре их нет → рабочий overlap 0 → 0ч.
+    const weekend = mkPeriod('2026-06-06', '2026-06-07');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', weekend, spread)).toBe(0);
+  });
+
+  it('праздник/короткий день учтены: короткий день даёт меньше часов', () => {
+    // Календарь: пн 8, вт 4 (короткий), ср 8 = 20 раб.ч на 3 дня. План 20ч.
+    const shortCal: CalendarDay[] = [
+      { date: '2026-06-01', hours: 8 },
+      { date: '2026-06-02', hours: 4 }, // короткий день
+      { date: '2026-06-03', hours: 8 },
+    ];
+    const sp = { hoursByDay: buildHoursByDay(shortCal) };
+    // колонка = только вторник (короткий) → 20 × 4/20 = 4ч.
+    const tue = mkPeriod('2026-06-02', '2026-06-02');
+    expect(plannedHoursInPeriod(20, '2026-06-01', '2026-06-03', tue, sp)).toBeCloseTo(4);
+    // колонка = пн+ср → 20 × 16/20 = 16ч.
+    const monWed = mkPeriod('2026-06-01', '2026-06-03');
+    const wed = mkPeriod('2026-06-03', '2026-06-03');
+    expect(plannedHoursInPeriod(20, '2026-06-01', '2026-06-03', wed, sp)).toBeCloseTo(8);
+    expect(plannedHoursInPeriod(20, '2026-06-01', '2026-06-03', monWed, sp)).toBeCloseTo(20);
+  });
+
+  it('нет рабочих дней в диапазоне плана → 0 (защита от деления-на-0)', () => {
+    // диапазон плана целиком в выходных (нет в календаре) → totalWork=0 → 0.
+    const sat = mkPeriod('2026-06-06', '2026-06-07');
+    expect(plannedHoursInPeriod(80, '2026-06-06', '2026-06-07', sat, spread)).toBe(0);
+  });
+
+  it('граница периода: частичное пересечение по рабочим часам', () => {
+    // план 01-12 (80 раб.ч), колонка 04-09: рабочие дни 04,05 (нед1) + 08,09 (нед2)
+    // = 4×8 = 32 раб.ч → 80 × 32/80 = 32ч.
+    const mid = mkPeriod('2026-06-04', '2026-06-09');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', mid, spread)).toBeCloseTo(32);
+  });
+
+  it('проект без endDate → раскид до horizonEnd (иначе план невидим)', () => {
+    // без endDate, horizonEnd=12: тянем 01..12 → как полный диапазон (80 раб.ч).
+    const sp = { hoursByDay, horizonEnd: '2026-06-12' };
+    const wk1 = mkPeriod('2026-06-01', '2026-06-07');
+    expect(plannedHoursInPeriod(80, '2026-06-01', null, wk1, sp)).toBeCloseTo(40);
+  });
+
+  it('проект без endDate и без horizonEnd → 0 (прежнее поведение)', () => {
+    const wk1 = mkPeriod('2026-06-01', '2026-06-07');
+    expect(plannedHoursInPeriod(80, '2026-06-01', null, wk1, spread)).toBe(0);
+  });
+
+  it('без spread — прежний календарный раскид (back-compat)', () => {
+    // 12 календарных дней, колонка 01-07 = 7 дней → 80 × 7/12 ≈ 46.67 (НЕ 40).
+    const wk1 = mkPeriod('2026-06-01', '2026-06-07');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-12', wk1)).toBeCloseTo((80 * 7) / 12);
+  });
+});
+
+describe('обёртки раскида принимают PlanSpread (WI-05)', () => {
+  const cal: CalendarDay[] = [
+    { date: '2026-06-01', hours: 8 },
+    { date: '2026-06-02', hours: 8 },
+    { date: '2026-06-03', hours: 8 },
+    { date: '2026-06-04', hours: 8 },
+    { date: '2026-06-05', hours: 8 },
+    { date: '2026-06-08', hours: 8 },
+    { date: '2026-06-09', hours: 8 },
+    { date: '2026-06-10', hours: 8 },
+    { date: '2026-06-11', hours: 8 },
+    { date: '2026-06-12', hours: 8 },
+  ];
+  const spread = { hoursByDay: buildHoursByDay(cal) };
+  const wk1 = mkPeriod('2026-06-01', '2026-06-07');
+
+  const proj = (over: Partial<CapProject> = {}): CapProject => ({
+    id: 'p1',
+    code: 'P1',
+    name: 'Проект',
+    departmentId: 'd1',
+    plannedEffort: 80,
+    startDate: '2026-06-01',
+    endDate: '2026-06-12',
+    ...over,
+  });
+
+  it('projectHoursInPeriod по рабочим дням → 40 (неделя 1)', () => {
+    expect(projectHoursInPeriod(proj(), wk1, spread)).toBeCloseTo(40);
+  });
+
+  it('deptPlanHoursInPeriod по рабочим дням → 40', () => {
+    const plan: DeptPlan = {
+      id: 'dp1',
+      label: 'Резерв',
+      departmentId: 'd1',
+      category: null,
+      plannedEffort: 80,
+      startDate: '2026-06-01',
+      endDate: '2026-06-12',
+    };
+    expect(deptPlanHoursInPeriod(plan, wk1, spread)).toBeCloseTo(40);
+  });
+
+  it('bookingHoursInPeriod по рабочим дням → 40', () => {
+    const b = mkBooking({ hours: 80, startDate: '2026-06-01', endDate: '2026-06-12' });
+    expect(bookingHoursInPeriod(b, wk1, spread)).toBeCloseTo(40);
+  });
+
+  it('projectShareHoursInPeriod по рабочим дням → 20 (доля 40ч)', () => {
+    const share: ProjectDeptShare = { projectId: 'p1', departmentId: 'd1', plannedEffortShare: 40 };
+    expect(projectShareHoursInPeriod(proj(), share, wk1, spread)).toBeCloseTo(20);
+  });
+
+  it('deptLoadCells пробрасывает spread в загрузку отдела', () => {
+    const periods = [wk1];
+    const [c] = deptLoadCells(dept(), [proj()], periods, [], undefined, undefined, undefined, spread);
+    expect(c.load).toBeCloseTo(40); // по рабочим дням, не 80×7/12
+  });
+
+  it('deptProjectLoads: проект без endDate виден при horizonEnd', () => {
+    const sp = { hoursByDay: spread.hoursByDay, horizonEnd: '2026-06-12' };
+    const periods = [wk1, mkPeriod('2026-06-08', '2026-06-14')];
+    const { planned, unplanned } = deptProjectLoads(
+      dept(),
+      [proj({ endDate: null })],
+      periods,
+      undefined,
+      sp,
+    );
+    expect(unplanned).toHaveLength(0);
+    expect(planned).toHaveLength(1);
+    expect(planned[0].total).toBeCloseTo(80);
+  });
+
+  it('deptProjectLoads: проект без endDate и без horizonEnd → в unplanned', () => {
+    const periods = [wk1];
+    const { planned, unplanned } = deptProjectLoads(dept(), [proj({ endDate: null })], periods, undefined, spread);
+    expect(planned).toHaveLength(0);
+    expect(unplanned.map((p) => p.id)).toEqual(['p1']);
+  });
+});

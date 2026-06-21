@@ -14,7 +14,7 @@ type Props = {
   rowLocked?: boolean;
   hasHours?: boolean; // есть что заполнять/очищать (иначе пункты не нужны)
   onDuplicate: () => void;
-  onFillWeekdays: () => void; // 8 ч во все пустые будни строки
+  onFillWeekdays: () => void; // норма дня во все пустые будни строки (WI-02 SSOT)
   onClearRow: () => void; // обнулить все часы строки
   onDeleteRow: () => void; // убрать строку из сетки целиком
 };
@@ -47,9 +47,9 @@ export const RowMenu = ({
   ];
   if (!rowLocked) {
     items.push({
-      label: 'Заполнить будни (8 ч)',
+      label: 'Заполнить будни нормой',
       onClick: run(onFillWeekdays),
-      hint: 'во все пустые будни строки',
+      hint: 'норма дня в пустые будни этой строки',
       dividerBefore: true,
     });
     if (hasHours)

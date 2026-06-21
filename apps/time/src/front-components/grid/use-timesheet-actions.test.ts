@@ -4,9 +4,11 @@ import {
   calcClearRow,
   calcClearWeek,
   calcCopyWithHours,
+  calcFillRowWeekdays,
   calcFillStandardWeek,
   isCellLocked,
 } from './use-timesheet-actions';
+import type { NormForDay } from './use-daily-norm';
 import type { WeekDay } from './use-week';
 import type { ApiEntry } from './types';
 import type { GridRowModel } from './use-grid-model';
@@ -21,6 +23,17 @@ const day = (iso: string, isWeekend = false): WeekDay => ({
   isWeekend,
   isToday: false,
 });
+
+// WI-02: норма дня (SSOT). Плоская: будни 8ч, выходные 0 — эквивалент старого
+// хардкода DAILY_NORM_HOURS, чтобы существующие ассерты (hours===8) держались.
+const NORM_FLAT8: NormForDay = (_iso, isWeekend) => (isWeekend ? 0 : 8);
+
+// WI-02: норма с коротким днём (праздничный/предпраздничный) — проверка SSOT:
+// fill льёт часы дня, а не 8. 2026-06-24 = 7ч.
+const NORM_SHORT_WED: NormForDay = (iso, isWeekend) => {
+  if (isWeekend) return 0;
+  return iso === '2026-06-24' ? 7 : 8;
+};
 
 // Пн–Пт текущей недели, Сб–Вс выходные
 const CUR_WEEK: WeekDay[] = [
@@ -114,6 +127,30 @@ describe('calcCopyWithHours', () => {
     const prev = [entry('2026-06-15', 8)];
     const { inputs } = calcCopyWithHours(CUR_WEEK, prev);
     expect(inputs[0].id).toBeUndefined();
+  });
+
+  // WI-07/CISO-011 §F6 (UC-TS-10): пустая APPROVED-ячейка тек.недели — read-only,
+  // copy-week в неё НЕ пишет (передаём rowList с lockedByDay).
+  it('пустая согласованная ячейка тек.недели → не перетирается копированием', () => {
+    const prev = [entry('2026-06-15', 8)]; // прошлая Пн → тек. Пн 2026-06-22
+    // Строка тек.недели: Пн заблокирован (APPROVED), но без часов.
+    const lockedMon = [true, false, false, false, false, false, false];
+    const rows = [row(Array(7).fill(0), lockedMon)];
+    const { inputs } = calcCopyWithHours(CUR_WEEK, prev, rows);
+    expect(inputs.some((i) => i.date === '2026-06-22')).toBe(false); // guard сработал
+  });
+
+  it('несогласованная пустая ячейка → копируется как обычно', () => {
+    const prev = [entry('2026-06-15', 8)];
+    const rows = [row(Array(7).fill(0))]; // без блокировок
+    const { inputs } = calcCopyWithHours(CUR_WEEK, prev, rows);
+    expect(inputs.some((i) => i.date === '2026-06-22')).toBe(true);
+  });
+
+  it('rowList не передан → поведение прежнее (lock-look-up пуст)', () => {
+    const prev = [entry('2026-06-15', 8)];
+    const { inputs } = calcCopyWithHours(CUR_WEEK, prev);
+    expect(inputs.some((i) => i.date === '2026-06-22')).toBe(true);
   });
 });
 
@@ -214,7 +251,7 @@ describe('calcClearWeek', () => {
 
 describe('calcFillStandardWeek', () => {
   it('пустая строка → 8ч во все 5 будней, выходные не трогаются', () => {
-    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK);
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK, NORM_FLAT8);
     expect(inputs).toHaveLength(5);
     expect(inputs.every((i) => i.hours === 8)).toBe(true);
     expect(inputs.map((i) => i.date)).toEqual([
@@ -223,14 +260,14 @@ describe('calcFillStandardWeek', () => {
   });
 
   it('заполненные будни не перетираются', () => {
-    const inputs = calcFillStandardWeek([row([4, 0, 0, 0, 0, 0, 0])], CUR_WEEK);
+    const inputs = calcFillStandardWeek([row([4, 0, 0, 0, 0, 0, 0])], CUR_WEEK, NORM_FLAT8);
     expect(inputs).toHaveLength(4); // Пн уже 4ч — пропущен
     expect(inputs.some((i) => i.date === '2026-06-22')).toBe(false);
   });
 
   it('заблокированная (согласованная) ячейка пропускается', () => {
     const locked = [true, false, false, false, false, false, false];
-    const inputs = calcFillStandardWeek([row(Array(7).fill(0), locked)], CUR_WEEK);
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0), locked)], CUR_WEEK, NORM_FLAT8);
     expect(inputs).toHaveLength(4);
     expect(inputs.some((i) => i.date === '2026-06-22')).toBe(false);
   });
@@ -239,18 +276,73 @@ describe('calcFillStandardWeek', () => {
     const inputs = calcFillStandardWeek(
       [row(Array(7).fill(0), undefined, 'p1', 'w1'), row(Array(7).fill(0), undefined, 'p2', 'w2')],
       CUR_WEEK,
+      NORM_FLAT8,
     );
     expect(inputs).toHaveLength(10);
   });
 
   it('полностью заполненная неделя → пустой результат', () => {
-    const inputs = calcFillStandardWeek([row([8, 8, 8, 8, 8, 0, 0])], CUR_WEEK);
+    const inputs = calcFillStandardWeek([row([8, 8, 8, 8, 8, 0, 0])], CUR_WEEK, NORM_FLAT8);
     expect(inputs).toHaveLength(0);
   });
 
   it('id всегда undefined (новые записи)', () => {
-    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK);
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK, NORM_FLAT8);
     expect(inputs.every((i) => i.id === undefined)).toBe(true);
+  });
+
+  // WI-02/A1.12/A4.8: норма дня = SSOT (useDailyNorm), не хардкод 8.
+  it('короткий день календаря → его часы (7), а не 8', () => {
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK, NORM_SHORT_WED);
+    const wed = inputs.find((i) => i.date === '2026-06-24');
+    expect(wed?.hours).toBe(7); // Ср = короткий день
+    expect(inputs.find((i) => i.date === '2026-06-22')?.hours).toBe(8); // Пн обычный
+  });
+
+  it('норма дня 0 (нерабочий по календарю) → ячейку не заполняем', () => {
+    // Все будни норма 0 → пусто
+    const normZero: NormForDay = () => 0;
+    const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK, normZero);
+    expect(inputs).toHaveLength(0);
+  });
+});
+
+// WI-06/A1.13: «Заполнить будни нормой» (меню одной строки) — норма дня в пустые
+// несогласованные будни ЭТОЙ строки.
+describe('calcFillRowWeekdays', () => {
+  it('пустая строка → норма во все 5 будней', () => {
+    const inputs = calcFillRowWeekdays([row(Array(7).fill(0))], 'proj-1|wt-1', CUR_WEEK, NORM_FLAT8);
+    expect(inputs).toHaveLength(5);
+    expect(inputs.every((i) => i.hours === 8)).toBe(true);
+  });
+
+  it('короткий день → его часы (WI-02 SSOT)', () => {
+    const inputs = calcFillRowWeekdays([row(Array(7).fill(0))], 'proj-1|wt-1', CUR_WEEK, NORM_SHORT_WED);
+    expect(inputs.find((i) => i.date === '2026-06-24')?.hours).toBe(7);
+  });
+
+  it('заполняет только указанную строку, не трогает другие', () => {
+    const rows = [
+      row(Array(7).fill(0), undefined, 'p1', 'w1'),
+      row(Array(7).fill(0), undefined, 'p2', 'w2'),
+    ];
+    const inputs = calcFillRowWeekdays(rows, 'p1|w1', CUR_WEEK, NORM_FLAT8);
+    expect(inputs).toHaveLength(5);
+    expect(inputs.every((i) => i.projectId === 'p1')).toBe(true);
+  });
+
+  it('заполненные/согласованные будни пропускаются', () => {
+    const locked = [true, false, false, false, false, false, false];
+    const inputs = calcFillRowWeekdays([row([0, 4, 0, 0, 0, 0, 0], locked)], 'proj-1|wt-1', CUR_WEEK, NORM_FLAT8);
+    // Пн locked, Вт уже 4ч → остаются Ср/Чт/Пт = 3
+    expect(inputs).toHaveLength(3);
+    expect(inputs.some((i) => i.date === '2026-06-22')).toBe(false);
+    expect(inputs.some((i) => i.date === '2026-06-23')).toBe(false);
+  });
+
+  it('неизвестный rowKey → пусто, без падения', () => {
+    const inputs = calcFillRowWeekdays([row(Array(7).fill(0))], 'нет|такой', CUR_WEEK, NORM_FLAT8);
+    expect(inputs).toHaveLength(0);
   });
 });
 

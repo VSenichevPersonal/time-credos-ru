@@ -2,6 +2,7 @@ import { T } from 'src/front-components/capacity/cap-tokens';
 import { DeptPlanRow } from 'src/front-components/capacity/dept-plan-row';
 import { ProjectPlanRow } from 'src/front-components/capacity/project-plan-row';
 import { PlannedProjectRow } from 'src/front-components/capacity/planned-project-row';
+import type { PlanSpread } from 'src/front-components/capacity/calc-load';
 import type {
   CapProject,
   CellMetric,
@@ -31,6 +32,7 @@ type Props = {
   onSaveDeptPlan?: (id: string, patch: ProjectPatch) => Promise<boolean>; // REQ-0012
   // Drill 3-й уровень: проект → доли по отделам (мульти-отдел REQ-0013 13b).
   sharesByProject?: Map<string, ProjectDeptShare[]>;
+  spread?: PlanSpread; // WI-05: раскид доли по рабочим дням в breakdown
   deptById?: Map<string, DeptRef>;
   // Метрика и ёмкость отдела — чтобы детализация следовала переключателю
   // (Загрузка % = доля от ёмкости), а не показывала всегда часы. currentDeptId —
@@ -114,6 +116,7 @@ export const ProjectDetail = ({
   onSave,
   onSaveDeptPlan,
   sharesByProject,
+  spread,
   deptById,
   metric = 'plan',
   deptCells,
@@ -142,6 +145,7 @@ export const ProjectDetail = ({
           periods={periods}
           nameWidth={nameWidth}
           sharesByProject={sharesByProject}
+          spread={spread}
           deptById={deptById}
           metric={metric}
           deptCells={deptCells}

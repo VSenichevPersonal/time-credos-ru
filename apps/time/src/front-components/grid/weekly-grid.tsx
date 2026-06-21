@@ -18,7 +18,6 @@ import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { useValidation } from 'src/front-components/grid/use-validation';
 import { ValidationToast } from 'src/front-components/grid/validation-toast';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
-import { DAILY_NORM_HOURS } from 'src/front-components/grid/format';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
@@ -65,6 +64,7 @@ export const WeeklyGrid = () => {
     rowList,
     days: week.days,
     entries: data.entries,
+    normFor, // WI-02: норма дня (SSOT) для всех fill-путей
     upsert: data.upsert,
     upsertMany: data.upsertMany,
     remove: data.remove,
@@ -97,8 +97,15 @@ export const WeeklyGrid = () => {
     if (skippedLocked) validation.notifyLocked();
     void result.then((r) => validation.showServerResult(r));
   };
-  // Меню строки: «Заполнить будни (8 ч)» — bulk-fill нормой будня во все пустые.
-  const fillWeekdays = (rowKey: string) => bulkFill(rowKey, DAILY_NORM_HOURS);
+  // WI-06 меню строки: «Заполнить будни нормой» — норма дня (WI-02 SSOT,
+  // произв.календарь) в пустые несогласованные будни ЭТОЙ строки. Не bulkFill с
+  // хардкодом 8: короткий день календаря → его часы. Согласованные/занятые ячейки
+  // calc пропускает.
+  const fillWeekdays = (rowKey: string) => {
+    const inputs = actions.fillRowWeekdays(rowKey);
+    if (inputs.length > 0)
+      void data.upsertMany(inputs).then((r) => validation.showServerResult(r));
+  };
   // Меню строки: «Очистить строку» — удалить все несогласованные записи строки.
   const clearRow = (rowKey: string) => {
     const { skippedLocked, result } = actions.clearRow(rowKey);

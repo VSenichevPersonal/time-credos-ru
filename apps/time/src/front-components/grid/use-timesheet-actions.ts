@@ -6,7 +6,7 @@ import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { UpsertInput } from 'src/front-components/grid/use-grid-data';
 import type { MutationResult } from 'src/front-components/grid/time-rest';
-import { DAILY_NORM_HOURS } from 'src/front-components/grid/format';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 
 // Действия записи: правка ячейки, bulk-fill по строке, копирование прошлой недели.
 
@@ -14,6 +14,9 @@ type Args = {
   rowList: GridRowModel[];
   days: WeekDay[];
   entries: ApiEntry[];
+  // WI-02: норма дня (SSOT, useDailyNorm) — единственный источник часов для всех
+  // fill-путей вместо хардкода DAILY_NORM_HOURS. Короткий день календаря = его часы.
+  normFor: NormForDay;
   upsert: (input: UpsertInput) => Promise<MutationResult>;
   upsertMany: (inputs: UpsertInput[]) => Promise<MutationResult>;
   remove: (id: string) => Promise<MutationResult>;
@@ -50,9 +53,17 @@ export const isCellLocked = (
 // Чистая calc: копирование прошлой недели со часами (без side-effects, тестируема).
 // days[0].iso = Пн текущей недели. Записи прошлой недели → тот же день-недели текущей.
 // Не перетирает filled (уже есть запись тек.нед), не льёт в выходные.
+//
+// WI-07/CISO-011 §F6 (UC-TS-10): lockedByDay-guard. Согласованная (APPROVED)
+// ПУСТАЯ ячейка тек.недели тоже read-only — copy-week не должен в неё писать
+// (как bulkFill/fillStandardWeek). filled отсекает только занятые ячейки, поэтому
+// нужен явный lock-look-up по строке (projectId|workTypeId) и дню. rowList может
+// не содержать строки прошлонедельной пары — тогда lock=false (ячейка точно
+// пустая и несогласованная, писать можно).
 export const calcCopyWithHours = (
   days: WeekDay[],
   entries: ApiEntry[],
+  rowList: GridRowModel[] = [],
 ): { rowKeys: string[]; inputs: UpsertInput[] } => {
   const prevStartDay =
     Math.floor(new Date(`${days[0].iso}T00:00:00Z`).getTime() / 86400000) - 7;
@@ -63,6 +74,15 @@ export const calcCopyWithHours = (
     if (curDates.has(d) && e.projectId && e.workTypeId && e.hours) {
       filled.add(`${e.projectId}|${e.workTypeId}|${d}`);
     }
+  }
+  // WI-07: индекс lock-статуса согласованных ПУСТЫХ ячеек тек.недели —
+  // `${projectId}|${workTypeId}|${iso}` → true. APPROVED-ячейку (даже без часов)
+  // copy-week обходит.
+  const lockedCells = new Set<string>();
+  for (const row of rowList) {
+    days.forEach((d, i) => {
+      if (row.lockedByDay[i]) lockedCells.add(`${row.projectId}|${row.workTypeId}|${d.iso}`);
+    });
   }
   const rowKeys = new Set<string>();
   const inputs: UpsertInput[] = [];
@@ -75,6 +95,7 @@ export const calcCopyWithHours = (
     const target = days[off];
     if (!target || target.isWeekend) continue;
     if (filled.has(`${e.projectId}|${e.workTypeId}|${target.iso}`)) continue;
+    if (lockedCells.has(`${e.projectId}|${e.workTypeId}|${target.iso}`)) continue; // WI-07: APPROVED
     rowKeys.add(`${e.projectId}|${e.workTypeId}`);
     inputs.push({
       id: undefined,
@@ -87,30 +108,59 @@ export const calcCopyWithHours = (
   return { rowKeys: Array.from(rowKeys), inputs };
 };
 
-// REQ-0015 §2: шаблон «8×5». Чистая calc — для каждой строки сетки проставить
-// DAILY_NORM_HOURS (8 ч) в будни, где ячейка ещё пуста. Выходные и уже
-// заполненные ячейки не трогаем (как bulkFill, но по всем строкам недели).
-// Сверка: Timetta schedule-fill (заполнить таймшит нормой). Возвращает inputs
-// для одного пакетного upsertMany.
+// WI-06/A1.13 «Заполнить неделю для всех». Чистая calc — для каждой строки сетки
+// проставить НОРМУ ДНЯ в будни, где ячейка ещё пуста. Выходные и уже заполненные
+// ячейки не трогаем (A1.14 — только пустые будни). Сверка: Timetta «расставить по
+// расписанию» = норма из графика. Возвращает inputs для одного upsertMany.
+//
+// WI-02/A1.12/A4.8: часы = `normFor(iso, isWeekend)` (SSOT useDailyNorm,
+// произв.календарь), а НЕ хардкод DAILY_NORM_HOURS. Короткий день (праздник) →
+// его часы, не 8. Норма 0 (выходной/нерабочий по календарю) → ячейку пропускаем.
 export const calcFillStandardWeek = (
   rowList: GridRowModel[],
   days: WeekDay[],
+  normFor: NormForDay,
 ): UpsertInput[] => {
   const inputs: UpsertInput[] = [];
-  for (const row of rowList) {
-    days.forEach((d, i) => {
-      if (d.isWeekend) return;
-      if (row.hoursByDay[i] > 0) return; // не перетираем заполненное
-      if (row.lockedByDay[i]) return; // согласованную ячейку не трогаем
-      inputs.push({
-        id: undefined,
-        date: d.iso,
-        hours: DAILY_NORM_HOURS,
-        projectId: row.projectId,
-        workTypeId: row.workTypeId,
-      });
+  for (const row of rowList) inputs.push(...fillRowInputs(row, days, normFor));
+  return inputs;
+};
+
+// WI-06/A1.13 «Заполнить будни нормой» (меню ОДНОЙ строки). Та же логика, что у
+// fillStandardWeek, но для одной строки. Норма дня (WI-02 SSOT), только пустые
+// будни (A1.14), согласованные/выходные не трогаем.
+export const calcFillRowWeekdays = (
+  rowList: GridRowModel[],
+  rowKey: string,
+  days: WeekDay[],
+  normFor: NormForDay,
+): UpsertInput[] => {
+  const row = rowList.find((r) => r.key === rowKey);
+  return row ? fillRowInputs(row, days, normFor) : [];
+};
+
+// Общий хелпер WI-02/WI-06: inputs для нормы дня в пустые несогласованные будни
+// одной строки. Норма 0 → пропуск (выходной/нерабочий по календарю).
+const fillRowInputs = (
+  row: GridRowModel,
+  days: WeekDay[],
+  normFor: NormForDay,
+): UpsertInput[] => {
+  const inputs: UpsertInput[] = [];
+  days.forEach((d, i) => {
+    if (d.isWeekend) return;
+    if (row.hoursByDay[i] > 0) return; // не перетираем заполненное (A1.14)
+    if (row.lockedByDay[i]) return; // согласованную ячейку не трогаем
+    const hours = normFor(d.iso, d.isWeekend);
+    if (hours <= 0) return; // нерабочий день по календарю — заполнять нечем
+    inputs.push({
+      id: undefined,
+      date: d.iso,
+      hours,
+      projectId: row.projectId,
+      workTypeId: row.workTypeId,
     });
-  }
+  });
   return inputs;
 };
 
@@ -160,6 +210,7 @@ export const useTimesheetActions = ({
   rowList,
   days,
   entries,
+  normFor,
   upsert,
   upsertMany,
   remove,
@@ -264,15 +315,22 @@ export const useTimesheetActions = ({
   // заполненные ячейки и не льёт в выходные. Возвращает строки (для добавления в
   // сетку) + upsert-входы (для записи часов одним пакетом).
   const copyPreviousWeekWithHours = useCallback(
-    () => calcCopyWithHours(days, entries),
-    [days, entries],
+    () => calcCopyWithHours(days, entries, rowList), // WI-07: rowList для lock-guard
+    [days, entries, rowList],
   );
 
-  // REQ-0015 §2: «Заполнить неделю 8×5» — проставить норму в пустые будни всех
-  // строк недели. Без записи часов (нет строк) делать нечего.
+  // WI-06 «Заполнить неделю для всех» — норма дня (WI-02 SSOT) в пустые будни всех
+  // строк недели. Без строк делать нечего.
   const fillStandardWeek = useCallback(
-    () => calcFillStandardWeek(rowList, days),
-    [rowList, days],
+    () => calcFillStandardWeek(rowList, days, normFor),
+    [rowList, days, normFor],
+  );
+
+  // WI-06 «Заполнить будни нормой» (меню одной строки) — норма дня в пустые будни
+  // этой строки.
+  const fillRowWeekdays = useCallback(
+    (rowKey: string) => calcFillRowWeekdays(rowList, rowKey, days, normFor),
+    [rowList, days, normFor],
   );
 
   // «Очистить строку» (Timetta removeLines): удалить все записи строки, кроме
@@ -303,6 +361,7 @@ export const useTimesheetActions = ({
     copyPreviousWeek,
     copyPreviousWeekWithHours,
     fillStandardWeek,
+    fillRowWeekdays,
     clearRow,
     clearWeek,
   };

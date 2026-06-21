@@ -42,6 +42,23 @@ const workHoursBetween = (
   return sum;
 };
 
+// WI-05: сумма рабочих часов диапазона дат [startKey..endKey] (YYYY-MM-DD,
+// включительно) из календаря. Строковые границы — чтобы не плодить Date.
+// Используется делителем/числителем раскида плана по РАБОЧИМ дням.
+const workHoursBetweenKeys = (
+  hoursByDay: Map<string, number>,
+  startKey: string,
+  endKey: string,
+): number => {
+  if (endKey < startKey) return 0;
+  let sum = 0;
+  for (const [day, h] of hoursByDay) {
+    if (day < startKey || day > endKey) continue;
+    sum += h;
+  }
+  return sum;
+};
+
 // Колонки горизонта: недели или месяцы от anchor на horizon периодов.
 export const buildPeriods = (
   anchor: Date,
@@ -183,18 +200,57 @@ export const deptCapacity = (
   return Math.max(0, base - deptAbsenceHours(dept, ctx, period));
 };
 
-// Раскид плановых часов РАВНОМЕРНО по календарным дням диапазона [startDate,
-// endDate], пересечённым с колонкой периода. Общая логика для проектов и плановых
-// загрузок отдела без проекта (REQ-0012), а также броней (REQ-0004 Часть C).
+// WI-05: контекст раскида плана по РАБОЧИМ дням производственного календаря.
+//   hoursByDay  — карта YYYY-MM-DD → рабочих часов дня (buildHoursByDay). Делитель
+//                 раскида = Σ рабочих часов диапазона плана, числитель = Σ рабочих
+//                 часов пересечения с колонкой. План «капает» только на будни,
+//                 поэтому бьётся с ёмкостью (она тоже по рабочим часам календаря).
+//   horizonEnd  — последний день горизонта доски (YYYY-MM-DD). Для проекта БЕЗ
+//                 endDate: раскид от startDate до horizonEnd (иначе план невидим).
+// Контекст ОПЦИОНАЛЕН: без hoursByDay поведение прежнее (равномерно по календарным
+// дням) — обратная совместимость для вызовов без производственного календаря.
+export type PlanSpread = {
+  hoursByDay?: Map<string, number>;
+  horizonEnd?: string;
+};
+
+// Раскид плановых часов по диапазону [startDate, endDate], пересечённому с колонкой
+// периода. С PlanSpread.hoursByDay — РАВНОМЕРНО по РАБОЧИМ дням (производственный
+// календарь: выходные/праздники/короткие дни учтены, инвариант Σ=plannedEffort).
+// Без него — прежнее равномерно-по-календарным-дням (back-compat). Общая логика
+// для проектов, долей отделов (REQ-0013), планов отдела (REQ-0012) и броней (C).
 export const plannedHoursInPeriod = (
   plannedEffort: number | null,
   startDate: string | null,
   endDate: string | null,
   period: Period,
+  spread?: PlanSpread,
 ): number => {
-  if (!plannedEffort || !startDate || !endDate) return 0;
+  if (!plannedEffort || !startDate) return 0;
+  // Проект без endDate: тянем раскид до конца горизонта доски (если он задан),
+  // иначе (нет горизонта) — прежнее поведение «нет даты конца → 0».
+  const effEnd = endDate ?? spread?.horizonEnd ?? null;
+  if (!effEnd) return 0;
+
+  // Путь по РАБОЧИМ дням (есть производственный календарь).
+  if (spread?.hoursByDay) {
+    const sKey = startDate.slice(0, 10);
+    const eKey = effEnd.slice(0, 10);
+    if (eKey < sKey) return 0;
+    const totalWork = workHoursBetweenKeys(spread.hoursByDay, sKey, eKey);
+    if (totalWork <= 0) return 0; // нет рабочих дней в диапазоне → деление-на-0 защита
+    const loKey = dateKey(period.from);
+    const hiKey = dateKey(period.to);
+    const overStart = sKey > loKey ? sKey : loKey;
+    const overEnd = eKey < hiKey ? eKey : hiKey;
+    const overlapWork = workHoursBetweenKeys(spread.hoursByDay, overStart, overEnd);
+    if (overlapWork <= 0) return 0;
+    return (plannedEffort * overlapWork) / totalWork;
+  }
+
+  // Back-compat: равномерно по КАЛЕНДАРНЫМ дням (нет производственного календаря).
   const ps = utcDay(new Date(startDate));
-  const pe = utcDay(new Date(endDate));
+  const pe = utcDay(new Date(effEnd));
   if (pe < ps) return 0;
   const totalDays = pe - ps + 1;
   const cs = utcDay(period.from);
@@ -204,17 +260,21 @@ export const plannedHoursInPeriod = (
   return (plannedEffort * overlap) / totalDays;
 };
 
-// Часы проекта, попадающие в период: plannedEffort раскидан РАВНОМЕРНО по
-// календарным дням периода действия проекта, пересечённым с колонкой.
+// Часы проекта, попадающие в период: plannedEffort раскидан по периоду действия
+// проекта, пересечённому с колонкой. С PlanSpread — по РАБОЧИМ дням (WI-05);
+// без него — по календарным (back-compat). Проект без endDate тянется до
+// spread.horizonEnd (если задан).
 export const projectHoursInPeriod = (
   project: CapProject,
   period: Period,
+  spread?: PlanSpread,
 ): number =>
   plannedHoursInPeriod(
     project.plannedEffort,
     project.startDate,
     project.endDate,
     period,
+    spread,
   );
 
 // ===========================================================================
@@ -245,12 +305,14 @@ export const projectShareHoursInPeriod = (
   project: CapProject,
   share: ProjectDeptShare,
   period: Period,
+  spread?: PlanSpread,
 ): number =>
   plannedHoursInPeriod(
     share.plannedEffortShare,
     project.startDate,
     project.endDate,
     period,
+    spread,
   );
 
 // Часы ОДНОГО проекта, попадающие в загрузку ОТДЕЛА за период, с учётом долей.
@@ -262,17 +324,18 @@ const projectDeptHoursInPeriod = (
   deptId: string,
   period: Period,
   sharesByProject?: Map<string, ProjectDeptShare[]>,
+  spread?: PlanSpread,
 ): number => {
   const shares = sharesByProject?.get(project.id);
   if (shares && shares.length > 0) {
     let sum = 0;
     for (const s of shares) {
-      if (s.departmentId === deptId) sum += projectShareHoursInPeriod(project, s, period);
+      if (s.departmentId === deptId) sum += projectShareHoursInPeriod(project, s, period, spread);
     }
     return sum;
   }
   // Fallback: долей нет → целый plannedEffort на «родной» отдел проекта.
-  return project.departmentId === deptId ? projectHoursInPeriod(project, period) : 0;
+  return project.departmentId === deptId ? projectHoursInPeriod(project, period, spread) : 0;
 };
 
 // REQ-0012: часы плановой загрузки отдела (без проекта), попадающие в период.
@@ -280,8 +343,9 @@ const projectDeptHoursInPeriod = (
 export const deptPlanHoursInPeriod = (
   plan: DeptPlan,
   period: Period,
+  spread?: PlanSpread,
 ): number =>
-  plannedHoursInPeriod(plan.plannedEffort, plan.startDate, plan.endDate, period);
+  plannedHoursInPeriod(plan.plannedEffort, plan.startDate, plan.endDate, period, spread);
 
 // ===========================================================================
 // REQ-0004 Часть C: БРОНЬ ёмкости ресурса (credosTimeBooking) как СЛОЙ Demand.
@@ -293,17 +357,26 @@ export const deptPlanHoursInPeriod = (
 // ===========================================================================
 
 // Часы ОДНОЙ брони, попадающие в период (раскид hours по дням [startDate..endDate]).
-export const bookingHoursInPeriod = (booking: Booking, period: Period): number =>
-  plannedHoursInPeriod(booking.hours, booking.startDate, booking.endDate, period);
+// С PlanSpread — по РАБОЧИМ дням (WI-05); без него — по календарным (back-compat).
+export const bookingHoursInPeriod = (
+  booking: Booking,
+  period: Period,
+  spread?: PlanSpread,
+): number =>
+  plannedHoursInPeriod(booking.hours, booking.startDate, booking.endDate, period, spread);
 
 // Суммарные часы броней (HARD и SOFT раздельно) для набора броней за период.
 export type BookingHours = { hard: number; soft: number };
 
-const sumBookingHours = (bookings: Booking[], period: Period): BookingHours => {
+const sumBookingHours = (
+  bookings: Booking[],
+  period: Period,
+  spread?: PlanSpread,
+): BookingHours => {
   let hard = 0;
   let soft = 0;
   for (const b of bookings) {
-    const h = bookingHoursInPeriod(b, period);
+    const h = bookingHoursInPeriod(b, period, spread);
     if (h <= 0) continue;
     if (b.bookingType === 'HARD') hard += h;
     else soft += h;
@@ -342,6 +415,7 @@ const deptBookingHours = (
   dept: DeptRef,
   ctx: BookingCtx | undefined,
   period: Period,
+  spread?: PlanSpread,
 ): BookingHours => {
   if (!ctx) return { hard: 0, soft: 0 };
   let hard = 0;
@@ -350,7 +424,7 @@ const deptBookingHours = (
     if (e.departmentId !== dept.id) continue;
     const bs = ctx.byEmployee.get(e.id);
     if (!bs) continue;
-    const h = sumBookingHours(bs, period);
+    const h = sumBookingHours(bs, period, spread);
     hard += h.hard;
     soft += h.soft;
   }
@@ -362,10 +436,11 @@ const empBookingHours = (
   employeeId: string,
   ctx: BookingCtx | undefined,
   period: Period,
+  spread?: PlanSpread,
 ): BookingHours => {
   if (!ctx) return { hard: 0, soft: 0 };
   const bs = ctx.byEmployee.get(employeeId);
-  return bs ? sumBookingHours(bs, period) : { hard: 0, soft: 0 };
+  return bs ? sumBookingHours(bs, period, spread) : { hard: 0, soft: 0 };
 };
 
 // Собрать LoadCell с учётом слоёв брони. planLoad — Demand плана (проекты+dept-plan).
@@ -404,17 +479,18 @@ export const deptLoadCells = (
   ctx?: AbsenceCtx,
   sharesByProject?: Map<string, ProjectDeptShare[]>,
   bookingCtx?: BookingCtx,
+  spread?: PlanSpread,
 ): LoadCell[] =>
   periods.map((period) => {
     const capacity = deptCapacity(dept, period, ctx);
     let planLoad = 0;
     for (const p of projects) {
-      planLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject);
+      planLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject, spread);
     }
     for (const dp of deptPlans) {
-      if (dp.departmentId === dept.id) planLoad += deptPlanHoursInPeriod(dp, period);
+      if (dp.departmentId === dept.id) planLoad += deptPlanHoursInPeriod(dp, period, spread);
     }
-    const booking = deptBookingHours(dept, bookingCtx, period);
+    const booking = deptBookingHours(dept, bookingCtx, period, spread);
     return composeCell(capacity, planLoad, booking, bookingCtx?.includeSoft ?? false);
   });
 
@@ -431,6 +507,7 @@ export const employeeLoadCells = (
   ctx?: AbsenceCtx,
   sharesByProject?: Map<string, ProjectDeptShare[]>,
   bookingCtx?: BookingCtx,
+  spread?: PlanSpread,
 ): LoadCell[] => {
   const factor = dept?.capacityFactor ?? 0.8;
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
@@ -446,17 +523,17 @@ export const employeeLoadCells = (
     if (dept) {
       // REQ-0013 13b: загрузка отдела по долям проектов (fallback на plannedEffort).
       for (const p of projects) {
-        deptLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject);
+        deptLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject, spread);
       }
       // REQ-0012: плановые загрузки отдела без проекта тоже делятся поровну.
       for (const dp of deptPlans) {
-        if (dp.departmentId === dept.id) deptLoad += deptPlanHoursInPeriod(dp, period);
+        if (dp.departmentId === dept.id) deptLoad += deptPlanHoursInPeriod(dp, period, spread);
       }
     }
     // REQ-0004 C: личные брони сотрудника НЕ делятся на численность — это его
     // персональный резерв (employee×проект). HARD → в Demand, SOFT → пунктир.
     const planLoad = deptLoad * share;
-    const booking = empBookingHours(employee.id, bookingCtx, period);
+    const booking = empBookingHours(employee.id, bookingCtx, period, spread);
     return composeCell(capacity, planLoad, booking, bookingCtx?.includeSoft ?? false);
   });
 };
@@ -511,6 +588,7 @@ export const deptProjectLoads = (
   projects: CapProject[],
   periods: Period[],
   sharesByProject?: Map<string, ProjectDeptShare[]>,
+  spread?: PlanSpread,
 ): { planned: ProjectLoad[]; unplanned: CapProject[] } => {
   const planned: ProjectLoad[] = [];
   const unplanned: CapProject[] = [];
@@ -522,12 +600,15 @@ export const deptProjectLoads = (
       ? shares.some((s) => s.departmentId === dept.id)
       : p.departmentId === dept.id;
     if (!belongs) continue;
-    if (!p.startDate || !p.endDate) {
+    // WI-05: проект без endDate раскидываем до конца горизонта (spread.horizonEnd),
+    // иначе (нет горизонта) — как раньше: без даты конца в «без плана».
+    const hasEnd = !!p.endDate || !!spread?.horizonEnd;
+    if (!p.startDate || !hasEnd) {
       unplanned.push(p);
       continue;
     }
     const perPeriod = periods.map((per) =>
-      projectDeptHoursInPeriod(p, dept.id, per, sharesByProject),
+      projectDeptHoursInPeriod(p, dept.id, per, sharesByProject, spread),
     );
     const total = perPeriod.reduce((a, b) => a + b, 0);
     if (total > 0) planned.push({ project: p, perPeriod, total });
@@ -552,12 +633,13 @@ export const projectDeptShareLoads = (
   project: CapProject,
   periods: Period[],
   sharesByProject?: Map<string, ProjectDeptShare[]>,
+  spread?: PlanSpread,
 ): ProjectDeptBreakdown[] => {
   const shares = sharesByProject?.get(project.id);
   if (!shares || shares.length === 0) return [];
   const out: ProjectDeptBreakdown[] = [];
   for (const s of shares) {
-    const perPeriod = periods.map((per) => projectShareHoursInPeriod(project, s, per));
+    const perPeriod = periods.map((per) => projectShareHoursInPeriod(project, s, per, spread));
     const total = perPeriod.reduce((a, b) => a + b, 0);
     if (total > 0) out.push({ departmentId: s.departmentId, perPeriod, total });
   }
@@ -572,11 +654,12 @@ export const deptPlanLoads = (
   dept: DeptRef,
   deptPlans: DeptPlan[],
   periods: Period[],
+  spread?: PlanSpread,
 ): DeptPlanLoad[] => {
   const out: DeptPlanLoad[] = [];
   for (const plan of deptPlans) {
     if (plan.departmentId !== dept.id) continue;
-    const perPeriod = periods.map((per) => deptPlanHoursInPeriod(plan, per));
+    const perPeriod = periods.map((per) => deptPlanHoursInPeriod(plan, per, spread));
     const total = perPeriod.reduce((a, b) => a + b, 0);
     if (total > 0) out.push({ plan, perPeriod, total });
   }

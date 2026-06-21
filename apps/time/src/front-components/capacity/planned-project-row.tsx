@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { T, childCell, colWidth } from 'src/front-components/capacity/cap-tokens';
 import { projectDeptShareLoads } from 'src/front-components/capacity/calc-load';
+import type { PlanSpread } from 'src/front-components/capacity/calc-load';
 import { departmentLabel } from 'src/constants/labels';
 import type {
   CapProject,
@@ -35,6 +36,7 @@ type Props = {
   periods: Period[];
   nameWidth: number;
   sharesByProject?: Map<string, ProjectDeptShare[]>;
+  spread?: PlanSpread; // WI-05: раскид доли по рабочим дням
   deptById?: Map<string, DeptRef>;
   metric?: CellMetric;
   deptCells?: LoadCell[]; // ёмкость отдела по периодам (для метрики «Загрузка %»)
@@ -46,6 +48,7 @@ export const PlannedProjectRow = ({
   periods,
   nameWidth,
   sharesByProject,
+  spread,
   deptById,
   metric = 'plan',
   deptCells,
@@ -54,7 +57,7 @@ export const PlannedProjectRow = ({
   const { project, perPeriod } = load;
   const [open, setOpen] = useState(false);
   const colW = colWidth(metric);
-  const breakdown = projectDeptShareLoads(project, periods, sharesByProject);
+  const breakdown = projectDeptShareLoads(project, periods, sharesByProject, spread);
   const drillable = breakdown.length > 1; // ≥2 отдела — есть что детализировать
   // Σ проект по периодам (для строки-итога мульти-отдел: видно, что доли сходятся).
   const projTotal = periods.map((_, i) => breakdown.reduce((s, b) => s + b.perPeriod[i], 0));

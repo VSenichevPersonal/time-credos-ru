@@ -29,7 +29,7 @@ type Props = {
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
-  onFillWeekdays: (rowKey: string) => void; // меню строки: 8 ч в пустые будни
+  onFillWeekdays: (rowKey: string) => void; // меню строки: норма дня в пустые будни
   onClearRow: (rowKey: string) => void; // меню строки: обнулить часы
   onDeleteRow: (rowKey: string) => void; // меню строки: убрать строку
   onCommitDescription: (rowKey: string, dayIso: string, text: string) => void; // комментарий к ячейке

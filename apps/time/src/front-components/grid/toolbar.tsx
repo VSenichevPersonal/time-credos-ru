@@ -86,9 +86,9 @@ export const Toolbar = ({
             onClick={onFillStandardWeek}
             disabled={copyDisabled}
             style={actionBtn(copyDisabled)}
-            title="Проставить 8 ч в будни всех строк недели (заполненные ячейки и выходные не трогаются)"
+            title="Проставить норму дня в пустые будни ВСЕХ строк недели (заполненные ячейки и выходные не трогаются)"
           >
-            Заполнить 8×5
+            Заполнить неделю для всех
           </button>
         )}
         <button
