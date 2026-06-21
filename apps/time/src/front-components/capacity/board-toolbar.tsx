@@ -52,17 +52,15 @@ export const BoardToolbar = ({
     }}
   >
     <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Планирование</span>
+    <span style={{ fontSize: 12, color: T.textMuted, marginLeft: 4 }}>Планировать по:</span>
     <Segmented
-      ariaLabel="Срез группировки"
+      ariaLabel="Планировать по"
       value={axis}
       segments={[
-        { value: 'dept', label: 'Отделы' },
-        { value: 'employee', label: 'Люди' },
+        { value: 'dept', label: 'Отделам' },
+        { value: 'employee', label: 'Людям' },
       ]}
-      onChange={(v) => {
-        if (planning) return; // в планировании срез фиксирован на «Отделы»
-        onAxis(v);
-      }}
+      onChange={onAxis}
     />
     <Segmented
       ariaLabel="Метрика ячейки"
@@ -111,7 +109,9 @@ export const BoardToolbar = ({
     {planning && <SaveIndicator status={saveStatus} />}
     <span style={{ marginLeft: 'auto', fontSize: 11.5, color: planning ? T.accent : T.textFaint }}>
       {planning
-        ? 'Раскройте отдел → задайте плановые часы и срок проекту. Загрузка пересчитается.'
+        ? axis === 'employee'
+          ? 'Срез «Люди»: «✎ План» на строке сотрудника → план часов человеку по месяцам.'
+          : 'Раскройте отдел → задайте плановые часы и срок проекту. Загрузка пересчитается.'
         : HINT[metric]}
     </span>
   </div>

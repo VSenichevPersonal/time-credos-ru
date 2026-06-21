@@ -4,9 +4,12 @@ import { RestApiClient } from 'twenty-client-sdk/rest';
 // Слот = {project(rel), periodMonth TEXT 'YYYY-MM', plannedHours NUMBER, (опц)
 // department}. Доступ из песочницы виджета (Web Worker Remote DOM) через /s/ route.
 // КОНТРАКТ Dev2 (POST /s/plan-slots, isAuthRequired, mode-based):
-//   read:   { mode:'read', projectId }            → {ok, slots:[{id,projectId,departmentId,periodMonth,plannedHours}]}
-//   upsert: { mode:'upsert', projectId, slots:[{periodMonth,plannedHours,departmentId?}] }
+//   read:   { mode:'read', projectId }            → {ok, slots:[{id,projectId,departmentId,employeeId,periodMonth,plannedHours}]}
+//   upsert: { mode:'upsert', projectId, slots:[{periodMonth,plannedHours,departmentId?,employeeId?}] }
 //           plannedHours<=0 → слот удаляется. → {ok, created,updated,deleted, slots}
+//           дедуп по ключу (project, department|null, employee|null, periodMonth).
+// Планирование до СОТРУДНИКА (PLANNING_EMPLOYEE_LEVEL §3.1): employeeId задан →
+// персональный слот (≠ отдельский слот того же месяца+отдела, не схлопывается).
 // ВАЖНО: роут зарегистрирован ТОЛЬКО как POST — GET даёт 404 (была ошибка контракта).
 
 const client = () => new RestApiClient();
@@ -15,12 +18,14 @@ export type PlanSlotInput = {
   periodMonth: string; // 'YYYY-MM'
   plannedHours: number;
   departmentId?: string | null;
+  employeeId?: string | null; // задан = персональный слот (план на человека)
 };
 
 type RawSlot = {
   periodMonth?: string | null;
   plannedHours?: number | null;
   departmentId?: string | null;
+  employeeId?: string | null;
 };
 type ListResp = { ok?: boolean; slots?: RawSlot[]; error?: string };
 
@@ -37,6 +42,7 @@ export const fetchPlanSlots = async (projectId: string): Promise<PlanSlotInput[]
       periodMonth: s.periodMonth,
       plannedHours: s.plannedHours ?? 0,
       departmentId: s.departmentId ?? null,
+      employeeId: s.employeeId ?? null,
     }));
 };
 
@@ -55,6 +61,7 @@ export const savePlanSlots = async (
       periodMonth: s.periodMonth,
       plannedHours: s.plannedHours,
       departmentId: s.departmentId ?? undefined,
+      employeeId: s.employeeId ?? undefined,
     })),
   });
   if (!resp?.ok) throw new Error(resp?.error ?? 'Не удалось сохранить раскид по месяцам');

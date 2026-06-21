@@ -134,6 +134,8 @@ type EmpProps = {
   spread?: PlanSpread;
   nameWidth: number;
   metric: CellMetric;
+  planning?: boolean; // режим планирования → персональный план на строке сотрудника
+  onSavedPlan?: () => void; // перезагрузка слотов/доски после сохранения
 };
 
 // Срез «Люди»: личная ёмкость сотрудника (календарь × коэф отдела) + доля
@@ -151,6 +153,8 @@ export const EmployeeRows = ({
   spread,
   nameWidth,
   metric,
+  planning,
+  onSavedPlan,
 }: EmpProps) => {
   const sorted = [...employees].sort((a, b) => {
     const da = deptById.get(a.departmentId ?? '')?.code ?? '';
@@ -171,6 +175,9 @@ export const EmployeeRows = ({
             periods={periods}
             nameWidth={nameWidth}
             metric={metric}
+            planning={planning}
+            projects={projects}
+            onSavedPlan={onSavedPlan}
           />
         );
       })}

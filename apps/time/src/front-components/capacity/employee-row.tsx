@@ -1,7 +1,9 @@
 import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow } from 'src/front-components/capacity/cap-tokens';
 import { BookingMarker } from 'src/front-components/capacity/booking-marker';
+import { EmployeePlanPanel } from 'src/front-components/capacity/employee-plan-panel';
 import { departmentLabel } from 'src/constants/labels';
 import type {
+  CapProject,
   CellMetric,
   EmployeeRef,
   LoadCell,
@@ -10,6 +12,9 @@ import type {
 
 // Строка сотрудника (срез «по людям»): имя + код отдела + ячейки личной ёмкости.
 // Без раскрытия — лист дерева. Личная ёмкость из произв. календаря × коэф отдела.
+// В режиме планирования (planning) — кнопка «✎ План» → персональный план по
+// месяцам (employee-plan-panel, слоты с employeeId). Раньше план-на-человека был
+// недоступен (тумблер перекидывал на «Отделы»).
 
 type Props = {
   employee: EmployeeRef;
@@ -18,6 +23,9 @@ type Props = {
   periods: Period[];
   nameWidth: number;
   metric: CellMetric;
+  planning?: boolean; // режим планирования → показать персональный план
+  projects?: CapProject[]; // проекты для привязки персонального слота
+  onSavedPlan?: () => void; // перезагрузка доски после сохранения
 };
 
 export const EmployeeRow = ({
@@ -27,14 +35,17 @@ export const EmployeeRow = ({
   periods,
   nameWidth,
   metric,
+  planning,
+  projects,
+  onSavedPlan,
 }: Props) => (
-  <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}` }}>
+  <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, alignItems: 'stretch' }}>
     <div
       style={{
         width: nameWidth,
         minWidth: nameWidth,
-        padding: '0 12px',
-        height: 40,
+        padding: planning ? '6px 12px' : '0 12px',
+        minHeight: 40,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -61,6 +72,15 @@ export const EmployeeRow = ({
       <span style={{ fontSize: 10.5, color: T.textFaint, whiteSpace: 'nowrap' }}>
         {deptCode ? departmentLabel(deptCode, { short: true }) : 'без отдела'}
       </span>
+      {planning && (
+        <div style={{ marginTop: 3 }}>
+          <EmployeePlanPanel
+            employee={employee}
+            projects={projects ?? []}
+            onSaved={onSavedPlan}
+          />
+        </div>
+      )}
     </div>
 
     {periods.map((p, i) => {
@@ -80,7 +100,7 @@ export const EmployeeRow = ({
           style={{
             flex: 1,
             minWidth: colWidth(metric),
-            height: 40,
+            minHeight: 40,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -123,7 +143,7 @@ export const EmployeeRow = ({
           style={{
             width: SIGMA_W,
             minWidth: SIGMA_W,
-            height: 40,
+            minHeight: 40,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',

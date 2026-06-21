@@ -35,8 +35,10 @@ export const CapacityBoard = () => {
     reloadDeptPlans,
   );
 
-  // Режим планирования живёт только в срезе «Отделы» (детализация по проектам).
-  const effectiveAxis: CapAxis = planning ? 'dept' : axis;
+  // Планирование доступно в ОБОИХ срезах: «Отделы» → план проектам отдела;
+  // «Люди» → персональный план сотруднику по месяцам (employee-plan-panel).
+  // Раньше тумблер фиксировал срез на «Отделы» — план-на-человека был недоступен.
+  const effectiveAxis: CapAxis = axis;
 
   const deptById = useMemo(
     () => new Map(departments.map((d) => [d.id, d])),
@@ -166,6 +168,8 @@ export const CapacityBoard = () => {
                 spread={spread}
                 nameWidth={NAME_WIDTH}
                 metric={metric}
+                planning={planning}
+                onSavedPlan={reload}
               />
             )}
           </div>

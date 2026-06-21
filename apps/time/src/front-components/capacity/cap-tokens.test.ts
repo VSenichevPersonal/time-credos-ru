@@ -119,20 +119,20 @@ describe('gapTone (шкала ±5/15%)', () => {
     expect(gapTone(null).fg).toBe('#7c8089'); // T.textFaint (AA, WI-34)
   });
 
-  it('|gap| ≤ 5% → баланс (прозрачно)', () => {
+  it('|gap| ≤ 10% → баланс (прозрачно)', () => {
     expect(gapTone(0).bg).toBe('transparent');
-    expect(gapTone(0.04).bg).toBe('transparent');
-    expect(gapTone(-0.04).bg).toBe('transparent');
+    expect(gapTone(0.09).bg).toBe('transparent');
+    expect(gapTone(-0.09).bg).toBe('transparent');
   });
 
-  it('дефицит 5..15% → янтарь, >15% → терракот', () => {
-    expect(gapTone(0.1).bg).toBe('#fef3c7');  // T.warnTint
-    expect(gapTone(0.2).bg).toBe('#fbe4dd');  // терракот
+  it('дефицит 10..20% → янтарь, >20% → терракот', () => {
+    expect(gapTone(0.15).bg).toBe('#fef3c7');  // T.warnTint
+    expect(gapTone(0.25).bg).toBe('#fbe4dd');  // терракот
   });
 
-  it('профицит → синий, сильнее при >15%', () => {
-    expect(gapTone(-0.1).bg).toMatch(/^rgba\(46, 71, 215,/); // бренд-индиго ACCENT_RGB
-    expect(alphaOf(gapTone(-0.2).bg)).toBeGreaterThan(alphaOf(gapTone(-0.1).bg));
+  it('профицит → синий, сильнее при >20%', () => {
+    expect(gapTone(-0.15).bg).toMatch(/^rgba\(46, 71, 215,/); // бренд-индиго ACCENT_RGB
+    expect(alphaOf(gapTone(-0.25).bg)).toBeGreaterThan(alphaOf(gapTone(-0.15).bg));
   });
 });
 
