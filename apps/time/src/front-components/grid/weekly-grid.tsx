@@ -18,6 +18,7 @@ import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { useValidation } from 'src/front-components/grid/use-validation';
 import { ValidationToast } from 'src/front-components/grid/validation-toast';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
+import { DAILY_NORM_HOURS } from 'src/front-components/grid/format';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
@@ -96,6 +97,24 @@ export const WeeklyGrid = () => {
     if (skippedLocked) validation.notifyLocked();
     void result.then((r) => validation.showServerResult(r));
   };
+  // Меню строки: «Заполнить будни (8 ч)» — bulk-fill нормой будня во все пустые.
+  const fillWeekdays = (rowKey: string) => bulkFill(rowKey, DAILY_NORM_HOURS);
+  // Меню строки: «Очистить строку» — удалить все несогласованные записи строки.
+  const clearRow = (rowKey: string) => {
+    const { skippedLocked, result } = actions.clearRow(rowKey);
+    if (skippedLocked) validation.notifyLocked();
+    void result.then((r) => validation.showServerResult(r));
+  };
+  // Меню строки: «Удалить строку» — очистить часы и убрать строку из сетки. Если
+  // строка пустая (нет записей) — просто снять её из extraRowKeys.
+  const deleteRow = (rowKey: string) => {
+    clearRow(rowKey);
+    setExtraRowKeys((prev) => prev.filter((k) => k !== rowKey));
+  };
+  // U11: комментарий к ячейке (общий для Дня и Недели). commitDescription есть в
+  // actions, теперь выведен и в Неделю (был разрыв — только День).
+  const commitDescription = (rowKey: string, dayIso: string, text: string) =>
+    actions.commitDescription(rowKey, dayIso, text);
 
   // Согласование периода (отключаемое): бейдж + действия в подвале.
   const approval = useApproval({
@@ -186,6 +205,15 @@ export const WeeklyGrid = () => {
               }
             : undefined
         }
+        onClearWeek={
+          mode === 'week'
+            ? () => {
+                const { skippedLocked, result } = actions.clearWeek();
+                if (skippedLocked) validation.notifyLocked();
+                void result.then((r) => validation.showServerResult(r));
+              }
+            : undefined
+        }
         onFillStandardWeek={
           mode === 'week' && rowList.length > 0
             ? () => {
@@ -230,6 +258,10 @@ export const WeeklyGrid = () => {
           loading={data.loading}
           onCellCommit={commitCell}
           onBulkFill={bulkFill}
+          onFillWeekdays={fillWeekdays}
+          onClearRow={clearRow}
+          onDeleteRow={deleteRow}
+          onCommitDescription={commitDescription}
           onAddRow={addRow}
         />
       )}

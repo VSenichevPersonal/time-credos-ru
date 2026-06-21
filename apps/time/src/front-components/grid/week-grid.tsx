@@ -29,6 +29,10 @@ type Props = {
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
+  onFillWeekdays: (rowKey: string) => void; // меню строки: 8 ч в пустые будни
+  onClearRow: (rowKey: string) => void; // меню строки: обнулить часы
+  onDeleteRow: (rowKey: string) => void; // меню строки: убрать строку
+  onCommitDescription: (rowKey: string, dayIso: string, text: string) => void; // комментарий к ячейке
   onAddRow: (rowKey: string) => void;
 };
 
@@ -46,6 +50,10 @@ export const WeekGrid = ({
   loading,
   onCellCommit,
   onBulkFill,
+  onFillWeekdays,
+  onClearRow,
+  onDeleteRow,
+  onCommitDescription,
   onAddRow,
 }: Props) => {
   const nav = useKeyboard(rowList.length, 7);
@@ -108,13 +116,19 @@ export const WeekGrid = ({
               days={days}
               hoursByDay={row.hoursByDay}
               lockedByDay={row.lockedByDay}
+              descByDay={row.descByDay}
               overtimeThreshold={overtimeThreshold}
               rowTotal={row.rowTotal}
               alt={i % 2 === 1}
               nav={nav}
+              normFor={normFor}
               onCellCommit={(dayIso, hours) => onCellCommit(row.key, dayIso, hours)}
+              onCommitDescription={(dayIso, text) => onCommitDescription(row.key, dayIso, text)}
               onFill={(v) => onBulkFill(row.key, v)}
               onDuplicate={() => duplicateRow(row.projectId)}
+              onFillWeekdays={() => onFillWeekdays(row.key)}
+              onClearRow={() => onClearRow(row.key)}
+              onDeleteRow={() => onDeleteRow(row.key)}
             />
           ))
         )}

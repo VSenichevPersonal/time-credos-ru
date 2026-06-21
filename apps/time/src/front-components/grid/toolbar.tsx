@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { T } from 'src/front-components/grid/tokens';
 import { ModeSwitcher } from 'src/front-components/grid/mode-switcher';
 import { PeriodNav } from 'src/front-components/grid/period-nav';
+import { CopyMenu } from 'src/front-components/grid/copy-menu';
 import { Cheatsheet } from 'src/front-components/grid/cheatsheet';
 import { SaveIndicator } from 'src/front-components/grid/save-indicator';
 import type { SaveStatus } from 'src/front-components/grid/use-save-status';
@@ -20,6 +21,7 @@ type Props = {
   onToday: () => void;
   onCopyWeek?: () => void;
   onCopyWeekHours?: () => void;
+  onClearWeek?: () => void;
   onFillStandardWeek?: () => void;
   copyDisabled?: boolean;
 };
@@ -49,6 +51,7 @@ export const Toolbar = ({
   onToday,
   onCopyWeek,
   onCopyWeekHours,
+  onClearWeek,
   onFillStandardWeek,
   copyDisabled,
 }: Props) => {
@@ -70,25 +73,13 @@ export const Toolbar = ({
       <ModeSwitcher value={mode} onChange={onModeChange} />
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
         <PeriodNav title={periodTitle} onPrev={onPrev} onNext={onNext} onToday={onToday} />
-        {onCopyWeek && (
-          <button
-            onClick={onCopyWeek}
+        {onCopyWeek && onCopyWeekHours && onClearWeek && (
+          <CopyMenu
             disabled={copyDisabled}
-            style={actionBtn(copyDisabled)}
-            title="Перенести только строки (проект · вид работ) прошлой недели — часы заполнить заново"
-          >
-            Копировать неделю
-          </button>
-        )}
-        {onCopyWeekHours && (
-          <button
-            onClick={onCopyWeekHours}
-            disabled={copyDisabled}
-            style={actionBtn(copyDisabled)}
-            title="Перенести строки и часы прошлой недели на те же дни (заполненные ячейки и выходные не трогаются)"
-          >
-            …с часами
-          </button>
+            onCopyRows={onCopyWeek}
+            onCopyHours={onCopyWeekHours}
+            onClearWeek={onClearWeek}
+          />
         )}
         {onFillStandardWeek && (
           <button

@@ -107,6 +107,8 @@ export const CREDOS_TIME_PROJECT_CATEGORY_FIELD_ID = '9630aaf0-7371-4d07-8754-bc
 export const CREDOS_TIME_PROJECT_STATUS_FIELD_ID = '8098049a-872d-4c33-8f27-f05d15a53cc1';
 export const CREDOS_TIME_PROJECT_PLANNED_EFFORT_FIELD_ID = '4f202b64-a1cb-4e88-a917-06d9931ab489';
 export const CREDOS_TIME_PROJECT_EXTERNAL_CODE_FIELD_ID = 'c1f0b3a2-7e4d-4a91-9b6c-2d8e5f1a3c47';
+// P2 (FIELDS_COLUMNS_AUDIT §1): описание проекта (Timetta/Kimai description).
+export const CREDOS_TIME_PROJECT_DESCRIPTION_FIELD_ID = '991f5621-6e99-4a6b-b63d-4217bb69b762';
 // Entry
 export const CREDOS_TIME_ENTRY_DATE_FIELD_ID = '359bdb1d-f6c5-4780-b560-5013858d2ec3';
 export const CREDOS_TIME_ENTRY_HOURS_FIELD_ID = '3b8ea288-2594-4d9a-8314-b1d8dee0e0c5';
@@ -135,6 +137,9 @@ export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_DATE_ID =
   '67ea8110-ea38-41cf-91b1-554f5671eeda';
 // WorkType
 export const CREDOS_TIME_WORK_TYPE_GROUP_FIELD_ID = '78e61c8f-d18c-48c3-9897-5cf3316aebe9';
+// P1 (FIELDS_COLUMNS_AUDIT §7): собственное наименование вида работ (Kimai activity.name).
+// До него виды в одной группе/отделе были неотличимы. labelIdentifier карточки.
+export const CREDOS_TIME_WORK_TYPE_NAME_FIELD_ID = '166ee92b-bb71-4ea5-840c-7e57866c8097';
 // Employee
 export const CREDOS_TIME_EMPLOYEE_FIRST_NAME_FIELD_ID = 'a52484bf-afd2-4a01-ace3-7042a762dbfe';
 export const CREDOS_TIME_EMPLOYEE_LAST_NAME_FIELD_ID = 'ca5f2e4e-bf80-4bd4-b049-219b7c464429';
@@ -145,7 +150,9 @@ export const CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID = '2f8a6d31-4c7e-4b59-9a0d
 // Department
 export const CREDOS_TIME_DEPARTMENT_CODE_FIELD_ID = '474dd507-0969-4a74-a981-2da5ede39fe0';
 export const CREDOS_TIME_DEPARTMENT_APPROVAL_REQUIRED_FIELD_ID = 'b399c04e-af37-48cc-ae3e-b6899776c174';
+// headcount-решение (drop vs hide) отложено: drop-миграция падала в проде. Поле сохранено.
 export const CREDOS_TIME_DEPARTMENT_HEADCOUNT_FIELD_ID = '4837bf7d-a05d-4b2b-b71c-53f463fe586f';
+export const CREDOS_TIME_DEPARTMENT_CAPACITY_FACTOR_FIELD_ID = 'ec699c59-b373-4f8a-8d22-c3894b69d515';
 
 // --- Wave 3 (NAV): views, navigation, доп. роль ---
 // Index-views по видимым объектам.
@@ -169,6 +176,8 @@ export const CREDOS_TIME_MANAGER_ROLE_UNIVERSAL_IDENTIFIER = '68211cf6-bc05-422a
 // --- Аудит карточка↔вид: недостающие field-id скаляров (для колонок views) ---
 // Stage
 export const CREDOS_TIME_STAGE_CODE_FIELD_ID = '4eda4ffc-d036-4303-80b2-5242bce0a230';
+// P2 (FIELDS_COLUMNS_AUDIT §6): человекочитаемое название этапа (Timetta projectTask.name).
+export const CREDOS_TIME_STAGE_NAME_FIELD_ID = '1732bf5b-1610-4797-a4c4-71c7c29cbdea';
 export const CREDOS_TIME_STAGE_STATUS_FIELD_ID = 'e977847f-c8f0-4861-a4c1-394439120092';
 export const CREDOS_TIME_STAGE_PLANNED_EFFORT_FIELD_ID = '5d03bd03-64f1-4e50-bda6-3341c9b2fab6';
 // BillingLink

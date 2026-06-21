@@ -110,6 +110,13 @@ export const AddRow = ({
           color: ready ? T.surface : T.textFaint,
           cursor: ready ? 'pointer' : 'default',
           fontFamily: 'inherit',
+          transition: 'background 120ms ease-out', // P2: hover у primary-кнопки
+        }}
+        onMouseEnter={(e) => {
+          if (ready) e.currentTarget.style.background = T.accentHover;
+        }}
+        onMouseLeave={(e) => {
+          if (ready) e.currentTarget.style.background = T.accent;
         }}
       >
         Добавить

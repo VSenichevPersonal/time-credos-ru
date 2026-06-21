@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { calcCopyWithHours, calcFillStandardWeek, isCellLocked } from './use-timesheet-actions';
+import {
+  calcClearRow,
+  calcClearWeek,
+  calcCopyWithHours,
+  calcFillStandardWeek,
+  isCellLocked,
+} from './use-timesheet-actions';
 import type { WeekDay } from './use-week';
 import type { ApiEntry } from './types';
 import type { GridRowModel } from './use-grid-model';
@@ -130,6 +136,80 @@ const row = (
   lockedByDay,
   tags: [],
   rowTotal: hoursByDay.reduce((s, n) => s + n, 0),
+});
+
+// Строка с явными entryId по дням (для clearRow/clearWeek).
+const rowWithIds = (
+  ids: (string | null)[],
+  lockedByDay: boolean[] = Array(7).fill(false),
+  projectId = 'proj-1',
+  workTypeId = 'wt-1',
+): GridRowModel => ({
+  key: `${projectId}|${workTypeId}`,
+  projectId,
+  workTypeId,
+  projectName: 'Проект',
+  category: null,
+  workTypeName: 'Разработка',
+  hoursByDay: ids.map((id) => (id ? 8 : 0)),
+  entryIdByDay: ids,
+  descByDay: Array(7).fill(null),
+  lockedByDay,
+  tags: [],
+  rowTotal: ids.filter(Boolean).length * 8,
+});
+
+describe('calcClearRow', () => {
+  it('собирает все entryId строки на удаление', () => {
+    const rows = [rowWithIds(['e1', 'e2', null, null, 'e5', null, null])];
+    const { ids, skippedLocked } = calcClearRow(rows, 'proj-1|wt-1');
+    expect(ids).toEqual(['e1', 'e2', 'e5']);
+    expect(skippedLocked).toBe(false);
+  });
+
+  it('согласованную (locked) ячейку пропускает и помечает skippedLocked', () => {
+    const locked = [true, false, false, false, false, false, false];
+    const rows = [rowWithIds(['e1', 'e2', null, null, null, null, null], locked)];
+    const { ids, skippedLocked } = calcClearRow(rows, 'proj-1|wt-1');
+    expect(ids).toEqual(['e2']);
+    expect(skippedLocked).toBe(true);
+  });
+
+  it('неизвестный rowKey → пусто, без падения', () => {
+    const rows = [rowWithIds(['e1', null, null, null, null, null, null])];
+    const { ids, skippedLocked } = calcClearRow(rows, 'нет|такой');
+    expect(ids).toHaveLength(0);
+    expect(skippedLocked).toBe(false);
+  });
+
+  it('строка без записей → пустой результат', () => {
+    const rows = [rowWithIds(Array(7).fill(null))];
+    expect(calcClearRow(rows, 'proj-1|wt-1').ids).toHaveLength(0);
+  });
+});
+
+describe('calcClearWeek', () => {
+  it('собирает записи всех строк недели', () => {
+    const rows = [
+      rowWithIds(['a1', null, null, null, null, null, null], undefined, 'p1', 'w1'),
+      rowWithIds(['b1', 'b2', null, null, null, null, null], undefined, 'p2', 'w2'),
+    ];
+    const { ids, skippedLocked } = calcClearWeek(rows);
+    expect(ids).toEqual(['a1', 'b1', 'b2']);
+    expect(skippedLocked).toBe(false);
+  });
+
+  it('согласованные ячейки пропускаются, skippedLocked=true', () => {
+    const locked = [true, false, false, false, false, false, false];
+    const rows = [rowWithIds(['a1', 'a2', null, null, null, null, null], locked, 'p1', 'w1')];
+    const { ids, skippedLocked } = calcClearWeek(rows);
+    expect(ids).toEqual(['a2']);
+    expect(skippedLocked).toBe(true);
+  });
+
+  it('пустая неделя → пустой результат', () => {
+    expect(calcClearWeek([]).ids).toHaveLength(0);
+  });
 });
 
 describe('calcFillStandardWeek', () => {

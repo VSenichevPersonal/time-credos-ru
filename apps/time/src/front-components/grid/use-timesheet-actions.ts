@@ -21,6 +21,19 @@ type Args = {
 
 const isoDay = (date: string): string => date.slice(0, 10);
 
+// Пакет удалений по списку id → один агрегатный MutationResult. Пустой список →
+// no-op ok. Любая ошибка отдельной мутации агрегируется (ok=false + первый error).
+const removeManyResult = (
+  ids: string[],
+  remove: (id: string) => Promise<MutationResult>,
+): Promise<MutationResult> => {
+  if (ids.length === 0) return Promise.resolve({ ok: true });
+  return Promise.all(ids.map((id) => remove(id))).then((results) => {
+    const failed = results.find((r) => !r.ok);
+    return failed ?? { ok: true };
+  });
+};
+
 // W6-2/CISO-012: согласована ли (APPROVED → read-only) ячейка строки на дату.
 // Чистый предикат — SSOT для гардов commitCell. true → правка/удаление no-op.
 export const isCellLocked = (
@@ -99,6 +112,48 @@ export const calcFillStandardWeek = (
     });
   }
   return inputs;
+};
+
+// REQ «Очистить строку» (Timetta removeLines): id всех записей строки, кроме
+// согласованных (APPROVED → read-only, не удаляем). Чистая calc — возвращает
+// список entryId на удаление. Сверка: согласованную запись правит только отзыв.
+export const calcClearRow = (
+  rowList: GridRowModel[],
+  rowKey: string,
+): { ids: string[]; skippedLocked: boolean } => {
+  const row = rowList.find((r) => r.key === rowKey);
+  if (!row) return { ids: [], skippedLocked: false };
+  const ids: string[] = [];
+  let skippedLocked = false;
+  row.entryIdByDay.forEach((id, i) => {
+    if (!id) return;
+    if (row.lockedByDay[i]) {
+      skippedLocked = true; // согласованную не трогаем
+      return;
+    }
+    ids.push(id);
+  });
+  return { ids, skippedLocked };
+};
+
+// REQ «Очистить неделю» (Timetta removeLines, опасное): id всех записей недели,
+// кроме согласованных. Чистая calc — для confirm-сценария вверху тулбара.
+export const calcClearWeek = (
+  rowList: GridRowModel[],
+): { ids: string[]; skippedLocked: boolean } => {
+  const ids: string[] = [];
+  let skippedLocked = false;
+  for (const row of rowList) {
+    row.entryIdByDay.forEach((id, i) => {
+      if (!id) return;
+      if (row.lockedByDay[i]) {
+        skippedLocked = true;
+        return;
+      }
+      ids.push(id);
+    });
+  }
+  return { ids, skippedLocked };
 };
 
 export const useTimesheetActions = ({
@@ -220,6 +275,27 @@ export const useTimesheetActions = ({
     [rowList, days],
   );
 
+  // «Очистить строку» (Timetta removeLines): удалить все записи строки, кроме
+  // согласованных. Пакет удалений одним Promise.all → один reload. Возвращает
+  // skippedLocked (для мягкого сообщения) + агрегатный промис.
+  const clearRow = useCallback(
+    (rowKey: string): { skippedLocked: boolean; result: Promise<MutationResult> } => {
+      const { ids, skippedLocked } = calcClearRow(rowList, rowKey);
+      return { skippedLocked, result: removeManyResult(ids, remove) };
+    },
+    [rowList, remove],
+  );
+
+  // «Очистить неделю» (Timetta removeLines, опасное → confirm у вызывающего):
+  // удалить все несогласованные записи недели.
+  const clearWeek = useCallback(
+    (): { skippedLocked: boolean; result: Promise<MutationResult> } => {
+      const { ids, skippedLocked } = calcClearWeek(rowList);
+      return { skippedLocked, result: removeManyResult(ids, remove) };
+    },
+    [rowList, remove],
+  );
+
   return {
     commitCell,
     commitDescription,
@@ -227,5 +303,7 @@ export const useTimesheetActions = ({
     copyPreviousWeek,
     copyPreviousWeekWithHours,
     fillStandardWeek,
+    clearRow,
+    clearWeek,
   };
 };

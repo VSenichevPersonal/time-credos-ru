@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { T, cellFill } from 'src/front-components/grid/tokens';
+import { CellComment } from 'src/front-components/grid/cell-comment';
 import { fmtHours, isOvertime, parseHours } from 'src/front-components/grid/format';
 
 // Ячейка часов: tabular-nums, правое выравнивание. Активная (по клавиатуре)
@@ -15,8 +16,11 @@ type Props = {
   locked?: boolean; // W6-2: согласованная запись — только чтение
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек (fallback 12)
   seed: string | null; // символ, с которого начали печатать
+  norm?: number; // норма дня (чип быстрого ввода в пустой активной ячейке)
+  description?: string | null; // комментарий записи (Неделя: поповер на ячейке)
   onActivate: () => void;
   onCommit: (hours: number) => void;
+  onCommitDescription?: (text: string) => void; // U11: комментарий к ячейке (Неделя)
   onKey: (e: { key: string; shiftKey: boolean }) => void; // навигация (родитель)
   onSeedConsumed: () => void;
   onFill?: () => void; // U5: заполнить будни строки значением этой ячейки
@@ -30,8 +34,11 @@ export const HourCell = ({
   locked,
   overtimeThreshold,
   seed,
+  norm,
+  description,
   onActivate,
   onCommit,
+  onCommitDescription,
   onKey,
   onSeedConsumed,
   onFill,
@@ -153,7 +160,69 @@ export const HourCell = ({
     >
       {/* W6-2: замок — статус read-only не только цветом (a11y). Слева, тихо. */}
       {locked && <LockGlyph />}
-      {value > 0 ? fmtHours(value) : '·'}
+
+      {/* Чип нормы дня в активной ПУСТОЙ ячейке — «кнопка в месте ввода»: один
+          клик ставит норму (8 ч из useDailyNorm), быстрее печати. */}
+      {active && !locked && value === 0 && onFill && norm !== undefined && norm > 0 ? (
+        <button
+          type="button"
+          title={`Поставить норму дня: ${fmtHours(norm)} ч`}
+          aria-label={`Поставить норму ${fmtHours(norm)} часов`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onCommit(norm);
+          }}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            height: 18,
+            padding: '0 6px',
+            fontSize: 11.5,
+            fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+            border: `1px solid ${T.accentRing}`,
+            borderRadius: 5,
+            background: T.accentSoft,
+            color: T.accent,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = T.accent;
+            e.currentTarget.style.color = T.onAccent;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = T.accentSoft;
+            e.currentTarget.style.color = T.accent;
+          }}
+        >
+          {fmtHours(norm)}
+        </button>
+      ) : (
+        value > 0 ? fmtHours(value) : '·'
+      )}
+
+      {/* Индикатор комментария: тихая точка-маркер, если описание есть (Неделя). */}
+      {value > 0 && description && (
+        <span
+          aria-hidden
+          title={description}
+          style={{
+            position: 'absolute',
+            top: 3,
+            left: 4,
+            width: 5,
+            height: 5,
+            borderRadius: '50%',
+            background: T.accent,
+            opacity: 0.7,
+          }}
+        />
+      )}
+
+      {/* U5: заполнить будни строки значением — глиф ⇥ + хит-зона ≥16px (P2). */}
       {active && !locked && value > 0 && onFill && (
         <button
           type="button"
@@ -166,18 +235,38 @@ export const HourCell = ({
           }}
           style={{
             position: 'absolute',
-            right: 1,
-            bottom: 1,
-            width: 10,
-            height: 10,
+            right: 0,
+            bottom: 0,
+            width: 18,
+            height: 18,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             padding: 0,
             border: 'none',
-            borderRadius: 2,
-            background: T.accent,
+            borderRadius: 4,
+            background: 'transparent',
+            color: T.accent,
             cursor: 'pointer',
+            fontSize: 12,
             lineHeight: 0,
+            fontFamily: 'inherit',
           }}
-        />
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = T.accentSoft;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+        >
+          ⇥
+        </button>
+      )}
+
+      {/* U11: комментарий к ячейке в режиме Неделя (триггер ✎ + поповер). Раньше
+          был только в режиме День — устраняем разрыв. */}
+      {active && !locked && value > 0 && onCommitDescription && (
+        <CellComment description={description ?? null} onCommit={onCommitDescription} />
       )}
     </div>
   );

@@ -1,9 +1,11 @@
 import { HourCell } from 'src/front-components/grid/hour-cell';
+import { RowMenu } from 'src/front-components/grid/row-menu';
 import { TagChips } from 'src/front-components/grid/tag-chips';
 import { T } from 'src/front-components/grid/tokens';
 import { GRID_TEMPLATE, GRID_TEMPLATE_SINGLE } from 'src/front-components/grid/week-header';
 import { fmtTotal } from 'src/front-components/grid/format';
 import { categoryMeta } from 'src/front-components/shared/category-meta';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { Nav } from 'src/front-components/grid/use-keyboard';
 
@@ -28,9 +30,15 @@ type Props = {
   rowTotal: number;
   alt: boolean;
   nav: Nav;
+  normFor?: NormForDay; // норма дня для чипа быстрого ввода в пустой ячейке
   onCellCommit: (dayIso: string, hours: number) => void;
   onFill?: (value: number) => void; // U5: заполнить будни строки значением ячейки
   onDuplicate?: () => void; // W3-1: дублировать строку (тот же проект, новый вид работ)
+  onFillWeekdays?: () => void; // меню строки: 8 ч во все пустые будни
+  onClearRow?: () => void; // меню строки: обнулить все часы строки
+  onDeleteRow?: () => void; // меню строки: убрать строку из сетки
+  onCommitDescription?: (dayIso: string, text: string) => void; // комментарий к ячейке (Неделя)
+  descByDay?: (string | null)[]; // описания записей строки по дням
 };
 
 export const GridRow = ({
@@ -47,10 +55,29 @@ export const GridRow = ({
   rowTotal,
   alt,
   nav,
+  normFor,
   onCellCommit,
   onFill,
   onDuplicate,
-}: Props) => (
+  onFillWeekdays,
+  onClearRow,
+  onDeleteRow,
+  onCommitDescription,
+  descByDay,
+}: Props) => {
+  const rowLocked = (lockedByDay ?? []).length > 0 && (lockedByDay ?? []).every(Boolean);
+  const hasHours = hoursByDay.some((h) => h > 0);
+  const menu = onDuplicate && (
+    <RowMenu
+      rowLocked={rowLocked}
+      hasHours={hasHours}
+      onDuplicate={onDuplicate}
+      onFillWeekdays={() => onFillWeekdays?.()}
+      onClearRow={() => onClearRow?.()}
+      onDeleteRow={() => onDeleteRow?.()}
+    />
+  );
+  return (
   <div
     style={{
       display: 'grid',
@@ -88,6 +115,7 @@ export const GridRow = ({
           >
             {projectName}
           </div>
+          {menu}
         </div>
         <TagChips tags={tags} />
       </div>
@@ -121,7 +149,7 @@ export const GridRow = ({
             >
               {projectName}
             </div>
-            {onDuplicate && <DuplicateButton onClick={onDuplicate} />}
+            {menu}
           </div>
           <TagChips tags={tags} />
         </div>
@@ -163,8 +191,13 @@ export const GridRow = ({
         overtimeThreshold={overtimeThreshold}
         active={nav.isActive(rowIndex, i)}
         seed={nav.isActive(rowIndex, i) ? nav.editSeed : null}
+        norm={normFor ? normFor(day.iso, day.isWeekend) : undefined}
+        description={descByDay?.[i] ?? null}
         onActivate={() => nav.setActive({ row: rowIndex, col: i })}
         onCommit={(h) => onCellCommit(day.iso, h)}
+        onCommitDescription={
+          onCommitDescription ? (text) => onCommitDescription(day.iso, text) : undefined
+        }
         onFill={onFill ? () => onFill(hoursByDay[i]) : undefined}
         onKey={(e) => nav.handleKey(e)}
         onSeedConsumed={nav.consumeSeed}
@@ -186,34 +219,5 @@ export const GridRow = ({
       {fmtTotal(rowTotal)}
     </div>
   </div>
-);
-
-// W3-1 (Kimai Duplicate): иконка «⧉» — дублировать строку. Подставляет тот же
-// проект в форму добавления ниже, вид работ и часы вводятся заново.
-const DuplicateButton = ({ onClick }: { onClick: () => void }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    title="Дублировать строку: тот же проект, выберите вид работ"
-    aria-label="Дублировать строку"
-    style={{
-      flexShrink: 0,
-      width: 22,
-      height: 22,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 0,
-      border: 'none',
-      borderRadius: 6,
-      background: 'transparent',
-      color: T.textMuted,
-      cursor: 'pointer',
-      fontSize: 13,
-      lineHeight: 1,
-      fontFamily: 'inherit',
-    }}
-  >
-    ⧉
-  </button>
-);
+  );
+};
