@@ -814,3 +814,181 @@ describe('approval.logic — CISO-005 server-identity actor', () => {
     expect(result).toMatchObject({ ok: true, updated: 1 });
   });
 });
+
+// WI-55 (W5A.7/29): optimistic CAS-skip устаревших + collect-errors (батч не падает).
+describe('approval.logic — WI-55 CAS + collect-errors', () => {
+  const ID1 = '00000000-0000-4000-8000-000000000001';
+  const ID2 = '00000000-0000-4000-8000-000000000002';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  // CAS: запись уже не SUBMITTED (кто-то согласовал раньше) → skip, не затираем.
+  it('approve: статус уже сменился (APPROVED) между read/write → skipped:1, updated:0', async () => {
+    // dev-bypass (нет workspaceMemberRef) → guard пропущен, идём в CAS.
+    const alreadyApproved = {
+      data: { credosTimeEntries: [{ id: ID1, status: 'APPROVED', employeeId: 'e2', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([alreadyApproved]));
+    const result = await handler(event({ op: 'approve', ids: ID1 }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skipped: 1, failed: [] });
+  });
+
+  // collect-errors: первый PATCH падает (500) — батч НЕ бросает, идёт ко второму.
+  it('approve батч: PATCH id1 падает → failed[id1], id2 проходит → updated:1', async () => {
+    const entry1 = { data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }] } };
+    const entry2 = { data: { credosTimeEntries: [{ id: ID2, status: 'SUBMITTED', employeeId: 'e3', projectId: 'p1' }] } };
+    let call = 0;
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: { method?: string }) => {
+      call += 1;
+      // 1: GET entry1, 2: PATCH entry1 (FAIL 500), 3: GET entry2, 4: PATCH entry2 (OK)
+      if (opts?.method === 'PATCH' && typeof url === 'string' && url.includes(ID1)) {
+        return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('boom'), json: () => Promise.resolve({}) });
+      }
+      const data = call === 1 ? entry1 : entry2;
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(data), text: () => Promise.resolve('') });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await handler(event({ op: 'approve', ids: `${ID1},${ID2}` })) as Record<string, unknown>;
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    expect((result.failed as unknown[]).length).toBe(1);
+    expect((result.failed as { id: string }[])[0].id).toBe(ID1);
+  });
+
+  // revoke CAS: запись уже SUBMITTED (revoke кем-то выполнен) → skipped, не падает.
+  it('revoke: запись уже SUBMITTED (не APPROVED) → skipped:1, updated:0', async () => {
+    const already = {
+      data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([already]));
+    const result = await handler(event({ op: 'revoke', ids: ID1 }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skipped: 1, failed: [] });
+  });
+});
+
+// WI-56 (W5A.11/12/24): аудит resolvedBy/At (resolver) + revokedBy/At (кто отозвал).
+describe('approval.logic — WI-56 аудит resolver/revoke', () => {
+  const REF = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const UW = 'ffffffff-1111-4fff-8fff-ffffffffffff';
+  const ID = '00000000-0000-4000-8000-000000000001';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  const patchBody = (mockFn: ReturnType<typeof mockFetch>): Record<string, unknown> => {
+    const call = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    if (!call) throw new Error('PATCH-вызов не найден');
+    return JSON.parse((call[1] as { body: string }).body);
+  };
+
+  // approve: approvedBy + resolvedBy = server-actor (userWorkspaceId), revoked-поля null.
+  it('approve: approvedBy+resolvedBy=actor (server-truth), revokedBy=null', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const entryOther = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, entryOther, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'approve', ids: ID }, { userWorkspaceId: UW }));
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('APPROVED');
+    expect(body.approvedBy).toBe(UW);
+    expect(body.resolvedBy).toBe(UW);
+    expect(body.revokedBy).toBeNull();
+  });
+
+  // reject: approvedBy НЕ ставится (разведена семантика), resolvedBy=actor, rejectComment.
+  it('reject: approvedBy=null, resolvedBy=actor, rejectComment сохранён (семантика разведена)', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const entryOther = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, entryOther, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'reject', ids: ID, comment: 'Уточните состав' }, { userWorkspaceId: UW }));
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('REJECTED');
+    expect(body.approvedBy).toBeNull();
+    expect(body.resolvedBy).toBe(UW);
+    expect(body.resolvedAt).toEqual(expect.any(String));
+    expect(body.rejectComment).toBe('Уточните состав');
+  });
+
+  // revoke: revokedBy=server-actor записан, approve/resolve-аудит обнулён (W5A.24).
+  it('revoke: revokedBy=actor (server-truth), approvedBy+resolvedBy обнулены, без REVOKED-статуса', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const approvedOther = { data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e-other', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, approvedOther, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'revoke', ids: ID }, { userWorkspaceId: UW }));
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('SUBMITTED'); // не REVOKED — 4 статуса сохранены
+    expect(body.revokedBy).toBe(UW);
+    expect(body.revokedAt).toEqual(expect.any(String));
+    expect(body.approvedBy).toBeNull();
+    expect(body.approvedAt).toBeNull();
+    expect(body.resolvedBy).toBeNull();
+  });
+
+  // recall: revokedBy=server-actor (сотрудник сам отозвал отправку).
+  it('recall: revokedBy=actor (сотрудник отозвал свою отправку), resolver-аудит null', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const ownEntry = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, ownEntry, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'recall', ids: ID }, { userWorkspaceId: UW }));
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('DRAFT');
+    expect(body.revokedBy).toBe(UW);
+    expect(body.resolvedBy).toBeNull();
+    expect(body.approvedBy).toBeNull();
+  });
+});
+
+// WI-57 (W5A.5): reject-defense — backend валидирует полноту submit сотрудника.
+describe('approval.logic — WI-57 reject-defense (полнота submit)', () => {
+  const ID1 = '00000000-0000-4000-8000-000000000001';
+  const ID2 = '00000000-0000-4000-8000-000000000002';
+  const FROM = '2026-06-01';
+  const TO = '2026-06-30';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  // Неполная выборка: сотрудник e1 имеет 2 SUBMITTED, в reject передан только 1 → отказ.
+  it('reject c периодом: передан не весь submit сотрудника → ok:false, incompleteEmployees', async () => {
+    // dev-bypass actor=null. Порядок fetch defense: GET id1 (employeeId) → GET все SUBMITTED e1.
+    const entry1 = { data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
+    const allOfE1 = { data: { credosTimeEntries: [
+      { id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' },
+      { id: ID2, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }, // НЕ в ids
+    ] } };
+    vi.stubGlobal('fetch', mockFetch([entry1, allOfE1]));
+    const result = await handler(event({ op: 'reject', ids: ID1, from: FROM, to: TO })) as Record<string, unknown>;
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('весь submit') });
+    expect(result.incompleteEmployees).toEqual(['e1']);
+  });
+
+  // Полная выборка: все SUBMITTED-записи сотрудника переданы → reject проходит.
+  it('reject c периодом: передан весь submit → проходит (updated:1)', async () => {
+    const entry1 = { data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
+    const allOfE1 = { data: { credosTimeEntries: [
+      { id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' },
+    ] } };
+    // defense ok → далее CAS-цикл: GET id1 + PATCH.
+    const casEntry1 = { data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
+    vi.stubGlobal('fetch', mockFetch([entry1, allOfE1, casEntry1, {}]));
+    const result = await handler(event({ op: 'reject', ids: ID1, from: FROM, to: TO }));
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+
+  // Без периода (from/to) defense неприменима — reject как раньше (обратная совместимость).
+  it('reject без from/to: defense пропущена, reject работает по ids (updated:1)', async () => {
+    const casEntry1 = { data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
+    vi.stubGlobal('fetch', mockFetch([casEntry1, {}]));
+    const result = await handler(event({ op: 'reject', ids: ID1 }));
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+});

@@ -21,6 +21,10 @@ import {
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
   CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID,
+  CREDOS_TIME_ENTRY_RESOLVED_AT_FIELD_ID,
+  CREDOS_TIME_ENTRY_RESOLVED_BY_FIELD_ID,
+  CREDOS_TIME_ENTRY_REVOKED_AT_FIELD_ID,
+  CREDOS_TIME_ENTRY_REVOKED_BY_FIELD_ID,
   CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
   CREDOS_TIME_ENTRY_TAGS_FIELD_ID,
   CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
@@ -120,6 +124,48 @@ export default defineObject({
       type: FieldType.TEXT,
       label: 'Причина отклонения',
       icon: 'IconMessageCircleX',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // WI-56 аудит-resolver (W5A.11/12/24). approvedBy/At остаются approve-only;
+    // resolvedBy/At фиксируют АВТОРА решения и для reject (где approvedBy раньше
+    // нёс двойную семантику «отклонивший»). Заполняет /s/approval approve+reject.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_RESOLVED_BY_FIELD_ID,
+      name: 'resolvedBy',
+      type: FieldType.TEXT,
+      label: 'Кто вынес решение',
+      icon: 'IconGavel',
+      isNullable: true,
+      defaultValue: null,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_RESOLVED_AT_FIELD_ID,
+      name: 'resolvedAt',
+      type: FieldType.DATE_TIME,
+      label: 'Дата решения',
+      icon: 'IconCalendarStats',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // revokedBy/At — кто/когда отозвал согласование (revoke, руководитель) ИЛИ
+    // отправку (recall, сотрудник). W5A.24: REVOKED-статус не вводим — признак
+    // «отозвано согласование» = approvedAt пуст И revokedBy задан.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_REVOKED_BY_FIELD_ID,
+      name: 'revokedBy',
+      type: FieldType.TEXT,
+      label: 'Кто отозвал',
+      icon: 'IconArrowBackUp',
+      isNullable: true,
+      defaultValue: null,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_REVOKED_AT_FIELD_ID,
+      name: 'revokedAt',
+      type: FieldType.DATE_TIME,
+      label: 'Дата отзыва',
+      icon: 'IconCalendarMinus',
       isNullable: true,
       defaultValue: null,
     },

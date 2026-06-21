@@ -81,6 +81,7 @@ export type DeptPlan = {
 export type PlanSlot = {
   projectId: string | null;
   departmentId: string | null;
+  employeeId: string | null; // планирование до сотрудника: задан = персональный слот
   periodMonth: string | null; // 'YYYY-MM'
   plannedHours: number | null;
 };
@@ -147,6 +148,7 @@ export type ProjectPatch = {
   plannedEffort?: number | null;
   startDate?: string | null; // YYYY-MM-DD
   endDate?: string | null; // YYYY-MM-DD
+  planMethod?: 'EVEN' | 'MANUAL' | null; // SSOT способа раскида (round-trip)
 };
 
 // Вклад проекта в загрузку отдела за период (для детализации).

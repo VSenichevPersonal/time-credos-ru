@@ -163,26 +163,66 @@ const buildApprovalMap = async (): Promise<Map<string, boolean>> => {
   return map;
 };
 
+// Действие, вызвавшее смену статуса. Определяет, какие аудит-поля писать (WI-56).
+//   submit  — DRAFT/REJECTED → SUBMITTED (новая попытка, аудит «с чистого листа»).
+//   approve — SUBMITTED → APPROVED (approvedBy/At + resolvedBy/At).
+//   reject  — SUBMITTED → REJECTED (resolvedBy/At + rejectComment; approvedBy НЕ пишем).
+//   revoke  — APPROVED → SUBMITTED (revokedBy/At; снять approve+resolve-аудит).
+//   recall  — SUBMITTED → DRAFT (revokedBy/At = сотрудник отозвал отправку; снять resolve).
+type ApprovalAction = 'submit' | 'approve' | 'reject' | 'revoke' | 'recall';
+
+// WI-56 (W5A.11/12/24): семантика аудит-полей разведена.
+//   approvedBy/At — ТОЛЬКО approve (кто согласовал; на REJECTED больше не пишем).
+//   resolvedBy/At — кто вынес решение (approve ИЛИ reject) — resolver-аудит.
+//   revokedBy/At  — кто отозвал согласование (revoke) или отправку (recall).
+// На откате назад прежний аудит обнуляется, чтобы запись не выглядела решённой;
+// REVOKED-статус не вводим — «отозвано» = approvedAt пуст И revokedBy задан.
 const setStatus = async (
   id: string,
   status: string,
+  action: ApprovalAction,
   actor: string | null,
   comment: string | null = null,
 ): Promise<void> => {
+  const now = new Date().toISOString();
   const data: Record<string, unknown> = { status };
-  if (status === ENTRY_STATUS.APPROVED || status === ENTRY_STATUS.REJECTED) {
+
+  if (action === 'approve') {
     data.approvedBy = actor ?? null;
-    data.approvedAt = new Date().toISOString();
-  }
-  // Откат назад (recall SUBMITTED→DRAFT, revoke APPROVED→SUBMITTED) снимает прежнее
-  // решение руководителя — обнуляем аудит-поля, чтобы запись не выглядела согласованной.
-  if (status === ENTRY_STATUS.DRAFT || status === ENTRY_STATUS.SUBMITTED) {
+    data.approvedAt = now;
+    data.resolvedBy = actor ?? null;
+    data.resolvedAt = now;
+    data.revokedBy = null;
+    data.revokedAt = null;
+    data.rejectComment = null;
+  } else if (action === 'reject') {
+    // approvedBy НЕ трогаем как «согласовавшего» — это отклонение. resolver = actor.
     data.approvedBy = null;
     data.approvedAt = null;
+    data.resolvedBy = actor ?? null;
+    data.resolvedAt = now;
+    data.revokedBy = null;
+    data.revokedAt = null;
+    data.rejectComment = comment ?? null;
+  } else if (action === 'revoke' || action === 'recall') {
+    // Откат назад: снимаем решение, фиксируем кто/когда отозвал.
+    data.approvedBy = null;
+    data.approvedAt = null;
+    data.resolvedBy = null;
+    data.resolvedAt = null;
+    data.revokedBy = actor ?? null;
+    data.revokedAt = now;
+    data.rejectComment = null;
+  } else {
+    // submit: новая попытка согласования «с чистого листа» — весь аудит обнуляем.
+    data.approvedBy = null;
+    data.approvedAt = null;
+    data.resolvedBy = null;
+    data.resolvedAt = null;
+    data.revokedBy = null;
+    data.revokedAt = null;
+    data.rejectComment = null;
   }
-  // rejectComment: при REJECT сохраняем причину (сотрудник видит что исправить);
-  // при approve/повторном submit/откате очищаем прежнюю причину — запись «ожила».
-  data.rejectComment = status === ENTRY_STATUS.REJECTED ? comment ?? null : null;
   await restPatch(`/rest/credosTimeEntries/${id}`, data);
 };
 
@@ -213,13 +253,121 @@ const runSubmit = async (params: Record<string, string>): Promise<object> => {
   const targets = (res.data?.credosTimeEntries ?? []).filter(
     (e) => SUBMITTABLE.has(e.status) && e.projectId && approvalMap.get(e.projectId),
   );
-  for (const e of targets) await setStatus(e.id, ENTRY_STATUS.SUBMITTED, null);
-  return { ok: true, updated: targets.length };
+  // WI-55 collect-errors: батч не падает на середине — собираем per-item ошибки.
+  let updated = 0;
+  const failed: { id: string; error: string }[] = [];
+  for (const e of targets) {
+    try {
+      await setStatus(e.id, ENTRY_STATUS.SUBMITTED, 'submit', null);
+      updated += 1;
+    } catch (err) {
+      failed.push({ id: e.id, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return { ok: true, updated, failed };
+};
+
+// WI-55 (W5A.7/29) оптимистичный CAS + collect-errors на одном id.
+// SDK не даёт транзакций/condition-update → делаем read-then-write с проверкой
+// ОЖИДАЕМОГО статуса непосредственно перед PATCH (optimistic-lock):
+//   - статус уже сменился (не expectedFrom) → skip как «уже обработано» (идемпотентно,
+//     повторное approve = no-op — эталон Timetta single-resolver), запись НЕ затираем;
+//   - запись принадлежит актору и нарушает SoD → skipOwn (вызывающий считает отдельно);
+//   - PATCH упал → НЕ бросаем на середине батча, собираем в failed и идём дальше.
+// Возврат: 'done' | 'skipped' (CAS-устарел/нет записи) | 'skippedOwn' | 'failed'.
+type CasOutcome = 'done' | 'skipped' | 'skippedOwn' | 'failed';
+const casApply = async (
+  id: string,
+  expectedFrom: string,
+  action: ApprovalAction,
+  targetStatus: string,
+  actor: Actor,
+  actorId: string | null,
+  comment: string | null,
+  ownConflict: 'sameEmployeeForbidden' | 'foreignEmployeeForbidden' | 'none',
+  failed: { id: string; error: string }[],
+): Promise<CasOutcome> => {
+  try {
+    const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
+      '/rest/credosTimeEntries',
+      { filter: `id[eq]:${id}`, limit: '1' },
+    );
+    const entry = res.data?.credosTimeEntries?.[0];
+    // CAS: запись пропала ИЛИ статус уже не ожидаемый → пропускаем (гонка/идемпотентность).
+    if (!entry || entry.status !== expectedFrom) return 'skipped';
+    // Ownership-гейт. approve/revoke: руководитель не действует над СВОЕЙ (SoD).
+    // recall: сотрудник действует только над СВОЕЙ (чужая запрещена).
+    if (actor && ownConflict === 'sameEmployeeForbidden' && entry.employeeId === actor.employeeId) {
+      return 'skippedOwn';
+    }
+    if (actor && ownConflict === 'foreignEmployeeForbidden' && entry.employeeId !== actor.employeeId) {
+      return 'skippedOwn';
+    }
+    await setStatus(id, targetStatus, action, actorId, comment);
+    return 'done';
+  } catch (err) {
+    failed.push({ id, error: err instanceof Error ? err.message : String(err) });
+    return 'failed';
+  }
+};
+
+const parseIds = (raw: string | undefined): string[] =>
+  (raw ?? '').split(',').map((s) => s.trim()).filter(isUuid);
+
+// WI-57 (W5A.5) reject-defense: backend не доверяет клиенту, что в reject передан
+// ПОЛНЫЙ submit сотрудника (Timetta: reject таймшита целиком, не выборочно).
+// Defense активна, когда клиент передал период (from/to) — только тогда сервер
+// знает «полный submit». Для каждого затронутого сотрудника тянем его SUBMITTED-
+// записи периода и сверяем: все ли вошли в ids. Не вошли → неполная выборка.
+// Возврат: список employeeId с неполной выборкой (пусто = выборка полная/проверка
+// неприменима). Ошибки сети не валят reject — defense best-effort (вернёт пусто).
+const findIncompleteRejectEmployees = async (
+  ids: string[],
+  from: string,
+  to: string,
+): Promise<string[]> => {
+  if (!isIsoDate(from) || !isIsoDate(to)) return [];
+  const idSet = new Set(ids);
+  // employeeId затронутых записей (из переданных ids).
+  const employees = new Set<string>();
+  try {
+    for (const id of ids) {
+      const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
+        '/rest/credosTimeEntries',
+        { filter: `id[eq]:${id}`, limit: '1' },
+      );
+      const e = res.data?.credosTimeEntries?.[0];
+      if (e?.status === ENTRY_STATUS.SUBMITTED && e.employeeId) employees.add(e.employeeId);
+    }
+    const incomplete: string[] = [];
+    for (const empId of employees) {
+      const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
+        '/rest/credosTimeEntries',
+        {
+          filter: `date[gte]:${from},date[lte]:${to},employeeId[eq]:${empId}`,
+          limit: '500',
+        },
+      );
+      const submitted = (res.data?.credosTimeEntries ?? []).filter(
+        (e) => e.status === ENTRY_STATUS.SUBMITTED,
+      );
+      // Хотя бы одна SUBMITTED-запись сотрудника в периоде НЕ попала в reject-выборку.
+      if (submitted.some((e) => !idSet.has(e.id))) incomplete.push(empId);
+    }
+    return incomplete;
+  } catch {
+    // Сетевой сбой defense → не блокируем reject (best-effort, CAS ниже всё равно
+    // проверит статусы поштучно). Логируем для аудита.
+    // eslint-disable-next-line no-console
+    console.warn('[approval] reject-defense: проверка полноты пропущена (ошибка чтения)');
+    return [];
+  }
 };
 
 // approve/reject: переданные id (SUBMITTED) → APPROVED/REJECTED, фиксируем actor+дату.
 // RBAC (CISO-002): согласовывать может только руководитель (actor.isManager),
 // и нельзя согласовывать собственные записи (separation of duties: actor != owner).
+// WI-55: CAS-skip устаревших + collect-errors (батч не падает на середине).
 const runResolve = async (
   params: Record<string, string>,
   status: string,
@@ -228,11 +376,12 @@ const runResolve = async (
 ): Promise<object> => {
   // CISO-006: каждый id идёт в `id[eq]:${id}` filter — оставляем только UUID
   // (инъекция-строки отбрасываются до запроса).
-  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
+  const ids = parseIds(params.ids);
   if (ids.length === 0) return { ok: false, error: 'ids required' };
   // Причина отклонения (op=reject). Хранится на каждой записи батча. min-длина —
   // UI-валидация (Dev1); backend сохраняет переданное (decoupled rollout).
-  const comment = params.comment ?? null;
+  const comment = status === ENTRY_STATUS.REJECTED ? params.comment ?? null : null;
+  const action: ApprovalAction = status === ENTRY_STATUS.REJECTED ? 'reject' : 'approve';
 
   // Guard роли. Если actor резолвлен — требуем isManager. Если не резолвлен
   // (workspaceMemberRef ещё не сопоставлен — dev), пропускаем с предупреждением.
@@ -246,32 +395,45 @@ const runResolve = async (
     );
   }
 
+  // WI-57 reject-defense: при reject c периодом сверяем полноту выборки сотрудника.
+  // Неполная выборка (часть SUBMITTED-записей не вошла) → отказ, клиенту не доверяем.
+  if (action === 'reject' && params.from && params.to) {
+    const incomplete = await findIncompleteRejectEmployees(ids, params.from, params.to);
+    if (incomplete.length > 0) {
+      return {
+        ok: false,
+        error: 'reject должен отклонять весь submit сотрудника (неполная выборка)',
+        incompleteEmployees: incomplete,
+      };
+    }
+  }
+
   let updated = 0;
   let skippedOwn = 0;
+  let skipped = 0;
+  const failed: { id: string; error: string }[] = [];
   for (const id of ids) {
-    const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
-      '/rest/credosTimeEntries',
-      { filter: `id[eq]:${id}`, limit: '1' },
+    const r = await casApply(
+      id, ENTRY_STATUS.SUBMITTED, action, status,
+      actor, actorId, comment, 'sameEmployeeForbidden', failed,
     );
-    const entry = res.data?.credosTimeEntries?.[0];
-    if (entry?.status !== ENTRY_STATUS.SUBMITTED) continue; // только из «На согласовании»
-    // Separation of duties: руководитель не согласует собственные трудозатраты.
-    if (actor && entry.employeeId === actor.employeeId) {
-      skippedOwn += 1;
-      continue;
-    }
-    await setStatus(id, status, actorId, comment);
-    updated += 1;
+    if (r === 'done') updated += 1;
+    else if (r === 'skippedOwn') skippedOwn += 1;
+    else if (r === 'skipped') skipped += 1;
   }
-  return { ok: true, updated, skippedOwn };
+  return { ok: true, updated, skippedOwn, skipped, failed };
 };
 
 // recall (A4.3/A4.4): СОТРУДНИК отзывает СВОЮ отправку SUBMITTED → DRAFT,
 // пока руководитель не вынес решение (запись ещё SUBMITTED). Право — владелец записи:
 // actor.employeeId == entry.employeeId. Чужие/не-SUBMITTED записи пропускаются.
 // Руководитель НЕ нужен (это действие сотрудника над собственными трудозатратами).
-const runRecall = async (params: Record<string, string>, actor: Actor): Promise<object> => {
-  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
+const runRecall = async (
+  params: Record<string, string>,
+  actorId: string | null,
+  actor: Actor,
+): Promise<object> => {
+  const ids = parseIds(params.ids);
   if (ids.length === 0) return { ok: false, error: 'ids required' };
 
   // dev-bypass: actor не сопоставлен (workspaceMemberRef пуст) — пропускаем ownership-гейт.
@@ -280,24 +442,22 @@ const runRecall = async (params: Record<string, string>, actor: Actor): Promise<
     console.warn('[approval] recall: actor не сопоставлен — ownership-guard пропущен (DEV)');
   }
 
+  // WI-55 CAS + collect-errors. recall = действие сотрудника над СВОЕЙ отправкой:
+  // revokedBy фиксирует, кто отозвал (WI-56). Чужая запись → skippedForeign.
   let updated = 0;
   let skippedForeign = 0;
+  let skipped = 0;
+  const failed: { id: string; error: string }[] = [];
   for (const id of ids) {
-    const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
-      '/rest/credosTimeEntries',
-      { filter: `id[eq]:${id}`, limit: '1' },
+    const r = await casApply(
+      id, RECALL_FROM, 'recall', RECALL_TO,
+      actor, actorId, null, 'foreignEmployeeForbidden', failed,
     );
-    const entry = res.data?.credosTimeEntries?.[0];
-    if (entry?.status !== RECALL_FROM) continue; // отзыв отправки только из SUBMITTED
-    // Сотрудник отзывает ТОЛЬКО свои записи (нельзя дёрнуть чужую отправку).
-    if (actor && entry.employeeId !== actor.employeeId) {
-      skippedForeign += 1;
-      continue;
-    }
-    await setStatus(id, RECALL_TO, null);
-    updated += 1;
+    if (r === 'done') updated += 1;
+    else if (r === 'skippedOwn') skippedForeign += 1;
+    else if (r === 'skipped') skipped += 1;
   }
-  return { ok: true, updated, skippedForeign };
+  return { ok: true, updated, skippedForeign, skipped, failed };
 };
 
 // revoke (A4.25/A4.26): РУКОВОДИТЕЛЬ отзывает выданное согласование APPROVED → SUBMITTED
@@ -308,7 +468,7 @@ const runRevoke = async (
   actorId: string | null,
   actor: Actor,
 ): Promise<object> => {
-  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
+  const ids = parseIds(params.ids);
   if (ids.length === 0) return { ok: false, error: 'ids required' };
 
   if (actor && !actor.isManager) {
@@ -319,25 +479,22 @@ const runRevoke = async (
     console.warn('[approval] revoke: actor не сопоставлен — RBAC-guard пропущен (DEV)');
   }
 
+  // WI-55 CAS + collect-errors. revoke = руководитель отзывает согласование:
+  // revokedBy фиксирует, кто отозвал (WI-56). SoD: не отзывать СВОЮ запись.
   let updated = 0;
   let skippedOwn = 0;
+  let skipped = 0;
+  const failed: { id: string; error: string }[] = [];
   for (const id of ids) {
-    const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
-      '/rest/credosTimeEntries',
-      { filter: `id[eq]:${id}`, limit: '1' },
+    const r = await casApply(
+      id, REVOKE_FROM, 'revoke', REVOKE_TO,
+      actor, actorId, null, 'sameEmployeeForbidden', failed,
     );
-    const entry = res.data?.credosTimeEntries?.[0];
-    if (entry?.status !== REVOKE_FROM) continue; // отзыв согласования только из APPROVED
-    // Separation of duties: руководитель не отзывает собственные записи.
-    if (actor && entry.employeeId === actor.employeeId) {
-      skippedOwn += 1;
-      continue;
-    }
-    // actorId передаём ради единообразия; setStatus для SUBMITTED обнулит approvedBy/At.
-    await setStatus(id, REVOKE_TO, actorId);
-    updated += 1;
+    if (r === 'done') updated += 1;
+    else if (r === 'skippedOwn') skippedOwn += 1;
+    else if (r === 'skipped') skipped += 1;
   }
-  return { ok: true, updated, skippedOwn };
+  return { ok: true, updated, skippedOwn, skipped, failed };
 };
 
 const run = async (event: RoutePayload) => {
@@ -352,7 +509,7 @@ const run = async (event: RoutePayload) => {
   if (op === 'submit') return runSubmit(params);
   if (op === 'approve') return runResolve(params, ENTRY_STATUS.APPROVED, actorId, actor);
   if (op === 'reject') return runResolve(params, ENTRY_STATUS.REJECTED, actorId, actor);
-  if (op === 'recall') return runRecall(params, actor);
+  if (op === 'recall') return runRecall(params, actorId, actor);
   if (op === 'revoke') return runRevoke(params, actorId, actor);
   return { ok: false, error: `unknown op: ${op}` };
 };

@@ -15,16 +15,21 @@ import { validUuidParam } from './params-validate';
  *   mode='read' (по умолчанию):
  *     ЗАПРОС:  { mode?: 'read', projectId: UUID }
  *     ОТВЕТ:   { ok: true, mode: 'read', projectId,
- *                slots: [{ id, projectId, departmentId, periodMonth, plannedHours }] }
- *              - отсортированы по periodMonth возр., затем departmentId.
+ *                slots: [{ id, projectId, departmentId, employeeId,
+ *                          periodMonth, plannedHours }] }
+ *              - отсортированы по periodMonth возр., затем departmentId, затем employeeId.
  *
- *   mode='upsert' — дедуп по ключу (projectId, departmentId|null, periodMonth):
+ *   mode='upsert' — дедуп по ключу (projectId, departmentId|null, employeeId|null,
+ *                   periodMonth):
  *     ЗАПРОС:  { mode: 'upsert', projectId: UUID,
  *                slots: [{ periodMonth: 'YYYY-MM', plannedHours: number,
- *                          departmentId?: UUID|null }] }
+ *                          departmentId?: UUID|null, employeeId?: UUID|null }] }
  *              - body.slots можно передать JSON-строкой (queryString-режим) или
  *                массивом (JSON body). plannedHours пустой/0 → слот УДАЛЯЕТСЯ
  *                (или не создаётся). Существующий по ключу → PATCH; иначе → POST.
+ *              - Планирование до СОТРУДНИКА (bottom-up SSOT §3.1): employeeId задан →
+ *                персональный слот; пуст → отдельский/проектный (прежнее). Слот с
+ *                employeeId БЕЗ departmentId допустим (персональный без отдела).
  *     ОТВЕТ:   { ok: true, mode: 'upsert', projectId,
  *                created, updated, deleted,           // счётчики
  *                slots: [...]                          // итоговый набор (как read) }
@@ -82,6 +87,7 @@ type RawSlot = {
   id: string;
   projectId: string | null;
   departmentId: string | null;
+  employeeId: string | null;
   periodMonth: string | null;
   plannedHours: number | null;
 };
@@ -117,20 +123,27 @@ const sortSlots = (slots: RawSlot[]): RawSlot[] =>
   [...slots].sort(
     (a, b) =>
       (a.periodMonth ?? '').localeCompare(b.periodMonth ?? '') ||
-      (a.departmentId ?? '').localeCompare(b.departmentId ?? ''),
+      (a.departmentId ?? '').localeCompare(b.departmentId ?? '') ||
+      (a.employeeId ?? '').localeCompare(b.employeeId ?? ''),
   );
 
 const toView = (s: RawSlot) => ({
   id: s.id,
   projectId: s.projectId,
   departmentId: s.departmentId,
+  employeeId: s.employeeId,
   periodMonth: s.periodMonth,
   plannedHours: s.plannedHours,
 });
 
-// Дедуп-ключ слота: проект подразумевается, ключ = month|dept.
-const slotKey = (periodMonth: string, departmentId: string | null): string =>
-  `${periodMonth}|${departmentId ?? ''}`;
+// Дедуп-ключ слота: проект подразумевается, ключ = month|dept|employee.
+// Планирование до сотрудника: персональный слот (employeeId) отличается от
+// отдельского (тот же month+dept без employee) → разные ключи, не схлопываются.
+const slotKey = (
+  periodMonth: string,
+  departmentId: string | null,
+  employeeId: string | null,
+): string => `${periodMonth}|${departmentId ?? ''}|${employeeId ?? ''}`;
 
 const MONTH_RE = /^\d{4}-\d{2}$/;
 
@@ -143,11 +156,16 @@ const readParams = (event: RoutePayload): Record<string, unknown> => {
   return out;
 };
 
-type InputSlot = { periodMonth: string; plannedHours: number; departmentId: string | null };
+type InputSlot = {
+  periodMonth: string;
+  plannedHours: number;
+  departmentId: string | null;
+  employeeId: string | null;
+};
 
-// Нормализация входных слотов: только валидный 'YYYY-MM', departmentId — UUID|null.
-// plannedHours приводится к числу (NaN → 0 → удаление). Дубли по ключу схлопываются
-// (последний выигрывает).
+// Нормализация входных слотов: только валидный 'YYYY-MM', departmentId/employeeId —
+// UUID|null. plannedHours приводится к числу (NaN → 0 → удаление). Дубли по ключу
+// (month|dept|employee) схлопываются (последний выигрывает).
 const parseInputSlots = (raw: unknown): InputSlot[] => {
   let arr: unknown = raw;
   if (typeof raw === 'string') {
@@ -165,9 +183,15 @@ const parseInputSlots = (raw: unknown): InputSlot[] => {
     const periodMonth = String(o.periodMonth ?? '');
     if (!MONTH_RE.test(periodMonth)) continue;
     const departmentId = o.departmentId ? validUuidParam(String(o.departmentId)) : null;
+    const employeeId = o.employeeId ? validUuidParam(String(o.employeeId)) : null;
     const hoursNum = Number(o.plannedHours);
     const plannedHours = Number.isFinite(hoursNum) ? hoursNum : 0;
-    byKey.set(slotKey(periodMonth, departmentId), { periodMonth, plannedHours, departmentId });
+    byKey.set(slotKey(periodMonth, departmentId, employeeId), {
+      periodMonth,
+      plannedHours,
+      departmentId,
+      employeeId,
+    });
   }
   return [...byKey.values()];
 };
@@ -187,7 +211,7 @@ const runUpsert = async (projectId: string, inputs: InputSlot[]) => {
   const byKey = new Map<string, RawSlot>();
   for (const s of existing) {
     if (!s.periodMonth) continue;
-    byKey.set(slotKey(s.periodMonth, s.departmentId), s);
+    byKey.set(slotKey(s.periodMonth, s.departmentId, s.employeeId), s);
   }
 
   let created = 0;
@@ -195,7 +219,7 @@ const runUpsert = async (projectId: string, inputs: InputSlot[]) => {
   let deleted = 0;
 
   for (const inp of inputs) {
-    const key = slotKey(inp.periodMonth, inp.departmentId);
+    const key = slotKey(inp.periodMonth, inp.departmentId, inp.employeeId);
     const cur = byKey.get(key);
     // Пустой/0 → удалить существующий (или ничего не создавать).
     if (!inp.plannedHours || inp.plannedHours <= 0) {
@@ -215,6 +239,7 @@ const runUpsert = async (projectId: string, inputs: InputSlot[]) => {
       await restPost('/rest/credosTimePlanSlots', {
         projectId,
         departmentId: inp.departmentId,
+        employeeId: inp.employeeId,
         periodMonth: inp.periodMonth,
         plannedHours: inp.plannedHours,
       });
@@ -262,7 +287,7 @@ export default defineLogicFunction({
   universalIdentifier: PLAN_SLOTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER,
   name: 'plan-slots',
   description:
-    'Помесячные слоты плана проекта (WI-47): read by projectId + upsert (дедуп по project×dept×month)',
+    'Помесячные слоты плана проекта (WI-47): read by projectId + upsert (дедуп по project×dept×employee×month)',
   timeoutSeconds: 30,
   handler,
   httpRouteTriggerSettings: {

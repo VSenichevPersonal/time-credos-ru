@@ -9,7 +9,10 @@ import {
 import {
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_PLAN_SLOTS_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_PLAN_SLOTS_FIELD_ID,
   CREDOS_TIME_PLAN_SLOT_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_PLAN_SLOT_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_PLAN_SLOT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PLAN_SLOT_PERIOD_MONTH_FIELD_ID,
   CREDOS_TIME_PLAN_SLOT_PLANNED_HOURS_FIELD_ID,
@@ -32,8 +35,9 @@ import {
 // department nullable: гранулярность по умолчанию проект×месяц; при детализации по
 // отделам (REQ-0013) слот = проект×отдел×месяц. SET_NULL — удаление отдела не сносит
 // слот плана (часы остаются на проекте, отдел просто «снимается»).
-// Дедуп (project[,department],periodMonth) обеспечивает upsert /s/plan-slots
-// (read-by-key → PATCH | POST): SDK-индексов объекты этого проекта не используют.
+// Дедуп (project[,department][,employee],periodMonth) обеспечивает upsert
+// /s/plan-slots (read-by-key → PATCH | POST): SDK-индексов объекты этого проекта
+// не используют. employee — персональное измерение (планирование до сотрудника).
 export default defineObject({
   universalIdentifier: CREDOS_TIME_PLAN_SLOT_OBJECT_UNIVERSAL_IDENTIFIER,
   nameSingular: 'credosTimePlanSlot',
@@ -99,6 +103,29 @@ export default defineObject({
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.SET_NULL,
         joinColumnName: 'departmentId',
+      },
+    },
+    // PlanSlot.employee -> Employee.planSlots (MANY_TO_ONE, nullable, SET_NULL).
+    // Планирование до СОТРУДНИКА (bottom-up SSOT §3.1): employee задан → персональный
+    // слот (высший приоритет в иерархии employee>dept>EVEN, §7.2); пуст → отдельский/
+    // проектный остаток (прежнее поведение). SET_NULL — удаление сотрудника не сносит
+    // слот плана (часы «снимаются» с человека, остаются нераспределённым остатком
+    // отдела/проекта; слот переживает как история, аналогично department SET_NULL).
+    {
+      universalIdentifier: CREDOS_TIME_PLAN_SLOT_EMPLOYEE_FIELD_ID,
+      name: 'employee',
+      type: FieldType.RELATION,
+      label: 'Сотрудник',
+      icon: 'IconUser',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_EMPLOYEE_PLAN_SLOTS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'employeeId',
       },
     },
   ],

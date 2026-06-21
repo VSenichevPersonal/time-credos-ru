@@ -46,6 +46,12 @@ type Props = {
 const isoToDate = (iso: string | null): string => (iso ? String(iso).slice(0, 10) : '');
 const todayKey = (): string => new Date().toISOString().slice(0, 10);
 
+// SSOT: способ раскида читается из сохранённого project.planMethod (round-trip).
+// MANUAL → панель открывается в ручном режиме с префиллом слотов; иначе EVEN.
+// Экспорт для unit-теста init/reset (env=node, без mount панели).
+export const methodOf = (project: CapProject): 'EVEN' | 'MANUAL' =>
+  project.planMethod === 'MANUAL' ? 'MANUAL' : 'EVEN';
+
 // Число часов: запятая→точка, отрицательные/нечисло → null (план не задан).
 const parseEffort = (raw: string): number | null => {
   const s = raw.trim().replace(',', '.');
@@ -75,7 +81,7 @@ const tnum = { fontVariantNumeric: 'tabular-nums' as const };
 export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave }: Props) => {
   const [open, setOpen] = useState(false);
   // Черновик независим от строки: Отмена/Esc отбрасывает без записи.
-  const [method, setMethod] = useState<'EVEN' | 'MANUAL'>('EVEN');
+  const [method, setMethod] = useState<'EVEN' | 'MANUAL'>(methodOf(project));
   const [start, setStart] = useState(isoToDate(project.startDate) || todayKey());
   const [end, setEnd] = useState(isoToDate(project.endDate));
   const [hours, setHours] = useState(
@@ -161,7 +167,7 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
 
   // Открытие — синхронизируем черновик с актуальным состоянием строки.
   const openPanel = () => {
-    setMethod('EVEN');
+    setMethod(methodOf(project));
     setStart(isoToDate(project.startDate) || todayKey());
     setEnd(isoToDate(project.endDate));
     setHours(project.plannedEffort != null ? String(project.plannedEffort) : '');
@@ -193,6 +199,7 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
           plannedEffort: manualRecon.sum,
           startDate: start || null,
           endDate: end || null,
+          planMethod: 'MANUAL',
         });
         setSaving(false);
         if (slotsOk && rowOk) close();
@@ -202,6 +209,7 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
         plannedEffort: effort,
         startDate: start || null,
         endDate: end || null,
+        planMethod: 'EVEN',
       });
       setSaving(false);
       if (ok) close();

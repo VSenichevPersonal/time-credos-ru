@@ -16,6 +16,7 @@ import {
   deptPlanLoads,
   deptProjectLoads,
   employeeLoadCells,
+  employeePersonalHoursInPeriod,
   firstFreePeriod,
   fteHeadcountByDept,
   isAssignmentActive,
@@ -1326,6 +1327,7 @@ describe('buildSlotsByProject (WI-47, дедуп-группировка)', () =>
   const slot = (over: Partial<PlanSlot> = {}): PlanSlot => ({
     projectId: 'p1',
     departmentId: null,
+    employeeId: null,
     periodMonth: '2026-01',
     plannedHours: 100,
     ...over,
@@ -1359,7 +1361,7 @@ describe('slotsHoursInPeriod (WI-47, раскид внутри месяца по
     // январь 2026: рабочих дней (по календарю-фикстуре 12..25) = 10 дней × 8ч = 80ч.
     // слот 80ч на 2026-01 → 1ч/рабочий час. Неделя 12..18: рабочих 5×8=40ч → 40ч.
     const slots: PlanSlot[] = [
-      { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 80 },
+      { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 80 },
     ];
     const week = period('w', utc(2026, 0, 12), utc(2026, 0, 18), 40);
     expect(slotsHoursInPeriod(slots, week, spread)).toBeCloseTo(40);
@@ -1367,7 +1369,7 @@ describe('slotsHoursInPeriod (WI-47, раскид внутри месяца по
 
   it('Σ слота по обеим неделям = весь plannedHours месяца (инвариант)', () => {
     const slots: PlanSlot[] = [
-      { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 80 },
+      { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 80 },
     ];
     const w1 = period('w1', utc(2026, 0, 12), utc(2026, 0, 18), 40);
     const w2 = period('w2', utc(2026, 0, 19), utc(2026, 0, 25), 40);
@@ -1379,7 +1381,7 @@ describe('slotsHoursInPeriod (WI-47, раскид внутри месяца по
     const week = period('w', utc(2026, 0, 12), utc(2026, 0, 18), 40);
     expect(
       slotsHoursInPeriod(
-        [{ projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 0 }],
+        [{ projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 0 }],
         week,
         spread,
       ),
@@ -1402,7 +1404,7 @@ describe('projectHoursInPeriod MANUAL vs EVEN (WI-47)', () => {
       endDate: '2026-12-31',
     });
     const slotsByProject = buildSlotsByProject([
-      { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 80 },
+      { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 80 },
     ]);
     // январь раскидан по рабочим дням, неделя 12..18 → 40ч (а не 1000-раскид).
     expect(projectHoursInPeriod(p, week, spread, slotsByProject)).toBeCloseTo(40);
@@ -1425,7 +1427,7 @@ describe('projectHoursInPeriod MANUAL vs EVEN (WI-47)', () => {
     expect(projectHoursInPeriod(project({ planMethod: 'EVEN' }), p5)).toBe(50);
     // слоты переданы, но режим EVEN → слоты игнорируются
     const slotsByProject = buildSlotsByProject([
-      { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 999 },
+      { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 999 },
     ]);
     expect(projectHoursInPeriod(project({ planMethod: 'EVEN' }), p5, undefined, slotsByProject)).toBe(50);
   });
@@ -1439,7 +1441,7 @@ describe('projectDeptHoursInPeriod MANUAL (WI-47, отделы)', () => {
   it('слот без отдела → «родному» отделу проекта', () => {
     const p = project({ id: 'p1', departmentId: 'd1', planMethod: 'MANUAL', plannedEffort: 0 });
     const slotsByProject = buildSlotsByProject([
-      { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 80 },
+      { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 80 },
     ]);
     expect(projectDeptHoursInPeriod(p, 'd1', week, undefined, spread, slotsByProject)).toBeCloseTo(40);
     expect(projectDeptHoursInPeriod(p, 'd2', week, undefined, spread, slotsByProject)).toBe(0);
@@ -1448,7 +1450,7 @@ describe('projectDeptHoursInPeriod MANUAL (WI-47, отделы)', () => {
   it('слот с departmentId → именно тому отделу', () => {
     const p = project({ id: 'p1', departmentId: 'd1', planMethod: 'MANUAL', plannedEffort: 0 });
     const slotsByProject = buildSlotsByProject([
-      { projectId: 'p1', departmentId: 'd2', periodMonth: '2026-01', plannedHours: 80 },
+      { projectId: 'p1', departmentId: 'd2', employeeId: null, periodMonth: '2026-01', plannedHours: 80 },
     ]);
     expect(projectDeptHoursInPeriod(p, 'd2', week, undefined, spread, slotsByProject)).toBeCloseTo(40);
     expect(projectDeptHoursInPeriod(p, 'd1', week, undefined, spread, slotsByProject)).toBe(0);
@@ -1466,7 +1468,7 @@ describe('deptLoadCells MANUAL (WI-47, интеграция)', () => {
   it('MANUAL: загрузка отдела = Σ слотов по месяцу (раскид по неделям)', () => {
     const p = project({ id: 'p1', departmentId: 'd1', planMethod: 'MANUAL', plannedEffort: 0 });
     const slotsByProject = buildSlotsByProject([
-      { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 80 },
+      { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 80 },
     ]);
     const cells = deptLoadCells(dept(), [p], periods, [], undefined, undefined, undefined, spread, slotsByProject);
     // Σ загрузки по двум неделям = весь месячный слот 80ч.
@@ -1482,9 +1484,9 @@ describe('deptLoadCells MANUAL (WI-47, интеграция)', () => {
 
 describe('slotsVsPlannedEffort / sumSlotHours (WI-47, Σ-сверка для Dev1)', () => {
   const slots: PlanSlot[] = [
-    { projectId: 'p1', departmentId: null, periodMonth: '2026-01', plannedHours: 30 },
-    { projectId: 'p1', departmentId: null, periodMonth: '2026-02', plannedHours: 20 },
-    { projectId: 'p1', departmentId: null, periodMonth: 'bad', plannedHours: 999 }, // игнор
+    { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-01', plannedHours: 30 },
+    { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: '2026-02', plannedHours: 20 },
+    { projectId: 'p1', departmentId: null, employeeId: null, periodMonth: 'bad', plannedHours: 999 }, // игнор
   ];
 
   it('sumSlotHours суммирует только валидные месяцы', () => {
@@ -1502,5 +1504,158 @@ describe('slotsVsPlannedEffort / sumSlotHours (WI-47, Σ-сверка для Dev
 
   it('plannedEffort=null → gap=null, matches=true (нечего сверять)', () => {
     expect(slotsVsPlannedEffort(slots, null)).toEqual({ sum: 50, gap: null, matches: true });
+  });
+});
+
+// =============================================================================
+// Планирование до СОТРУДНИКА (bottom-up SSOT §7.2): персональные слоты + остаток
+// отдела по FTE, анти-двойной-счёт booking, иерархия employee>dept>EVEN.
+// Раскид по рабочим дням фикстуры-календаря (январь: 10 будней × 8ч = 80ч).
+// =============================================================================
+describe('планирование до сотрудника (employeeLoadCells rollup)', () => {
+  const hoursByDay = buildHoursByDay(calendar);
+  const spread = { hoursByDay };
+  // Колонка = весь январь (накрывает рабочие дни 12..25).
+  const jan = period('2026-01', utc(2026, 0, 1), utc(2026, 0, 31), 80);
+  // Проект MANUAL без EVEN-раскида: загрузка только из слотов.
+  const proj = (over: Partial<CapProject> = {}): CapProject =>
+    project({ id: 'p1', planMethod: 'MANUAL', departmentId: 'd1', ...over });
+  const eEmp = (id: string): EmployeeRef => ({ id, name: id, departmentId: 'd1' });
+  const pslot = (over: Partial<PlanSlot> = {}): PlanSlot => ({
+    projectId: 'p1',
+    departmentId: 'd1',
+    employeeId: null,
+    periodMonth: '2026-01',
+    plannedHours: 80,
+    ...over,
+  });
+
+  it('персональный слот → весь его объём попадает в employeeLoad (без деления)', () => {
+    const slots = buildSlotsByProject([pslot({ employeeId: 'e1', plannedHours: 80 })]);
+    const [c] = employeeLoadCells(
+      eEmp('e1'), dept({ id: 'd1', headcount: 5 }), [proj()], [jan], [],
+      undefined, undefined, undefined, spread, slots,
+    );
+    expect(c.load).toBeCloseTo(80, 6); // НЕ 80/5 — персональный слот целиком
+  });
+
+  it('коллега без персонального слота не получает чужой персональный объём', () => {
+    const slots = buildSlotsByProject([pslot({ employeeId: 'e1', plannedHours: 80 })]);
+    // deptLoad = 80 (этот персональный слот), остаток = 80 − 80 = 0 → коллеге 0.
+    const [c] = employeeLoadCells(
+      eEmp('e2'), dept({ id: 'd1', headcount: 5 }), [proj()], [jan], [],
+      undefined, undefined, undefined, spread, slots,
+    );
+    expect(c.load).toBeCloseTo(0, 6);
+  });
+
+  it('остаток отдела (dept-слот) делится по FTE: полуставочник < полного', () => {
+    // dept-слот 80ч (без employee) → остаток 80, делится по FTE.
+    const slots = buildSlotsByProject([pslot({ employeeId: null, plannedHours: 80 })]);
+    const rollupCtx = {
+      assignments: [
+        asgn({ employeeId: 'e1', ftePercent: 100 }),
+        asgn({ employeeId: 'e2', ftePercent: 50 }),
+      ],
+      employees: [eEmp('e1'), eEmp('e2')],
+    };
+    const d = dept({ id: 'd1', headcount: 2 });
+    const [c1] = employeeLoadCells(
+      eEmp('e1'), d, [proj()], [jan], [], undefined, undefined, undefined, spread, slots, rollupCtx,
+    );
+    const [c2] = employeeLoadCells(
+      eEmp('e2'), d, [proj()], [jan], [], undefined, undefined, undefined, spread, slots, rollupCtx,
+    );
+    // Σ FTE = 1.0 + 0.5 = 1.5 → e1 = 80×(1/1.5)=53.33, e2 = 80×(0.5/1.5)=26.67.
+    expect(c1.load).toBeCloseTo(80 * (1 / 1.5), 4);
+    expect(c2.load).toBeCloseTo(80 * (0.5 / 1.5), 4);
+    expect(c1.load).toBeGreaterThan(c2.load); // фикс W5B.13
+    expect(c1.load + c2.load).toBeCloseTo(80, 4); // инвариант: Σ = загрузка отдела
+  });
+
+  it('персональный слот + остаток отдела по FTE (смешанный уровень, без двойного счёта)', () => {
+    // deptLoad = 100 (персональный e1=60 + dept-слот 40). Остаток = 100 − 60 = 40.
+    const slots = buildSlotsByProject([
+      pslot({ employeeId: 'e1', plannedHours: 60 }),
+      pslot({ employeeId: null, plannedHours: 40 }),
+    ]);
+    const rollupCtx = {
+      assignments: [
+        asgn({ employeeId: 'e1', ftePercent: 100 }),
+        asgn({ employeeId: 'e2', ftePercent: 100 }),
+      ],
+      employees: [eEmp('e1'), eEmp('e2')],
+    };
+    const d = dept({ id: 'd1', headcount: 2 });
+    const [c1] = employeeLoadCells(
+      eEmp('e1'), d, [proj()], [jan], [], undefined, undefined, undefined, spread, slots, rollupCtx,
+    );
+    const [c2] = employeeLoadCells(
+      eEmp('e2'), d, [proj()], [jan], [], undefined, undefined, undefined, spread, slots, rollupCtx,
+    );
+    // e1 = персональные 60 + доля остатка 40×0.5 = 80; e2 = 0 + 40×0.5 = 20.
+    expect(c1.load).toBeCloseTo(80, 4);
+    expect(c2.load).toBeCloseTo(20, 4);
+    expect(c1.load + c2.load).toBeCloseTo(100, 4); // Σ = deptLoad (нет двойного счёта)
+  });
+
+  it('SSOT booking: персональный слот и HARD-бронь — один источник (max, не сумма)', () => {
+    const slots = buildSlotsByProject([pslot({ employeeId: 'e1', plannedHours: 40 })]);
+    // HARD-бронь 70ч у e1 на январь. Demand = max(40, 70) = 70, НЕ 110.
+    const bookingCtx = buildBookingCtx(
+      [{
+        id: 'b1', employeeId: 'e1', projectId: 'p1', bookingType: 'HARD',
+        hours: 70, startDate: '2026-01-01', endDate: '2026-01-31',
+      }],
+      [eEmp('e1')],
+      false,
+    );
+    const [c] = employeeLoadCells(
+      eEmp('e1'), dept({ id: 'd1', headcount: 1 }), [proj()], [jan], [],
+      undefined, undefined, bookingCtx, spread, slots,
+    );
+    expect(c.load).toBeCloseTo(70, 4); // max, не 40+70
+    expect(c.hardBooking).toBeCloseTo(70, 4); // индикатор сохранён
+  });
+
+  it('SSOT booking: слот больше брони → берётся слот', () => {
+    const slots = buildSlotsByProject([pslot({ employeeId: 'e1', plannedHours: 80 })]);
+    const bookingCtx = buildBookingCtx(
+      [{
+        id: 'b1', employeeId: 'e1', projectId: 'p1', bookingType: 'HARD',
+        hours: 30, startDate: '2026-01-01', endDate: '2026-01-31',
+      }],
+      [eEmp('e1')],
+      false,
+    );
+    const [c] = employeeLoadCells(
+      eEmp('e1'), dept({ id: 'd1', headcount: 1 }), [proj()], [jan], [],
+      undefined, undefined, bookingCtx, spread, slots,
+    );
+    expect(c.load).toBeCloseTo(80, 4); // max(80,30)=80
+  });
+
+  it('EVEN/dept-уровень БЕЗ персональных слотов и rollupCtx → прежнее деление поровну', () => {
+    // EVEN-проект 50ч на январь, headcount 5 → 10ч на человека (как раньше).
+    const evenProj = project({
+      id: 'pE', planMethod: 'EVEN', departmentId: 'd1',
+      plannedEffort: 50, startDate: '2026-01-01', endDate: '2026-01-31',
+    });
+    const [c] = employeeLoadCells(
+      eEmp('e1'), dept({ id: 'd1', headcount: 5 }), [evenProj], [jan], [],
+      undefined, undefined, undefined, spread,
+    );
+    expect(c.load).toBeCloseTo(10, 4); // 50/5 — не сломано
+  });
+
+  it('employeePersonalHoursInPeriod: Σ персональных слотов по проектам', () => {
+    const slots = buildSlotsByProject([
+      pslot({ projectId: 'p1', employeeId: 'e1', plannedHours: 30 }),
+      pslot({ projectId: 'p2', employeeId: 'e1', plannedHours: 20 }),
+      pslot({ projectId: 'p1', employeeId: 'e2', plannedHours: 99 }),
+    ]);
+    expect(employeePersonalHoursInPeriod('e1', slots, jan, spread)).toBeCloseTo(50, 4);
+    expect(employeePersonalHoursInPeriod('e2', slots, jan, spread)).toBeCloseTo(99, 4);
+    expect(employeePersonalHoursInPeriod('e1', undefined, jan, spread)).toBe(0);
   });
 });

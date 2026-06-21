@@ -186,6 +186,21 @@ describe('fetchProjects', () => {
       expect.objectContaining({ query: expect.objectContaining({ limit: '300' }) }),
     );
   });
+
+  // SSOT planMethod: round-trip способа раскида (баг — MANUAL показывался как EVEN).
+  it('маппит planMethod: MANUAL сохраняется, иначе дефолт EVEN', async () => {
+    mockGet.mockResolvedValueOnce(listOf('credosTimeProjects', [
+      { id: 'p1', name: 'Ручной', planMethod: 'MANUAL' },
+      { id: 'p2', name: 'Равномерно', planMethod: 'EVEN' },
+      { id: 'p3', name: 'Без поля' }, // planMethod отсутствует → EVEN
+      { id: 'p4', name: 'Мусор', planMethod: 'WAT' }, // нераспознанный → EVEN
+    ]));
+    const result = await fetchProjects();
+    expect(result[0].planMethod).toBe('MANUAL');
+    expect(result[1].planMethod).toBe('EVEN');
+    expect(result[2].planMethod).toBe('EVEN');
+    expect(result[3].planMethod).toBe('EVEN');
+  });
 });
 
 // ─── fetchDeptPlans ────────────────────────────────────────────────────────────
@@ -302,6 +317,19 @@ describe('patchProject', () => {
     mockPatch.mockResolvedValueOnce(undefined);
     await patchProject('p1', { startDate: null });
     expect(mockPatch.mock.calls[0][1].startDate).toBeNull();
+  });
+
+  // SSOT planMethod: способ раскида персистится на проекте при сохранении плана.
+  it('шлёт planMethod когда он в patch (MANUAL/EVEN)', async () => {
+    mockPatch.mockResolvedValueOnce(undefined);
+    await patchProject('p1', { plannedEffort: 80, planMethod: 'MANUAL' });
+    expect(mockPatch.mock.calls[0][1]).toMatchObject({ plannedEffort: 80, planMethod: 'MANUAL' });
+  });
+
+  it('не трогает planMethod если его нет в patch', async () => {
+    mockPatch.mockResolvedValueOnce(undefined);
+    await patchProject('p1', { plannedEffort: 80 });
+    expect(mockPatch.mock.calls[0][1]).not.toHaveProperty('planMethod');
   });
 });
 

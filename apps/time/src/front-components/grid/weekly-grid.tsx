@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { T, FONT } from 'src/front-components/grid/tokens';
 import { Toolbar } from 'src/front-components/grid/toolbar';
 import { FiltersBar } from 'src/front-components/grid/filters-bar';
+import { GridLegend } from 'src/front-components/grid/grid-legend';
 import { WeekGrid } from 'src/front-components/grid/week-grid';
 import { DayView } from 'src/front-components/grid/day-view';
 import { ProjectView } from 'src/front-components/grid/project-view';
@@ -290,6 +291,12 @@ export const WeeklyGrid = () => {
         onClearKey={clearKey}
         onClearAll={clearAll}
       />
+
+      {/* Легенда сигналов сетки (🔒 / тинт / переработка / норма). Сворачиваемая,
+          одна строка — не съедает фикс-высоту виджета. Режимы Неделя/Проект
+          показывают тинт-заливку и норма-хинт; в режиме День сетки нет, легенда
+          не нужна. */}
+      {mode !== 'day' && <GridLegend />}
 
       <ErrorBoundary
         title="Не удалось показать таблицу"

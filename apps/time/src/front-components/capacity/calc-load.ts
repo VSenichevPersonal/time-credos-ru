@@ -298,6 +298,43 @@ export const buildSlotsByProject = (
   return m;
 };
 
+// Планирование до СОТРУДНИКА (SSOT §7.2). Часы ПЕРСОНАЛЬНЫХ слотов сотрудника
+// (employeeId=emp) по ВСЕМ проектам, попавшие в период. Это «детальный уровень»
+// иерархии employee>dept>EVEN — считается напрямую по employeeId (вне зависимости
+// от отдела слота). Пустой набор → 0.
+export const employeePersonalHoursInPeriod = (
+  employeeId: string,
+  slotsByProject: Map<string, PlanSlot[]> | undefined,
+  period: Period,
+  spread?: PlanSpread,
+): number => {
+  if (!slotsByProject) return 0;
+  let sum = 0;
+  for (const slots of slotsByProject.values()) {
+    const own = slots.filter((s) => s.employeeId === employeeId);
+    sum += slotsHoursInPeriod(own, period, spread);
+  }
+  return sum;
+};
+
+// Часы ВСЕХ персональных слотов отдела (любой сотрудник, employeeId!=null И
+// departmentId=deptId) ОДНОГО проекта в периоде. Используется как вычитаемое из
+// загрузки отдела → нераспределённый остаток (§7.2: deptLoad = Σ empSlot + остаток).
+// Персональный слот БЕЗ departmentId в остаток отдела не входит (учитывается только
+// на уровне сотрудника/проекта) — UI при детализации отдела проставляет departmentId.
+const deptPersonalHoursInPeriod = (
+  project: CapProject,
+  deptId: string,
+  slotsByProject: Map<string, PlanSlot[]> | undefined,
+  period: Period,
+  spread?: PlanSpread,
+): number => {
+  const slots = slotsByProject?.get(project.id);
+  if (!slots || slots.length === 0) return 0;
+  const personal = slots.filter((s) => s.employeeId && s.departmentId === deptId);
+  return slotsHoursInPeriod(personal, period, spread);
+};
+
 // Часы НАБОРА слотов, попадающие в колонку периода: для каждого слота раскид
 // plannedHours по рабочим дням его месяца, пересечённый с period. Пустые/0 слоты
 // вклада не дают.
@@ -604,10 +641,71 @@ export const deptLoadCells = (
     return composeCell(capacity, planLoad, booking, bookingCtx?.includeSoft ?? false);
   });
 
+// Планирование до СОТРУДНИКА (SSOT §7.2). Контекст детерминированной иерархии
+// employee>dept>EVEN для распределения нераспределённого остатка отдела ПО FTE
+// (фикс W5B.13 — полуставочник получает долю по своей ставке, а не поровну).
+//   assignments — записи employee-department (FTE+даты) для расчёта долей.
+//   employees   — состав (employeeId→departmentId), чтобы найти коллег по отделу.
+// Контекст ОПЦИОНАЛЕН: без него остаток делится поровну (1/headcount) — прежнее
+// поведение (обратная совместимость EVEN/dept-уровня).
+export type PlanRollupCtx = {
+  assignments: EmpDeptAssignment[];
+  employees: EmployeeRef[];
+};
+
+// Доля сотрудника в нераспределённом остатке отдела за период (по FTE):
+// fte(emp) / Σ fte(коллеги по отделу, активные в периоде). Без rollupCtx (или
+// нулевой суммы FTE) — fallback 1/headcount (прежнее «поровну»). Деление по FTE
+// закрывает W5B.13: полуставочник ≠ полная ставка.
+const remainderShare = (
+  employee: EmployeeRef,
+  dept: DeptRef,
+  period: Period,
+  rollupCtx?: PlanRollupCtx,
+): number => {
+  if (rollupCtx) {
+    const from = dateKey(period.from);
+    const to = dateKey(period.to);
+    const empInDept = new Set<string>();
+    for (const e of rollupCtx.employees) if (e.departmentId === dept.id) empInDept.add(e.id);
+    // FTE сотрудника + суммарный FTE активных назначений отдела в периоде.
+    let myFte = 0;
+    let totalFte = 0;
+    const counted = new Set<string>();
+    for (const a of rollupCtx.assignments) {
+      if (a.departmentId !== dept.id || !a.employeeId) continue;
+      if (!isAssignmentActive(a, from, to)) continue;
+      const fte = fteUnits(a.ftePercent);
+      if (fte <= 0) continue;
+      totalFte += fte;
+      counted.add(a.employeeId);
+      if (a.employeeId === employee.id) myFte += fte;
+    }
+    // Fallback по составу: сотрудники отдела БЕЗ записи назначения = 100% (как
+    // fteHeadcountByDept), чтобы Σ долей = 1 и не терять остаток.
+    for (const id of empInDept) {
+      if (counted.has(id)) continue;
+      totalFte += 1;
+      if (id === employee.id) myFte += 1;
+    }
+    if (totalFte > 0) return myFte / totalFte;
+  }
+  // Fallback: поровну по численности (прежнее поведение).
+  return dept.headcount > 0 ? 1 / dept.headcount : 0;
+};
+
 // Срез «по людям»: ячейки загрузки сотрудника. Личная ёмкость = рабочие часы
-// периода × коэффициент его отдела. Загрузка = доля плановых часов проектов
-// отдела, поделённая поровну на численность отдела (allocation по людям в модели
-// нет — равномерное распределение, согласовано с REPORTS_CONTRACT byEmployee).
+// периода × коэффициент его отдела.
+//
+// Планирование до СОТРУДНИКА (SSOT §7.2, фикс бага W5B.13 «деление поровну»):
+//   employeeLoad(emp,period) = Σ персональных слотов сотрудника (employeeId=emp)
+//                            + доля нераспределённого остатка отдела по FTE.
+// Нераспределённый остаток отдела = Σ загрузок отдела (проекты+dept-plans)
+//   − Σ ВСЕХ персональных слотов отдела (вычитание исключает двойной счёт §7.2:
+//   персональные слоты уже отнесены конкретным людям, в остаток не попадают).
+// Доля остатка = по FTE (rollupCtx) либо поровну 1/headcount (без rollupCtx —
+// обратная совместимость). EVEN/dept-уровень без персональных слотов: остаток =
+// весь deptLoad → поведение прежнее (НЕ сломано).
 export const employeeLoadCells = (
   employee: EmployeeRef,
   dept: DeptRef | undefined,
@@ -619,9 +717,9 @@ export const employeeLoadCells = (
   bookingCtx?: BookingCtx,
   spread?: PlanSpread,
   slotsByProject?: Map<string, PlanSlot[]>,
+  rollupCtx?: PlanRollupCtx,
 ): LoadCell[] => {
   const factor = resolveCapacityFactor(dept?.capacityFactor);
-  const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
   return periods.map((period) => {
     // W3-1: личная ёмкость уменьшается на часы отсутствий ЭТОГО сотрудника
     // (не ниже 0). Без ctx — прежняя формула.
@@ -630,9 +728,17 @@ export const employeeLoadCells = (
       ? absenceHoursByEmpInPeriod(ctx.absences, ctx.hoursByDay, period).get(employee.id) ?? 0
       : 0;
     const capacity = Math.max(0, baseCapacity - absHours);
-    let deptLoad = 0;
+
+    // Детальный уровень: персональные слоты сотрудника (по всем проектам). Считаются
+    // ОДИН раз по employeeId, в остаток отдела не входят (исключён двойной счёт).
+    const personal = employeePersonalHoursInPeriod(employee.id, slotsByProject, period, spread);
+
+    let remainder = 0;
     if (dept) {
-      // REQ-0013 13b: загрузка отдела по долям проектов (fallback на plannedEffort).
+      // Загрузка отдела (проекты по долям/слотам + dept-plans), включая все
+      // персональные слоты отдела.
+      let deptLoad = 0;
+      let deptPersonal = 0;
       for (const p of projects) {
         deptLoad += projectDeptHoursInPeriod(
           p,
@@ -642,17 +748,35 @@ export const employeeLoadCells = (
           spread,
           slotsByProject,
         );
+        deptPersonal += deptPersonalHoursInPeriod(p, dept.id, slotsByProject, period, spread);
       }
-      // REQ-0012: плановые загрузки отдела без проекта тоже делятся поровну.
+      // REQ-0012: плановые загрузки отдела без проекта (персон не имеют → весь объём
+      // в остатке, делится по FTE).
       for (const dp of deptPlans) {
         if (dp.departmentId === dept.id) deptLoad += deptPlanHoursInPeriod(dp, period, spread);
       }
+      // Нераспределённый остаток = загрузка отдела − персональные слоты отдела.
+      const unallocated = Math.max(0, deptLoad - deptPersonal);
+      remainder = unallocated * remainderShare(employee, dept, period, rollupCtx);
     }
-    // REQ-0004 C: личные брони сотрудника НЕ делятся на численность — это его
-    // персональный резерв (employee×проект). HARD → в Demand, SOFT → пунктир.
-    const planLoad = deptLoad * share;
+
+    // SSOT booking (анти-двойной-счёт §3.4/§6.6): персональный слот (оценка плана)
+    // и HARD-бронь (резерв ёмкости) на одного человека — ОДНА ось Demand, НЕ две.
+    // Берём ОДИН источник: max(персональный слот, HARD-бронь) — бронь, если есть,
+    // иначе слот; max не допускает двойного счёта при наличии обоих. SOFT не
+    // потребляет ёмкость → отдельный пунктирный слой (как прежде).
     const booking = empBookingHours(employee.id, bookingCtx, period, spread);
-    return composeCell(capacity, planLoad, booking, bookingCtx?.includeSoft ?? false);
+    const personalDemand = Math.max(personal, booking.hard);
+    const planLoad = personalDemand + remainder;
+    // composeCell прибавит booking.hard к load → передаём hard=0 (он уже учтён в
+    // personalDemand), но сохраняем индикатор hardBooking отдельной плашкой.
+    const cell = composeCell(
+      capacity,
+      planLoad,
+      { hard: 0, soft: booking.soft },
+      bookingCtx?.includeSoft ?? false,
+    );
+    return { ...cell, hardBooking: booking.hard };
   });
 };
 

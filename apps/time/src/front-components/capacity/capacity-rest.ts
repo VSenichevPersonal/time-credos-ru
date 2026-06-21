@@ -126,6 +126,7 @@ type RawProject = {
   startDate?: string | null;
   endDate?: string | null;
   status?: string | null;
+  planMethod?: string | null;
 };
 
 // Берём проекты, релевантные планированию (не завершённые/отменённые).
@@ -141,6 +142,10 @@ export const fetchProjects = async (): Promise<CapProject[]> => {
     plannedEffort: p.plannedEffort ?? null,
     startDate: p.startDate ?? null,
     endDate: p.endDate ?? null,
+    // SSOT planMethod: round-trip способа раскида. MANUAL → calc-load применяет
+    // помесячные слоты; иначе EVEN. Без round-trip сохранённый MANUAL показывался
+    // как EVEN и ручной раскид игнорировался.
+    planMethod: p.planMethod === 'MANUAL' ? 'MANUAL' : 'EVEN',
   }));
 };
 
@@ -287,6 +292,7 @@ export const patchProject = async (id: string, patch: ProjectPatch): Promise<voi
   if ('plannedEffort' in patch) data.plannedEffort = patch.plannedEffort;
   if ('startDate' in patch) data.startDate = toIso(patch.startDate ?? null);
   if ('endDate' in patch) data.endDate = toIso(patch.endDate ?? null);
+  if ('planMethod' in patch) data.planMethod = patch.planMethod;
   await client().patch(`/rest/credosTimeProjects/${id}`, data);
 };
 

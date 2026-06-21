@@ -120,6 +120,15 @@ export const CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID = '1cb81c6a-41bd-4f69-8eca-e
 // rejectComment — причина отклонения (заполняет /s/approval op=reject; сотрудник
 // видит что исправить). Очищается при approve/повторном submit. UX-gap (Timetta).
 export const CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID = 'c9d4029f-f588-4bfe-86ca-2252870e8272';
+// WI-56 (W5A.11/12/24) аудит-resolver. approvedBy/At оставлены approve-only;
+// эти поля разводят семантику «кто вынес решение» и «кто отозвал»:
+//   resolvedBy/resolvedAt — кто/когда вынес РЕШЕНИЕ (approve ИЛИ reject) — resolver.
+//   revokedBy/revokedAt   — кто/когда отозвал согласование (revoke) или отправку (recall).
+// REVOKED-статус НЕ вводим (W5A.24): «отозвано» = approvedAt is null + revokedBy задан.
+export const CREDOS_TIME_ENTRY_RESOLVED_BY_FIELD_ID = '12f510fc-4441-4c18-b601-02491d1bf34a';
+export const CREDOS_TIME_ENTRY_RESOLVED_AT_FIELD_ID = 'c5209758-47bf-4ee8-89af-093f12fde9ac';
+export const CREDOS_TIME_ENTRY_REVOKED_BY_FIELD_ID = '179888ee-c661-40a5-bc82-72dc7f2227aa';
+export const CREDOS_TIME_ENTRY_REVOKED_AT_FIELD_ID = '8947e2c9-ceb7-456d-b857-96f79109275d';
 // Уникальный индекс записи трудозатрат (SCOUT-B): защита factHours от дублей.
 // UNIQUE(employeeId, projectId, workTypeId, date). БД-уровень — ловит дубли на
 // ВСЕХ путях (REST/грид/CSV), кроме строк с NULL в ключе (PG: NULL != NULL) —
@@ -825,6 +834,16 @@ export const CREDOS_TIME_PLAN_SLOT_DEPARTMENT_FIELD_ID =
   'a26d956b-880b-49eb-92e1-9472fae20786';
 export const CREDOS_TIME_DEPARTMENT_PLAN_SLOTS_FIELD_ID =
   '184ba47c-e6c6-45ad-9f7d-3bb570a9c8cd';
+// Планирование до СОТРУДНИКА (bottom-up, SSOT §3.1/§7.2): PlanSlot.employee ->
+// Employee.planSlots (MANY_TO_ONE nullable, SET_NULL + обратная ONE_TO_MANY).
+// ADDITIVE: слот теперь {project, department?, employee?, periodMonth, plannedHours}.
+// employee задан = персональный слот (высший приоритет); пуст = отдельский/проектный
+// остаток (прежнее поведение). SET_NULL: удаление сотрудника не сносит слот (часы
+// остаются на проекте/отделе как нераспределённый остаток).
+export const CREDOS_TIME_PLAN_SLOT_EMPLOYEE_FIELD_ID =
+  '3d6b4f1a-9c27-4e85-bf30-2a1e7c9d4b06';
+export const CREDOS_TIME_EMPLOYEE_PLAN_SLOTS_FIELD_ID =
+  'c8f0a25e-7b41-49d3-86af-15e2b3d9c70a';
 // Index-view + nav.
 export const CREDOS_TIME_PLAN_SLOT_VIEW_UNIVERSAL_IDENTIFIER =
   'bbbfbb26-35ff-4008-8ee4-106c84e6e3f1';
