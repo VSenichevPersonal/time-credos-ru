@@ -15,6 +15,7 @@ import {
   CREDOS_TIME_ENTRY_STAGE_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_STAGES_FIELD_ID,
+  CREDOS_TIME_STAGE_NAME_FIELD_ID,
   CREDOS_TIME_STAGE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_STAGE_PROJECT_FIELD_ID,
   CREDOS_TIME_STAGE_TIME_ENTRIES_FIELD_ID,
@@ -39,6 +40,18 @@ export default defineObject({
       type: FieldType.TEXT,
       label: 'Код этапа',
       icon: 'IconHash',
+    },
+    // P2 (FIELDS_COLUMNS_AUDIT §6): человекочитаемое название этапа
+    // (Timetta projectTask.name). Дополняет машинный code. Слаг = `title`
+    // (НЕ `name`), чтобы не удалять зарезервированное авто-поле `name` (additive).
+    {
+      universalIdentifier: CREDOS_TIME_STAGE_NAME_FIELD_ID,
+      name: 'title',
+      type: FieldType.TEXT,
+      label: 'Название',
+      icon: 'IconFileText',
+      isNullable: true,
+      defaultValue: null,
     },
     {
       universalIdentifier: 'e977847f-c8f0-4861-a4c1-394439120092',

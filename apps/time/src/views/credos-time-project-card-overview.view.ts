@@ -6,6 +6,7 @@ import {
   CREDOS_TIME_PROJECT_CODE_FIELD_ID,
   CREDOS_TIME_PROJECT_COMPANY_FIELD_ID,
   CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_PROJECT_DESCRIPTION_FIELD_ID,
   CREDOS_TIME_PROJECT_END_DATE_FIELD_ID,
   CREDOS_TIME_PROJECT_EXTERNAL_CODE_FIELD_ID,
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
@@ -100,6 +101,14 @@ export default defineView({
       position: 9,
       isVisible: true,
       size: 140,
+    },
+    // P2: описание проекта в карточке «Обзор».
+    {
+      universalIdentifier: '1aa3b36f-45a8-49fe-b4e0-c4f2cc874450',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_DESCRIPTION_FIELD_ID,
+      position: 10,
+      isVisible: true,
+      size: 360,
     },
   ],
 });

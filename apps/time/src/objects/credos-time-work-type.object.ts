@@ -12,6 +12,7 @@ import {
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
   CREDOS_TIME_WORK_TYPE_DEPARTMENT_FIELD_ID,
+  CREDOS_TIME_WORK_TYPE_NAME_FIELD_ID,
   CREDOS_TIME_WORK_TYPE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_WORK_TYPE_TIME_ENTRIES_FIELD_ID,
 } from 'src/constants/universal-identifiers';
@@ -26,9 +27,20 @@ export default defineObject({
   labelPlural: 'Виды работ',
   description: 'Справочник видов работ (тип работ)',
   icon: 'IconListCheck',
-  // labelIdentifier: ядро требует searchable (TEXT). У вида работ TEXT-поля нет
-  // (group — SELECT), поэтому заголовок карточки остаётся авто-полем name.
+  // P1 (FIELDS_COLUMNS_AUDIT §7): собственное наименование вида работ (слаг `title`,
+  // НЕ `name` — `name` зарезервировано). labelIdentifier НЕ задаём в этой миграции:
+  // нельзя сделать labelIdentifier полем, создаваемым в том же sync (objectMetadata
+  // update падает, 94c519b4). Различимость даёт колонка `title` в реестре; назначение
+  // labelIdentifier=title — отдельным деплоем ПОСЛЕ создания поля (follow-up).
   fields: [
+    // P1: собственное наименование вида работ (Kimai activity.name).
+    {
+      universalIdentifier: CREDOS_TIME_WORK_TYPE_NAME_FIELD_ID,
+      name: 'title',
+      type: FieldType.TEXT,
+      label: 'Наименование',
+      icon: 'IconListCheck',
+    },
     {
       universalIdentifier: '78e61c8f-d18c-48c3-9897-5cf3316aebe9',
       name: 'group',
