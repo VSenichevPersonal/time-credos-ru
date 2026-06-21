@@ -831,6 +831,7 @@ export const deptProjectLoads = (
   periods: Period[],
   sharesByProject?: Map<string, ProjectDeptShare[]>,
   spread?: PlanSpread,
+  slotsByProject?: Map<string, PlanSlot[]>,
 ): { planned: ProjectLoad[]; unplanned: CapProject[] } => {
   const planned: ProjectLoad[] = [];
   const unplanned: CapProject[] = [];
@@ -850,7 +851,9 @@ export const deptProjectLoads = (
       continue;
     }
     const perPeriod = periods.map((per) =>
-      projectDeptHoursInPeriod(p, dept.id, per, sharesByProject, spread),
+      // B2-фикс: прокидываем slotsByProject → в MANUAL проект в drill считается по
+      // слотам (как строка-итог отдела deptLoadCells), вертикаль сходится.
+      projectDeptHoursInPeriod(p, dept.id, per, sharesByProject, spread, slotsByProject),
     );
     const total = perPeriod.reduce((a, b) => a + b, 0);
     if (total > 0) planned.push({ project: p, perPeriod, total });

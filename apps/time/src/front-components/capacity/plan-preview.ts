@@ -366,6 +366,37 @@ export const reconcileSlots = (
   return { sum, target: tgt, ok };
 };
 
+// P1 (модель «отдел=контейнер, человек=детализация»): для ПОЛЕЙ ВВОДА dept-панели
+// берём ТОЛЬКО отдельские слоты (employeeId пуст). Персональные (employeeId задан)
+// в эти поля не протекают — их редактирует employee-plan-panel. Структурный тип:
+// подходит для PlanSlotInput и PlanSlot.
+type SlotLike = { employeeId?: string | null };
+
+export const deptInputSlots = <T extends SlotLike>(slots: T[]): T[] =>
+  slots.filter((s) => !s.employeeId);
+
+// P1 read-only чип «людям: N ч»: Σ персональных слотов проекта (employeeId задан),
+// сгруппировано по месяцам. Планировщик отдела ВИДИТ, сколько уже роздано людям,
+// но не редактирует здесь. Возвращает { byMonth, total } (часы по месяцам + Σ).
+export const personalSlotsByMonth = <
+  T extends SlotLike & { periodMonth: string; plannedHours: number | null },
+>(
+  slots: T[],
+): { byMonth: Map<string, number>; total: number } => {
+  const byMonth = new Map<string, number>();
+  for (const s of slots) {
+    if (!s.employeeId) continue;
+    if (s.plannedHours == null || !Number.isFinite(s.plannedHours)) continue;
+    byMonth.set(s.periodMonth, (byMonth.get(s.periodMonth) ?? 0) + s.plannedHours);
+  }
+  let total = 0;
+  for (const [m, h] of byMonth) {
+    byMonth.set(m, Math.round(h * 100) / 100);
+    total += h;
+  }
+  return { byMonth, total: Math.round(total * 100) / 100 };
+};
+
 // W3B.16: утилизация периода = план / СВОБОДНАЯ ёмкость (PreviewRow.capacity).
 // Это доля свободной ёмкости, которую съедает план периода — иной показатель, чем
 // hours/maxHours (масштаб бара). null = нет ёмкости (capacity null или ≤ 0) →

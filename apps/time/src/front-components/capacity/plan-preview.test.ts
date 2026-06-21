@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computePreview,
+  deptInputSlots,
   monthsInRange,
   openEndedHint,
+  personalSlotsByMonth,
   previewBuckets,
   previewDeptsForProject,
   previewGranularity,
@@ -365,5 +367,60 @@ describe('reconcileSlots (WI-47 Σ-сверка)', () => {
 
   it('объём не задан (null) → не ok, target 0', () => {
     expect(reconcileSlots([{ plannedHours: 40 }], null)).toEqual({ sum: 40, target: 0, ok: false });
+  });
+});
+
+describe('deptInputSlots (P1 фильтр emp=null)', () => {
+  it('оставляет только отдельские слоты (employeeId пуст), отсекает персональные', () => {
+    const slots = [
+      { periodMonth: '2026-05', plannedHours: 100, employeeId: null },
+      { periodMonth: '2026-05', plannedHours: 40, employeeId: 'emp-1' },
+      { periodMonth: '2026-06', plannedHours: 80, employeeId: undefined },
+    ];
+    const out = deptInputSlots(slots);
+    expect(out.map((s) => s.periodMonth)).toEqual(['2026-05', '2026-06']);
+    expect(out.every((s) => !s.employeeId)).toBe(true);
+  });
+
+  it('пустой вход → пустой выход', () => {
+    expect(deptInputSlots([])).toEqual([]);
+  });
+
+  it('только персональные → пусто (чужие данные не текут в поля)', () => {
+    const slots = [{ periodMonth: '2026-07', plannedHours: 10, employeeId: 'e' }];
+    expect(deptInputSlots(slots)).toEqual([]);
+  });
+});
+
+describe('personalSlotsByMonth (P1 Σ персональных для чипа)', () => {
+  it('суммирует персональные по месяцам, игнорит отдельские и null', () => {
+    const slots = [
+      { periodMonth: '2026-05', plannedHours: 100, employeeId: null }, // отдел — игнор
+      { periodMonth: '2026-05', plannedHours: 40, employeeId: 'a' },
+      { periodMonth: '2026-05', plannedHours: 20, employeeId: 'b' },
+      { periodMonth: '2026-06', plannedHours: 30, employeeId: 'a' },
+      { periodMonth: '2026-07', plannedHours: null, employeeId: 'a' }, // null — игнор
+    ];
+    const { byMonth, total } = personalSlotsByMonth(slots);
+    expect(byMonth.get('2026-05')).toBe(60);
+    expect(byMonth.get('2026-06')).toBe(30);
+    expect(byMonth.has('2026-07')).toBe(false);
+    expect(total).toBe(90);
+  });
+
+  it('нет персональных → total 0, пустая карта', () => {
+    const { byMonth, total } = personalSlotsByMonth([
+      { periodMonth: '2026-05', plannedHours: 100, employeeId: null },
+    ]);
+    expect(total).toBe(0);
+    expect(byMonth.size).toBe(0);
+  });
+
+  it('округление до 2 знаков (без хвоста float)', () => {
+    const { total } = personalSlotsByMonth([
+      { periodMonth: '2026-05', plannedHours: 0.1, employeeId: 'a' },
+      { periodMonth: '2026-05', plannedHours: 0.2, employeeId: 'b' },
+    ]);
+    expect(total).toBe(0.3);
   });
 });

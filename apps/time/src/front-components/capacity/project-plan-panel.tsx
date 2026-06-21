@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { T, loadTone, formatPct } from 'src/front-components/capacity/cap-tokens';
 import {
   computePreview,
+  deptInputSlots,
   monthsInRange,
   openEndedHint,
+  personalSlotsByMonth,
   previewLoadCtxFor,
   reconcileSlots,
   utilPct,
@@ -94,6 +96,9 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
   const [slotDept, setSlotDept] = useState<Record<string, string | null>>({});
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotsError, setSlotsError] = useState<string | null>(null);
+  // P1: Σ персональных слотов проекта (роздано людям). Read-only — для чипа,
+  // в поля dept-панели не попадает (employee-plan-panel редактирует это).
+  const [personalHours, setPersonalHours] = useState(0);
 
   const effort = parseEffort(hours);
   const rangeError = validateRange(start, end);
@@ -142,14 +147,18 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
     fetchPlanSlots(project.id)
       .then((slots) => {
         if (!alive) return;
+        // P1: поля ввода dept-панели префиллим ТОЛЬКО отдельскими слотами
+        // (employeeId пуст) — персональные не протекают в чужие поля.
         const hoursMap: Record<string, string> = {};
         const deptMap: Record<string, string | null> = {};
-        for (const s of slots) {
+        for (const s of deptInputSlots(slots)) {
           hoursMap[s.periodMonth] = String(s.plannedHours);
           deptMap[s.periodMonth] = s.departmentId ?? null;
         }
         setSlotHours((prev) => ({ ...hoursMap, ...prev }));
         setSlotDept((prev) => ({ ...deptMap, ...prev }));
+        // P1: Σ персональных (роздано людям) — для read-only чипа.
+        setPersonalHours(personalSlotsByMonth(slots).total);
         setSlotsLoading(false);
       })
       .catch((e: unknown) => {
@@ -174,6 +183,7 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
     setSlotHours({});
     setSlotDept({});
     setSlotsError(null);
+    setPersonalHours(0);
     setOpen(true);
   };
 
@@ -189,10 +199,13 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
       if (method === 'MANUAL') {
         // Upsert каждого месяца (включая 0 — явный «нет часов» в месяце). Объём
         // проекта/диапазон тоже сохраняем строкой, чтобы доска знала границы.
+        // P1: dept-панель пишет ТОЛЬКО отдельские слоты (employeeId=null) — дедуп
+        // upsert по project×dept|null×emp|null×month не трогает персональные слоты.
         const slots: PlanSlotInput[] = months.map((m) => ({
           periodMonth: m.periodMonth,
           plannedHours: parseEffort(slotHours[m.periodMonth] ?? '') ?? 0,
           departmentId: slotDept[m.periodMonth] ?? project.departmentId ?? null,
+          employeeId: null,
         }));
         const slotsOk = await savePlanSlots(project.id, slots);
         const rowOk = await onSave(project.id, {
@@ -298,6 +311,31 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
             <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, marginBottom: 12 }}>
               План проекта
             </div>
+
+            {/* P1: read-only чип «людям N ч» — Σ персональных слотов проекта (роздано
+                сотрудникам). Здесь не редактируется (это делает панель сотрудника) —
+                планировщик отдела видит занятый людьми объём. Только когда есть >0. */}
+            {personalHours > 0 && (
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11,
+                  color: T.text,
+                  background: T.accentSoft,
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 6,
+                  padding: '3px 8px',
+                  marginBottom: 12,
+                  lineHeight: 1.3,
+                }}
+                title="Сумма персональных планов сотрудников по этому проекту. Редактируется на строке сотрудника, не здесь."
+              >
+                <span style={{ color: T.textMuted }}>людям</span>
+                <span style={{ fontWeight: 600, ...tnum }}>{round(personalHours)} ч</span>
+              </div>
+            )}
 
             {/* Способ */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }} role="radiogroup" aria-label="Способ распределения">

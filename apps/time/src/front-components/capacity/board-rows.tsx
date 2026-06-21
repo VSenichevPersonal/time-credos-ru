@@ -89,7 +89,7 @@ export const DeptRows = ({
       // REQ-0004 C: + слой брони (bookingCtx).
       const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread, slotsByProject);
       const isOpen = expanded.has(dept.id);
-      const detail = isOpen ? deptProjectLoads(dept, projects, periods, sharesByProject, spread) : null;
+      const detail = isOpen ? deptProjectLoads(dept, projects, periods, sharesByProject, spread, slotsByProject) : null;
       const planRows = isOpen ? deptPlanLoads(dept, deptPlans, periods, spread) : null;
       return (
         <div key={dept.id}>
