@@ -123,6 +123,25 @@ export const WeeklyGrid = () => {
   const commitDescription = (rowKey: string, dayIso: string, text: string) =>
     actions.commitDescription(rowKey, dayIso, text);
 
+  // E1.18: внутренний буфер виджета (системный clipboard в RemDOM недоступен).
+  // React-стейт: Ctrl+C кладёт значение активной ячейки, Ctrl+V вставляет в активную.
+  const [clipboard, setClipboard] = useState<number | null>(null);
+
+  // E1.20 (Ctrl+D): значение активной ячейки вниз по тому же столбцу на все строки
+  // ниже. Согласованные/невалидные отсеет commitCell (CISO-012, серверный ответ).
+  const fillDown = (col: number, fromRow: number) => {
+    const src = rowList[fromRow]?.hoursByDay[col];
+    if (!src || src <= 0) return;
+    const dayIso = week.days[col]?.iso;
+    if (!dayIso) return;
+    for (let r = fromRow + 1; r < rowList.length; r++) {
+      const target = rowList[r];
+      if (!target || target.lockedByDay?.[col]) continue;
+      if (target.hoursByDay[col] === src) continue;
+      commitCell(target.key, dayIso, src);
+    }
+  };
+
   // Согласование периода (отключаемое): бейдж + действия в подвале.
   const approval = useApproval({
     entries: data.entries,
@@ -265,6 +284,9 @@ export const WeeklyGrid = () => {
           loading={data.loading}
           onCellCommit={commitCell}
           onBulkFill={bulkFill}
+          onFillDown={fillDown}
+          clipboard={clipboard}
+          onCopyCell={setClipboard}
           onFillWeekdays={fillWeekdays}
           onClearRow={clearRow}
           onDeleteRow={deleteRow}

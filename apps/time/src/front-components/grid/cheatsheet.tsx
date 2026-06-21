@@ -1,18 +1,9 @@
 import { T } from 'src/front-components/grid/tokens';
+import { SHORTCUTS } from 'src/front-components/grid/keymap';
 
 // Подсказка горячих клавиш (по «?»). Инлайн-поповер, не модалка.
-
-const KEYS: { keys: string; desc: string }[] = [
-  { keys: '↑ ↓ ← →', desc: 'перемещение по ячейкам' },
-  { keys: '0–9', desc: 'начать ввод часов' },
-  { keys: 'Enter', desc: 'подтвердить и вниз' },
-  { keys: 'Tab', desc: 'подтвердить и вправо' },
-  { keys: 'Shift+Tab', desc: 'влево' },
-  { keys: 'Esc', desc: 'отмена ввода' },
-  { keys: '0 / Del', desc: 'удалить запись' },
-  { keys: 'Shift+Enter', desc: 'часы на все будни строки' },
-  { keys: '?', desc: 'эта подсказка' },
-];
+// Список клавиш — из SSOT keymap.ts (E4.14): один источник для показа И обработки,
+// чтобы cheatsheet и use-keyboard не дрейфовали (E4.5 был именно таким дрейфом).
 
 const Kbd = ({ children }: { children: string }) => (
   <kbd
@@ -53,8 +44,8 @@ export const Cheatsheet = ({ onClose }: { onClose: () => void }) => (
         Горячие клавиши
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {KEYS.map((k) => (
-          <div key={k.keys} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {SHORTCUTS.map((k) => (
+          <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ minWidth: 96 }}>
               <Kbd>{k.keys}</Kbd>
             </span>

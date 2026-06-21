@@ -7,7 +7,7 @@ import { FooterTotals } from 'src/front-components/grid/footer-totals';
 import { AddRow } from 'src/front-components/grid/add-row';
 import type { Prefill } from 'src/front-components/grid/add-row';
 import { Center } from 'src/front-components/grid/center';
-import { firstEmptyCell, useKeyboard } from 'src/front-components/grid/use-keyboard';
+import { firstEmptyCell, keyAction, useKeyboard } from 'src/front-components/grid/use-keyboard';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
@@ -29,6 +29,9 @@ type Props = {
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
+  onFillDown: (col: number, fromRow: number) => void; // Ctrl+D: значение вниз по столбцу (E1.20)
+  clipboard: number | null; // E1.18: внутренний буфер виджета (Ctrl+C/V)
+  onCopyCell: (hours: number) => void; // E1.18: положить значение в буфер
   onFillWeekdays: (rowKey: string) => void; // меню строки: норма дня в пустые будни
   onClearRow: (rowKey: string) => void; // меню строки: обнулить часы
   onDeleteRow: (rowKey: string) => void; // меню строки: убрать строку
@@ -50,6 +53,9 @@ export const WeekGrid = ({
   loading,
   onCellCommit,
   onBulkFill,
+  onFillDown,
+  clipboard,
+  onCopyCell,
   onFillWeekdays,
   onClearRow,
   onDeleteRow,
@@ -81,17 +87,40 @@ export const WeekGrid = ({
   const duplicateRow = (projectId: string) =>
     setPrefill({ projectId, nonce: Date.now() });
 
-  // Shift+Enter на активной ячейке: bulk-fill её значения на будни строки.
-  // Слушаем onKeyDown на контейнере (React-событие), а НЕ window.addEventListener:
-  // в песочнице Web Worker (Remote DOM) глобальные window-слушатели host-клавиатуры
-  // не срабатывают. UI_PLAYBOOK §0.
-  const onContainerKeyDown = (e: { key: string; shiftKey: boolean; preventDefault: () => void }) => {
-    if (e.key === 'Enter' && e.shiftKey && nav.active) {
-      const row = rowList[nav.active.row];
-      const val = row?.hoursByDay[nav.active.col];
-      if (row && val && val > 0) {
+  // Массовые/буферные действия на активной ячейке: Shift+Enter (bulk-fill будней),
+  // Ctrl+D (вниз по столбцу), Ctrl+C/V (внутренний буфер виджета). Маршрут — через
+  // SSOT keyAction (E4.14: тот же источник, что cheatsheet). Слушаем onKeyDown на
+  // контейнере (React-событие), а НЕ window.addEventListener: в песочнице Web Worker
+  // (Remote DOM) глобальные window-слушатели host-клавиатуры не срабатывают (UI_PLAYBOOK §0).
+  const onContainerKeyDown = (e: {
+    key: string;
+    shiftKey: boolean;
+    ctrlKey?: boolean;
+    metaKey?: boolean;
+    preventDefault: () => void;
+  }) => {
+    if (!nav.active) return;
+    const row = rowList[nav.active.row];
+    if (!row) return;
+    const val = row.hoursByDay[nav.active.col];
+    const action = keyAction(e);
+    if (action.type === 'bulkFillRow') {
+      if (val && val > 0) {
         e.preventDefault();
-        onBulkFill(row.key, val);
+        onBulkFill(row.key, val); // E4.5: часы ячейки на все будни строки
+      }
+    } else if (action.type === 'fillDown') {
+      if (val && val > 0) {
+        e.preventDefault();
+        onFillDown(nav.active.col, nav.active.row); // E1.20: вниз по столбцу
+      }
+    } else if (action.type === 'copy') {
+      e.preventDefault();
+      onCopyCell(val ?? 0); // E1.18: в внутренний буфер
+    } else if (action.type === 'paste') {
+      if (clipboard !== null) {
+        e.preventDefault();
+        onCellCommit(row.key, days[nav.active.col]?.iso ?? '', clipboard); // E1.18
       }
     }
   };

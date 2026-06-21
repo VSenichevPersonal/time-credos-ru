@@ -18,11 +18,12 @@ type Props = {
   weekend: boolean;
   today: boolean;
   active: boolean;
+  selected?: boolean; // E1.3: входит в прямоугольник выделения (Shift+клик)
   locked?: boolean; // W6-2: согласованная запись — только чтение
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек (fallback 12)
   seed: string | null; // символ, с которого начали печатать
   description?: string | null; // комментарий записи — read-only индикатор (правка в меню ⋯)
-  onActivate: () => void;
+  onActivate: (extend?: boolean) => void; // extend=true → Shift+клик (диапазон)
   onCommit: (hours: number) => void;
   onKey: (e: { key: string; shiftKey: boolean }) => void; // навигация (родитель)
   onSeedConsumed: () => void;
@@ -33,6 +34,7 @@ export const HourCell = ({
   weekend,
   today,
   active,
+  selected,
   locked,
   overtimeThreshold,
   seed,
@@ -44,14 +46,21 @@ export const HourCell = ({
 }: Props) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [invalid, setInvalid] = useState(false); // E1.6: ввод не распознан → красная рамка
   const inputRef = useRef<HTMLInputElement>(null);
+  // E1.5 (F2-паттерн): отличаем вход по клику (выделить всё) от входа по seed-печати
+  // (цифра уже заменила значение — выделять/select не нужно).
+  const selectOnFocus = useRef(false);
 
   // Вход в редактирование по seed (печать цифры на активной ячейке). Заблокированную
-  // (согласованную) ячейку не редактируем — только seed гасим.
+  // (согласованную) ячейку не редактируем — только seed гасим. Seed уже ЗАМЕНЯЕТ
+  // значение (E1.5): draft = сам символ, не дописывается к старому.
   useEffect(() => {
     if (active && seed !== null && !editing) {
       if (!locked) {
         setDraft(seed === '0' ? '' : seed);
+        setInvalid(false);
+        selectOnFocus.current = false; // seed-ввод: не выделять (уже заменили)
         setEditing(true);
       }
       onSeedConsumed();
@@ -59,15 +68,28 @@ export const HourCell = ({
   }, [active, seed, editing, locked, onSeedConsumed]);
 
   useEffect(() => {
-    if (!editing) setDraft(fmtHours(value));
+    if (!editing) {
+      setDraft(fmtHours(value));
+      setInvalid(false);
+    }
   }, [value, editing]);
 
+  // E1.5: при входе по клику — выделить весь текст (Excel: клик в ячейку = заменить).
+  useEffect(() => {
+    if (editing && selectOnFocus.current) {
+      inputRef.current?.select();
+      selectOnFocus.current = false;
+    }
+  }, [editing]);
+
+  // Возврат: true — закрывать редактор; false — оставить открытым (невалид, E1.6).
   const commit = (): boolean => {
     const parsed = parseHours(draft);
     if (parsed === null) {
-      setDraft(fmtHours(value));
+      setInvalid(true); // E1.6: НЕ откатываем молча — красная рамка + подсказка
       return false;
     }
+    setInvalid(false);
     if (parsed !== value) onCommit(parsed);
     return true;
   };
@@ -90,39 +112,74 @@ export const HourCell = ({
 
   if (editing) {
     return (
-      <input
-        ref={inputRef}
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          commit();
-          setEditing(false);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === 'Tab') {
-            e.preventDefault();
-            if (commit()) {
-              setEditing(false);
-              onKey({ key: e.key, shiftKey: e.shiftKey });
-            }
-          } else if (e.key === 'Escape') {
-            setDraft(fmtHours(value));
+      <div style={{ position: 'relative', width: '100%' }}>
+        <input
+          ref={inputRef}
+          autoFocus
+          value={draft}
+          placeholder="8 / 8:30" // E1.7: подсказка форматов в пустом инпуте
+          aria-invalid={invalid || undefined}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (invalid) setInvalid(false); // правит ввод → снять красную рамку
+          }}
+          onBlur={() => {
+            // E1.6: уход с ячейки при невалиде — откат к последнему значению
+            // (редактор закрывается, держать его нельзя). Подсказка живёт пока редактируем.
+            if (!commit()) setDraft(fmtHours(value));
+            setInvalid(false);
             setEditing(false);
-          }
-        }}
-        style={{
-          ...base,
-          width: '100%',
-          textAlign: 'right',
-          border: `1px solid ${T.accent}`,
-          borderRadius: 4,
-          outline: 'none',
-          color: T.text,
-          fontFamily: 'inherit',
-          background: T.surface,
-        }}
-      />
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+              e.preventDefault();
+              // E1.6: невалид → НЕ закрываем, держим красную рамку + подсказку.
+              if (commit()) {
+                setEditing(false);
+                onKey({ key: e.key, shiftKey: e.shiftKey });
+              }
+            } else if (e.key === 'Escape') {
+              setDraft(fmtHours(value));
+              setInvalid(false);
+              setEditing(false);
+            }
+          }}
+          style={{
+            ...base,
+            width: '100%',
+            textAlign: 'right',
+            border: `1px solid ${invalid ? T.over : T.accent}`,
+            borderRadius: 4,
+            outline: 'none',
+            color: invalid ? T.over : T.text,
+            fontFamily: 'inherit',
+            background: T.surface,
+          }}
+        />
+        {/* E1.6: подсказка форматов вместо тихого отката — под инпутом, не закрывает сетку. */}
+        {invalid && (
+          <div
+            role="alert"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 2px)',
+              right: 0,
+              zIndex: 5,
+              whiteSpace: 'nowrap',
+              fontSize: 11,
+              lineHeight: 1.3,
+              color: T.over,
+              background: T.surface,
+              border: `1px solid ${T.over}`,
+              borderRadius: 4,
+              padding: '3px 6px',
+              boxShadow: '0 4px 14px rgba(29,31,38,0.12)',
+            }}
+          >
+            Не понял. Форматы: 8 · 1.5 · 1:30 · 1ч30м
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -138,19 +195,33 @@ export const HourCell = ({
             ? 'Переработка: часов больше порога'
             : description || undefined
       }
-      onClick={() => {
-        onActivate();
+      onClick={(e) => {
+        // E1.3: Shift+клик — расширить выделение-диапазон, в правку НЕ входим.
+        if (e.shiftKey) {
+          onActivate(true);
+          return;
+        }
+        onActivate(false);
         if (locked) return; // W6-2: согласованную не редактируем
         setDraft(fmtHours(value));
+        selectOnFocus.current = true; // E1.5: клик = выделить всё (Excel-паттерн)
         setEditing(true);
       }}
-      onMouseDown={onActivate}
+      onMouseDown={() => onActivate(false)}
       style={{
         ...base,
         position: 'relative',
         cursor: locked ? 'default' : 'text',
         // Read-only: тихий нейтральный фон (не цвет-сигнал), приглушённый текст.
-        background: locked ? T.panelBg : value > 0 ? cellFill(value) : bg,
+        // E1.3: ячейка в диапазоне выделения (не активная) — лёгкая accent-подложка.
+        background:
+          selected && !active
+            ? T.accentSoft
+            : locked
+              ? T.panelBg
+              : value > 0
+                ? cellFill(value)
+                : bg,
         color: locked ? T.textMuted : over ? T.warn : value > 0 ? T.text : T.textFaint,
         fontWeight: value > 0 ? 500 : 400,
         boxShadow: active ? `inset 0 0 0 2px ${T.accent}` : 'none',

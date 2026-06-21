@@ -199,9 +199,14 @@ export const GridRow = ({
         locked={lockedByDay?.[i]}
         overtimeThreshold={overtimeThreshold}
         active={nav.isActive(rowIndex, i)}
+        selected={nav.isSelected(rowIndex, i)}
         seed={nav.isActive(rowIndex, i) ? nav.editSeed : null}
         description={descByDay?.[i] ?? null}
-        onActivate={() => nav.setActive({ row: rowIndex, col: i })}
+        onActivate={(extend) =>
+          extend
+            ? nav.extendTo({ row: rowIndex, col: i })
+            : nav.setActive({ row: rowIndex, col: i })
+        }
         onCommit={(h) => onCellCommit(day.iso, h)}
         onKey={(e) => nav.handleKey(e)}
         onSeedConsumed={nav.consumeSeed}
