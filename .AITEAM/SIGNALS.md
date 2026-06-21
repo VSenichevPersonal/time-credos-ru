@@ -12,6 +12,52 @@
 
 ## Dev 1 → arch
 
+### 2026-06-21 23:00 — [report] polish-faded-tooltip (готово, dry-run чисто)
+
+2 полиша итерации 127, ADDITIVE, формулы/logic calc-load НЕ тронуты.
+
+**#3 Faded «учтено в другом месте» (RG SSOT-визуал).** Самый явный кейс двойного отображения — SOFT-бронь: не входит в Demand/load (отдельный слой, тумблер), но рисуется в той же ячейке → глаз может сложить её в загрузку. В `booking-marker.tsx` на SOFT-часть добавил `opacity: 0.55` + усилил title: «…не потребляет ёмкость, учтена отдельным слоем (не в спросе)». Чистый opacity, числа не менял. HARD не трогал (она ВХОДИТ в load — не «учтено в другом месте», глушить нельзя). Дочерние строки проектов (childCell) уже показывают «вклад» по семантике метрики — отдельный faded там был бы шумом, не делал.
+
+**#5 Overbooking-tooltip (W6C.23 elastic-overtime).** Чистая `overbookTip(cell)` в `cap-tokens.ts`. Формат строки (по-русски, целые часы): **`Перегруз: 200 ч спрос / 160 ч ёмкость (+40 ч)`**. Спрос = Demand (load = план+HARD-бронь), превышение K = округл(load−capacity), гард `Math.max(1, …)` чтобы дробный перегруз не дал «+0 ч». Пусто без `conflict`. Подключил к title ячеек во ВСЕХ трёх строках доски (employee-row, dept-row, summary-row) — заменил прежний голый `· ⚠ овербукинг` на `· ⚠ <разбивка>`; и к title значка ▲ (gap+обычный режим, 5 мест). tabular-nums у ячеек уже был.
+
+**Тесты (+4).** `cap-tokens.test.ts` overbookTip: нет conflict→пусто; формат строки; округление дробных; дробный <1ч → «+1 ч».
+
+**Валидация.** `yarn lint` 0/0. `yarn test:unit` 2371 passed, 0 failed. `twenty dev --once --dry-run` — typecheck passed, «no changes were applied» (diff в метадате — viewSort + frontComponent-бандл, pre-existing/пересборка, не от логики). Не коммитил, не деплоил.
+
+Файлы (моя зона): `apps/time/src/front-components/capacity/{cap-tokens.ts, cap-tokens.test.ts, booking-marker.tsx, employee-row.tsx, dept-row.tsx, summary-row.tsx}`.
+
+### 2026-06-21 22:10 — [report] plan-zero-fix (баг «0 в строке проекта = ОШИБКА»)
+
+**Где была ошибка ТОЧНО.** Не REST 400 и не NaN-рендер — расчёт/калк 0 переносят чисто (`plannedHoursInPeriod` гард `!plannedEffort`→0; `computePreview(0)`→нулевой раскид). Источник «ошибки», которую видел заказчик:
+- **Строка проекта** (`project-plan-row.tsx` commitHours): на `0` слался валидный, но мусорный патч `{plannedEffort:0, startDate:today}` — 0-часовой план + авто-дата под него. Любой 0-патч шёл в REST на каждый blur; на стороне сервера это и порождало шум/ошибку, которую `usePlanEdit.run` ловил → `setError` → юзер видел «ошибку».
+- **Панель** (`project-plan-panel.tsx:117`): гейт превью `... && effort` — `0` falsy → превью/сверка молча ПРОПАДАЛИ при объёме 0 (выглядело как «сломалось»).
+
+**Как починил (робастно).**
+1. **Семантика 0 = «снять план» (null), консистентно.** Вынес чистую `planEffortFromInput(raw)` (экспорт, sentinel `{skip}|{effort}`): `0`→`null`, пусто→`null`, невалид→`skip`. Строка теперь шлёт `plannedEffort:null` на 0, без авто-startDate. Обоснование: 0-часовой план бессмыслен (раскид по дням = 0), хранить его = мусор + REST-шум; «снять» — естественный жест.
+2. **Панель EVEN save:** `effort===0 ? null` (та же семантика). MANUAL не трогал — там `plannedEffort=manualRecon.sum` (Σ месяцев), 0 в месяце = явный «нет часов», слот-upsert с `<=0` удаляет слот (контракт Dev2), пустой батч ок.
+3. **Превью-гейт:** `effort` → `effort != null` — превью с нулём показывается, не исчезает.
+
+**Тесты (+).** `project-plan-row.test.ts` (новый, 8): parseEffort 0/пусто/невалид + planEffortFromInput (0→null, не ошибка). `plan-preview.test.ts` (+2): `computePreview(0)`→ractкид 0 без throw; `reconcileSlots([...],0)`→ok (target 0 валиден ≠ null).
+
+**Валидация.** `yarn lint` 0/0. `yarn test:unit` 2336 passed, 0 failed. `twenty dev --once --dry-run` — typecheck passed, «✓ Dry run complete — no changes were applied» (diff в метадате — pre-existing viewField/viewSort, не от моих фронт-правок). Не коммитил, не деплоил.
+
+Файлы (моя зона): `apps/time/src/front-components/capacity/{project-plan-row.tsx, project-plan-panel.tsx, project-plan-row.test.ts, plan-preview.test.ts}`.
+
+### 2026-06-22 23:00 — [report] таймшит-UX батч (заказчик live-аудит) + #7 absence-note
+
+Заказчик live-прошёлся по таймшиту — пакет UX-фиксов (всё lint+tsc 0, моя зона):
+- **Placeholder «8 / 8:30» убран** (засорял, заказчик-direct) — hour-cell.
+- **Легенда «Обозначения» полная** — +синяя точка (fill-handle), +Сегодня, +Выходной/праздник — grid-legend.
+- **⋯ row-menu заметнее** — был голый глиф → чип с рамкой + bold (заказчик «незаметна»).
+- **«Заполнить неделю для всех» → «Заполнить будни нормой»** — «для всех» путало — toolbar.
+- Метка оси «Планировать по:», поповер-баг, поиск проекта — ранее.
+
+**#7 Отсутствия:** index-view «Все отсутствия» был — добавил колонку **«Примечание»** (note, было скрыто). +1 viewField UUID без дублей.
+
+**Диагнозы (на спеку):** метрики «разъезжаются» = project-row sign-flip (те же часы); identity-UX «чей таймшит» блокирован server-RBAC (аналитик итер.128: resolveActor только в approval, не в time-entry/plan → Dev2). dry-run.
+
+— Dev 1
+
 ### 2026-06-22 22:30 — [@Аналитик ‼️ заказчик-direct] ВОПРОСЫ: «чей таймшит правим» + менеджер-за-других (identity/RBAC)
 
 Заказчик (live-аудит) поднял КРИТИЧНОЕ: «под админом вижу свой таймшит? не указано чей правим. рук.отдела/админ/рук.проекта/рук.компании — наверное не внедрено чтобы видеть всех и вносить за всех? непонятно за кого вносим!». Просит **детальный ресёрч аналитика**.
@@ -758,6 +804,22 @@ oxlint 0/0, tsc мои чисто, DOM-free. dry-run, НЕ коммитил.
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [ready ‼️ @arch] role-guard тест ЗЕЛЁНЫЙ под scoped-destroy — деплой разблокирован
+
+Блокер b88eb50 закрыт: `src/__tests__/role-guard.test.ts` содержит тест `canDestroyObjectRecords = true ТОЛЬКО на credosTimeEntries (scoped op:delete)` — `destroyEnabled.toHaveLength(1)`. **19/19 passed.** Соответствует моему `default-role` scoped-destroy (committed a046d6f).
+
+**Мой backend-слот закоммичен (a046d6f) + тест зелёный → весь набор готов к деплою:**
+- ФИО-путь (post-install миграция singleton false→true + seed=true) — заказчик ‼️
+- op:delete scoped-destroy + role-guard тест зелёный (P1)
+- Booking-2 teamRole/winChance/employee-nullable
+
+Никаких резерв-имён, INVALID, красных тестов. Деплой af1fdb+a046d6f чист со стороны Dev2-backend.
+
+**Спасибо за слот.** Моя backend-очередь (план #6/#7 + user-direct ФИО) ЗАКРЫТА. Готов к следующему — вижу твои предложения (d5f3aac): audit-log/period-lockdown/manager-on-behalf на едином resolveActor (CISO-005 закрыт). Назначь — возьму.
+
+— Dev 2
+
+
 ### 2026-06-22 — [ready ‼️ @arch] BOOKING-2 ПЕРЕИМЕНОВАН — dry-run ЧИСТО, деплой af1fdb+Dev2 одним заходом
 
 Резерв-имена устранены (bug#4 INVALID_FIELD_INPUT):
@@ -1240,6 +1302,158 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 137 · 2026-06-21]**
+[signal-arch]
+
+QA-сверка [22:47] принята: **2367 passed, 0 failed, 85 файлов** (предсущ. role-guard fail ушёл). Dev1 (parseEffort/planEffortFromInput экспорт + plan-row тесты) + Dev2 (5 integrity-фиксов) + QA (+11 граничных тестов стыковки слот↔plannedEffort) — все зелёные. Стабильно.
+
+**Картина (актуализация):**
+- ✅ ВСЕ 4 P0 закрыты + harden + integrity-cluster + bug#5/6/7 + grid-SSOT + approval-петля (submit/approve/reject/recall/revoke+аудит) + person-plan + planmethod + hide-planslot-nav.
+- ⚠️ Открыто (НЕ-P0): bug#4 role-rename (Dev-booking, если ещё актуален — role-guard fail ушёл, проверить) · CISO-005 расширить на time-entry/plan CRUD (server-gate под on-behalf) · coverage-вынос+пресейл (iter.133/134) · спека планирования (арх) · identity-домен (a3c1 lockdown / aa30 on-behalf — мои предложения iter.131/130/128, жду возврата аналитиков).
+
+Реакции по коду не требуется (сверка зелёная). Жду спеку планирования + возврат a3c1/aa30. Монитор держу.
+
+---
+
+**[Аналитик · итерация 136 · 2026-06-21]**
+@Dev2 @arch [signal-arch]
+
+p0-integrity-cluster принят — 5 фиксов, **закрыт 4-й P0 + 3 моих HIGH-бага**. Сверка:
+
+**1. B3 пустые слоты гард ✓** — parseInputSlots: MONTH_RE + isValidPlannedHours, null-часы отброс (не «удалить»), 0 остаётся валидным (удаление по ключу). Невалид UUID бросает (CISO-006). Закрывает мусор-слоты.
+
+**2. WI-52 / W5C.27 «0ч → ERROR» ✓** — validatePositiveHours (hours≤0/NaN/Inf→ERROR) в upsert ДО резолва. Запись 0ч не сохраняется, не занимает уникальный ключ. = мой W5C.27 (устранена несогласованность «0 хранится, не считается, держит ключ»). validateEntry не тронут (0=низ диапазона) — верно.
+
+**3. WI-54 / W6B.14 «CSV запятая RU» ✓** — csvNum: дробное→запятая (8.5→8,5), целое без дробной, один источник → и detail-CSV, и grid-CSV. = мой W6B.14/W6A.3 (RU-Excel локаль). Строки (даты/коды/ФИО) не трогаются — корректно.
+
+**4. WI-51 / W5C.2 «date день-дубль» ✓** — normalizeEntryDate к полуночи (T00:00:00.000Z) → БД-индекс ловит дубль на ЛЮБОМ пути (не только app-гард). = мой W5C.2/W5C.6 (корень двойного factHours). Гард по дню оставлен (back-compat). **Закрывает двойной счёт.**
+
+**5. 🔴 detail-CSV ПДн (4-й P0, W5C.19) — ЗАКРЫТО, утечки НЕТ ✓** — Dev2 верифицировал: employeeName=ФИО ТОЛЬКО при revealNames, иначе employeeCode (КОД, не ФИО/UUID); detailToCsv сериализует уже-гейтнутое; reveal пробрасывается (дефолт false). Тест-инвариант есть (CSV без reveal не содержит «Иванов»). **W5C.19 был перестраховкой — реально уже reveal-gated. P0#4 снят.**
+
+**🎯 ВСЕ 4 P0 ЗАКРЫТЫ:** submit-REJECTED · capacityFactor-SSOT · CASCADE-RESTRICT · detail-CSV-PII (verified-safe). + harden (CAS/аудит/defense) + integrity (0ч/CSV-запятая/date-дубль/слоты).
+
+**Картина:** P0 0/4 осталось. Тесты 2367 passed. Открыто (НЕ-P0): bug#4 role-rename (Dev-booking) · CISO-005 расширить на time-entry/plan CRUD (iter.128, server-gate под on-behalf) · coverage-вынос+пресейл (iter.133/134) · identity-домен (a3c1 lockdown / aa30 on-behalf — мои предложения iter.131, жду возврата) · спека планирования (арх). Монитор держу.
+
+---
+
+**[Аналитик · итерация 135 · 2026-06-21]**
+@Dev1 [signal-arch]
+
+hide-planslot-nav принят — закрывает UX-путаницу, которую флагал.
+- Убран nav «Плановое распределение» (сырой object-view). Слот теперь правится ТОЛЬКО через панель «Планировать», не через сырой CRUD-реестр. = решение моего §8.1 (итер.119: endpoint готов, реестр сбивал с толку) + Planning-Records #10 (путаница «Плановые загрузки»). Юзер не создаёт мусор кнопкой «+Создать». ✓
+- Объект/view/данные целы (только nav-leaf удалён), прецедент join-объектов (employee-department/project-department без nav) — консистентно. TECHNICAL_VIEWS в schema-guard — корректное расширение под этот паттерн.
+- Dry-run чисто, 2333 passed.
+
+**Остаток (Dev1 флагнул):** 2 пустые записи-мусор в dev-БД (B3) — REST DELETE + guard, зона Dev2. Не блокер.
+
+**Картина:** план правится консистентно через панель (нет сырого реестра-ловушки). Открыто без изменений: bug#4 role-rename · detail-CSV-PII (P0#4) · CISO-005 расширить · coverage-вынос+пресейл (итер.133/134) · identity-домен (a3c1/aa30) · спека планирования · B3 мусор-записи (Dev2). Монитор держу.
+
+---
+
+**[Аналитик · итерация 134 · 2026-06-21]**
+@QA @arch [signal-arch]
+
+bug#7 принят — QA нашёл РЕАЛЬНЫЙ корень «0 = ошибка»:
+- `project-plan-row.tsx:90,95` `(e.target).blur()` → `TypeError: blur is not a function` в Remote DOM при Enter (любой ввод, вкл. 0). Фикс `e.currentTarget.blur()` (как day-row:118). **Корректирую свою итер.133:** настоящая причина = blur-TypeError, а НЕ мой `effort ?` (стр.116). Спасибо QA — это был основной баг.
+- **Мой `effort ?` остаётся вторичным замечанием** (W5C.27): 0 как валидный объём попадает в falsy → превью null. Не error (после фикса blur), но 0=«план не задан» стоит трактовать явно. Минор, не срочно.
+
+**Стыковка coverage — статус уточнён (лучше, чем по grep):**
+QA подтвердил: `slotsVsPlannedEffort` / `sumSlotHours` УЖЕ считают gap (plannedEffort − Σ слотов) + matches-флаг:
+- 0 в слоте = удалить (контракт) — не суммируется ✓
+- plannedEffort=null → gap=null, matches=true (нет объёма = нет чипа) ✓
+- нет слотов + план задан → gap<0, matches=false (всё нераспланировано) ✓
+- допуск ≤0.01ч, не блок; UI «Σ раскид N · план M · ✓/≠».
+
+→ **Coverage-РАСЧЁТ есть** (мой §2 пробел частично закрыт). Остаётся ВЫНЕСТИ на строку проекта/доску (сейчас только MANUAL-панель) + **пресейл** (company-booking без plannedEffort → gap не от чего, нужен expectedEffort/Opportunity — мой §3, всё ещё открыто).
+
+**Резюме coverage:** расчёт slotsVsPlannedEffort готов; недостаёт (1) показа на доске/строке вне панели, (2) для EVEN, (3) пресейл-target. Триада «План·Распланировано·Остаток» (итер.133) = вынос этого расчёта в UI строки/доски.
+
+**Картина:** тесты 2326 passed (0 failed). bug#7 закрыт. Открыто: bug#4 role-rename · detail-CSV-PII (P0#4) · CISO-005 расширить · coverage-вынос+пресейл (итер.133) · identity-домен (a3c1/aa30) · спека планирования. Монитор держу.
+
+---
+
+**[Аналитик · итерация 133 · 2026-06-21]**
+@arch @Dev1 [signal-arch]
+
+Исследовал 2 вопроса заказчика по планированию. `docs/analysis/PLAN_COVERAGE.md`.
+
+**1. БАГ «0 в строке = ошибка» — корень найден (Dev1, P2):**
+`project-plan-panel.tsx:116` `effort ? computePreview : null` — truthy-проверка. parseEffort на «0» вернёт валидный **0**, но `0` falsy → preview=null → панель как «объём не задан» → подсказка/блок. **Фикс:** `effort != null && effort > 0` вместо `effort ?`; 0/пусто = «план не задан» БЕЗ error (консистентно со слот-контрактом «0→удаление», = W5C.27). Зона Dev1 panel.
+
+**2. Стыковка с плановой трудоёмкостью + «сколько распланировано / всё ли»:**
+
+**ТРИ разных числа — не путать (ось внутри плана):**
+- `plannedEffort` (бюджет часов проекта) — ЕСТЬ.
+- **Распланировано** (Σ слотов MANUAL / Σ EVEN-раскид) — частично (reconcileSlots ТОЛЬКО в MANUAL-панели).
+- `factHours` (ФАКТ) — ЕСТЬ.
+- `budgetRemaining = план − ФАКТ` (освоение) — ЕСТЬ.
+- **Coverage = план − распланировано** (всё ли распланировано) — **НЕТ. Это пробел.**
+
+**Ключевое:** budgetRemaining (план−факт) ≠ coverage (план−распланировано). Пример: план 500, распланировано 300, факт 0 → 200ч НЕ распланировано (дыра спроса), хотя budgetRemaining=500. Заказчик спрашивает именно про coverage.
+
+**Предложение:** индикатор-триада на строке проекта+доске+панели: **«План M · Распланировано N · Остаток (M−N)»** + флаг:
+- остаток=0 → ✓ «распланировано полностью»;
+- >0 → «N ч не распределено» (жёлтый, дыра спроса);
+- <0 → «переаллокация +N» (терракот).
+Распланировано: MANUAL=Σслотов, EVEN=plannedEffort (раскид всегда покрывает 100%). reconcileSlots уже считает — вынести на строку/доску, не только MANUAL-панель. Опц. три бара budget-burn: План→Распланировано→Факт (как Float/Forecast).
+
+**3. ПРЕСЕЙЛ (company-booking) — ПРОБЕЛ:**
+Бронь пресейла (company без project) имеет ТОЛЬКО `hours`, НЕТ плановой трудоёмкости → coverage посчитать НЕ от чего. Варианты: (а) +поле `expectedEffort` на booking (target пресейл-coverage, ADDITIVE) — рекоменд. минимум; (б) связь с Opportunity (CRM-сделка, W4A.26) — estimate оттуда; (в) пресейл без «всё ли» (MVP). 
+
+**Разведка:** Float/Forecast/Runn/Timetta/RG ВСЕ разделяют бюджет / распланировано / факт (budget burn). Наш пробел = «распланировано» (allocated) как видимое число + coverage.
+
+**5 вопросов заказчику** (в доке §6): 0=очистка vs ошибка · триада на строке/доске · пресейл expectedEffort vs без coverage · EVEN-распланировано 100% vs факт-раскид · пресейл↔Opportunity сейчас/roadmap.
+
+Всё в существующих блоках (panel/calc-load/board-row + опц. 1 поле booking). @arch — coverage-индикатор + 0-фикс рекомендую первыми. Монитор держу.
+
+---
+
+**[Аналитик · итерация 132 · 2026-06-21]**
+[signal-arch]
+
+[bug]#6 QA нашёл+исправил сам (time-entry-api:357 двойной код проекта `А-001 — А-001 — …` в op=list, причина — UX-5 пересев положил код в p.name; фикс `name: p.name` без конкатенации). QA-зона, закрыто. Реакции по коду не требует.
+
+**Ценное:** QA добавил `entry-crud-matrix.test.ts` (18 тестов) — кросс-матрица delete/upsert/by-key × {DRAFT/SUBMITTED/APPROVED-guard/REJECTED} + rollup + op=list. **Это покрывает мои W5C-инварианты** (CRUD×статус, APPROVED-guard, rollup пересчёт) — защита от регрессий формул, о которой просил (итер.122 п.4). Хорошо.
+
+**Картина:** тесты 2298 passed (1 предсущ. role-guard). Открыто без изменений: bug#4 role-rename (Dev-booking) · detail-CSV-PII (P0#4) · CISO-005 расширить на time-entry/plan · identity-домен (a3c1 lockdown / aa30 on-behalf — мои предложения в итер.131, жду их возврата) · спека планирования. Монитор держу.
+
+---
+
+**[Аналитик · итерация 131 · 2026-06-21]**
+@arch @a3c1 @aa30 [signal-arch]
+
+Предложения по identity-домену (#1 «чей таймшит» + #2 ввод-за-людей). Опора: identity-ответ (итер.128), lockdown (итер.130, PERIOD_LOCKDOWN.md), actorLabel (итер.129), Timetta lifecycleRoleResolver (DEEP_VALUE №1), конкуренты on-behalf (Clockify «add on behalf», Timetta «руководитель за подчинённого»).
+
+**#1 «ЧЕЙ ТАЙМШИТ» (для aa30):**
+- Заголовок «Таймшит: <ФИО/КОД> · <Отдел>», read-only индикатор, всегда виден (и для себя). Front-win, server-gate НЕ нужен (только показ).
+- **ПДн (CISO-007):** для СЕБЯ — всегда ФИО (это ты). Для ЧУЖОГО — actorLabel(reveal): руководитель своей команды видит ФИО (W4B.14), иначе КОД. Переиспользовать `actor-names.ts`/`actorLabel` (итер.129) — мост готов.
+- Для себя текст «Мой таймшит · <Отдел>»; для чужого — «Таймшит: <ФИО> · <Отдел>» + явный визуальный маркер «вы смотрите чужой» (цвет/иконка).
+- **Жить рядом с employee-селектором** (viewEmployeeId) — индикатор + селектор один блок, чтоб не переделывать. Согласовать с моделью селектора aa30.
+
+**#2 ВВОД ЗА ЛЮДЕЙ — server-gate СНАЧАЛА (для aa30, Dev1 прав):**
+- **Правило «кто-за-кого»** (lifecycleRoleResolver-стиль, Timetta):
+  - Author → свои всегда.
+  - AuthorManager (руковод отдела цели по employee-department НА ДАТУ записи) → за людей своего отдела.
+  - ProjectManager (если введём PM на проекте) → за участников своего проекта.
+  - Admin → за всех.
+- **Server-gate:** resolveActor (CISO-005) резолвит actor сервером → `assertCanActFor(actor, targetEmployee, date)` ПЕРЕД мутацией в time-entry CRUD + plan-write. Client передаёт КОГО (target), но СЕРВЕР проверяет ПРАВО. Без этого — дыра «запись за чужого».
+- **Аудит «введено X за Y»:** поле `enteredBy` (userWorkspaceId actor) + `enteredAt`, ОТДЕЛЬНО от `employeeId` (чей таймшит). Переиспользовать паттерн resolvedBy/revokedBy (WI-56). Показ через actorLabel: если enteredBy≠owner → «введено руководителем X».
+- **Последовательность:** server-gate (Dev2) → UX-селектор (Dev1). UX НЕ раньше серверной защиты (арх согласен).
+
+**КООРДИНАЦИЯ с lockdown (a3c1):**
+- on-behalf и lockdown делят ОДНО место guard (time-entry-api) и ОДИН resolveActor. `assertCanActFor` + `assertPeriodNotLocked` оба перед мутацией — единый auth-слой. Не плодить два резолва actor.
+- Оба override-права (lockdown-override + on-behalf «кто-за-кого») — RBAC-гранулы, единый permission-резолв по server-identity.
+- Композиция guard: `assertActor → assertCanActFor(target) → assertPeriodNotLocked(date) → assertNotApproved → mutate`. Один порядок для всех write-путей. @a3c1 @aa30 — согласуем общий guard-pipeline, чтоб не конфликтовать.
+
+**Единый слой identity-домена (предложение арху):**
+Один модуль `time-entry-authz` (server): resolveActor + canActFor + periodLock + approvedLock — все write-проверки в одном месте, переиспользуют userWorkspaceRef-мост. time-entry CRUD, plan-slots, approval зовут его. Закрывает CISO-005 системно + on-behalf + lockdown разом, без дублей.
+
+**Вопросы (согласуем после возврата a3c1/aa30):** PM-роль на проекте вводим сейчас или только отдел+admin? · enteredBy показывать всем или только manager? · on-behalf за прошлый период (lockdown) — override нужен И на on-behalf И на lockdown?
+
+Жду a3c1/aa30 — дам по ним рекомендации + сведём в общий guard-pipeline. Монитор держу.
+
+---
 
 **[Аналитик · итерация 130 · 2026-06-21]**
 @arch @CISO [signal-arch]
@@ -7461,6 +7675,13 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch] РЕШЕНИЯ ЗАКАЗЧИКА приняты → СТАРТ planning-budget + identity
+1. plannedEffort = ИЗНАЧАЛЬНАЯ ОЦЕНКА-БЮДЖЕТ, НЕИЗМЕННА без доп.соглашения. НЕ затирать Σслотов (баг панели). Индикатор «распланировано X/Y + остаток» + warning пере-аллокации.
+2. Lockdown: закрывать прошлые месяцы + АВТОЗАКРЫТИЕ после согласования; reopen=админ; логи хранить.
+3. On-behalf: рук отдела + рук проекта + админ; сотрудник правит введённое за него (до согл). Нужен server-gate resolveActor→CRUD.
+4. winChance — P2 (не сейчас).
+ПОРЯДОК: (A) plannedEffort-split+индикатор X/Y — Dev1, ПОСЛЕ a59755 (Persist-Views в той же зоне). (B) resolveActor→CRUD фундамент — Dev2 СЕЙЧАС (база для audit/lockdown/on-behalf). → (C) audit-log → (D) lockdown → (E) on-behalf canWriteFor+UX. Анализ-доки готовы. [[planning-identity-decisions]]. — arch
+
 ### 2026-06-22 — [arch ПРЕДЛОЖЕНИЯ] audit-log + period-lockdown + manager-on-behalf
 Архитектурное направление (аналитики a3c1/aa30 уточнят разведкой; это база для согласования с заказчиком):
 
@@ -10699,6 +10920,51 @@ Dev1 — контракт для кнопок: recall { op:recall, ids, workspac
 ---
 
 ## CISO → arch
+
+### 2026-06-21 22:46 — [ciso-review] p0-integrity-cluster (Dev2, іт.135)
+
+@Dev2/@arch — CISO-оцінка 5 фіксів.
+
+**ВСІ 5 СХВАЛЕНІ:**
+1. B3 upsert-guard (plan-slots): isValidPlannedHours відкидає null/NaN/Inf, CISO-006 UUID-guard незмінний ✅
+2. WI-52 validatePositiveHours: hours≤0 → ERROR server-side, джерело істини ✅
+3. WI-54 csvNum: форматування, нових security gaps немає ✅
+4. WI-51 normalizeEntryDate: **security-позитив** — нормалізація до опівночі ліквідує TOCTOU gap між app-guard і DB-index. Раніше дві записи з різним часом обходили dedup. Тепер DB-індекс ловить дубль на будь-якому шляху ✅
+5. detail-CSV ПДн: Dev2 прочитав код та ПІДТВЕРДИВ revealNames-guard. **CISO-016 = CLOSED** (підтверджено code-review Dev2). Прошу аналітика виключити з «відкритих» назавжди.
+
+@аналітик: detail-CSV-PII (P0#4) — ЗАКРИТО, підтверджено Dev2 code-review. Вилучіть з open-списку.
+— CISO
+
+### 2026-06-21 21:57 — [ciso-note] detail-CSV-PII = CLOSED (повтор, іт.132)
+
+@аналітик — detail-CSV-PII ЗАКРИТО (CISO-016 CLOSED, false alarm).
+
+Guard вже є:
+- `reports.logic.ts:306`: `computeDetail(input, opts, reveal)` — `reveal` з settings
+- `reports-detail.ts:45`: `revealNames = false` default — маскує ФИО при reveal=false
+
+Це не P0#4. RISK_REGISTER: CISO-016 CLOSED 2026-06-21.
+— CISO
+
+### 2026-06-21 21:56 — [ciso-note] identity-домен guard-pipeline (іт.131)
+
+@аналітик/@arch — позиція CISO (@a3c1).
+
+**Guard-pipeline СХВАЛЕНИЙ:**
+`assertActor → assertCanActFor(target) → assertPeriodNotLocked(date) → assertNotApproved → mutate`
+Порядок правильний. Один resolveActor на початку, всі наступні guard-и споживають actor-об'єкт — не дублюємо резолв.
+
+**`time-entry-authz` модуль — ПІДТРИМУЮ.** Системно закриває CISO-005 + lockdown + on-behalf в одному місці. Пріоритет: цей модуль ПЕРЕД lockdown-override і ПЕРЕД on-behalf UX.
+
+**enteredBy (userWorkspaceId)** ✅ — паттерн resolvedBy/revokedBy, server-truth, не підмінюється.
+
+**ВІДПОВІДЬ на питання аналітика:**
+- PM-роль на проекті — ВІДКЛАСТИ. Зараз тільки відділ+admin. PM = RBAC-волна (складніша гранула).
+- enteredBy показувати тільки manager/HR (не всім) — мінімальна область розкриття ПДн.
+- on-behalf за закритий період: override НА ОБА (on-behalf + lockdown) — одна RBAC-гранула або два окремих (краще окремих: «ввід за інших» ≠ «правка закритого»).
+
+**Координація aa30/Dev1:** UX-селектор after сервер. Підтверджую порядок.
+— CISO
 
 ### 2026-06-21 21:55 — [ciso-review] period-lockdown дизайн (іт.130)
 
@@ -14461,3 +14727,95 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 - op=list: entries+projects+workTypes, name без дубля кода
 
 Итого: **2298 + 15 todo** (82 файл), 1 preexist-fail role-guard.
+
+## QA → Dev 1 + arch [22:02] — [bug]#7 + тесты стыковки
+**[bug]#7 ИСПРАВЛЕН:** `project-plan-row.tsx:90,95` — `(e.target as HTMLInputElement).blur()` бросает `TypeError: x.target.blur is not a function` в Remote DOM при нажатии Enter. Фикс: `e.currentTarget.blur()` (как в `day-row.tsx:118`). Ошибка воспроизводится при ЛЮБОМ вводе (вкл. 0) по Enter.
+
+**Стыковка слотов с plannedEffort/пресейлом** — покрыта (`slotsVsPlannedEffort` / `sumSlotHours`):
+- `0` в слоте = удалить (контракт `/s/plan-slots`) — корректно не суммируется
+- `plannedEffort=null` → `gap=null, matches=true` (нет объёма = чипа нет)
+- `нет слотов + plannedEffort задан` → `gap<0, matches=false` (всё нераспланировано)
+- Допуск мягкий ≤0.01 ч (не блок сохранения)
+- В UI: `Σ раскид = N ч · план M ч` + `✓`/`≠` (project-plan-panel)
+
+Итого: **2326 + 15 todo** (83 файл, 0 failed).
+
+## Dev 1 → arch [22:40] — [report] hide-planslot-nav (B4/B5)
+**[taking] → [report] СДЕЛАНО. nav-пункт «Плановое распределение» УБРАН из сайдбара.**
+
+**Что сделал (минимально, MVP):**
+- Удалён файл `navigation-menu-items/credos-time-plan-slot.navigation-menu-item.ts` (был папка «Планирование», pos 9).
+- Объект `credos-time-plan-slot.object.ts` — НЕ тронут (цел, данные целы).
+- View `credos-time-plan-slot.view.ts` — НЕ удалён (остаётся для админ-доступа по прямой ссылке; SDK-pitfall требует index-view). Добавлен комментарий-шапка: технический view, nav убран намеренно, правка через панели.
+- `__tests__/schema-guard.test.ts` — добавил `TECHNICAL_VIEWS` set (+ исключение в правиле «standalone INDEX обязан иметь nav»). Иначе guard ложно падал. Это тест-файл вне чистой nav/view-зоны, но правка — прямое следствие моего nav-изменения, logic/objects (зона Dev2) НЕ трогал. Флагну как согласованное расширение guard.
+
+**Two-phase НЕ нужен.** Удаляемый nav-item тип VIEW (leaf), не FOLDER — иерархия папок не меняется. Dry-run топосортится чисто.
+
+**Прецедент в репо:** `credos-time-employee-department` и `credos-time-project-department` уже существуют как объект+view БЕЗ nav-item (технические join-объекты). Мой кейс полностью консистентен этому паттерну.
+
+**Валидация:**
+- `yarn lint` → 0 warnings, 0 errors.
+- `yarn test:unit` → 84 files passed, 2333 passed | 15 todo, **0 failed**.
+- `yarn twenty dev --once --dry-run` → ЧИСТО. Diff: `deleted navigationMenuItem 7dcc2b69-7143-4733-b48a-0fcec5dd2433` (ровно мой nav-пункт). НЕТ NAVIGATION_MENU_ITEM_NOT_FOUND, НЕТ sync-fail. (прочие updated viewSort/logicFunction/frontComponent в diff — чужие правки в рабочем дереве, не мои).
+
+**Эффект:** юзер больше не попадает на сырой object-view из меню + не создаёт мусор кнопкой «+Создать». План правится через панели «Планировать». Объект/данные целы. НЕ коммитил, НЕ деплоил.
+
+**Остаток (вне моей задачи, флаг arch):** 2 пустые записи-мусор (B3) ещё в dev-БД — это REST DELETE по данным + серверный guard в логик-функции (зона Dev2), не nav/view-конфиг.
+
+## Dev 2 → arch
+[report] p0-integrity-cluster ГОТОВО (НЕ коммичу, НЕ деплою). По пунктам:
+
+**1. B3 — upsert-гард пустых слотов (plan-slots.logic.ts):**
+- `parseInputSlots` ужесточён: слот ПРИНИМАЕТСЯ только если periodMonth строго `^\d{4}-\d{2}$` (MONTH_RE) И plannedHours — конечное число (новый `isValidPlannedHours`: null/undefined/''/NaN/Inf → отброс). Раньше `Number(o.plannedHours)` коэрсил мусор в 0 (= «удалить по ключу») — теперь null-часы просто отбрасываются, не трогают существующие слоты.
+- `plannedHours=0` остаётся ВАЛИДНЫМ входом (семантика «удалить по ключу» в runUpsert) — гард его не режет.
+- Мусорный слот в пачке не блокирует валидные. Невалидный UUID dept/emp по-прежнему БРОСАЕТ (validUuidParam, CISO-006) → handler ловит → ok:false (не молчаливый null).
+- parseInputSlots/InputSlot экспортированы для теста. +тест `plan-slots.logic.test.ts` (17).
+
+**2. WI-52 / W5C.27 — 0ч → ERROR (validation.ts + time-entry-api.logic.ts):**
+- Новая чистая `validatePositiveHours(hours)` (constants/validation.ts) + код `POSITIVE_HOURS_REQUIRED`. hours<=0/NaN/Inf → ERROR.
+- Подключена в upsert ДО лимита/переработки и ДО резолва сотрудника → `{ ok:false, error:'hours must be positive', validation }`, без POST/PATCH. Запись 0ч больше НЕ сохраняется (не занимает уникальный ключ).
+- `validateEntry` НЕ трогал (там 0 — валидный низ диапазона; ломать warn/error семантику и `if(hours===0)continue`-вызывающих нельзя). UI уже удаляет на 0 (commitCell) — сервер теперь источник истины. +тесты validation.test.ts (5) + time-entry-api.logic.test.ts (3).
+
+**3. WI-54 / W6B.14 — CSV decimal comma RU (reports-detail.ts):**
+- Новая чистая `csvNum(n)`: дробное → запятая (`8.5`→`8,5`), целое без дробной (`8`→`8`), NaN/Inf→`'0'`.
+- Встроена в `toCsvRow`: числовые ячейки → csvNum, строки (ISO-даты, коды, ФИО) НЕ трогаются. Один источник → фикс автоматически и в detail-CSV, и в grid-CSV (gridToCsv: total + часы). Разделитель `;`+BOM+CRLF без изменений. +тесты reports-detail.test.ts (csvNum + toCsvRow + detailToCsv дробные).
+
+**4. WI-51 / W5C.2 — date день-дубль (time-entry-api.logic.ts):**
+- Риск ПОДТВЕРЖДЁН: БД-индекс по полному DATE_TIME vs гард findExistingEntryIdByKey по диапазону ДНЯ → две записи в один день с разным временем оба проходят → двойной factHours.
+- Фикс минимальный: `normalizeEntryDate` нормализует сохраняемый `data.date` к полуночи дня (`YYYY-MM-DDT00:00:00.000Z`). Все записи дня получают идентичный DATE_TIME → БД-индекс ловит дубль на ЛЮБОМ пути (не только через app-гард). Гард по диапазону дня оставлен (back-compat со старыми записями с произвольным временем). +тесты (2: с временем / date-only).
+
+**5. detail-CSV ПДн (B-аудит): ЗАКРЫТО — ДА, ПДн НЕ утекает.**
+- reports-detail.ts:76-84 `employeeName` = ФИО ТОЛЬКО при `revealNames && emp`, иначе `employeeCode` (КОД «Сотрудник·XXXX», не ФИО/UUID). detailToCsv (line 137) сериализует уже-гейтнутый `employeeName`. reports.logic.ts:309-316 пробрасывает `reveal` из `revealEmployeeNames` (дефолт false). Тест-инвариант уже есть (CSV без reveal не содержит «Иванов»). КОД НЕ ТРОГАЛ.
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0/0. `yarn test:unit` 85 файлов, 2367 passed | 15 todo, 0 failed. `yarn twenty dev --once --dry-run` ЧИСТО (typecheck ок, нет INVALID/reserved/sync-fail; diff updated logicFunction = пере-хеш моего кода, ожидаемо; viewSort/nav/frontComponent в diff — чужой стрим Dev1).
+
+**Зоны:** plan-slots.logic / time-entry-api.logic / reports-detail / constants/validation (+их тесты). approval.logic/objects/front-grid НЕ трогал. Все 5 фиксов аддитивны и независимы. НЕ коммитил.
+— Dev 2
+
+## QA → all [22:47] — сверка после Dev 1 + Dev 2 (plan-row + 5 фиксов)
+`yarn test:unit` подтверждён: **2367 + 15 todo, 0 failed, 85 файлов**.
+- Dev 1: `parseEffort` + `planEffortFromInput` экспортированы → `project-plan-row.test.ts` (8 тестов) зелёный
+- Dev 2: 5 аддитивных фиксов (plan-slots/time-entry-api/reports-detail/constants/validation) → 0 failed
+- QA: `calc-load.test.ts` +11 тестов граничных кейсов стыковки слотов с plannedEffort
+
+## Dev 1 → arch [23:25] — persist-views (итер.127 #2)
+`[taking] persist-views` → `[report]`
+
+**Механизм per-user persist: НАЙДЕН, но ДЁШЕВО НЕЛЬЗЯ → не строю силой (развилка «отложить»).**
+
+Что проверил:
+- Песочница RemDOM: localStorage/sessionStorage/window — НЕТ (подтверждено, PLAYBOOK §9).
+- SDK `twenty-sdk/front-component`: per-user storage / view-state / userPreferences API — **НЕТ**. Есть только `useUserId`, `navigate(queryParams, options.state)`, snackbar, sidePanel. Греп по node_modules (twenty-sdk + twenty-client-sdk) на preference/viewState/persist — пусто.
+- URL/queryParams: `navigate` умеет писать queryParams, но виджет НЕ читает свой URL обратно (нет `useSearchParams`/window в песочнице). Persist через URL не замыкается → нерабочий путь.
+- credosTimeSettings — singleton (не per-user), не годится. Подтверждено.
+- Per-user REST-объект (credos-time-view-prefs {workspaceMemberRef, viewKey, stateJson}, additive, мост useUserId→workspaceMember уже отлажен в use-self-employee) — **технически реален**, но дорог: новый объект + миграция-сид + GET на маунт каждого открытия + POST/PATCH на КАЖДУЮ смену фильтра/периода/drill. Шумно, противоречит [[keep-it-simple]] и hot-file осторожности. Для UX-удобства «не сбрасывать вид» — оверкилл сейчас.
+
+Что реализовал (дешёвый минимум, не силой):
+- `reports/view-state.ts` — ЧИСТЫЙ сериализатор состояния вида (view+gran+offset+groupBy+utilPreset+catFilter+drill-путь) ↔ компактная stateJson-строка. Версионирование схемы, sanitize (clamp offset≤0, dedup+sort cats, фильтр битых drill-уровней, лимит глубины 8, отброс >256-символьных значений, любой мусор→DEFAULT без исключений). Лейблы НЕ храним — реконструируются из данных.
+- `reports/view-state.test.ts` — 13 тестов (round-trip, детерминизм, устойчивость к мусору/чужой версии/инъекциям).
+- НЕ подключал transport к компоненту: заготовка под будущий persist. Когда придёт RBAC-волна ИЛИ Twenty добавит view-state API — останется лишь повесить GET/PATCH stateJson по userWorkspaceRef-мосту (CISO-005). useDrill уже умеет восстанавливать стек (reducer `into`).
+
+Что нужно от arch (решение, не блокер):
+- ОК ли отложить полный per-user persist до RBAC-волны? ИЛИ платим за объект credos-time-view-prefs сейчас (additive, дам ADDITIVE-объект + use-view-prefs хук с debounce)? Жду решения — заготовка-сериализатор готова в обоих случаях.
+
+Валидация: `yarn lint` 0/0 · `yarn test:unit` 86 файлов / 2384 passed, 0 failed (15 todo) · `yarn twenty dev --once --dry-run` ЧИСТО (typecheck ok, объект не добавлял — diff только чужой viewSort-дрейф). НЕ коммитил.
