@@ -1,4 +1,4 @@
-import { T, loadTone, formatCell } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatCell, formatPct, avgRatio, SIGMA_W } from 'src/front-components/capacity/cap-tokens';
 import type { CellMetric, LoadCell, Period } from 'src/front-components/capacity/types';
 
 // Сводная строка «Все отделы»: суммарная загрузка компании по периодам.
@@ -60,5 +60,30 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
         </div>
       );
     })}
+    {(() => {
+      const avg = avgRatio(cells);
+      const tone = loadTone(avg);
+      return (
+        <div
+          title={`Средняя загрузка компании за горизонт: ${formatPct(avg) || '—'}`}
+          style={{
+            width: SIGMA_W,
+            minWidth: SIGMA_W,
+            height: 34,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderLeft: `1px solid ${T.borderStrong}`,
+            background: tone.bg,
+            color: tone.fg,
+            fontSize: 12.5,
+            fontWeight: 700,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {formatPct(avg)}
+        </div>
+      );
+    })()}
   </div>
 );

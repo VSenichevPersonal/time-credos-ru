@@ -16,7 +16,7 @@ Owner: CISO. Полный реестр: `docs/security/RISK_REGISTER.md`.
 | CISO-004 | P2 | OPEN | Общий мастер-объект Employee (PII) будет виден между time/catalog/CRM без явного RBAC | Определить владельца PII Employee до старта catalog-app |
 | CISO-005 | P1 | OPEN | IDOR: личность сотрудника берётся из client-supplied `workspaceMemberRef`, не из `event.userWorkspaceId`; delete без ownership-guard | Dev2: server-side резолв `userWorkspaceId` → employeeId; ownership-guard на delete/patch |
 | CISO-006 | P2 | MITIGATING | Filter injection: client params интерполируются в filter-строки Twenty REST без валидации | Dev2: `isUuid()` и `isIsoDate()` на всех params ПЕРЕД интерполяцией (детали ниже) |
-| CISO-007 | P1 | OPEN | `byEmployee` + detail-режим в `/s/reports` раскрывают ФИО всех сотрудников без role-guard | Dev2: `revealNames=false` без isManager; скрывать employeeName (UUID вместо ФИО) |
+| CISO-007 | P1 | **CLOSED** (0446388) | `byEmployee` + detail-режим в `/s/reports` раскрывали ФИО без role-guard | **Закрыт:** `revealNames=false` по умолчанию во всех срезах (detail/byEmployee/OLAP/CSV). TODO: раскрыть ФИО менеджеру после CISO-005 (server-identity). |
 | CISO-008 | P3 | OPEN | `credosTimeAbsence.note` провоцирует ввод медицинских ПДн (тип SICK) | Dev2: help-текст в UI «не указывайте диагнозы»; внести в PII_INVENTORY |
 | CISO-009 | P3 | OPEN | `seed-real.mjs` содержит реальные наименования клиентов/заказчиков | Dev2: синтетические названия клиентов в сиде |
 | CISO-010 | P2 | OPEN (pre-impl) | Будущий CSV-экспорт: медПДн (код «Б») в файле; нет role-guard; интеграция 1С = новый канал ПДн | Dev2: role-guard экспорта; SICK→«Н» для не-HR; аудит-лог |

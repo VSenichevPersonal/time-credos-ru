@@ -33,11 +33,6 @@ const KEY = process.env.TWENTY_DEV_API_KEY ?? '';
 const APPLY = process.argv.includes('--apply');
 const KEEP_HOURS = process.argv.includes('--keep-hours');
 
-if (!BASE || !KEY) {
-  console.error('Нет TWENTY_DEV_URL / TWENTY_DEV_API_KEY (source ../../.env).');
-  process.exit(1);
-}
-
 const AUTH = { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' };
 
 const get = async (path, query) => {
@@ -74,13 +69,14 @@ const fetchAllEntries = async () => {
   return all;
 };
 
-const dayKey = (d) => String(d ?? '').slice(0, 10);
-const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-const keyOf = (e) =>
+// --- Чистые хелперы (экспортируются для unit-тестов) ---
+export const dayKey = (d) => String(d ?? '').slice(0, 10);
+export const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+export const keyOf = (e) =>
   [e.employeeId ?? '-', e.projectId ?? '-', e.workTypeId ?? '-', dayKey(e.date)].join('|');
 
 // Выбор выжившего: APPROVED важнее, затем самая ранняя (createdAt → id).
-const pickSurvivor = (group) =>
+export const pickSurvivor = (group) =>
   [...group].sort((a, b) => {
     const ap = (a.status === 'APPROVED' ? 0 : 1) - (b.status === 'APPROVED' ? 0 : 1);
     if (ap !== 0) return ap;
@@ -90,58 +86,77 @@ const pickSurvivor = (group) =>
     return String(a.id) < String(b.id) ? -1 : 1;
   })[0];
 
-const main = async () => {
-  console.log(`[dedup] режим: ${APPLY ? 'APPLY (реальное слияние)' : 'DRY-RUN'}`);
-  const entries = await fetchAllEntries();
-  console.log(`[dedup] всего записей: ${entries.length}`);
-
+// Чистое планирование дедупа: группирует по ключу, для дублей считает выжившего,
+// целевые часы (Σ или без изменений при keepHours) и удаляемых. Без сети —
+// тестируется напрямую. Возвращает { groups, plan: [{key, survivorId,
+// survivorHours, targetHours, deleteIds, projectIds}] }.
+export const planDedup = (entries, { keepHours = false } = {}) => {
   const groups = new Map();
   for (const e of entries) {
     const k = keyOf(e);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(e);
   }
+  const plan = [];
+  for (const [k, group] of groups) {
+    if (group.length <= 1) continue;
+    const survivor = pickSurvivor(group);
+    const sum = round2(group.reduce((s, e) => s + (Number(e.hours) || 0), 0));
+    plan.push({
+      key: k,
+      survivorId: survivor.id,
+      survivorHours: round2(survivor.hours),
+      targetHours: keepHours ? round2(survivor.hours) : sum,
+      deleteIds: group.filter((e) => e.id !== survivor.id).map((e) => e.id),
+      projectIds: [...new Set(group.map((e) => e.projectId).filter(Boolean))],
+    });
+  }
+  return { uniqueKeys: groups.size, plan };
+};
 
-  const dupGroups = [...groups.entries()].filter(([, v]) => v.length > 1);
-  console.log(`[dedup] уникальных ключей: ${groups.size}`);
-  console.log(`[dedup] групп с дублями: ${dupGroups.length}`);
+const main = async () => {
+  if (!BASE || !KEY) {
+    console.error('Нет TWENTY_DEV_URL / TWENTY_DEV_API_KEY (source ../../.env).');
+    process.exit(1);
+  }
+  console.log(`[dedup] режим: ${APPLY ? 'APPLY (реальное слияние)' : 'DRY-RUN'}`);
+  const entries = await fetchAllEntries();
+  console.log(`[dedup] всего записей: ${entries.length}`);
 
-  if (dupGroups.length === 0) {
+  const { uniqueKeys, plan } = planDedup(entries, { keepHours: KEEP_HOURS });
+  console.log(`[dedup] уникальных ключей: ${uniqueKeys}`);
+  console.log(`[dedup] групп с дублями: ${plan.length}`);
+
+  if (plan.length === 0) {
     console.log('[dedup] дублей нет — данные готовы к введению уникального ключа.');
     return;
   }
 
   const affectedProjects = new Set();
-  let mergedSum = 0;
   let deleted = 0;
 
-  for (const [k, group] of dupGroups) {
-    const survivor = pickSurvivor(group);
-    const sum = round2(group.reduce((s, e) => s + (Number(e.hours) || 0), 0));
-    const targetHours = KEEP_HOURS ? round2(survivor.hours) : sum;
-    const losers = group.filter((e) => e.id !== survivor.id);
+  for (const g of plan) {
     console.log(
-      `[dedup] ключ ${k}: ${group.length} записей → выживший ${survivor.id} ` +
-        `(${survivor.status}), hours ${survivor.hours} → ${targetHours}; удаляем ${losers.map((l) => l.id).join(', ')}`,
+      `[dedup] ключ ${g.key}: выживший ${g.survivorId}, hours ${g.survivorHours} → ${g.targetHours}; ` +
+        `удаляем ${g.deleteIds.join(', ')}`,
     );
-    for (const e of group) if (e.projectId) affectedProjects.add(e.projectId);
+    for (const pid of g.projectIds) affectedProjects.add(pid);
 
     if (APPLY) {
       // 1) приводим часы выжившего (Σ, либо без изменений при --keep-hours)
-      if (round2(survivor.hours) !== targetHours) await patch(`/rest/credosTimeEntries/${survivor.id}`, { hours: targetHours });
+      if (g.survivorHours !== g.targetHours) await patch(`/rest/credosTimeEntries/${g.survivorId}`, { hours: g.targetHours });
       // 2) удаляем лишние
-      for (const l of losers) {
-        await del(`/rest/credosTimeEntries/${l.id}`);
+      for (const id of g.deleteIds) {
+        await del(`/rest/credosTimeEntries/${id}`);
         deleted++;
       }
     } else {
-      deleted += losers.length;
+      deleted += g.deleteIds.length;
     }
-    mergedSum++;
   }
 
   console.log(
-    `[dedup] ${APPLY ? 'СЛИТО' : 'будет слито'}: групп ${mergedSum}, удалено записей ${deleted}, ` +
+    `[dedup] ${APPLY ? 'СЛИТО' : 'будет слито'}: групп ${plan.length}, удалено записей ${deleted}, ` +
       `затронуто проектов ${affectedProjects.size}`,
   );
 
@@ -167,7 +182,15 @@ const main = async () => {
   }
 };
 
-main().catch((e) => {
-  console.error('[dedup] ОШИБКА:', e.message);
-  process.exit(1);
-});
+// Авто-запуск только при прямом вызове из CLI (не при import в тестах).
+const isDirectRun =
+  typeof process !== 'undefined' &&
+  process.argv?.[1] &&
+  import.meta.url === `file://${process.argv[1]}`;
+
+if (isDirectRun) {
+  main().catch((e) => {
+    console.error('[dedup] ОШИБКА:', e.message);
+    process.exit(1);
+  });
+}

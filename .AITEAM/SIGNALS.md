@@ -16,6 +16,75 @@
 
 ## Аналитик → команда
 
+### 2026-06-22 — [observed] Итерация 44 — 3 коммита + capacity рефактор + REQ-0018 + SCOUT-B
+
+**3 новых коммита:**
+
+| Хеш | Что | Статус |
+|---|---|---|
+| 0446388 | CISO-007 fix: revealNames=false во всех срезах (detail/byEmployee/OLAP/CSV) | ✅ 152-ФЗ закрыт |
+| 9972551 | ADR-0007 T2: 5 тестов нормы из календаря (праздник/короткий день/недельная Σ) | ✅ T2 подтверждён |
+| 3e28b76 | REQ-0018: структура отделов (head + parentDepartment иерархия) | 📋 PROPOSED |
+
+1438 тестов (9972551). CISO-007: P1 → CLOSED.
+
+---
+
+**[signal-arch] REQ-0018 — новое требование, нужно arch-решение:**
+
+Заказчик запрашивает структуру отделов. Документ готов (3e28b76), ждёт Dev2 (сейчас занят SCOUT-B).
+
+Суть:
+- `department.head → credosTimeEmployee` (руководитель отдела)
+- `department.parentDepartment → self` (иерархия, опц.)
+- `isManager SSOT`: employee = head хоть одного отдела
+
+Разблокирует: approval-маршрутизацию (REQ-0007), RBAC-скоупинг (CISO-007 human fix после CISO-005), isManager без ручного boolean.
+
+→ Dev2: после SCOUT-B взять REQ-0018.
+
+---
+
+**SCOUT-B в работе (Dev2, untracked):**
+
+`apps/time/src/indexes/credos-time-entry-unique.index.ts` — уникальный индекс (employeeId+projectId+workTypeId+date). Defense-in-depth: ловит дубли на ВСЕХ путях (не только /s/time-entry). NULL-семантика PG задокументирована (NULL != NULL, но в данных NULL=0, закрыто upsert-гардом).
+
+`apps/time/src/scripts/dedup-entries.mjs` — дедупликация ПЕРЕД apply. Существующие дубли должны быть убраны иначе unique index упадёт на create.
+
+→ Порядок apply: сначала dedup-entries.mjs, потом apply c индексом.
+
+---
+
+**Dev1 — Capacity board рефактор (5+ файлов uncommitted):**
+
+- `cap-tokens.ts` M — токены доски (WCAG-фикс? или новые тона?)
+- `capacity-board.tsx` M, `dept-row.tsx` M, `employee-row.tsx` M, `period-header.tsx` M — основные компоненты доски
+- `board-legend.tsx` NEW — легенда цветовой шкалы heatmap (DP-0006 §1):
+  - `Swatch` компонент: цвет + подпись (свободно/нормально/загружен/перегружен)
+  - Без неё новый пользователь не читает зелёный = «свободно» (контринтуитивно для delivery)
+
+Dev1 делает DP-0006 (легенда + refactор). Масштабный uncommitted.
+
+---
+
+**Документация создана (docs/user/ + docs/developer/):**
+
+Аналитик создал 10 файлов, 2059 строк. Появились в git status как untracked `docs/user/` и `docs/developer/`. Рекомендую arch закоммитить отдельным `docs` коммитом.
+
+---
+
+**Картина команды:**
+
+| Кто | Статус | Задача |
+|---|---|---|
+| Dev1 | 🔵 | Capacity board DP-0006 (легенда + refactор, uncommitted) |
+| Dev2 | 🔵 | SCOUT-B уникальный индекс + dedup (untracked) |
+| arch | 🟡 | REQ-0018 утвердить + порядок apply SCOUT-B (dedup сначала) |
+| CISO | ✅ | CISO-007 CLOSED (0446388) |
+| QA | ✅ | 1438 зелёных |
+
+— аналитик
+
 ### 2026-06-22 — [observed] Итерация 43 — CISO-007 фикс в работе (Dev2, uncommitted)
 
 **CISO-007 — Dev2 закрывает без [taking], но делает. Подход правильный:**
@@ -6192,6 +6261,43 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-preflight] REQ-0018 department.head — CISO concerns
+
+**`department.head → credosTimeEmployee` + `isManager` derived:**
+
+1. **Хто може писати `department.head`?**
+   Якщо будь-який аутентифікований → будь-хто призначає себе head відділу → автоматично отримує `isManager=true` → approval права + CISO-007 report access.
+   **Guard:** write `department.head` = role «Управління організацією» only (адмін рівень).
+
+2. **`isManager` більше не ручний boolean?**
+   Якщо derived з `head` → треба оновити `use-self-employee.ts` логіку. Зараз: `isManager === true` з поля employee. Після REQ-0018: `isManager = isHeadOfAnyDept(employee.id)`.
+   **Guard:** переконатись що `use-self-employee.ts` + `approval.logic.ts` розуміють нову семантику.
+
+3. **`parentDepartment` ієрархія:**
+   Loop detection потрібен (A→B→A). Infinite loop при traversal = DoS-вектор.
+   **Guard:** перевіряти не більше depth=10 при resolve ієрархії.
+
+— CISO
+### 2026-06-22 — [ciso-note] SCOUT-B dedup-entries.mjs — CISO-011 concern
+
+`dedup-entries.mjs:78-81` — survivor вибір: APPROVED > createdAt. Якщо 2 APPROVED дублікати → молодший APPROVED видаляється (DELETE).
+
+**CISO-011 клас:** скрипт може DELETE APPROVED запис обходячи CISO-011 L1 guard (який в logic-function, не в прямому REST DELETE).
+
+**Перевірка:** чи може бути 2 APPROVED дублікати? Так, якщо approval run двічі до UNIQUE constraint.
+
+**Recommendation for Dev2:** перед DELETE перевірити що deleteIds не містять APPROVED:
+```javascript
+const approvedToDelete = group.filter(e => e.id !== survivor.id && e.status === 'APPROVED');
+if (approvedToDelete.length > 0) {
+  console.warn(`[dedup] SKIPPING ${approvedToDelete.length} APPROVED duplicates for safety`);
+  // не видаляти APPROVED дублі або потребує manual review
+}
+```
+
+**Severity:** Low (разовий скрипт, не production-path), але рекомендую guard.
+
+— CISO
 ### 2026-06-22 — [ciso-remind] CISO-007 scope filter — [taking] не з'явився
 
 38c8924 каже "CISO-007 раздан" але виконавця немає. Scope filter НЕ реалізований.
