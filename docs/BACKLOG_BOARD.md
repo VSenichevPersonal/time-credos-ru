@@ -10,6 +10,9 @@
 
 > 🔴 **OLAP drill-down — СЛЕДУЮЩИЙ крупный (заказчик 2026-06-22 «углубить drill down»):** Dev2 `/s/reports` параметрический (groupBy+filters[]+пагинация, обезличенные оси) → Dev1 drill-UI+хлебные крошки+cross-filter+связь с «Людьми». research: `OLAP_REPORTS_RESEARCH.md`. Запуск после REQ-0011 (Dev2) и доли-в-карточку (Dev1). [OLAP-PRIORITY] МИНИМАЛЬНЫЙ подход (аналитик I30): 1 клик→child-таблица (фильтр+sub-request), БЕЗ тяжёлого движка. 3 оси: отдел→сотрудники, проект→записи, capacity-ячейка→проекты.
 
+
+> 🔴 **REQ-0019 РАСШИРЕННЫЕ НАСТРОЙКИ (заказчик 2026-06-22):** singleton credosTimeSettings + 12 глобальных параметров (норма/горизонт/период-согл/пороги/напоминания/revealNames/бронь). Dev2 объект → Dev1 UI секция «Общие параметры». После REQ-0018/REQ-0016. [SETTINGS-PRIORITY]
+
 Детали задач: `docs/requirements/REQ-*`, `docs/ROADMAP.md`, `data-model/GAP_AUDIT_TIMETTA_KIMAI*.md`.
 
 ---
