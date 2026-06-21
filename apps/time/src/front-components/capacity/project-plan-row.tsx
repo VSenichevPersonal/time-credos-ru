@@ -1,17 +1,23 @@
 import { useEffect, useState } from 'react';
 
 import { T } from 'src/front-components/capacity/cap-tokens';
-import type { CapProject, ProjectPatch } from 'src/front-components/capacity/types';
+import { ProjectPlanPanel } from 'src/front-components/capacity/project-plan-panel';
+import type { PlanSpread } from 'src/front-components/capacity/calc-load';
+import type { CapProject, DeptRef, ProjectPatch } from 'src/front-components/capacity/types';
 
 // Редактируемая строка проекта (режим планирования): руководитель задаёт плановые
-// часы и срок прямо в строке. Пустой план → видимый affordance «задать план».
-// Сохранение по Enter/blur; пересчёт загрузки делает родитель через onSave.
+// часы и срок прямо в строке (быстрый путь). Пустой план → видимый affordance
+// «задать план». Сохранение по Enter/blur; пересчёт делает родитель через onSave.
+// WI-11: кнопка «✎ План» открывает inline-поповер (способ + диапазон С/ПО + живое
+// превью раскида) для нетривиального планирования — spread/dept для превью.
 
 type Props = {
   project: CapProject;
   nameWidth: number;
   fieldsWidth: number;
   onSave: (id: string, patch: ProjectPatch) => Promise<boolean>;
+  spread?: PlanSpread; // WI-11: рабочие дни для превью раскида
+  dept?: DeptRef; // WI-11: ёмкость отдела для овербукинга в превью
 };
 
 const isoToDate = (iso: string | null): string => (iso ? String(iso).slice(0, 10) : '');
@@ -45,7 +51,7 @@ const inputStyle = {
   boxSizing: 'border-box' as const,
 };
 
-export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave }: Props) => {
+export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread, dept }: Props) => {
   const [hours, setHours] = useState(project.plannedEffort != null ? String(project.plannedEffort) : '');
   const [end, setEnd] = useState(isoToDate(project.endDate));
 
@@ -162,6 +168,9 @@ export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave }: Prop
             style={{ ...inputStyle, width: 130 }}
           />
         </label>
+        <span style={{ marginLeft: 'auto' }}>
+          <ProjectPlanPanel project={project} spread={spread} dept={dept} onSave={onSave} />
+        </span>
       </div>
     </div>
   );

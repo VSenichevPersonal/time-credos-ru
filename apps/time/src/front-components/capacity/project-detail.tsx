@@ -40,6 +40,8 @@ type Props = {
   metric?: CellMetric;
   deptCells?: LoadCell[];
   currentDeptId?: string;
+  // WI-11: текущий раскрытый отдел — для овербукинга в превью панели плана.
+  dept?: DeptRef;
 };
 
 // План отдела без проекта → форма проекта (те же поля plannedEffort/start/end).
@@ -62,9 +64,13 @@ const PlanningList = ({
   periods,
   onSave,
   onSaveDeptPlan,
+  spread,
+  dept,
 }: Required<Pick<Props, 'planned' | 'unplanned' | 'nameWidth' | 'periods' | 'onSave'>> & {
   deptPlans: DeptPlanLoad[];
   onSaveDeptPlan?: Props['onSaveDeptPlan'];
+  spread?: PlanSpread;
+  dept?: DeptRef;
 }) => {
   const projects = [...planned.map((pl) => pl.project), ...unplanned];
   const fieldsWidth = Math.max(360, periods.length * 56);
@@ -84,6 +90,8 @@ const PlanningList = ({
           nameWidth={nameWidth}
           fieldsWidth={fieldsWidth}
           onSave={onSave}
+          spread={spread}
+          dept={dept}
         />
       ))}
       {deptPlans.length > 0 && onSaveDeptPlan && (
@@ -98,6 +106,8 @@ const PlanningList = ({
               nameWidth={nameWidth}
               fieldsWidth={fieldsWidth}
               onSave={onSaveDeptPlan}
+              spread={spread}
+              dept={dept}
             />
           ))}
         </>
@@ -121,6 +131,7 @@ export const ProjectDetail = ({
   metric = 'plan',
   deptCells,
   currentDeptId,
+  dept,
 }: Props) => {
   if (planning && onSave) {
     return (
@@ -132,6 +143,8 @@ export const ProjectDetail = ({
         periods={periods}
         onSave={onSave}
         onSaveDeptPlan={onSaveDeptPlan}
+        spread={spread}
+        dept={dept}
       />
     );
   }

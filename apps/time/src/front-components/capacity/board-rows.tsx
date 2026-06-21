@@ -97,6 +97,7 @@ export const DeptRows = ({
               metric={metric}
               deptCells={cells}
               currentDeptId={dept.id}
+              dept={dept}
             />
           )}
         </div>
