@@ -67,6 +67,51 @@ describe('calcWeekGaps', () => {
   });
 });
 
+describe('calcWeekGaps + норма из произв. календаря (T2 SSOT)', () => {
+  // Имитация normFor из useDailyNorm: праздник=0, короткий предпраздничный=7, обычный=8.
+  // Праздник 24-го (норма 0), короткий день 23-го (норма 7).
+  const cal: Record<string, number> = {
+    '2026-06-22': 8,
+    '2026-06-23': 7, // короткий день
+    '2026-06-24': 0, // праздник (рабочий по дню недели, но нерабочий по календарю)
+    '2026-06-25': 8,
+    '2026-06-26': 8,
+  };
+  const normFor = (iso: string, isWeekend: boolean): number =>
+    cal[iso] ?? (isWeekend ? 0 : 8);
+
+  it('праздник (норма 0) пробелом не считается даже при 0 часов', () => {
+    const g = calcWeekGaps(WEEK, [8, 7, 0, 8, 8, 0, 0], normFor);
+    expect(g.gaps).toHaveLength(0);
+    expect(g.missingHours).toBe(0);
+  });
+
+  it('короткий день: 7ч = норма (не пробел), 5ч = недобор 2ч', () => {
+    const full = calcWeekGaps(WEEK, [8, 7, 0, 8, 8, 0, 0], normFor);
+    expect(full.gaps).toHaveLength(0);
+    const short = calcWeekGaps(WEEK, [8, 5, 0, 8, 8, 0, 0], normFor);
+    expect(short.underCount).toBe(1);
+    expect(short.missingHours).toBe(2); // 7 − 5, а не 8 − 5
+  });
+
+  it('недельная норма (Σ календаря) = 8+7+0+8+8 = 31, а не плоские 40', () => {
+    const weekNorm = WEEK.reduce((s, d) => s + normFor(d.iso, d.isWeekend), 0);
+    expect(weekNorm).toBe(31);
+  });
+
+  it('пустая неделя по календарю: недобор = Σ норм рабочих дней (31), праздник исключён', () => {
+    const g = calcWeekGaps(WEEK, [0, 0, 0, 0, 0, 0, 0], normFor);
+    expect(g.emptyCount).toBe(4); // праздник не пустой день
+    expect(g.missingHours).toBe(31);
+  });
+
+  it('без normFor — деградация на DAILY_NORM_HOURS×будни (back-compat)', () => {
+    const g = calcWeekGaps(WEEK, [0, 0, 0, 0, 0, 0, 0]);
+    expect(g.emptyCount).toBe(5);
+    expect(g.missingHours).toBe(40);
+  });
+});
+
 describe('gapsSummary', () => {
   it('нет пробелов → пустая строка', () => {
     const g = calcWeekGaps(WEEK, [8, 8, 8, 8, 8, 0, 0]);
