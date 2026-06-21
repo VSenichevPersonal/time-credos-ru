@@ -28,7 +28,7 @@ export const CapacityBoard = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
 
-  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, absenceCtx, sharesByProject, bookingCtx, spread, includeSoft, reload, reloadProjects, reloadDeptPlans } =
+  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, absenceCtx, sharesByProject, slotsByProject, rollupCtx, bookingCtx, spread, includeSoft, reload, reloadProjects, reloadDeptPlans } =
     useCapacity(granularity);
   const { save, saveDeptPlan, status: saveStatus, error: saveError } = usePlanEdit(
     reloadProjects,
@@ -47,11 +47,14 @@ export const CapacityBoard = () => {
 
   // REQ-0012: ёмкость/загрузка отдела включает план без проекта (deptPlans).
   // REQ-0004 C: + слой брони (HARD в Demand, SOFT отдельно) через bookingCtx.
+  // §7 SSOT: slotsByProject включает MANUAL-раскид + персональные слоты в остаток
+  // отдела (deptLoadCells вычитает Σ персональных через deptPersonalHoursInPeriod —
+  // анти-двойной-счёт). Без слотов карта пуста → прежнее EVEN/dept-поведение.
   const cellsByDept = useMemo(() => {
     const map = new Map<string, ReturnType<typeof deptLoadCells>>();
-    for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread));
+    for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread, slotsByProject));
     return map;
-  }, [departments, projects, deptPlans, periods, absenceCtx, sharesByProject, bookingCtx, spread]);
+  }, [departments, projects, deptPlans, periods, absenceCtx, sharesByProject, bookingCtx, spread, slotsByProject]);
 
   const summary = useMemo(
     () => summaryCells([...cellsByDept.values()], periods),
@@ -143,6 +146,7 @@ export const CapacityBoard = () => {
                 periods={periods}
                 absenceCtx={absenceCtx}
                 sharesByProject={sharesByProject}
+                slotsByProject={slotsByProject}
                 bookingCtx={bookingCtx}
                 spread={spread}
                 nameWidth={NAME_WIDTH}
@@ -164,6 +168,8 @@ export const CapacityBoard = () => {
                 periods={periods}
                 absenceCtx={absenceCtx}
                 sharesByProject={sharesByProject}
+                slotsByProject={slotsByProject}
+                rollupCtx={rollupCtx}
                 bookingCtx={bookingCtx}
                 spread={spread}
                 nameWidth={NAME_WIDTH}

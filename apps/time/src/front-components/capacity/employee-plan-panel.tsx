@@ -31,6 +31,9 @@ type Props = {
   // требует проект (slot = project×emp×month). Выбор проекта — в панели.
   projects: CapProject[];
   onSaved?: () => void; // перезагрузить доску после сохранения (опц.)
+  // Поповер живёт в sticky-ячейке имени (stacking-контекст). Родитель поднимает
+  // zIndex ячейки при открытии, иначе нижние строки перекрывают поповер.
+  onOpenChange?: (open: boolean) => void;
 };
 
 const todayKey = (): string => new Date().toISOString().slice(0, 10);
@@ -62,7 +65,7 @@ const fieldStyle = {
 
 const tnum = { fontVariantNumeric: 'tabular-nums' as const };
 
-export const EmployeePlanPanel = ({ employee, projects, onSaved }: Props) => {
+export const EmployeePlanPanel = ({ employee, projects, onSaved, onOpenChange }: Props) => {
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState<string>(projects[0]?.id ?? '');
   const [start, setStart] = useState(todayKey());
@@ -122,12 +125,16 @@ export const EmployeePlanPanel = ({ employee, projects, onSaved }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectId, employee.id]);
 
-  const close = () => setOpen(false);
+  const close = () => {
+    setOpen(false);
+    onOpenChange?.(false);
+  };
   const openPanel = () => {
     setProjectId((prev) => prev || projects[0]?.id || '');
     setSlotHours({});
     setError(null);
     setOpen(true);
+    onOpenChange?.(true);
   };
 
   const canSave = !!projectId && !rangeError && !needsEnd && !saving && !loading;

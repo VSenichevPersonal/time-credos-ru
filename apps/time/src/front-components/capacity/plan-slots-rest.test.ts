@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { fetchPlanSlots, savePlanSlots } from './plan-slots-rest';
+import { fetchAllPlanSlots, fetchPlanSlots, savePlanSlots } from './plan-slots-rest';
 
 // WI-47: клиент к /s/plan-slots (POST mode:read / mode:upsert).
 
@@ -124,5 +124,71 @@ describe('savePlanSlots', () => {
   it('ok:false → бросает ошибку', async () => {
     mockPost.mockResolvedValueOnce({ ok: false, error: 'timeout' });
     await expect(savePlanSlots('p1', [])).rejects.toThrow('timeout');
+  });
+});
+
+// §7 SSOT (замыкание фетч→calc-load): массовый фетч слотов по видимым проектам
+// (контракт read только by-projectId → N запросов, склейка в плоский PlanSlot[]).
+describe('fetchAllPlanSlots', () => {
+  it('пустой список проектов → [] без запросов', async () => {
+    const result = await fetchAllPlanSlots([]);
+    expect(result).toEqual([]);
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it('склеивает слоты двух проектов в плоский массив с projectId', async () => {
+    mockPost
+      .mockResolvedValueOnce({
+        ok: true,
+        slots: [{ periodMonth: '2026-01', plannedHours: 80, departmentId: 'd1', employeeId: 'e1' }],
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        slots: [{ periodMonth: '2026-02', plannedHours: 40, departmentId: 'd2', employeeId: null }],
+      });
+    const result = await fetchAllPlanSlots(['p1', 'p2']);
+    expect(result).toHaveLength(2);
+    expect(result).toContainEqual({
+      projectId: 'p1',
+      departmentId: 'd1',
+      employeeId: 'e1',
+      periodMonth: '2026-01',
+      plannedHours: 80,
+    });
+    expect(result).toContainEqual({
+      projectId: 'p2',
+      departmentId: 'd2',
+      employeeId: null,
+      periodMonth: '2026-02',
+      plannedHours: 40,
+    });
+  });
+
+  it('дедуп projectId: дубль в списке → один запрос', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true, slots: [] });
+    await fetchAllPlanSlots(['p1', 'p1']);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+  });
+
+  it('сбой/ok:false одного проекта не валит остальные', async () => {
+    mockPost
+      .mockResolvedValueOnce({ ok: false, error: 'нет доступа' })
+      .mockResolvedValueOnce({
+        ok: true,
+        slots: [{ periodMonth: '2026-03', plannedHours: 10, departmentId: null, employeeId: null }],
+      });
+    const result = await fetchAllPlanSlots(['bad', 'p2']);
+    expect(result).toHaveLength(1);
+    expect(result[0].projectId).toBe('p2');
+  });
+
+  it('исключение запроса проекта → пропуск без падения', async () => {
+    mockPost.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({
+      ok: true,
+      slots: [{ periodMonth: '2026-04', plannedHours: 5, departmentId: null, employeeId: null }],
+    });
+    const result = await fetchAllPlanSlots(['boom', 'p2']);
+    expect(result).toHaveLength(1);
+    expect(result[0].projectId).toBe('p2');
   });
 });

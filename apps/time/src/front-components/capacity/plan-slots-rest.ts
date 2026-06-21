@@ -1,5 +1,7 @@
 import { RestApiClient } from 'twenty-client-sdk/rest';
 
+import type { PlanSlot } from 'src/front-components/capacity/types';
+
 // WI-47 «Вручную по месяцам»: клиент к контракту Dev2 (`credos-time-plan-slot`).
 // Слот = {project(rel), periodMonth TEXT 'YYYY-MM', plannedHours NUMBER, (опц)
 // department}. Доступ из песочницы виджета (Web Worker Remote DOM) через /s/ route.
@@ -44,6 +46,42 @@ export const fetchPlanSlots = async (projectId: string): Promise<PlanSlotInput[]
       departmentId: s.departmentId ?? null,
       employeeId: s.employeeId ?? null,
     }));
+};
+
+// Планирование до СОТРУДНИКА — визуализация на доске (§7 SSOT, замыкание звена
+// фетч→calc-load). Контракт /s/plan-slots read ОБЯЗАТЕЛЬНО требует projectId и НЕ
+// поддерживает массовый read / by-period (см. plan-slots.logic.ts: «projectId is
+// required»). Чтобы доска показывала персональный/детальный план, фетчим слоты по
+// списку видимых проектов параллельно (N запросов) и склеиваем в ПЛОСКИЙ
+// PlanSlot[] (projectId проставлен) → calc-load.buildSlotsByProject. Пустой список
+// проектов → []. Ошибка отдельного проекта НЕ валит всю доску (тот проект просто
+// без слотов). keep-it-simple; для read-all/by-period — follow-up Dev2 (флаг в
+// SIGNALS), тогда заменим N вызовов одним.
+export const fetchAllPlanSlots = async (projectIds: string[]): Promise<PlanSlot[]> => {
+  const uniq = [...new Set(projectIds.filter(Boolean))];
+  if (uniq.length === 0) return [];
+  const perProject = await Promise.all(
+    uniq.map(async (projectId) => {
+      try {
+        const resp = await client().post<ListResp>('/s/plan-slots', { mode: 'read', projectId });
+        if (!resp?.ok) return [] as PlanSlot[];
+        return (resp.slots ?? [])
+          .filter((s): s is RawSlot & { periodMonth: string } => !!s.periodMonth)
+          .map(
+            (s): PlanSlot => ({
+              projectId,
+              departmentId: s.departmentId ?? null,
+              employeeId: s.employeeId ?? null,
+              periodMonth: s.periodMonth,
+              plannedHours: s.plannedHours ?? null,
+            }),
+          );
+      } catch {
+        return [] as PlanSlot[];
+      }
+    }),
+  );
+  return perProject.flat();
 };
 
 type UpsertResp = { ok?: boolean; error?: string };

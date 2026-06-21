@@ -8,7 +8,12 @@ import {
   employeeLoadCells,
   firstFreePeriod,
 } from 'src/front-components/capacity/calc-load';
-import type { AbsenceCtx, BookingCtx, PlanSpread } from 'src/front-components/capacity/calc-load';
+import type {
+  AbsenceCtx,
+  BookingCtx,
+  PlanRollupCtx,
+  PlanSpread,
+} from 'src/front-components/capacity/calc-load';
 import type { PreviewSource } from 'src/front-components/capacity/plan-preview';
 import type {
   CapProject,
@@ -18,6 +23,7 @@ import type {
   EmployeeRef,
   LoadCell,
   Period,
+  PlanSlot,
   ProjectDeptShare,
   ProjectPatch,
 } from 'src/front-components/capacity/types';
@@ -31,6 +37,7 @@ type DeptProps = {
   periods: Period[];
   absenceCtx?: AbsenceCtx;
   sharesByProject?: Map<string, ProjectDeptShare[]>;
+  slotsByProject?: Map<string, PlanSlot[]>;
   bookingCtx?: BookingCtx;
   spread?: PlanSpread;
   nameWidth: number;
@@ -52,6 +59,7 @@ export const DeptRows = ({
   periods,
   absenceCtx,
   sharesByProject,
+  slotsByProject,
   bookingCtx,
   spread,
   nameWidth,
@@ -79,7 +87,7 @@ export const DeptRows = ({
     {departments.map((dept) => {
       // REQ-0012: ячейки отдела учитывают план без проекта (deptPlans).
       // REQ-0004 C: + слой брони (bookingCtx).
-      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread);
+      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread, slotsByProject);
       const isOpen = expanded.has(dept.id);
       const detail = isOpen ? deptProjectLoads(dept, projects, periods, sharesByProject, spread) : null;
       const planRows = isOpen ? deptPlanLoads(dept, deptPlans, periods, spread) : null;
@@ -130,6 +138,8 @@ type EmpProps = {
   periods: Period[];
   absenceCtx?: AbsenceCtx;
   sharesByProject?: Map<string, ProjectDeptShare[]>;
+  slotsByProject?: Map<string, PlanSlot[]>;
+  rollupCtx?: PlanRollupCtx;
   bookingCtx?: BookingCtx;
   spread?: PlanSpread;
   nameWidth: number;
@@ -149,6 +159,8 @@ export const EmployeeRows = ({
   periods,
   absenceCtx,
   sharesByProject,
+  slotsByProject,
+  rollupCtx,
   bookingCtx,
   spread,
   nameWidth,
@@ -165,7 +177,7 @@ export const EmployeeRows = ({
     <>
       {sorted.map((emp) => {
         const dept = emp.departmentId ? deptById.get(emp.departmentId) : undefined;
-        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread);
+        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx, spread, slotsByProject, rollupCtx);
         return (
           <EmployeeRow
             key={emp.id}

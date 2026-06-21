@@ -6,10 +6,12 @@ import {
   fetchCalendar,
   fetchDepartments,
   fetchDeptPlans,
+  fetchEmployeeDepartments,
   fetchEmployees,
   fetchProjectDeptShares,
   fetchProjects,
 } from 'src/front-components/capacity/capacity-rest';
+import { fetchAllPlanSlots } from 'src/front-components/capacity/plan-slots-rest';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
 import {
@@ -18,8 +20,14 @@ import {
   buildHoursByDay,
   buildPeriods,
   buildSharesByProject,
+  buildSlotsByProject,
 } from 'src/front-components/capacity/calc-load';
-import type { AbsenceCtx, BookingCtx, PlanSpread } from 'src/front-components/capacity/calc-load';
+import type {
+  AbsenceCtx,
+  BookingCtx,
+  PlanRollupCtx,
+  PlanSpread,
+} from 'src/front-components/capacity/calc-load';
 import type {
   Absence,
   Booking,
@@ -27,8 +35,10 @@ import type {
   CapProject,
   DeptPlan,
   DeptRef,
+  EmpDeptAssignment,
   EmployeeRef,
   Period,
+  PlanSlot,
   ProjectDeptShare,
 } from 'src/front-components/capacity/types';
 
@@ -72,6 +82,8 @@ type State = {
   absences: Absence[]; // W3-1: отсутствия для вычета из ёмкости доски
   shares: ProjectDeptShare[]; // REQ-0013 13b: доли отделов в проектах
   bookings: Booking[]; // REQ-0004 C: брони ресурса (HARD/SOFT) для слоя Demand
+  assignments: EmpDeptAssignment[]; // §7.2 rollupCtx: назначения emp×отдел (FTE+даты)
+  planSlots: PlanSlot[]; // §7 SSOT: помесячные слоты плана (персональные + отдельские)
 };
 
 // Загрузка данных доски + расчёт колонок горизонта. reloadProjects() — точечный
@@ -101,6 +113,8 @@ export const useCapacity = (granularity: Granularity) => {
     absences: [],
     shares: [],
     bookings: [],
+    assignments: [],
+    planSlots: [],
   });
   // reload() — полный повтор загрузки доски (кнопка «Повторить» при ошибке).
   const [nonce, setNonce] = useState(0);
@@ -118,22 +132,30 @@ export const useCapacity = (granularity: Granularity) => {
       fetchAbsences(range.from, range.to),
       fetchProjectDeptShares(),
       fetchBookings(range.from, range.to),
+      fetchEmployeeDepartments(),
     ])
-      .then(([departments, employees, projects, deptPlans, calendar, absences, shares, bookings]) => {
-        if (!alive) return;
-        setState({
-          loading: false,
-          error: null,
-          departments,
-          employees,
-          projects,
-          deptPlans,
-          calendar,
-          absences,
-          shares,
-          bookings,
-        });
-      })
+      .then(
+        ([departments, employees, projects, deptPlans, calendar, absences, shares, bookings, assignments]) => {
+          if (!alive) return;
+          // planSlots грузятся отдельным эффектом (зависят от списка проектов) —
+          // на первой отрисовке доска без слотов = прежнее EVEN/dept-поведение,
+          // затем дозагружаются и пересчитывают персональный/детальный план.
+          setState((s) => ({
+            ...s,
+            loading: false,
+            error: null,
+            departments,
+            employees,
+            projects,
+            deptPlans,
+            calendar,
+            absences,
+            shares,
+            bookings,
+            assignments,
+          }));
+        },
+      )
       .catch((e: unknown) => {
         if (!alive) return;
         const message = e instanceof Error ? e.message : 'неизвестная ошибка';
@@ -143,6 +165,41 @@ export const useCapacity = (granularity: Granularity) => {
       alive = false;
     };
   }, [anchor, granularity, nonce, weekCount]);
+
+  // §7 SSOT: ключ списка проектов (сорт+join) — стабильная зависимость для
+  // дозагрузки слотов (массив projects меняет ссылку каждый рендер, id-ключ — нет).
+  const projectIdsKey = useMemo(
+    () => [...state.projects.map((p) => p.id)].sort().join(','),
+    [state.projects],
+  );
+
+  // §7 SSOT (замыкание фетч→calc-load): дозагрузка ПЛАНОВЫХ СЛОТОВ по видимым
+  // проектам. Отдельный эффект — слоты зависят от уже загруженного списка проектов;
+  // не блокирует первичную отрисовку доски. fetchAllPlanSlots = N read-запросов
+  // (контракт /s/plan-slots без массового read — см. plan-slots-rest). nonce →
+  // рефетч после правки персонального плана (onSavedPlan доски).
+  useEffect(() => {
+    let alive = true;
+    const ids = projectIdsKey ? projectIdsKey.split(',') : [];
+    if (ids.length === 0) {
+      setState((s) => (s.planSlots.length === 0 ? s : { ...s, planSlots: [] }));
+      return;
+    }
+    fetchAllPlanSlots(ids)
+      .then((planSlots) => {
+        if (!alive) return;
+        setState((s) => ({ ...s, planSlots }));
+      })
+      .catch(() => {
+        // Слоты — обогащение доски: сбой не должен ронять весь экран. Без слотов
+        // доска показывает прежнее EVEN/dept-распределение (fallback сохранён).
+        if (!alive) return;
+        setState((s) => (s.planSlots.length === 0 ? s : { ...s, planSlots: [] }));
+      });
+    return () => {
+      alive = false;
+    };
+  }, [projectIdsKey, nonce]);
 
   const reloadProjects = useCallback(async () => {
     const projects = await fetchProjects();
@@ -187,6 +244,20 @@ export const useCapacity = (granularity: Granularity) => {
     [state.shares],
   );
 
+  // §7 SSOT: карта projectId → его слоты (персональные + отдельские). Передаётся
+  // в deptLoadCells/employeeLoadCells. Пусто → расчёт прежний (EVEN/dept без слотов).
+  const slotsByProject = useMemo(
+    () => buildSlotsByProject(state.planSlots),
+    [state.planSlots],
+  );
+
+  // §7.2 rollupCtx: распределение нераспределённого остатка отдела ПО FTE
+  // (assignments + состав employees). Без него остаток делится поровну (1/headcount).
+  const rollupCtx: PlanRollupCtx = useMemo(
+    () => ({ assignments: state.assignments, employees: state.employees }),
+    [state.assignments, state.employees],
+  );
+
   // REQ-0004 C: контекст броней (группировка по сотруднику + тумблер SOFT).
   // Передаётся в deptLoadCells/employeeLoadCells. includeSoft = настройка
   // tentativeBookingEnabled (SOFT-слой рисуется только когда включён).
@@ -215,6 +286,8 @@ export const useCapacity = (granularity: Granularity) => {
     periods,
     absenceCtx,
     sharesByProject,
+    slotsByProject,
+    rollupCtx,
     bookingCtx,
     spread,
     includeSoft,

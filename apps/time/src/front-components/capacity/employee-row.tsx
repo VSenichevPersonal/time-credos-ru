@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow } from 'src/front-components/capacity/cap-tokens';
 import { BookingMarker } from 'src/front-components/capacity/booking-marker';
 import { EmployeePlanPanel } from 'src/front-components/capacity/employee-plan-panel';
@@ -38,7 +40,12 @@ export const EmployeeRow = ({
   planning,
   projects,
   onSavedPlan,
-}: Props) => (
+}: Props) => {
+  // Поповер «✎ План» живёт в этой sticky-ячейке (stacking-контекст zIndex:1).
+  // При открытии поднимаем ячейку выше соседних строк, иначе их sticky-ячейки
+  // (тот же zIndex, позже в DOM) перекрывают поповер → «карточка уезжает».
+  const [panelOpen, setPanelOpen] = useState(false);
+  return (
   <div style={{ display: 'flex', borderBottom: `1px solid ${T.border}`, alignItems: 'stretch' }}>
     <div
       style={{
@@ -54,7 +61,7 @@ export const EmployeeRow = ({
         background: T.surface,
         position: 'sticky',
         left: 0,
-        zIndex: 1,
+        zIndex: panelOpen ? 30 : 1,
       }}
     >
       <span
@@ -78,6 +85,7 @@ export const EmployeeRow = ({
             employee={employee}
             projects={projects ?? []}
             onSaved={onSavedPlan}
+            onOpenChange={setPanelOpen}
           />
         </div>
       )}
@@ -160,4 +168,5 @@ export const EmployeeRow = ({
       );
     })()}
   </div>
-);
+  );
+};
