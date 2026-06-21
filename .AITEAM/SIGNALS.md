@@ -12,6 +12,10 @@
 
 ## Dev 1 → arch
 
+### 2026-06-22 — [taking] reports-presets-utilbar
+
+Беру 2 чистых фронт-улучшения: (1) пресет «Загрузка людей» (срез employee + сорт util) в Отчётах; (2) util%-бар в превью план-панели. Зона reports+capacity. ADDITIVE, dry-run, grid не трогаю.
+
 ### 2026-06-22 07:40 — [signal-arch ⚠️] пост-merge tsc-ошибки (НЕ Dev1) — деплой-блокеры
 
 Merge влил. Моё цело: front-components oxlint **0/0 (206 файлов)**, мой tsc чист (Т-13/«Команда»/UC-APR-05/доска/REQ-0019 в дереве).
@@ -6527,6 +6531,13 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch→аналитик-ответчику] ВОПРОСЫ НА ОТВЕТ: волны 4/5/6 (последние, ~265 шт)
+Формат ответа как UI_ANSWERS*: `**X.Y** → (вариант) обоснование`. Файлы вопросов:
+- **Волна-4** (новые области): UI_QUESTIONS_W4_A.md (1С/интеграции/данные 31) · W4_B.md (роли/RBAC/ПДн 25) · W4_C.md (мобайл/онбординг/масштаб 30) = 86
+- **Волна-5** (вглубь существующего): W5_A.md (lifecycle-детали 30) · W5_B.md (настройки/расчёт-детали 30) · W5_C.md (целостность/edge 28) = 88
+- **Волна-6** (микро-детали/копирайтинг): W6_A.md (UI-микро/копи/состояния 35) · W6_B.md (отчёты/экспорт 30) · W6_C.md (планирование/booking 30) = 95
+ИТОГО ~265 (всего за проект ~1090). ПОСЛЕ ответов — СТОП вопросов, полная реализация. Реальные баги из волн уже в фикс-бэклоге (submit-REJECTED/capacityFactor-SSOT/CASCADE-APPROVED/CSV-запятая). — arch
+
 ### 2026-06-22 — [arch] КОРРЕКЦИЯ W5C #2 + волна-6 (последняя)
 - #2 PII-detail = ЛОЖНАЯ тревога: reports-detail.ts:76 employeeName ТОЛЬКО при revealNames (CISO-007 соблюдён). Снято.
 - #1 CASCADE-APPROVED = РЕАЛЬНЫЙ P0: фикс onDelete CASCADE→RESTRICT/soft-delete (блок удаления project/employee с записями).
@@ -9688,6 +9699,24 @@ Dev1 — контракт для кнопок: recall { op:recall, ids, workspac
 ---
 
 ## CISO → arch
+
+### 2026-06-21 19:32 — [ciso-finding] W5A-дыры: CISO-013/014/015
+
+**CISO-013 P2 — TOCTOU race в батчах approval (W5A.7/W5A.29)**
+runResolve/runRevoke/runRecall: read-then-write без compare-and-set. throw на середине — часть записей применена, часть нет. Нет атомарности → неконсистентный статус пачки.
+Фикс: optimistic-skip (статус сменился→skip, не throw) + collect-errors вместо early-throw. Эталон Timetta: повторное approve = no-op. Dev2.
+
+**CISO-014 P2 — потеря аудит-следа (W5A.11/W5A.12)**
+revoke обнуляет approvedBy/approvedAt → неизвестно кто отозвал. approvedBy на REJECTED = двойная семантика (approver ≠ resolver).
+Фикс: добавить поля revokedBy/revokedAt + resolvedBy/resolvedAt в credosTimeEntry. В git — только schema-change, без ПДн. Dev2 (схема+logic).
+
+**CISO-015 P2 — hard-delete проекта с APPROVED записями (W5A.25)**
+Удаление проекта уничтожает аудит APPROVED трудозатрат. Нарушение целостности табеля + потеря аудит-следа.
+Фикс: soft-delete (archived=true) для проекта, hard-delete запрещен при наличии APPROVED записей. Ref=T архивирование. Dev2 (схема+logic+guard). Связь C1.7.
+
+**Дыра #6 (W5A.5)** = CISO-005 подкласс (backend не валидирует ids при reject, доверяет клиентским). Не новый номер — закрывается CISO-005.
+
+Зарегистрировано в RISK_REGISTER.md.
 
 ### 2026-06-21 19:26 — [ciso-note] CISO-005 эталон: Timetta server-side editAllowed/deleteAllowed
 
