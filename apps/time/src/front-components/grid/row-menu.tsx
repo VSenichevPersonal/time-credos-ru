@@ -27,10 +27,11 @@ export type CommentDay = {
 type Props = {
   rowLocked?: boolean;
   hasHours?: boolean; // есть что заполнять/очищать (иначе пункты не нужны)
+  recordCount?: number; // W3A.11: сколько записей удалит «Убрать строку» (счётчик в confirm)
   onDuplicate: () => void;
   onFillWeekdays: () => void; // норма дня во все пустые будни строки (WI-02 SSOT)
-  onClearRow: () => void; // обнулить все часы строки
-  onDeleteRow: () => void; // убрать строку из сетки целиком
+  onClearRow: () => void; // обнулить все часы строки (W3A.11: мгновенно + undo-тост наверху)
+  onDeleteRow: () => void; // убрать строку из сетки целиком (W3A.11: через confirm)
   commentDays?: CommentDay[]; // WI-01: дни строки с часами — цели комментария
   onCommitComment?: (dayIso: string, text: string) => void; // WI-01: сохранить коммент дня
 };
@@ -39,12 +40,14 @@ type Item = {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  icon?: 'clear' | 'trash'; // W3A.10: иконки только у деструктивных действий
   hint?: string;
   dividerBefore?: boolean; // визуальный разделитель кластеров
 };
 
-// Режим поповера: список действий vs форма комментариев (WI-01).
-type View = 'menu' | 'comment';
+// Режим поповера: список действий / форма комментариев (WI-01) / подтверждение
+// удаления строки (W3A.11).
+type View = 'menu' | 'comment' | 'confirm-delete';
 
 // WI-01: дни-цели для комментария — только с проставленными часами (без часов
 // записи нет, комментировать нечего). Чистый предикат — SSOT для пункта меню
@@ -55,6 +58,7 @@ export const commentTargets = (days?: CommentDay[]): CommentDay[] =>
 export const RowMenu = ({
   rowLocked,
   hasHours,
+  recordCount,
   onDuplicate,
   onFillWeekdays,
   onClearRow,
@@ -79,15 +83,16 @@ export const RowMenu = ({
   const targets = commentTargets(commentDays);
   const canComment = !rowLocked && !!onCommitComment && targets.length > 0;
 
-  const items: Item[] = [
-    { label: 'Дублировать строку', onClick: run(onDuplicate), hint: 'тот же проект, новый вид работ' },
-  ];
+  // W3A.9: порядок по частоте использования — ежедневное наверх, деструктив вниз:
+  //   Заполнить будни → Комментарий → Дублировать → [разд] → Обнулить → Убрать.
+  // W3A.10: иконки только у деструктивных (Обнулить/Убрать). W3A.11: «Убрать» через
+  // confirm со счётчиком записей; «Обнулить» мгновенно (undo-тост — на уровне сетки).
+  const items: Item[] = [];
   if (!rowLocked) {
     items.push({
       label: 'Заполнить будни нормой',
       onClick: run(onFillWeekdays),
       hint: 'норма дня в пустые будни этой строки',
-      dividerBefore: true,
     });
     if (canComment)
       items.push({
@@ -95,14 +100,29 @@ export const RowMenu = ({
         onClick: () => setView('comment'),
         hint: 'что делали в этот день',
       });
+  }
+  items.push({
+    label: 'Дублировать строку',
+    onClick: run(onDuplicate),
+    hint: 'тот же проект, новый вид работ',
+  });
+  if (!rowLocked) {
     if (hasHours)
       items.push({
         label: 'Обнулить часы',
         onClick: run(onClearRow),
+        icon: 'clear',
         hint: 'все часы строки → пусто',
         dividerBefore: true,
       });
-    items.push({ label: 'Убрать строку', onClick: run(onDeleteRow), danger: true });
+    items.push({
+      label: 'Убрать строку',
+      // W3A.11: необратимо → сначала подтверждение (счётчик записей).
+      onClick: () => setView('confirm-delete'),
+      icon: 'trash',
+      danger: true,
+      dividerBefore: !hasHours, // разделитель, если «Обнулить» выше нет
+    });
   }
 
   return (
@@ -172,7 +192,9 @@ export const RowMenu = ({
                     role="menuitem"
                     onClick={it.onClick}
                     style={{
-                      display: 'block',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
                       width: '100%',
                       padding: '7px 9px',
                       textAlign: 'left',
@@ -190,16 +212,28 @@ export const RowMenu = ({
                       e.currentTarget.style.background = 'transparent';
                     }}
                   >
-                    <span style={{ fontSize: 12.5, fontWeight: 500 }}>{it.label}</span>
-                    {it.hint && (
-                      <span style={{ display: 'block', fontSize: 11, color: T.textFaint, marginTop: 1 }}>
-                        {it.hint}
-                      </span>
+                    {/* W3A.10: иконка только у деструктивных — акцент на риске. */}
+                    {it.icon && (
+                      <ActionIcon kind={it.icon} color={it.danger ? T.over : T.textMuted} />
                     )}
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 500 }}>{it.label}</span>
+                      {it.hint && (
+                        <span style={{ display: 'block', fontSize: 11, color: T.textFaint, marginTop: 1 }}>
+                          {it.hint}
+                        </span>
+                      )}
+                    </span>
                   </button>
                 </div>
               ))}
             </div>
+          ) : view === 'confirm-delete' ? (
+            <ConfirmDelete
+              count={recordCount ?? 0}
+              onConfirm={run(onDeleteRow)}
+              onBack={() => setView('menu')}
+            />
           ) : (
             <CommentPanel
               days={targets}
@@ -213,6 +247,105 @@ export const RowMenu = ({
     </div>
   );
 };
+
+// W3A.11: подтверждение удаления строки. Не window.confirm (запрещён в RemDOM) —
+// инлайн-панель со счётчиком записей, которые будут удалены. Счётчик 0 → строка
+// пуста (записей нет, удаляется только из сетки) — формулировка мягче.
+const ConfirmDelete = ({
+  count,
+  onConfirm,
+  onBack,
+}: {
+  count: number;
+  onConfirm: () => void;
+  onBack: () => void;
+}) => (
+  <div
+    role="menu"
+    onClick={(e) => e.stopPropagation()}
+    style={{
+      position: 'absolute',
+      top: 28,
+      left: 0,
+      zIndex: 21,
+      width: 240,
+      background: T.surface,
+      border: `1px solid ${T.borderStrong}`,
+      borderRadius: 10,
+      boxShadow: '0 10px 30px rgba(29,31,38,0.16)',
+      padding: 12,
+    }}
+  >
+    <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, marginBottom: 4 }}>
+      Убрать строку?
+    </div>
+    <div style={{ fontSize: 11.5, color: T.textMuted, marginBottom: 10, lineHeight: 1.4 }}>
+      {count > 0
+        ? `Будет удалено ${count} ${pluralRecords(count)}. Действие необратимо.`
+        : 'В строке нет записей — она просто исчезнет из таблицы.'}
+    </div>
+    <div style={{ display: 'flex', gap: 6 }}>
+      <button
+        type="button"
+        onClick={onBack}
+        style={{
+          flex: 1,
+          height: 30,
+          border: `1px solid ${T.border}`,
+          borderRadius: 7,
+          background: T.surface,
+          color: T.text,
+          cursor: 'pointer',
+          fontSize: 12,
+          fontFamily: 'inherit',
+        }}
+      >
+        Отмена
+      </button>
+      <button
+        type="button"
+        onClick={onConfirm}
+        style={{
+          flex: 1,
+          height: 30,
+          border: 'none',
+          borderRadius: 7,
+          background: T.over,
+          color: T.onAccent,
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 600,
+          fontFamily: 'inherit',
+        }}
+      >
+        {count > 0 ? 'Удалить' : 'Убрать'}
+      </button>
+    </div>
+  </div>
+);
+
+// Склонение «запись/записи/записей» (1 запись, 2 записи, 5 записей). Чистая функция.
+export const pluralRecords = (n: number): string => {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'запись';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'записи';
+  return 'записей';
+};
+
+// W3A.10: иконки деструктивных действий. clear=обнулить (ластик/× в круге),
+// trash=убрать (корзина). Тонкие штрихи, aria-hidden (смысл в подписи).
+const ActionIcon = ({ kind, color }: { kind: 'clear' | 'trash'; color: string }) =>
+  kind === 'trash' ? (
+    <svg aria-hidden width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ marginTop: 1, flexShrink: 0 }}>
+      <path d="M3 4.5h10M6.5 4.5V3.2a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.3M5 4.5l.6 8a1 1 0 0 0 1 .9h2.8a1 1 0 0 0 1-.9l.6-8" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ) : (
+    <svg aria-hidden width="14" height="14" viewBox="0 0 16 16" fill="none" style={{ marginTop: 1, flexShrink: 0 }}>
+      <circle cx="8" cy="8" r="5.6" stroke={color} strokeWidth="1.2" />
+      <path d="M6 6l4 4M10 6l-4 4" stroke={color} strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
 
 // WI-01: панель комментариев — по одному инлайн-полю на день с часами. Сохранение
 // по blur/Enter, Esc — назад. Поповер на useState (Remote DOM, host-DOM нет).

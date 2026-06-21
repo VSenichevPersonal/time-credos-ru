@@ -8,6 +8,7 @@ import { fmtTotal } from 'src/front-components/grid/format';
 import { categoryMeta } from 'src/front-components/shared/category-meta';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { Nav } from 'src/front-components/grid/use-keyboard';
+import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 
 // Строка сетки. Две левых колонки: «Проект» (цвет-точка категории + код/клиент,
 // 600) и «Вид работ» (название читаемого кегля 13/500, не tiny-faint) + 7 ячеек
@@ -26,6 +27,7 @@ type Props = {
   days: WeekDay[];
   hoursByDay: number[];
   lockedByDay?: boolean[];
+  normFor?: NormForDay; // W3A.17: норма дня — бледный плейсхолдер в пустой ячейке
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   rowTotal: number;
   alt: boolean;
@@ -49,6 +51,7 @@ export const GridRow = ({
   days,
   hoursByDay,
   lockedByDay,
+  normFor,
   overtimeThreshold,
   rowTotal,
   alt,
@@ -72,10 +75,13 @@ export const GridRow = ({
     description: descByDay?.[i] ?? null,
     locked: lockedByDay?.[i],
   }));
+  // W3A.11: счётчик записей для confirm удаления — дни с проставленными часами.
+  const recordCount = hoursByDay.filter((h) => h > 0).length;
   const menu = onDuplicate && (
     <RowMenu
       rowLocked={rowLocked}
       hasHours={hasHours}
+      recordCount={recordCount}
       onDuplicate={onDuplicate}
       onFillWeekdays={() => onFillWeekdays?.()}
       onClearRow={() => onClearRow?.()}
@@ -197,6 +203,7 @@ export const GridRow = ({
         weekend={day.isWeekend}
         today={day.isToday}
         locked={lockedByDay?.[i]}
+        normHint={normFor ? normFor(day.iso, day.isWeekend) : undefined}
         overtimeThreshold={overtimeThreshold}
         active={nav.isActive(rowIndex, i)}
         selected={nav.isSelected(rowIndex, i)}

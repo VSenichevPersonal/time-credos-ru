@@ -17,6 +17,7 @@ import { useApproval } from 'src/front-components/grid/use-approval';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { useValidation } from 'src/front-components/grid/use-validation';
 import { ValidationToast } from 'src/front-components/grid/validation-toast';
+import { UndoToast, type UndoState } from 'src/front-components/grid/undo-toast';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
@@ -106,11 +107,36 @@ export const WeeklyGrid = () => {
     if (inputs.length > 0)
       void data.upsertMany(inputs).then((r) => validation.showServerResult(r));
   };
-  // Меню строки: «Очистить строку» — удалить все несогласованные записи строки.
+  // W3A.7/W3A.11: тост «Отменить» для мгновенного обнуления часов строки. Снимок
+  // прежних значений (несогласованные дни с часами) → re-upsert при отмене.
+  const [undo, setUndo] = useState<UndoState | null>(null);
+
+  // Меню строки: «Обнулить часы» — удалить все несогласованные записи строки
+  // (W3A.11: мгновенно + undo-тост 5с). Снимок снимаем ДО очистки.
   const clearRow = (rowKey: string) => {
+    const { projectId, workTypeId } = splitRowKey(rowKey);
+    const row = rowList.find((r) => r.key === rowKey);
+    const snapshot =
+      row?.hoursByDay
+        .map((h, i) => ({ h, i }))
+        .filter(({ h, i }) => h > 0 && !row.lockedByDay?.[i])
+        .map(({ h, i }) => ({
+          date: week.days[i]?.iso ?? '',
+          hours: h,
+          projectId,
+          workTypeId,
+          description: row.descByDay?.[i] ?? undefined,
+        }))
+        .filter((u) => u.date) ?? [];
     const { skippedLocked, result } = actions.clearRow(rowKey);
     if (skippedLocked) validation.notifyLocked();
     void result.then((r) => validation.showServerResult(r));
+    if (snapshot.length > 0)
+      setUndo({
+        id: Date.now(),
+        message: `Часы строки обнулены (${snapshot.length})`,
+        onUndo: () => void data.upsertMany(snapshot).then((r) => validation.showServerResult(r)),
+      });
   };
   // Меню строки: «Удалить строку» — очистить часы и убрать строку из сетки. Если
   // строка пустая (нет записей) — просто снять её из extraRowKeys.
@@ -351,6 +377,7 @@ export const WeeklyGrid = () => {
       />
 
       <ValidationToast notices={validation.notices} onDismiss={validation.dismiss} />
+      <UndoToast state={undo} onDismiss={() => setUndo(null)} />
     </div>
   );
 };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { commentTargets } from 'src/front-components/grid/row-menu';
+import { commentTargets, pluralRecords } from 'src/front-components/grid/row-menu';
 import type { CommentDay } from 'src/front-components/grid/row-menu';
 
 // WI-01: «Комментарий к записи…» перенесён из ячейки в меню строки ⋯. Цели
@@ -42,5 +42,36 @@ describe('commentTargets (WI-01)', () => {
 
   it('дробные часы тоже валидная цель', () => {
     expect(commentTargets([day({ hours: 0.5 })])).toHaveLength(1);
+  });
+});
+
+// W3A.11: confirm удаления строки показывает «удалить N записей» — корректное
+// русское склонение существительного.
+describe('pluralRecords (W3A.11)', () => {
+  it('1 → «запись»', () => {
+    expect(pluralRecords(1)).toBe('запись');
+  });
+
+  it('2–4 → «записи»', () => {
+    expect(pluralRecords(2)).toBe('записи');
+    expect(pluralRecords(3)).toBe('записи');
+    expect(pluralRecords(4)).toBe('записи');
+  });
+
+  it('5–20 → «записей»', () => {
+    expect(pluralRecords(5)).toBe('записей');
+    expect(pluralRecords(11)).toBe('записей');
+    expect(pluralRecords(20)).toBe('записей');
+  });
+
+  it('исключения 11–14 → «записей» (не «запись/записи»)', () => {
+    expect(pluralRecords(11)).toBe('записей');
+    expect(pluralRecords(12)).toBe('записей');
+    expect(pluralRecords(14)).toBe('записей');
+  });
+
+  it('21 → «запись», 22 → «записи»', () => {
+    expect(pluralRecords(21)).toBe('запись');
+    expect(pluralRecords(22)).toBe('записи');
   });
 });

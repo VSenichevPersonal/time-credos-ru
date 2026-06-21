@@ -13,10 +13,10 @@ import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 
 // Ширины левых колонок (px / fr) для двухколоночной раскладки «Неделя».
 // Проект — эластичный (код+клиент), вид работ — фиксированные ~176px
-// читаемого кегля. 7 дней по 58px + «Итого» 66px не меняются.
+// читаемого кегля. W3A.25: день 58→64px (крупнее, ref T ~64×40), «Итого» 66px.
 export const COL_PROJECT = 'minmax(0, 1.4fr)';
 export const COL_WORKTYPE = '176px';
-const DAYS_COLS = 'repeat(7, 58px) 66px';
+const DAYS_COLS = 'repeat(7, 64px) 66px';
 
 // Двухколоночный шаблон (Неделя): Проект | Вид работ | 7 дней | Итого.
 export const GRID_TEMPLATE = `${COL_PROJECT} ${COL_WORKTYPE} ${DAYS_COLS}`;

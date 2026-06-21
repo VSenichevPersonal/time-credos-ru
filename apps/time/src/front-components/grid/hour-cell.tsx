@@ -20,6 +20,7 @@ type Props = {
   active: boolean;
   selected?: boolean; // E1.3: входит в прямоугольник выделения (Shift+клик)
   locked?: boolean; // W6-2: согласованная запись — только чтение
+  normHint?: number; // W3A.17: норма дня — бледный плейсхолдер пустой ячейки (0=нет)
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек (fallback 12)
   seed: string | null; // символ, с которого начали печатать
   description?: string | null; // комментарий записи — read-only индикатор (правка в меню ⋯)
@@ -36,6 +37,7 @@ export const HourCell = ({
   active,
   selected,
   locked,
+  normHint,
   overtimeThreshold,
   seed,
   description,
@@ -99,7 +101,7 @@ export const HourCell = ({
   const over = isOvertime(value, overtimeThreshold);
   const bg = today ? T.todayCol : weekend ? T.weekendBg : 'transparent';
   const base = {
-    height: 32,
+    height: 40, // W3A.25: 32→40 (заказчик просил крупнее, ref T ~64×40)
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'flex-end',
@@ -142,6 +144,10 @@ export const HourCell = ({
               setDraft(fmtHours(value));
               setInvalid(false);
               setEditing(false);
+            } else if (e.key === 'Home' || e.key === 'End') {
+              // W3A.8: в режиме РЕДАКТИРОВАНИЯ Home/End двигают курсор внутри инпута
+              // (нативно), а не прыгают по ячейкам — гасим всплытие к контейнеру.
+              e.stopPropagation();
             }
           }}
           style={{
@@ -231,7 +237,18 @@ export const HourCell = ({
       {/* W6-2: замок — статус read-only не только цветом (a11y). Слева, тихо. */}
       {locked && <LockGlyph />}
 
-      {value > 0 ? fmtHours(value) : '·'}
+      {/* W3A.17: пустая ячейка показывает бледную норму дня (placeholder), а не «·».
+          Подсказывает ожидаемое значение, не навязчиво. Для locked/нулевой нормы
+          (выходной/праздник) — прежняя нейтральная точка. */}
+      {value > 0 ? (
+        fmtHours(value)
+      ) : !locked && normHint && normHint > 0 ? (
+        <span aria-hidden style={{ color: T.textFaint, opacity: 0.55, fontWeight: 400 }}>
+          {fmtHours(normHint)}
+        </span>
+      ) : (
+        '·'
+      )}
 
       {/* Индикатор комментария: тихая точка-маркер (read-only), если описание есть.
           Правка комментария — в меню строки ⋯ → «Комментарий к записи…» (WI-01:

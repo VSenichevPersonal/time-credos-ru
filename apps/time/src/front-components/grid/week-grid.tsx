@@ -7,7 +7,7 @@ import { FooterTotals } from 'src/front-components/grid/footer-totals';
 import { AddRow } from 'src/front-components/grid/add-row';
 import type { Prefill } from 'src/front-components/grid/add-row';
 import { Center } from 'src/front-components/grid/center';
-import { firstEmptyCell, keyAction, useKeyboard } from 'src/front-components/grid/use-keyboard';
+import { firstEmptyCell, keyAction, rowEdgeCol, useKeyboard } from 'src/front-components/grid/use-keyboard';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { ProjectRef, WorkTypeRef } from 'src/front-components/grid/types';
@@ -97,6 +97,7 @@ export const WeekGrid = ({
     shiftKey: boolean;
     ctrlKey?: boolean;
     metaKey?: boolean;
+    altKey?: boolean;
     preventDefault: () => void;
   }) => {
     if (!nav.active) return;
@@ -104,6 +105,28 @@ export const WeekGrid = ({
     if (!row) return;
     const val = row.hoursByDay[nav.active.col];
     const action = keyAction(e);
+    // W3A.8: Home/End — к первой/последней РЕДАКТИРУЕМОЙ ячейке текущей строки
+    // (пропуск locked). Ctrl+Home/End — края всей сетки.
+    if (action.type === 'rowEdge') {
+      const col = rowEdgeCol(row.lockedByDay ?? [], action.dir);
+      if (col !== null) {
+        e.preventDefault();
+        nav.setActive({ row: nav.active.row, col });
+      }
+      return;
+    }
+    if (action.type === 'gridEdge') {
+      e.preventDefault();
+      if (action.dir === -1) {
+        const col = rowEdgeCol(rowList[0]?.lockedByDay ?? [], -1) ?? 0;
+        nav.setActive({ row: 0, col });
+      } else {
+        const last = rowList.length - 1;
+        const col = rowEdgeCol(rowList[last]?.lockedByDay ?? [], 1) ?? Math.max(0, (rowList[last]?.hoursByDay.length ?? 1) - 1);
+        nav.setActive({ row: last, col });
+      }
+      return;
+    }
     if (action.type === 'bulkFillRow') {
       if (val && val > 0) {
         e.preventDefault();
@@ -146,6 +169,7 @@ export const WeekGrid = ({
               hoursByDay={row.hoursByDay}
               lockedByDay={row.lockedByDay}
               descByDay={row.descByDay}
+              normFor={normFor}
               overtimeThreshold={overtimeThreshold}
               rowTotal={row.rowTotal}
               alt={i % 2 === 1}

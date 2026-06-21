@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { cellRange, clampCell, firstEmptyCell, inRange, keyAction } from './use-keyboard';
+import { cellRange, clampCell, firstEmptyCell, inRange, keyAction, rowEdgeCol } from './use-keyboard';
 import type { Cell } from './use-keyboard';
 
 const cell = (row: number, col: number): Cell => ({ row, col });
@@ -63,11 +63,37 @@ describe('keyAction — ввод', () => {
   });
 });
 
-describe('keyAction — массовые/буфер (WI-31/32)', () => {
-  it('Shift+Enter → bulkFillRow (E4.5: часы на будни строки)', () => {
-    expect(keyAction({ key: 'Enter', shiftKey: true })).toEqual({ type: 'bulkFillRow' });
+describe('keyAction — навигация/края (WI-45 · W3A.5/W3A.8)', () => {
+  it('Shift+Enter → move вверх (W3A.5: освобождён от bulk-fill)', () => {
+    expect(keyAction({ key: 'Enter', shiftKey: true })).toEqual({ type: 'move', dRow: -1, dCol: 0 });
   });
 
+  it('Alt+→ → bulkFillRow (W3A.5: часы на будни строки)', () => {
+    expect(keyAction({ key: 'ArrowRight', shiftKey: false, altKey: true })).toEqual({ type: 'bulkFillRow' });
+  });
+
+  it('→ без Alt → move вправо (не bulkFill)', () => {
+    expect(keyAction({ key: 'ArrowRight', shiftKey: false })).toEqual({ type: 'move', dRow: 0, dCol: 1 });
+  });
+
+  it('Home → rowEdge dir=-1 (W3A.8)', () => {
+    expect(keyAction({ key: 'Home', shiftKey: false })).toEqual({ type: 'rowEdge', dir: -1 });
+  });
+
+  it('End → rowEdge dir=+1 (W3A.8)', () => {
+    expect(keyAction({ key: 'End', shiftKey: false })).toEqual({ type: 'rowEdge', dir: 1 });
+  });
+
+  it('Ctrl+Home → gridEdge dir=-1 (W3A.8)', () => {
+    expect(keyAction({ key: 'Home', shiftKey: false, ctrlKey: true })).toEqual({ type: 'gridEdge', dir: -1 });
+  });
+
+  it('Ctrl+End → gridEdge dir=+1 (W3A.8)', () => {
+    expect(keyAction({ key: 'End', shiftKey: false, ctrlKey: true })).toEqual({ type: 'gridEdge', dir: 1 });
+  });
+});
+
+describe('keyAction — массовые/буфер (WI-31/32)', () => {
   it('Ctrl+D → fillDown (E1.20)', () => {
     expect(keyAction({ key: 'd', shiftKey: false, ctrlKey: true })).toEqual({ type: 'fillDown' });
   });
@@ -255,5 +281,44 @@ describe('inRange — принадлежность прямоугольнику'
 
   it('нет якоря → false', () => {
     expect(inRange(null, cell(1, 1), 1, 1)).toBe(false);
+  });
+});
+
+// ─── rowEdgeCol (W3A.8: Home/End — края редактируемой строки) ───────────────────
+
+describe('rowEdgeCol — крайняя редактируемая ячейка строки', () => {
+  it('Home (dir=-1): первая колонка без locked', () => {
+    expect(rowEdgeCol([false, false, false], -1)).toBe(0);
+  });
+
+  it('End (dir=+1): последняя колонка без locked', () => {
+    expect(rowEdgeCol([false, false, false], 1)).toBe(2);
+  });
+
+  it('Home пропускает locked слева', () => {
+    expect(rowEdgeCol([true, true, false, false], -1)).toBe(2);
+  });
+
+  it('End пропускает locked справа', () => {
+    expect(rowEdgeCol([false, false, true, true], 1)).toBe(1);
+  });
+
+  it('locked в середине не мешает краям', () => {
+    expect(rowEdgeCol([false, true, false], -1)).toBe(0);
+    expect(rowEdgeCol([false, true, false], 1)).toBe(2);
+  });
+
+  it('вся строка locked → null', () => {
+    expect(rowEdgeCol([true, true], -1)).toBeNull();
+    expect(rowEdgeCol([true, true], 1)).toBeNull();
+  });
+
+  it('пустой массив → null', () => {
+    expect(rowEdgeCol([], -1)).toBeNull();
+  });
+
+  it('undefined-флаги трактуются как редактируемые', () => {
+    expect(rowEdgeCol([undefined, undefined], -1)).toBe(0);
+    expect(rowEdgeCol([undefined, undefined], 1)).toBe(1);
   });
 });

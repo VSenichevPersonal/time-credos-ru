@@ -9,17 +9,24 @@ export type Cell = { row: number; col: number };
 // Действия, привязанные к ShortcutId из keymap (SSOT, E4.14).
 export type KeyAction =
   | { type: 'move'; dRow: number; dCol: number }
+  | { type: 'rowEdge'; dir: -1 | 1 } // W3A.8: Home/End — к первой(-1)/последней(+1) редактируемой ячейке строки
+  | { type: 'gridEdge'; dir: -1 | 1 } // W3A.8: Ctrl+Home/End — к началу(-1)/концу(+1) всей сетки
   | { type: 'edit'; seed: string }
-  | { type: 'bulkFillRow' } // Shift+Enter: часы активной ячейки на будни строки (E4.5)
+  | { type: 'bulkFillRow' } // Alt+→ (W3A.5): часы активной ячейки на будни строки (E4.5)
   | { type: 'fillDown' } // Ctrl+D: значение активной ячейки вниз по столбцу (E1.20/E4.6)
   | { type: 'copy' } // Ctrl+C: в внутренний буфер виджета (E1.18)
   | { type: 'paste' } // Ctrl+V: из внутреннего буфера в активную ячейку (E1.18)
   | { type: 'none' };
 
-type KeyEvent = { key: string; shiftKey: boolean; ctrlKey?: boolean; metaKey?: boolean };
+type KeyEvent = { key: string; shiftKey: boolean; ctrlKey?: boolean; metaKey?: boolean; altKey?: boolean };
 
 // Чистая функция: какое действие соответствует клавише. Cmd(meta)/Ctrl —
 // синонимы (mac/win). SSOT горячих клавиш — keymap.ts.
+//
+// W3A.5: Shift+Enter освобождён от bulk-fill → теперь навигация ВВЕРХ (commit-up,
+// зеркало Enter=вниз). Bulk-fill будней перевешен на Alt+→ (без коллизии с
+// Ctrl+D=заполнить-вниз). W3A.8: Home/End — края редактируемой строки; +Ctrl —
+// края всей сетки.
 export const keyAction = (e: KeyEvent): KeyAction => {
   const k = e.key;
   const mod = e.ctrlKey || e.metaKey; // Cmd/Ctrl
@@ -27,7 +34,13 @@ export const keyAction = (e: KeyEvent): KeyAction => {
   if (mod && (k === 'd' || k === 'D')) return { type: 'fillDown' };
   if (mod && (k === 'c' || k === 'C')) return { type: 'copy' };
   if (mod && (k === 'v' || k === 'V')) return { type: 'paste' };
-  if (k === 'Enter' && e.shiftKey) return { type: 'bulkFillRow' };
+  // W3A.8: Ctrl+Home/End — края всей сетки; Home/End без Ctrl — края строки.
+  if (k === 'Home') return mod ? { type: 'gridEdge', dir: -1 } : { type: 'rowEdge', dir: -1 };
+  if (k === 'End') return mod ? { type: 'gridEdge', dir: 1 } : { type: 'rowEdge', dir: 1 };
+  // W3A.5: Alt+→ — bulk-fill будней (часы ячейки на все будни строки).
+  if (k === 'ArrowRight' && e.altKey) return { type: 'bulkFillRow' };
+  // W3A.5: Shift+Enter — подтвердить и вверх (зеркало Enter=вниз).
+  if (k === 'Enter' && e.shiftKey) return { type: 'move', dRow: -1, dCol: 0 };
   if (k === 'ArrowUp') return { type: 'move', dRow: -1, dCol: 0 };
   if (k === 'ArrowDown' || k === 'Enter') return { type: 'move', dRow: 1, dCol: 0 };
   if (k === 'ArrowLeft') return { type: 'move', dRow: 0, dCol: -1 };
@@ -36,6 +49,20 @@ export const keyAction = (e: KeyEvent): KeyAction => {
   if (/^[0-9.,]$/.test(k)) return { type: 'edit', seed: k };
   if (k === 'Delete' || k === 'Backspace') return { type: 'edit', seed: '0' };
   return { type: 'none' };
+};
+
+// W3A.8: индекс крайней РЕДАКТИРУЕМОЙ (не locked) ячейки строки. dir=-1 — первая
+// слева, dir=+1 — последняя справа. Пропускает locked-колонки. null — вся строка
+// заблокирована (некуда вести). Чистая функция на массиве locked-флагов строки.
+export const rowEdgeCol = (locked: (boolean | undefined)[], dir: -1 | 1): number | null => {
+  const n = locked.length;
+  if (n === 0) return null;
+  if (dir === -1) {
+    for (let c = 0; c < n; c++) if (!locked[c]) return c;
+  } else {
+    for (let c = n - 1; c >= 0; c--) if (!locked[c]) return c;
+  }
+  return null;
 };
 
 // E1.3: диапазон ячеек прямоугольником от якоря до текущей (Shift+клик/Shift-стрелки).
