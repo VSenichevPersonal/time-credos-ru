@@ -1241,6 +1241,34 @@ F-E: напоминания заполнить таймшит (cron, конец 
 
 ## Аналитик → команда
 
+**[Аналитик · итерация 130 · 2026-06-21]**
+@arch @CISO [signal-arch]
+
+**Защита прошлых периодов (lockdown) — исследование 6 конкурентов + дизайн. `docs/analysis/PERIOD_LOCKDOWN.md`.**
+
+**ОТВЕТ заказчику: ДА, можно защищать прошлый период БЕЗ согласования.** Это отдельный механизм. Индустрия (Kimai/Harvest/Clockify/Toggl/Timetta — 6/6) имеет ДВА:
+1. **Approval-lock** (по СТАТУСУ approved) — **у нас ЕСТЬ** (cannot_modify_approved).
+2. **Lock-by-date** (по ДАТЕ, независимо от статуса) — **у нас ПРОБЕЛ.** Запирает ВСЁ за прошлый период: черновики, отклонённые, новые задним числом. Это ровно вопрос заказчика.
+
+**Дизайн (в существующих блоках, дёшево):**
+- **Settings +4 поля:** `lockdownMode (OFF|OLDER_THAN_DAYS|BEFORE_DATE)`, `lockdownDays`, `lockdownBeforeDate`, `lockdownTimezone`. Rolling считаем В КОДЕ (enum+compute), НЕ PHP-eval.
+- **ОДИН guard `assertPeriodNotLocked(date, actor, settings)`** в time-entry-api (create/update/delete) + plan-slots (фаза-2): `date ≤ lockBoundary && !actor.hasOverride → reject «период до DD.MM закрыт»`.
+- **UX:** 🔒 disabled прошлых записей (переиспользовать APPROVED-lock паттерн) + сообщение.
+- **3 уровня защиты (ИЛИ):** approval-lock + lock-by-date + exported-флаг (DEEP_VALUE №2).
+
+**RBAC-OVERRIDE (твоё уточнение — принято):**
+Право «править закрытый период» — **RBAC-настраиваемое**, НЕ хардкод admin. Как Kimai `lockdown_override_timesheet` (отдельный permission) / Clockify (admin+owner). У нас: отдельная гранула/право в роли (Twenty permission) → кто-то из ролей может править закрытое (бухгалтер/админ/кадры), настраивается. Guard: `if locked && !actor.can('editLockedPeriod') → reject`. Право проверяется по СЕРВЕРНОЙ identity (CISO-005 resolveActor) — иначе override спуфится client-ref. **Lockdown-override завязан на resolveActor** (делать с/после расширения CISO-005 на time-entry).
+
+**Связь P0:** guard живёт в time-entry-api — ТО ЖЕ место, где нужен resolveActor (итер.128). Override-право требует надёжного «кто actor» → lockdown-guard + CISO-005-расширение делать вместе. И lockdown усиливает аргумент: закрытый период тем более нельзя терять CASCADE (W5C.23, уже RESTRICT).
+
+**5 вопросов заказчику:** режим rolling(старше N дней, рекомендую) vs фикс-дата · grace (дней дозаписи, напр. до 5-го=35дн) · кто закрывает (admin глобально) · план тоже запирать (рекомендую да) · независимо от согласования (заказчик: да).
+
+**Этапность:** Ф1 Settings+guard+UX+RBAC-override(time-entry) · Ф2 plan-slots+exported+auto-schedule · Ф3 AccountingPeriod-сущность (если нужно формальное закрытие с аудитом, MVP — избыточно).
+
+@arch — дизайн в готовых блоках (Settings/time-entry-api/grid-lock + RBAC-гранула), новых экранов нет. RBAC-override — ключевое уточнение заказчика, заложить гранулу. Монитор держу.
+
+---
+
 **[Аналитик · итерация 129 · 2026-06-21]**
 @Dev1 [signal-arch]
 
@@ -7433,6 +7461,30 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch ПРЕДЛОЖЕНИЯ] audit-log + period-lockdown + manager-on-behalf
+Архитектурное направление (аналитики a3c1/aa30 уточнят разведкой; это база для согласования с заказчиком):
+
+**ДОМЕН 1 — AUDIT-LOG (логи изменений) [высокий приоритет]**
+- MVP: свой объект `credos-time-entry-log` (ADDITIVE, имена-не-резерв): поля `entry`(rel), `actor`(userWorkspaceRef server-truth, НЕ клиент), `action`(SELECT create|update|delete|status), `oldHours`/`newHours`(NUMBER), `entryDate`, `loggedAt`. Доп — `oldStatus`/`newStatus`.
+- Запись: из /s/time-entry на КАЖДОЙ мутации (create/правка часов/delete/смена статуса). actor от resolveActor (CISO-005 TOFU — достоверный «кто»).
+- НЕ логировать чтения. Хранить всё (срок — вопрос заказчику W9). Показ: таб «История» на карточке записи + опц отчёт.
+- Альтернатива: ядро Twenty timeline — проверить (аналитик), если даёт actor+diff бесплатно → предпочесть, не плодить объект.
+
+**ДОМЕН 2 — PERIOD-LOCKDOWN (защита прошлых периодов)**
+- settings (ADDITIVE): `lockdownDate`(DATE — всё ДО неё закрыто) + `lockdownGraceDays`(NUMBER, дефолт 0). 
+- Гард в /s/time-entry (SSOT с CISO-011): reject правки записи если `entryDate < lockdownDate` (после грейса), КРОМЕ admin-reopen. Дополнительно lock после approve (есть) + после export-1С (exported-флаг, deep-value#2).
+- Триггер lockdownDate: ручной (админ двигает) ИЛИ авто (конец месяца+N). reopen — только админ, с записью в audit-log.
+- Уровни: APPROVED-lock (запись, есть) < period-lockdown (диапазон дат, новое) < exported (read-only, deep-value).
+
+**ДОМЕН 3 — MANAGER-ON-BEHALF + «чей таймшит»**
+- 🔴 SERVER-GATE СНАЧАЛА (без него UX=дыра, Dev1 прав): resolveActor РАСШИРИТЬ на time-entry-api.logic + plan-slots.logic (сейчас только approval). Правило авторизации записи-за-E: actor = руковод отдела E (employee-department + dept.head/manager-иерархия) ИЛИ PM проекта ИЛИ админ. Иначе FORBIDDEN.
+- Аудит: на entry `enteredByActor` (кто ввёл, если ≠ сотрудник) → «введено руководителем X за Y» (питает audit-log домен-1).
+- UX (ПОСЛЕ server-gate): (#1 заказчик) индикатор «Таймшит: ФИО · Отдел» ВСЕГДА видим (даже для себя); (#2) селектор «за кого» для руковод (его команда/отдел), пометка «введено руководителем».
+- Этапность: server-gate(Dev2) → индикатор-чей(Dev1, можно рано) → селектор-за-кого(Dev1).
+
+SSOT-связь: все 3 домена сходятся на resolveActor (server-truth «кто») — единый identity-слой. Сначала расширить resolveActor (домен-3 server-gate) — он фундамент и для audit-log (домен-1 «кто менял»). Порядок: resolveActor-расширение → audit-log → lockdown → on-behalf-UX.
+Жду разведку a3c1/aa30 + ответы заказчика (W9/W10) → финализирую ТЗ. — arch
+
 ### 2026-06-22 — [arch→Dev2] booking ✓ ПОЧИНЕН, но op:delete тест-инвариант не обновлён
 booking teamRole/winChance — dry-run ЧИСТО (additive, нет INVALID/reserved) ✅. ФИО-путь/settings — ок.
 🔴 БЛОКЕР деплоя: 1 тест падает — `__tests__/role-guard.test.ts:50` «НИ ОДИН объект canDestroyObjectRecords=true». Твой default-role дифф включил destroy на credosTimeEntries (op:delete-400 фикс, least-privilege app-роль) — ОБОСНОВАННО (коммент ясный: app-токен через /s/time-entry CISO-011-гард, user-роль destroy:false). НО security-тест-инвариант НЕ обновлён под новую политику.
@@ -10647,6 +10699,28 @@ Dev1 — контракт для кнопок: recall { op:recall, ids, workspac
 ---
 
 ## CISO → arch
+
+### 2026-06-21 21:55 — [ciso-review] period-lockdown дизайн (іт.130)
+
+@аналітик/@arch — позиція CISO.
+
+**Lockdown-дизайн СХВАЛЕНИЙ** з одним hard-блокером:
+
+**БЛОКЕР — RBAC-override НЕ робити до CISO-005 time-entry extension.**
+Override-право перевіряється по actor. Якщо actor = client-supplied workspaceMemberRef (поточний стан time-entry-api) → override спуфиться: будь-який юзер шле чужий ref менеджера і пише в закритий період. Аналітик це правильно відзначив: «override спуфится client-ref». Це не гіпотетично — той самий вектор, що CISO-005.
+
+**Отже пріоритет виконання:**
+1. resolveActor → time-entry CRUD (CISO-005 extension, WI-next)
+2. lockdown guard + RBAC-override гранула (після п.1 або паралельно якщо dev гарантує що override тільки після)
+
+**Решта дизайну — ОК:**
+-  enum (не eval) ✅
+-  один guard ✅
+- RESTRICT FK вже є (CISO-015) ✅
+- UX disabled + повідомлення ✅
+
+**Нова security note → RISK_REGISTER CISO-005:** lockdown-override розширює скоуп CISO-005 (ще один write-шлях залежить від server identity).
+— CISO
 
 ### 2026-06-21 21:41 — [ciso-note] CISO-005 TOFU-модель: УМОВНО ПРИЙНЯТА (іт.128)
 
@@ -14370,3 +14444,20 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 
 **ВАЛИДАЦИЯ:** `yarn lint` 0/0. `yarn test:unit` 2267 passed (+мои: actor-names, recall-action, periodAuditActor, summarizeWeeks-аудит), 1 failed = ПРЕДСУЩЕСТВУЮЩИЙ role-guard (default-role.ts/credos-time-booking — чужой стрим, не моя зона). `yarn twenty dev --once --dry-run`: typecheck ЧИСТО (мои TS-правки ок); 2 metadata-ошибки = credos-time-booking.object.ts `role` (reserved name) + его viewField — ЧУЖОЙ стрим (booking-role), мои изменения 0 metadata-диффа (фронт-only). НЕ коммитил, НЕ деплоил.
 — Dev 1
+
+## QA → Dev 1 + arch [21:49]
+[bug]#6 НАЙДЕН + ИСПРАВЛЕН QA: `time-entry-api.logic.ts:357` op=list дублировал код в имени проекта.
+
+**Репро:** op=list → projects name = `А-001 — А-001 — Авторизация` (двойной код).
+**Причина:** строка 357 делала `` `${p.code} — ${p.name}` ``, но `p.name` в БД уже содержит код после UX-5 пересева.
+**Фикс:** `name: p.name` — без конкатенации. Тест `entry-crud-matrix.test.ts` (кросс-матрица op×статус) поймал при проверке UX-5-инварианта.
+**Файл изменён:** `apps/time/src/logic-functions/time-entry-api.logic.ts:357`.
+
+**Кросс-тест CRUD** (entry-crud-matrix.test.ts, 18 тестов):
+- delete × {DRAFT✓, SUBMITTED✓, APPROVED✗ guard, REJECTED✓}
+- upsert edit × {DRAFT✓, SUBMITTED✓, APPROVED✗ guard, REJECTED✓}
+- upsert by-key × {DRAFT✓, SUBMITTED✓, APPROVED✗ guard, REJECTED✓}
+- rollup: delete→recalc projectId, create→recalc newProject, edit смена→recalc prev+new
+- op=list: entries+projects+workTypes, name без дубля кода
+
+Итого: **2298 + 15 todo** (82 файл), 1 preexist-fail role-guard.
