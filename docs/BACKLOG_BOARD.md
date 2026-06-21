@@ -17,6 +17,36 @@
 > 🔬 **GAP-АУДИТ v3 (vs Timetta офиц.доки, 2026-06-22):** топ-пробелы → план. `GAP_AUDIT_TIMETTA_KIMAI_3.md`.
 > ❌ #1 billable — ОТКЛОНЁН (заказчик: нет биллируемости). 🔴 #2 Booking-сущность (чел×проект×период soft/hard, инвариант «оценка≠резерв») → REQ-0004. 🟢 #3 **Resource Gap** (Demand−Capacity + цвет ±5/10/15%) — быстрый выигрыш, Dev1 поверх капасити. 🟡 #4 Правила валидации как данные (warn/error) → расширить settings, Dev2. 🔴 #5 Финансовая RBAC (cost≠bill rate, 3 гранулы) — заложить ДО ставок REQ-0002. [GAP3]
 
+
+## 🌊 ВОЛНА КАЧЕСТВА — приоритетная очередь (из 7 аналитик, 2026-06-22) [QUALITY-WAVE]
+
+**В РАБОТЕ:** Dev2 fields-p1 + diverse-seed(фон) · Dev1 ts-actions + nav-groups-v2. Закончил — бери СЛЕДУЮЩЕЕ сверху своей очереди, НЕ простаивай.
+
+### Dev 1 (фронт) — очередь волны
+1. nav-groups-v2 (two-phase по шагам) — В РАБОТЕ
+2. ts-actions (меню строки/чип8/копировать▾) — В РАБОТЕ
+3. **Табель Т-13 экран** (бэк buildTimesheetGrid готов — нужен grid-компонент в Отчётах) — REPORTS_COMPLETENESS P1
+4. **Незаполненные таймшиты — сводная таблица** менеджеру (computeMissingTimesheets готов) — P1
+5. вкладка «Команда» в карточке проекта на /s/project-team (заменить клиентский limit:500) + «Проекты сотрудника» вкладка
+6. B2 PeriodNav общий компонент · impeccable P2 (board-toolbar overflow, grid ARIA role=grid) · P3 мелочи (IMPECCABLE_AUDIT)
+7. Отчёт «Отсутствия/отпуска» реестр (объект есть) · Утилизация-рейтинг пресет OLAP
+
+### Dev 2 (бэк) — очередь волны
+1. fields-p1 (WorkType.name/headcount/description/stage.name) — В РАБОТЕ
+2. diverse-seed прогон — В РАБОТЕ (фон ~78мин)
+3. **Отчёт по проектам план/факт/остаток** (новый агрегат, часы, без денег) — REPORTS_COMPLETENESS P1
+4. Booking волна-1 (BOOKING_ANALYSIS): нативные createdBy/At в view+карточку · кнопка SOFT→HARD (1 PATCH) · доострить овербукинг-бейдж
+5. employee.isManager ← department.head синк (database-event) · fields P2 остаток (employeeDepartment.endDate колонка, owner скрыть)
+6. Booking волна-2: поле `role`+employee nullable (универсальный резерв) · probability на проекте-кандидате
+7. Проверить [bug] op:delete 400 (UC-TS-07 из USE_CASES_LIBRARY)
+
+### QA — очередь волны
+1. Прогон USE_CASES_LIBRARY (103 UC) — топ-6 критичных: lock-APPROVED, SoD, ПДн-КОД, add-row-фильтр, CSV, booking-овербукинг
+2. Регресс после каждого деплоя arch · проверка флагов из USE_CASES (op:delete, reject-форма, табель-фильтр отсутствий)
+
+### Отложено (go-ahead заказчика): ФИНАНСЫ #5 фин-RBAC→E1 cost-rate→P&L · автоматизации поверх approval (Twenty Workflow: уведомления/авто-Акт) · CISO-005 server-identity (RBAC, закроет raw-API CISO-012) · host-bridge CSV-скачивание (платформа)
+
+
 Детали задач: `docs/requirements/REQ-*`, `docs/ROADMAP.md`, `data-model/GAP_AUDIT_TIMETTA_KIMAI*.md`.
 
 ---
