@@ -755,3 +755,24 @@ export const CREDOS_TIME_EMPLOYEE_CARD_VF_6 =
   'd9c9cbf6-8288-44bc-a1a7-ca91d8474076';
 export const CREDOS_TIME_EMPLOYEE_CARD_VF_7 =
   '58bdbaad-e268-41aa-9046-956f9bf8e8b9';
+
+// Единый паттерн вложенных таблиц (стандарт заказчика): к каждой relation-вкладке
+// карточки добавлен RECORD_TABLE-виджет полного реестра дочернего объекта
+// (сортируемые колонки) — рядом с FIELDS-виджетом (брони/записи ТЕКУЩЕЙ карточки,
+// отфильтрованы по родителю). Дублирует приём вкладок «Отделы/Сотрудники/Проекты».
+// RECORD_TABLE в SDK 2.14 принимает только viewId (без фильтра по родителю) →
+// показывает весь INDEX-view объекта; родительский срез даёт инлайн FIELDS-relation.
+// — Проект: реестры дочерних объектов.
+export const CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIER =
+  '6afa34e5-912c-401e-8279-61ceb5d707c4';
+export const CREDOS_TIME_PROJECT_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER =
+  '3e71cd35-039d-40fa-a147-bd8044395263';
+export const CREDOS_TIME_PROJECT_RP_W_STAGES_REGISTRY_UNIVERSAL_IDENTIFIER =
+  '0e9a7d5a-cacf-47f2-989d-f355c61e8428';
+export const CREDOS_TIME_PROJECT_RP_W_BILLING_REGISTRY_UNIVERSAL_IDENTIFIER =
+  '42f95be8-aea0-4958-ab61-616b71143784';
+// — Сотрудник: реестры дочерних объектов.
+export const CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIER =
+  '80766bd3-15f4-4772-b92f-7f2f52486cf2';
+export const CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER =
+  'abe3d2f5-67f7-4b35-805a-ea739c74b640';

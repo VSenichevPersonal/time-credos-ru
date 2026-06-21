@@ -19,6 +19,7 @@ import { DrillView } from 'src/front-components/reports/drill-view';
 import { dimLabel, nextAxis, valueLabel } from 'src/front-components/reports/drill-axis';
 import type { OlapDim, OlapFilter, OlapRow } from 'src/front-components/reports/olap-types';
 import { ExportCsvButton } from 'src/front-components/reports/export-csv';
+import { scopeKpiTotals } from 'src/front-components/reports/kpi-scope';
 import type { DetailFilters } from 'src/front-components/reports/reports-rest';
 import { departmentLabel } from 'src/constants/labels';
 
@@ -196,6 +197,16 @@ export const ReportsDashboard = () => {
     else if (f.dim === 'employee') exportFilters.employeeId = f.value;
   }
 
+  // KPI-карточки отражают ТЕКУЩИЙ скоуп дрилла. Корень — глобал (data.totals).
+  // Drill — Итого OLAP-среза по накопленным filters[] (scopeKpiTotals: scoped
+  // fact/client/util из olap totals + норма реконструирована из строк среза).
+  const scopedTotals: ReportRow =
+    drilled && olapData ? scopeKpiTotals(olapData.totals, olapData.rows) : data.totals;
+  // Подпись скоупа для карточек: путь дрилла (ось: значение › …). Пусто на корне.
+  const kpiScope = drilled
+    ? stack.map((l) => `${dimLabel(l.dim as OlapDim)}: ${l.valueLabel ?? l.label}`).join(' › ')
+    : undefined;
+
   // Опции отдела для фильтра тренда: byDept[].key = id отдела, name = код.
   // Тренд шлёт departmentId (id), пользователь видит русское название отдела.
   const deptOptions: DeptOption[] = (data?.byDept ?? []).map((d) => ({
@@ -291,7 +302,7 @@ export const ReportsDashboard = () => {
           resetKeys={[groupBy, period.from, period.to, stack.length]}
         >
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            <KpiCards totals={data.totals} />
+            <KpiCards totals={scopedTotals} scope={kpiScope} />
             {!drilled ? (
               <div
                 style={{

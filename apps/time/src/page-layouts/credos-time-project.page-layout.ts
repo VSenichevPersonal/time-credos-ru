@@ -34,6 +34,14 @@ import {
   CREDOS_TIME_PROJECT_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_STAGES_REGISTRY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_BILLING_REGISTRY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_STAGE_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_BILLING_LINK_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Развитая карточка проекта (RECORD_PAGE) со вкладками — задел на будущее.
@@ -114,12 +122,23 @@ export default definePageLayout({
             CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
           title: 'Записи трудозатрат',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_PROJECT_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все записи трудозатрат (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],
@@ -137,12 +156,23 @@ export default definePageLayout({
             CREDOS_TIME_PROJECT_RP_W_STAGES_UNIVERSAL_IDENTIFIER,
           title: 'Этапы проекта',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_PROJECT_CARD_STAGES_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_STAGES_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все этапы (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_STAGE_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],
@@ -161,12 +191,23 @@ export default definePageLayout({
             CREDOS_TIME_PROJECT_RP_W_BILLING_UNIVERSAL_IDENTIFIER,
           title: 'Связи с 1С',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_PROJECT_CARD_BILLING_LINKS_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_BILLING_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все связи с 1С (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_BILLING_LINK_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],
@@ -275,12 +316,23 @@ export default definePageLayout({
             CREDOS_TIME_PROJECT_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
           title: 'Брони ресурсов проекта',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_PROJECT_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все брони ресурсов (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],

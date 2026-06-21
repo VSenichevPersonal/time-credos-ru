@@ -85,10 +85,18 @@ const at = (y, m, d, h) =>
 
 // План резервов: code — код отдела (SELECT UPPER_CASE), category — UPPER_CASE
 // из WORK_CATEGORY_OPTIONS (синхронно с src/constants/select-options.ts).
+// §4b — ~10 планов (резерв/пресейл без проекта), Demand вперёд июл–сен.
 const PLAN = [
-  { code: 'OPIB', label: 'Резерв',        category: 'INTERNAL', effort: 40, start: at(2026, 7, 1, 9),  end: at(2026, 7, 31, 18) },
-  { code: 'OV',   label: 'Пресейл-бронь', category: 'PRESALE',  effort: 60, start: at(2026, 8, 1, 9),  end: at(2026, 8, 31, 18) },
-  { code: 'TC',   label: 'Прочее',        category: null,       effort: 20, start: at(2026, 7, 6, 9),  end: at(2026, 7, 17, 18) },
+  { code: 'OV',   label: 'Пресейл-бронь',              category: 'PRESALE',  effort: 120, start: at(2026, 7, 1, 9),  end: at(2026, 7, 31, 18) },
+  { code: 'OV',   label: 'Резерв под новый контракт',  category: 'INTERNAL', effort: 160, start: at(2026, 8, 1, 9),  end: at(2026, 8, 31, 18) },
+  { code: 'OIB',  label: 'Пресейл аудит',              category: 'PRESALE',  effort: 80,  start: at(2026, 7, 1, 9),  end: at(2026, 7, 31, 18) },
+  { code: 'OPIB', label: 'Резерв пентест-команды',     category: 'INTERNAL', effort: 100, start: at(2026, 9, 1, 9),  end: at(2026, 9, 30, 18) },
+  { code: 'TC',   label: 'Дежурство/поддержка',        category: null,       effort: 60,  start: at(2026, 7, 1, 9),  end: at(2026, 8, 31, 18) },
+  { code: 'OPR',  label: 'R&D',                        category: 'TRAINING', effort: 120, start: at(2026, 7, 1, 9),  end: at(2026, 9, 30, 18) },
+  { code: 'OIB',  label: 'Обучение по 57580',          category: 'TRAINING', effort: 40,  start: at(2026, 8, 1, 9),  end: at(2026, 8, 31, 18) },
+  { code: 'OPIB', label: 'Пресейл киберучения',        category: 'PRESALE',  effort: 60,  start: at(2026, 9, 1, 9),  end: at(2026, 9, 30, 18) },
+  { code: 'OV',   label: 'Резерв сопровождения',       category: 'INTERNAL', effort: 80,  start: at(2026, 9, 1, 9),  end: at(2026, 9, 30, 18) },
+  { code: 'OPR',  label: 'Внутренняя автоматизация',   category: 'INTERNAL', effort: 90,  start: at(2026, 7, 1, 9),  end: at(2026, 8, 31, 18) },
 ];
 
 const keyOf = (deptId, label, startISO) => `${deptId}|${label}|${startISO.slice(0, 10)}`;

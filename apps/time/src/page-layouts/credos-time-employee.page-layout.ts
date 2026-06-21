@@ -14,6 +14,10 @@ import {
   CREDOS_TIME_EMPLOYEE_RP_TAB_BOOKINGS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Карточка сотрудника (RECORD_PAGE) — вкладка «Отделы» (REQ-0011 follow-up).
@@ -84,12 +88,23 @@ export default definePageLayout({
             CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
           title: 'Записи трудозатрат',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_EMPLOYEE_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все записи трудозатрат (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],
@@ -112,12 +127,23 @@ export default definePageLayout({
             CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_UNIVERSAL_IDENTIFIER,
           title: 'Брони сотрудника',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_EMPLOYEE_CARD_BOOKINGS_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: false,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER,
+          title: 'Все брони ресурсов (реестр)',
+          type: 'RECORD_TABLE',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'RECORD_TABLE',
+            viewId: CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
           },
         },
       ],

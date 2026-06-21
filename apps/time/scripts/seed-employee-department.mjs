@@ -83,6 +83,23 @@ async function getAll(plural, params = {}) {
 
 const keyOf = (employeeId, departmentId) => `${employeeId}|${departmentId}`;
 
+// §7 FTE/мульти-отдел: точечные назначения (~8). emp: [deptCode, ordinal] — N-й
+// сотрудник отдела (1-based, стабильная сортировка id). fte — ftePercent.
+// kind: 'base' = подправить «родное» назначение сотрудника (partial FTE);
+//       'extra' = добавить назначение в ДРУГОЙ отдел (мульти-отдел).
+// start — опц. дата начала (датированное назначение, напр. новый сотрудник).
+const at = (y, m, d) => new Date(Date.UTC(y, m - 1, d, 9, 0, 0)).toISOString();
+const FTE_PLAN = [
+  { emp: ['TC', 5],  toDept: 'TC',   fte: 50,  kind: 'base',  note: 'частичная занятость' },
+  { emp: ['TC', 6],  toDept: 'TC',   fte: 80,  kind: 'base',  note: 'частичная занятость' },
+  { emp: ['OPR', 4], toDept: 'OPR',  fte: 80,  kind: 'base',  note: 'частичная занятость' },
+  { emp: ['OPR', 5], toDept: 'OPR',  fte: 50,  kind: 'base',  note: 'мульти: 50% в OPR' },
+  { emp: ['OPR', 5], toDept: 'OV',   fte: 50,  kind: 'extra', note: 'мульти: 50% помогает OV (перегруз)' },
+  { emp: ['OIB', 7], toDept: 'OIB',  fte: 60,  kind: 'base',  note: 'мульти: 60% в OIB' },
+  { emp: ['OIB', 7], toDept: 'OPIB', fte: 40,  kind: 'extra', note: 'мульти ИБ↔практич.ИБ: 40% в OPIB' },
+  { emp: ['OV', 11], toDept: 'OV',   fte: 100, kind: 'base',  note: 'новый сотрудник с апреля', start: at(2026, 4, 1) },
+];
+
 async function run() {
   console.log(`Сервер: ${BASE}`);
 
@@ -149,9 +166,50 @@ async function run() {
   }
 
   console.log(
-    `\nИтог: создано ${created}, пропущено (уже было) ${skipped}, ` +
+    `\nИтог (бэкфилл 100%): создано ${created}, пропущено (уже было) ${skipped}, ` +
     `сотрудников без отдела ${noDept}, с битым departmentId ${badDept}.`,
   );
+
+  // --- §7: точечные FTE/мульти-отдел назначения ---
+  console.log('\n[FTE/мульти §7] Применяю точечные назначения...');
+  const codeToId = new Map();
+  const idToCode = new Map();
+  for (const d of departments) { if (d.code) { codeToId.set(d.code, d.id); idToCode.set(d.id, d.code); } }
+  // сотрудники по «родному» отделу, стабильный порядок id.
+  const byDept = new Map();
+  for (const e of employees.slice().sort((a, b) => a.id.localeCompare(b.id))) {
+    const code = idToCode.get(e.departmentId);
+    if (!code) continue;
+    if (!byDept.has(code)) byDept.set(code, []);
+    byDept.get(code).push(e);
+  }
+  // освежить существующие назначения (после бэкфилла).
+  const assigns = await getAll('credosTimeEmployeeDepartments');
+  const assignByKey = new Map(assigns.filter((a) => a.employeeId && a.departmentId)
+    .map((a) => [keyOf(a.employeeId, a.departmentId), a]));
+  let ftePatched = 0, fteCreated = 0, fteSkip = 0, fteNoEmp = 0;
+  for (const row of FTE_PLAN) {
+    const [code, ord] = row.emp;
+    const emp = (byDept.get(code) || [])[ord - 1];
+    const toDeptId = codeToId.get(row.toDept);
+    if (!emp || !toDeptId) { fteNoEmp++; console.log(`  ! нет сотрудника ${code}#${ord} или отдела ${row.toDept} — пропуск`); continue; }
+    const key = keyOf(emp.id, toDeptId);
+    const cur = assignByKey.get(key);
+    const body = { employeeId: emp.id, departmentId: toDeptId, ftePercent: row.fte, startDate: row.start ?? null, endDate: null };
+    if (cur) {
+      if (cur.ftePercent === row.fte && (cur.startDate || null) === (row.start ?? null)) { fteSkip++; continue; }
+      await send('PATCH', `/rest/credosTimeEmployeeDepartments/${cur.id}`, { ftePercent: row.fte, startDate: row.start ?? null });
+      ftePatched++;
+      console.log(`  ~ ${emp.name} ${row.toDept}: FTE → ${row.fte}% (${row.note})`);
+    } else {
+      const r = await send('POST', '/rest/credosTimeEmployeeDepartments', body);
+      const id = ((r.data || r)[Object.keys(r.data || r)[0]] || {}).id;
+      if (id) assignByKey.set(key, { id, ftePercent: row.fte });
+      fteCreated++;
+      console.log(`  + ${emp.name} ${row.toDept}: ${row.fte}% (${row.note})`);
+    }
+  }
+  console.log(`  FTE-итог: изменено ${ftePatched}, создано ${fteCreated}, пропущено ${fteSkip}, не найдено ${fteNoEmp}.`);
 
   // --- Верификация: Σ FTE по отделам должна совпасть с count активных сотрудников ---
   console.log('\n[ВЕРИФИКАЦИЯ] headcount = count активных по отделам (ожидаемый = Σ FTE 100%):');

@@ -88,17 +88,27 @@ const TYPE = { VACATION: 'VACATION', SICK: 'SICK', UNPAID: 'UNPAID', OTHER: 'OTH
 const at = (y, m, d, h) =>
   new Date(Date.UTC(y, m - 1, d, h ?? 9, 0, 0)).toISOString();
 
-// План отсутствий: idx — индекс сотрудника в детерминированном списке.
-// 11 записей: 4 отпуска, 3 больничных, 2 без содержания, 2 иное. Июнь–сентябрь 2026.
+// План отсутствий §6: idx — индекс сотрудника в детерминированном списке.
+// ~16 записей: ~10 отпусков (концентрация в АВГУСТЕ — сезон, снижает capacity августа),
+// ~4 больничных (июл–сен), ~2 без содержания/иное + 1–2 коротких отпуска в H1
+// (просадка нормы факта у пары людей). Июнь–сентябрь 2026.
 const PLAN = [
+  // H1 — короткие отпуска
+  { idx: 14, type: TYPE.VACATION, start: at(2026, 2, 9, 9),   end: at(2026, 2, 13, 18), note: 'Отпуск (зимняя часть)' },
+  { idx: 15, type: TYPE.VACATION, start: at(2026, 4, 13, 9),  end: at(2026, 4, 17, 18), note: 'Отпуск (весенняя часть)' },
+  // Горизонт июн–сен
   { idx: 0,  type: TYPE.VACATION, start: at(2026, 6, 23, 9),  end: at(2026, 7, 6, 18),  note: 'Ежегодный оплачиваемый отпуск' },
   { idx: 1,  type: TYPE.SICK,     start: at(2026, 6, 16, 9),  end: at(2026, 6, 20, 18), note: 'Больничный лист' },
   { idx: 2,  type: TYPE.VACATION, start: at(2026, 7, 13, 9),  end: at(2026, 7, 26, 18), note: 'Отпуск, основная часть' },
   { idx: 3,  type: TYPE.UNPAID,   start: at(2026, 6, 29, 9),  end: at(2026, 6, 30, 18), note: 'Отпуск без сохранения зарплаты' },
   { idx: 4,  type: TYPE.OTHER,    start: at(2026, 7, 1, 9),   end: at(2026, 7, 3, 18),  note: 'Командировка' },
+  // АВГУСТ — пик отпусков (capacity августа ниже июля у затронутых отделов)
   { idx: 5,  type: TYPE.VACATION, start: at(2026, 8, 3, 9),   end: at(2026, 8, 14, 18), note: 'Летний отпуск' },
   { idx: 6,  type: TYPE.SICK,     start: at(2026, 7, 20, 9),  end: at(2026, 7, 24, 18), note: 'Больничный (ОРВИ)' },
   { idx: 7,  type: TYPE.VACATION, start: at(2026, 8, 17, 9),  end: at(2026, 8, 28, 18), note: 'Ежегодный отпуск' },
+  { idx: 16, type: TYPE.VACATION, start: at(2026, 8, 3, 9),   end: at(2026, 8, 14, 18), note: 'Летний отпуск' },
+  { idx: 17, type: TYPE.VACATION, start: at(2026, 8, 10, 9),  end: at(2026, 8, 21, 18), note: 'Летний отпуск' },
+  { idx: 18, type: TYPE.VACATION, start: at(2026, 8, 24, 9),  end: at(2026, 9, 4, 18),  note: 'Отпуск на стыке месяцев' },
   { idx: 8,  type: TYPE.UNPAID,   start: at(2026, 9, 1, 9),   end: at(2026, 9, 2, 18),  note: 'Отпуск за свой счёт' },
   { idx: 9,  type: TYPE.OTHER,    start: at(2026, 9, 7, 9),   end: at(2026, 9, 9, 18),  note: 'Обучение / повышение квалификации' },
   { idx: 10, type: TYPE.SICK,     start: at(2026, 9, 14, 9),  end: at(2026, 9, 18, 18), note: 'Больничный лист' },
@@ -125,8 +135,9 @@ async function run() {
   const employees = (await getAll('credosTimeEmployees'))
     .filter((e) => e && e.id && (e.name || '').trim())
     .sort((a, b) => a.id.localeCompare(b.id));
-  if (employees.length < PLAN.length) {
-    console.error(`Сотрудников недостаточно: есть ${employees.length}, нужно ${PLAN.length}.`);
+  const maxIdx = Math.max(...PLAN.map((p) => p.idx));
+  if (employees.length <= maxIdx) {
+    console.error(`Сотрудников недостаточно: есть ${employees.length}, нужен idx до ${maxIdx}.`);
     process.exit(1);
   }
   console.log(`Сотрудников доступно: ${employees.length}`);

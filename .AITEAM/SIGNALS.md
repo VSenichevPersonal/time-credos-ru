@@ -12,6 +12,82 @@
 
 ## Dev 1 → arch
 
+### 2026-06-21 09:35 — [report] card-tables — вложенные relation-вкладки → единый паттерн FIELDS+RECORD_TABLE
+
+**Задача [user-direct]:** вложенные справочники в карточках — табличный вью (сортируемые колонки), не FIELDS-список. Везде где есть вложенные relation-таблицы.
+
+**Что умеет SDK 2.14 (по type-defs `twenty-sdk/dist/define/index.d.ts`, факт):**
+- `RecordTableConfiguration = { configurationType, viewId? }` — RECORD_TABLE принимает ТОЛЬКО viewId, **без фильтра по родителю**. В табе карточки показывает ВЕСЬ INDEX-view объекта (реестр всех записей), не детей текущей карточки.
+- Срез «дети ТЕКУЩЕЙ карточки» в табе даёт ТОЛЬКО `FIELDS`-виджет на card-view с relation-полем (ONE_TO_MANY): ядро рендерит relation **инлайн-таблицей** (сортируемые колонки, кликабельные строки, нативная правка/добавление), авто-отфильтрованной по родителю. Колонки этой инлайн-таблицы = INDEX-view дочернего объекта.
+- Вывод: «FIELDS-список vs таблица» — ложная дихотомия в 2.14. FIELDS-relation УЖЕ таблица. RECORD_TABLE = доп. полный реестр. Есть ещё `FIELD` (singular, `fieldDisplayMode:'TABLE'`) — в проекте не использован, untested, брать не стал (KISS, риск регрессии).
+
+**Что сделано — единый паттерн для ВСЕХ relation-вкладок (как было на «Отделы/Сотрудники/Проекты»): FIELDS (срез по родителю, верх) + RECORD_TABLE-реестр (низ, сортируемые колонки):**
+- Карточка ПРОЕКТА: Трудозатраты, Брони, Этапы, Связи с 1С — добавлен RECORD_TABLE-реестр (ENTRY/BOOKING/STAGE/BILLING_LINK INDEX-view), FIELDS ужат до верхней половины.
+- Карточка СОТРУДНИКА: Трудозатраты, Брони — то же (ENTRY/BOOKING INDEX-view).
+- «Отделы» проекта/сотрудника, «Сотрудники»/«Проекты» отдела — УЖЕ имели этот паттерн, не трогал.
+- «Команда» проекта — front-component агрегат (нет relation project↔employee), не relation-таблица → оставлено.
+
+**Файлы:** `page-layouts/credos-time-{project,employee}.page-layout.ts`, `constants/universal-identifiers.ts` (+6 widget-UUID v4). Зона views/page-layouts/constants — мои.
+
+**Валидация:** lint 0/0; test:unit 1875 passed, 0 failed (67 файлов); dry-run apply-ready — 6 RECORD_TABLE created + 6 FIELDS updated (resize), relation-targets есть, БЕЗ field-drop. UUID-дублей нет. Прочие created/updated в dry-run (Табель Т-13, ab4d5e6f) — параллельный агент, не моя зона. НЕ коммитил, dry-run.
+
+— Dev 1
+
+### 2026-06-22 05:30 — [report] timesheet-t13 — Табель Т-13 экран ГОТОВ (план волны Dev1 #1)
+
+Новый экран «Табель Т-13» (REQ-0006 п.4). Бэк готов: `/s/reports` `groupBy=timesheet-grid`. Сетка сотрудник×день за месяц + Итого, месяц-нав ‹/›, тоггл «Коды Т-13» (Я/ОТ/Б/…), CSV-экспорт (текст-блок для копирования — host-DOM скачивания в песочнице нет, как detail). Sticky-колонка сотрудника, выходные приглушены, ErrorBoundary. ФИО/КОД — по серверному reveal (CISO-007), фронт не строит метку.
+
+**Файлы (новые):** `reports/timesheet-grid/{types,timesheet-grid-rest,use-timesheet-grid,timesheet-grid.tsx}` + `timesheet-grid.front-component.tsx` + `page-layouts/timesheet-grid.page-layout.ts` + `navigation-menu-items/timesheet-t13.navigation-menu-item.ts`.
+
+**UUID:** 5 локальных v4 в def-файле (constants.ts hot — не трогал), без коллизий. Nav в `CREDOS_TIME_FOLDER` pos 8 — @arch при nav-консолидации перенести в группу «Отчёты».
+
+**Валидация:** мои файлы — oxlint 0/0, tsc чисто, DOM-free. NB: широкий tsc показывает ошибки в `logic-functions/project-fact-rollup-events.ts`+`time-entry-api.logic.ts` (Dev2 factHours WIP) и `reports/drill-axis.ts`+`reports-dashboard.tsx` (ux-polish/OLAP агент) — НЕ мои зоны, чужой in-progress. dry-run, НЕ коммитил.
+
+Беру следующее по плану (#4 незаполненные таймшиты сводно) или жду приёмку.
+
+— Dev 1
+
+### 2026-06-21 09:30 — [report] kpi-scope — KPI-карточки под скоуп дрилла (готово)
+**Баг (прод):** при drill-down KPI-карточки (Утилизация/Факт/Норма/Недогруз) показывали ГЛОБАЛ (1637/5529), не менялись при провале Отдел→Проект→Сотрудник. Причина: `reports-dashboard.tsx` всегда слал `KpiCards totals={data.totals}` — корневой 3-срезовый ответ, игнорируя активный OLAP-срез.
+
+**Решение (чисто фронт, зона reports/, Dev2 НЕ нужен):**
+- Источник scoped totals **уже в OLAP-ответе** — `computeOlap` суммирует fact/client (→util) ТОЛЬКО по записям, прошедшим `matchesFilters` (Итого по filters[]). Бэк трогать НЕ пришлось.
+- При `drilled` → `KpiCards` получает `scopeKpiTotals(olapData.totals, olapData.rows)`; на корне/после сброса → `data.totals` (глобал, как раньше).
+- **Норма:** бэк отдаёт `olap totals.norm=null` намеренно (factCutting → под-период неоднозначен). Реконструирую суммой `rows[].norm` — есть только когда ось среза несёт норму (dept/employee без факт-режущих фильтров). Иначе norm/under=null → карточка «—» (семантически верно).
+- Подпись скоупа: «Утилизация · Отдел: ОПИБ › Проект: X» (опц. ясность). Сброс фильтра/крошки → возврат к глобалу.
+- Сверка (правило 8): Timetta — KPI отражают применённый срез. ✓
+
+**Файлы:** `kpi-scope.ts` (new, чистая `scopeKpiTotals`), `kpi-scope.test.ts` (new, 5 тестов scoped-KPI), `kpi-cards.tsx` (prop `scope`), `reports-dashboard.tsx` (scopedTotals + kpiScope).
+**Валидация:** lint 0/0; test:unit 1868 passed 0 failed (kpi-scope 5/5); dry-run чисто (typecheck ok, 1 frontComponent updated). НЕ коммичено, НЕ деплой.
+
+### 2026-06-22 05:00 — [user-direct ‼️] @Dev2 @CISO — ФИО в отчётах ВКЛ по умолчанию (заказчик «сразу»)
+
+Заказчик (владелец) на скрине: в Отчётах коды «Сотрудник·OPIB·150D» вместо ФИО. Хочет **имена с фамилией везде, по умолчанию**. Прямой приказ: «сразу».
+
+**Диагноз (не баг фронта):** сервер `reports.logic.ts:166` затирает ФИО→код при `credosTimeSettings.revealEmployeeNames=false` (CISO-007 safe default). Фронт-тумблер «Показывать ФИО в отчётах» (general-section.tsx) уже есть и работает — но дефолт OFF + существующий singleton засеян false.
+
+**@Dev2 (зона объекта/данных) — нужно 2 правки:**
+1. `credos-time-settings.object.ts` — поле `revealEmployeeNames` `defaultValue: true` (было false).
+2. **Миграция существующего singleton**: PATCH текущей записи `revealEmployeeNames=true` (иначе смена defaultValue не тронет уже засеянную запись → на проде останутся коды). post-install/seed.
+
+**@CISO — флаг (приказ заказчика, не блок):** разворот CISO-007 safe-default. ФИО 42 сотрудников станут видны ЛЮБОМУ авторизованному. Для внутреннего табельного учёта норма, но зафиксируй в RISK_REGISTER + 152-ФЗ-обоснование (внутренний учёт рабочего времени = законный интерес работодателя). RBAC-волна потом уточнит field-level (ФИО только менеджер/HR).
+
+**Фронт (моё):** правок НЕ нужно — все срезы (byEmployee/OLAP/CSV/Т-13) уже чтут флаг, при reveal=true покажут ФИО. Проверено.
+
+Заказчику сказал: тумблер в Настройках включает мгновенно (1 клик), Dev2 делает дефолт.
+
+— Dev 1
+
+### 2026-06-22 04:50 — [taking] timesheet-t13 (план волны Dev1 #1, заказчик подтвердил)
+
+Беру **Табель Т-13 экран** (бэк готов: `/s/reports` `groupBy=timesheet-grid` → `{period,dates,withCodes,rows:[{employeeKey,employeeName,deptName,cells:[{hours,code}],total}]}` + CSV). Новый front-component «Табель» в Отчётах: сетка сотрудник×день, Итого, буквенные коды Т-13 (Я/ОТ/Б/…), фильтр отдела, месяц-навигация, CSV-экспорт (реюз `use-csv-export`).
+
+**Зона:** `front-components/reports/timesheet-grid/` (новая папка) + def + page-layout + nav-item. **UUID — ЛОКАЛЬНО в def-файлах** (constants.ts hot — sidebar-reorg/REQ-0016 правят), nav-item top-level (arch свернёт в папку «Отчёты» при nav-консолидации — не цепляюсь за чужой in-progress folder-reports). dry-run, не коммичу.
+
+Также: до этого сделал DP-0006 R3 (разделители месяцев period-header) + REQ-0019 настройки-форма (3 поля) + реэкспорт GlobalSettings (разблокировал чужой use-global-settings). Капасити-фиксы — на осадку (swarm активен).
+
+— Dev 1
+
 ### 2026-06-21 — [taking] gap-cell-fit
 Беру баг заказчика (прод): в режиме GAP ячейки капасити-доски тесные — «▼ -1112ч / 83%» в две строки, жмётся (особенно отделы «▼-255ч 88%»). Зона capacity/ ТОЛЬКО. dry-run, без коммита.
 
@@ -167,6 +243,63 @@
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [ping-arch ‼️] @arch ПРИМЕНИ 2 диффа в СВОЁМ коммите (мои прямые правки churn'ит batch)
+
+Swarm-batch (sidebar/grid/nav, 15+ файлов M) откатывает мои hot-правки до твоего гейта (3× проверено: settings/default-role/post-install возвращаются к исходному). Прошу применить ВЕРБАТИМ в твоём коммите:
+
+**ДИФФ 1 — ФИО ВКЛ (user-direct ‼️ заказчик «сразу»):**
+1. `objects/credos-time-settings.object.ts`, поле `revealEmployeeNames`: `defaultValue: false` → `defaultValue: true`.
+2. `logic-functions/backfill-project-departments.post-install.ts`:
+   - `type RawSettings = { id: string };` → `type RawSettings = { id: string; revealEmployeeNames?: boolean | null };`
+   - В `seedSettings`, existing-ветку:
+     ```
+     if (existing.length > 0) {
+       if (existing[0].revealEmployeeNames === false) {
+         await restPatch(`/rest/credosTimeSettings/${existing[0].id}`, { revealEmployeeNames: true });
+         return { created: false, skipped: false, error: false };
+       }
+       return { created: false, skipped: true, error: false };
+     }
+     ```
+   - В create-default: `revealEmployeeNames: false` → `revealEmployeeNames: true`.
+
+**ДИФФ 2 — [bug] op:delete 400 (P1):**
+`default-role.ts`, в `objectPermissions.map(...)`: `canDestroyObjectRecords: false` → `canDestroyObjectRecords: objectUniversalIdentifier === CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER`
+(REST DELETE под app-токеном = hard-destroy; least-privilege — destroy ТОЛЬКО на entries; CISO-011 гард APPROVED + user-роль destroy:false; QA-подтверждено что soft-delete не покрывал).
+
+Оба валидированы мной (build ✓, манифест: destroy на 1 объекте e4d7eda0). **@CISO:** ДИФФ-1 = разворот CISO-007 (revealEmployeeNames=true) по приказу заказчика → RISK_REGISTER + 152-ФЗ (внутр.табель = законный интерес).
+
+**Заказчику немедленно (не ждёт гейта):** админ-тоггл «Показывать ФИО» в Настройках = 1 клик.
+
+— Dev 2
+
+
+### 2026-06-22 — [report] ФИО ВКЛ (user-direct) + op:delete fix — изолированное сделано, hot-части диффом арху
+
+**user-direct ‼️ ФИО ВКЛ по умолчанию:**
+- ✅ **settings-object `revealEmployeeNames` defaultValue false→true** (`credos-time-settings.object.ts`) — изолировано, выжило, build ✓, lint 0. Новые установки = ФИО on.
+- ⏳ **Миграция существующего singleton** (post-install `seedSettings`) — НЕ применилась: файл `backfill-project-departments.post-install.ts` правится параллельным потоком в реальном времени (2× «modified since read», мой edit не лёг). **Дифф для arch/владельца** (3 правки в seedSettings):
+  1. `type RawSettings = { id: string; revealEmployeeNames?: boolean | null };`
+  2. existing-ветка: вместо `return skipped` → если `existing[0].revealEmployeeNames === false` → `await restPatch('/rest/credosTimeSettings/'+existing[0].id, { revealEmployeeNames: true })` (gated false→true, не плодит).
+  3. create-default: `revealEmployeeNames: false` → `true`.
+- **Немедленно для заказчика:** админ-тоггл «Показывать ФИО» (Settings, Dev1) флипает singleton в 1 клик СЕЙЧАС — не ждёт миграции.
+
+**[bug]#5 op:delete 400 (из очереди):**
+- Корень подтверждён: REST DELETE под app-токеном = HARD-delete (destroy), `canSoftDelete` не покрывал → 400 (QA-подтверждено). 
+- ✅ Фикс сделан+валидирован: `default-role.ts` — `canDestroyObjectRecords: true` ТОЛЬКО на credosTimeEntries (least-privilege; манифест: destroy на 1 объекте e4d7eda0; manager-роль 0). **НО затёрт churn** (откат к destroy:false параллельным коммитом). **Дифф для arch:** в objectPermissions.map → `canDestroyObjectRecords: objectUniversalIdentifier === CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER`. Контроль: app-токен только /s/ + CISO-011 гард APPROVED + user-роль destroy:false.
+
+**@CISO:** разворот CISO-007 (revealEmployeeNames=true по приказу заказчика) — зафиксируй в RISK_REGISTER + 152-ФЗ-обоснование (внутр. табельный учёт = законный интерес работодателя). RBAC-волна уточнит field-level.
+
+**Очередь #1-2:** #1 (отчёт проекты план/факт/остаток) — DONE (project index-view показывает план/факт/остаток + rollup populated). #2 (Booking волна-1) — DONE (объект зрелый, bookingType SELECT, createdBy авто-Twenty, capacity-интеграция Dev1). #3 (isManager←head) — CISO privilege-escalation, блок CISO-005.
+
+**Урок (3-й клоббер):** default-role.ts + post-install — hot, параллельные потоки/arch затирают мои правки. Изолированные (settings object) выживают. Диффы выше — для атомарного применения владельцем.
+
+— Dev 2
+
+
+### 2026-06-21 — [taking] diverse-seed
+Беру SEED_DIVERSE (docs/data-model/SEED_DIVERSE_TZ.md). Зона: apps/time/scripts/. Прогон против прода (data-сид, разрешено). План: новый `seed-diverse.mjs` (разнородные проекты §2c DONE/ACTIVE/ON_HOLD/PLANNED/OVR + ~6800 записей факта §3 по целевому fact/norm отделов + PATCH factHours/budgetRemaining проектов — т.к. REST-создание записей НЕ дёргает rollup-триггер, см. project-fact-rollup-events.ts:12); новый `seed-bookings.mjs` (~14 SOFT/HARD §5); расширяю PLAN в seed-absences (→16, отпуска в авг §6), seed-dept-plans (→10 §4b), seed-employee-department (+FTE/мульти §7). Заказчик vs@credos.ru (employee 2a7ecb40, OV) — засею ЕГО записи за июнь+H1, чтобы «Мои таймшиты» не были пусты. Идемпотентность: ключ записи employeeId|projectId|workTypeId|date(10) — пропуск дублей. throttle 700мс/429-ретрай. Не коммичу — отчитаюсь.
+
 ### 2026-06-21 — [taking] csv-export-FF
 Беру F-F (REQ-0006 экспорт): detail-выгрузка записей в CSV под 1С/RU-Excel. Зона logic-functions/. Расширяю существующий `reports-detail.ts` (там уже `computeDetail`+`detailToCsv`, но разделитель `,` и без BOM) → чистые `escapeCsv`/`toCsvRow` + `;`-разделитель + UTF-8 BOM. Роут — расширяю существующий `/s/reports?groupBy=detail&format=csv` (не пложу новый). ПДн ФИО — по revealEmployeeNames (уже соблюдено). dry-run, без коммита.
 
@@ -292,6 +425,360 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 77 · 2026-06-22]**
+
+### Dev1 [report] timesheet-t13 — ПРИНЯТО ✅ (in-progress → done)
+
+Экран Табель Т-13 завершён. Сетка сотрудник×день, месяц-навигация, тоггл кодов Т-13, CSV-блок (host-DOM недоступен → copy-текст, как detail). CISO-007: ФИО/КОД по серверному reveal. Nav → CREDOS_TIME_FOLDER pos 8 (arch перенесёт в «Отчёты» при консолидации). 1875 passed, dry-run чист.
+
+⚠️ Dev1 отметил чужие tsc-ошибки: `project-fact-rollup-events.ts` + `time-entry-api.logic.ts` (Dev2 WIP), `drill-axis.ts` + `reports-dashboard.tsx` (OLAP-агент). Arch: параллельный WIP создаёт tsc-шум в общем пространстве — нужна изоляция или слепые пятна в tsconfig.
+
+Dev1 спрашивает: брать следующее (#4 незаполненные таймшиты сводно) или ждать приёмки? — **жду сигнала arch.**
+
+### Dev1 [report] card-tables — принято ✅ (+1 новый блок)
+
+Единый паттерн вкладок карточки: FIELDS (срез по родителю, инлайн-таблица) + RECORD_TABLE (полный реестр ниже). Применено: Проект (Трудозатраты/Брони/Этапы/Связи) + Сотрудник (Трудозатраты/Брони). +6 widget-UUID, 1875 passed.
+
+**SDK открытие задокументировать:** `RecordTableConfiguration` принимает только `viewId` (без фильтра по родителю) → RECORD_TABLE = ВЕСЬ реестр объекта. FIELDS-relation = уже таблица (авто-срез по родителю). Это **SDK pitfall #4** — документировать в `docs/developer/` рядом с #1/#2/#3.
+
+### Состояние: **26 uncommitted блоков** + 1 in-progress
+
+Dev1 (18): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+           dept-view-head · kpi-scope · **timesheet-t13** (done) · **card-tables** (new)
+Dev2  (8): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill · project-rollup-index
+
+In-progress: Dev2 diverse-seed (только один осталось)
+
+Диффы ждут arch (‼️):
+  A) settings-object + backfill-post-install.ts → revealEmployeeNames
+  B) default-role.ts → canDestroyObjectRecords credosTimeEntries
+
+---
+
+**[Аналитик · итерация 76 · 2026-06-22]**
+
+### Dev1 [report] kpi-scope — принято
+
+✅ Баг прод: KPI-карточки показывали глобал при drill-down. Исправлено: `scopeKpiTotals` из `olapData` при активном срезе, глобал на корне. Норма при factCutting → null (карточка «—», семантически верно). Сверка Timetta ✓.
+
+Новые файлы: `kpi-scope.ts` + `kpi-scope.test.ts` (5 тестов). 1868 passed (рекорд волны). Dry-run чист.
+
+**+1 блок Dev1 (kpi-scope) → итого 24 uncommitted.**
+
+### Состояние: **24 uncommitted блока** + 2 in-progress + 2 диффа ждут arch (‼️)
+
+Dev1 (16): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+           dept-view-head · **kpi-scope** (new)
+Dev2  (8): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill · project-rollup-index
+
+Диффы ждут arch (‼️ СРОЧНО, 3-й клоббер):
+  A) settings-object + backfill-post-install.ts → revealEmployeeNames (user-direct заказчик)
+  B) default-role.ts → canDestroyObjectRecords credosTimeEntries ([bug]#1 P1)
+
+In-progress: Dev1 timesheet-t13 · Dev2 diverse-seed
+
+---
+
+**[Аналитик · итерация 75 · 2026-06-22]**
+
+### [ping-arch ‼️] Dev2 — ЭСКАЛАЦИЯ: 2 диффа откатываются batch-коммитом
+
+**Статус:** Dev2 подтвердил 3-кратный клоббер `default-role.ts` / `post-install` / `settings-object`. Swarm-batch сбрасывает его правки. Это блокирует:
+- User-direct заказчика (ФИО по умолчанию) — ждёт уже с 05:00
+- P1 [bug]#1 op:delete 400 — ждёт с итерации 69+
+
+**[signal-arch] — действие СРОЧНО:**
+
+Arch должен применить оба диффа В СВОЁМ КОММИТЕ (не Dev2 — его правки затрут):
+
+| # | Файл | Правка |
+|---|------|--------|
+| ДИФФ 1a | `objects/credos-time-settings.object.ts` | `defaultValue: false` → `true` у `revealEmployeeNames` |
+| ДИФФ 1b | `logic-functions/backfill-project-departments.post-install.ts` | type + existing-ветка + create-default (verbatim в ping-arch Dev2) |
+| ДИФФ 2 | `default-role.ts` | `canDestroyObjectRecords: false` → `=== CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER` |
+
+Оба: build ✓, манифест: destroy только на entries e4d7eda0, CISO-011 гард APPROVED сохранён.
+
+**Заказчику немедленно (без gate):** тумблер «Показывать ФИО» в Settings → 1 клик уже работает.
+
+**HOT-FILES — рекомендация arch:**
+`default-role.ts`, `backfill-project-departments.post-install.ts`, `constants/universal-identifiers.ts` — заморозить для параллельных потоков. Только arch коммитит. Dev2 знает, больше не трогает.
+
+**CISO:** ДИФФ 1 = разворот CISO-007 по user-direct → RISK_REGISTER + 152-ФЗ (ст. 91 ТК РФ).
+
+### Состояние: **23 uncommitted блока** + 2 in-progress + 2 диффа ждут arch (‼️ СРОЧНО)
+
+Без изменений vs итерации 74.
+
+Dev1 (15): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3 · dept-view-head
+Dev2  (8): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill · project-rollup-index
+
+In-progress: Dev1 timesheet-t13 · Dev2 diverse-seed
+
+---
+
+**[Аналитик · итерация 74 · 2026-06-22]**
+
+### Dev1 [report] booking-cards — принято
+
+✅ Вкладки «Брони» в карточках Проекта (позиция 8) и Сотрудника (позиция 2) — нативные relation-FIELDS, 2 новых view, 2 page-layout обновлены. Сверка Timetta: брони видны в карточке ресурса — совпадает. 1807 passed, dry-run чисто.
+
+### Dev1 [report] booking-capacity + CSV-кнопка — принято
+
+✅ HARD/SOFT/конфликт в Demand: HARD→load, SOFT→пунктир (тумблер), конфликт-обводка без блока. Сверка Timetta: 1-в-1. +25 booking тестов. 1752 passed.
+
+⚠️ **SDK pitfall #2 (ПОВТОРНОЕ ПОДТВЕРЖДЕНИЕ Dev1):** Remote DOM — `Blob`/`URL.createObjectURL`/`a.download` недоступны. CSV-кнопка реализована как **popover** (копирование руками). Для автоскачивания нужен host-bridge — **arch решение**.
+
+### Dev2 [report] напоминания-FE — принято
+
+✅ POST /s/reminders детект-роут + `missing-timesheets.ts` (чистый модуль). Норма SSOT — reports-calc. CISO-007: ФИО только при revealEmployeeNames=true. +16 тестов. 1620 passed.
+
+⚠️ **SDK pitfall #2 (ПОВТОРНОЕ ПОДТВЕРЖДЕНИЕ Dev2):** нет email/push-канала из logic-function. Реализация = детект → UI-баннер/дайджест. Доставка — follow-up когда появится канал. Cron-payload не задокументирован в SDK.
+
+**[signal-arch] SDK pitfall #2 подтверждён независимо Dev1 и Dev2 — нужно задокументировать в `docs/developer/` (SDK limitations #2: no email/push channel from logic-function).**
+
+### Dev2 [report] lock-периода-T3 — аудит
+
+✅ CISO-011 L1 УЖЕ в коде (коммит fb5241e). Новый код не потребовался — Dev2 провёл аудит и подтвердил корректность: блок на delete/upsert/upsert-по-ключу; ENTRY_STATUS из SSOT. Тесты зелёные.
+
+### Dev2 [report] REQ-0018 (head + parentDepartment) — принято
+
+✅ Поля head/parentDepartment уже в коде main. Новое: `scripts/seed-department-heads.mjs` — идемпотентный backfill (head = isManager+детерминизм, только пустые). Цикл-гард задокументирован (структура плоская, данных иерархии нет → guard не нужен сейчас).
+
+**NEW follow-up → Dev1:** `views/credos-time-department.view.ts` НЕТ колонок head/parentDepartment — добавить в index-view. Arch: нужен [synced] для Dev1?
+
+### SDK pitfalls — просьба к arch задокументировать ДО gate
+
+Оба подтверждены независимо, нужны в `docs/developer/`:
+- **#1:** database-event = after-mutation, throw не откатывает
+- **#2:** нет email/push/notify-канала из logic-function; cron-payload не задокументирован в SDK  
+- **#3:** Remote DOM — нет `document`/`Blob`/`URL.createObjectURL`/`a.download`
+
+### Состояние: **23 uncommitted блока** + 2 in-progress + 2 диффа ждут arch
+
+Dev1 (15): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+           **dept-view-head** (new: head/parentDepartment в view отдела)
+Dev2  (8): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill · project-rollup-index
+
+Диффы ждут arch:
+  A) backfill-post-install.ts → revealEmployeeNames singleton
+  B) default-role.ts → canDestroyObjectRecords credosTimeEntries
+
+In-progress: Dev1 timesheet-t13 · Dev2 diverse-seed
+
+---
+
+**[Аналитик · итерация 73 · 2026-06-22]**
+
+### Dev2 [report] ФИО ВКЛ + op:delete fix — разбор
+
+**CISO-007 / revealEmployeeNames:**
+- ✅ `credos-time-settings.object.ts` defaultValue false→true — LANDED. Новые workspace = ФИО on.
+- ⛔ Singleton migration (post-install `seedSettings`) — **НЕ попала**: `backfill-project-departments.post-install.ts` hot-file, параллельный поток затёр (3-й клоббер). Dev2 предоставил **дифф arch-у** (3 строки).
+- 🚑 Немедленно заказчику: тумблер «Показывать ФИО» в Settings → 1 клик уже работает (Dev1 singleton patch). Не ждёт миграции.
+
+**[bug]#1 → [bug]#5 op:delete — fix готов, откатился:**
+- Диагноз подтверждён: REST DELETE = hard-destroy, `canSoftDelete` не покрывал → 400.
+- ✅ Fix: `default-role.ts` `canDestroyObjectRecords: true` ТОЛЬКО на `credosTimeEntries` (least-privilege, CISO-011 гард APPROVED).
+- ⛔ Параллельный коммит arch **откатил** правку (hot-file default-role.ts). Dev2 предоставил **дифф arch-у**.
+
+**[signal-arch] — 2 дифа ждут arch:**
+1. `backfill-project-departments.post-install.ts` — миграция singleton revealEmployeeNames (3 строки).
+2. `default-role.ts` — `canDestroyObjectRecords` для credosTimeEntries (1 строка в map).
+⚠️ **HOT-FILE паттерн (3-й раз):** `default-role.ts` + `post-install` — arch должен **заморозить** эти файлы для параллельных потоков. Dev2 отныне только изолированные файлы трогает.
+
+**Очередь Dev2 — статус:**
+- #1 project rollup index-view (план/факт/остаток) — ✅ **DONE** (+1 новый блок Dev2)
+- #2 Booking волна-1 объект — ✅ DONE (уже в booking-REQ0004 блоке)
+- #3 isManager←head — ⛔ CISO-005 blocker (privilege-escalation без server-identity)
+
+**CISO:** Dev2 явно передаёт флаг — CISO-007 разворот по приказу заказчика, нужен RISK_REGISTER + 152-ФЗ-обоснование.
+
+### Состояние: **22 uncommitted блока** + 2 in-progress + 2 диффа ждут arch
+
+Dev1 (14): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+Dev2  (8): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill · **project-rollup-index** (new)
+
+Диффы ждут arch (НЕ в uncommitted блоках, arch применяет):
+  A) backfill-post-install.ts → revealEmployeeNames singleton
+  B) default-role.ts → canDestroyObjectRecords credosTimeEntries
+
+In-progress: Dev1 timesheet-t13 · Dev2 diverse-seed
+
+---
+
+**[Аналитик · итерация 72 · 2026-06-22]**
+
+### Dev1 [report] REQ-0019 настройки-форма — принято
+
+**Блок подтверждён.** REQ-0019 UI: 3 поля (`maxHoursPerDay`, `minHoursPerWeek`, `warnOnScheduleDeviation`) в форме Настройки → Ввод. settings-rest тесты 16/16. Уже учтён в 21 uncommitted блоке.
+
+**Бонус — фикс build-блокера:** `use-global-settings.ts` импортировал `GlobalSettings` без реэкспорта → `TS2459`. Dev1 добавил реэкспорт в `settings-rest` аддитивно (чужой файл НЕ трогал). tsc разблокирован — важно для соседей по волне.
+
+**Остаток REQ-0019 по UI:** warnings из ответа `upsert` (`overtime`/недобор) ещё не показаны в гриде. Dev1 готов взять — нужно подтверждение arch (или Dev2 делает в своём блоке REQ-0019-consumers).
+
+### Состояние без изменений: 21 uncommitted блок + 2 in-progress + задача CISO-007
+
+Dev1 (14): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+Dev2 new:  [задача-dev2-ciso007] revealEmployeeNames=true дефолт + PATCH singleton
+
+In-progress: Dev1 timesheet-t13 · Dev2 diverse-seed
+
+---
+
+**[Аналитик · итерация 71 · 2026-06-22]**
+
+### [user-direct ‼️] Dev1 → `revealEmployeeNames=true` дефолт — разбор
+
+**Суть:** заказчик (владелец) хочет ФИО в отчётах по умолчанию. Dev1 переадресовал @Dev2 + @CISO.
+
+**Диагноз Dev1 корректен.** Проблема не в фронте — фронт уже чтит флаг. Два действия Dev2:
+1. `credos-time-settings.object.ts` — `defaultValue: true`
+2. PATCH singleton на dev/prod: `revealEmployeeNames=true` (иначе существующая запись не обновится)
+
+**CISO-007 разворот — оценка:**
+CISO-007 был закрыт как safe-default (ФИО скрыты). Заказчик легально отменяет safe-default для **внутреннего** инструмента. Правовое основание: ст. 91 ТК РФ (работодатель ведёт учёт рабочего времени) + ст. 88 ТК РФ (передача ПДн внутри организации). Риск остаётся, но acceptable для внутреннего B2B.
+
+**Что нужно CISO:**
+- Обновить `RISK_REGISTER.md`: CISO-007 статус → RE-OPENED (safe-default снят по решению владельца)
+- Внести в `PII_INVENTORY.md`: ФИО видны всем авторизованным пользователям workspace (до RBAC-волны)
+- Зафиксировать в `CISO_POLICY.md`: разворот по [user-direct], дата 2026-06-22
+
+**Что нужно Dev2 — задача:**
+
+```
+[задача-dev2-ciso007] revealEmployeeNames дефолт → true
+Файл 1: apps/time/src/objects/credos-time-settings.object.ts
+  поле revealEmployeeNames: defaultValue: false → true
+Файл 2: post-install или seed — PATCH существующего singleton:
+  PATCH /rest/credosTimeSettings/{id}  { revealEmployeeNames: true }
+Тест: reports.logic.test.ts — проверить, что тест на reveal=false не стал дефолтным
+  (тесты с reveal=false — НЕ удалять, тестировать явный false, не дефолт)
+```
+
+**[signal-arch] — уведомление**
+
+Arch: заказчик через [user-direct] изменил safe-default CISO-007. Dev1 корректно переадресовал Dev2+CISO. Аналитик фиксирует задачу + CISO-риск. Нужно:
+1. Arch подтверждает что user-direct принят (или переопределяет)
+2. Dev2 делает 2 правки (объект + PATCH singleton)
+3. CISO обновляет реестр
+
+**+0 uncommitted блоков** (это изменение данных, не код нового блока).
+
+### Текущее состояние: 21 uncommitted блок + 2 in-progress + 1 новая задача Dev2
+
+Dev1 (14): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+Dev2 new:  [задача-dev2-ciso007] revealEmployeeNames=true дефолт + PATCH singleton
+
+In-progress: Dev1 timesheet-t13 (фронт Т-13) · Dev2 diverse-seed (прод-сид)
+
+---
+
+**[Аналитик · итерация 70 · 2026-06-21]**
+
+### QA-smoke Волна 2 — 12 секций (§12–§23) добавлены
+
+Файл: `docs/qa/reports/QA_SMOKE_CHECKLIST.md` — appended.
+
+Что добавлено (12 секций + 0-B2 API-команды):
+
+| § | Блок | Роль | Статус |
+|---|------|------|--------|
+| 0-B2 | API curl-команды: credosTimeBookings, /s/reports tabel-grid, /s/reminders, CISO-012 guard | — | после gate |
+| 12 | Таймшит UX v2: worktype-column · gap-cell-fit · DP-0006-R3 | Dev1 | uncommitted |
+| 13 | Ёмкость v2: fix-capacity-metric · booking-capacity · Resource-gap | Dev1+Dev2 | uncommitted |
+| 14 | Брони: credosTimeBookings объект + вкладки в карточках | Dev2+Dev1 | uncommitted |
+| 15 | Настройки v2: REQ-0019 3 поля + валидаторы в гриде | Dev1+Dev2 | uncommitted |
+| 16 | CISO-012: lock APPROVED (W6-2 UI + ciso012-routing) | Dev1 | uncommitted |
+| 17 | CSV-экспорт: BOM+`;`+`\r\n`, popover workaround SDK | Dev2 | uncommitted |
+| 18 | Напоминания: /s/reminders маршрут + missing-timesheets | Dev2 | uncommitted |
+| 19 | Табель Т-13: backend (✅) + frontend (⏳ in-progress) | Dev2+Dev1 | partial |
+| 20 | Отделы v2: head/parentDepartment + backfill + CISO-009 | Dev2 | uncommitted |
+| 21 | OLAP drill-UI: breadcrumbs, dimLabel, CISO-007 | Dev1 | uncommitted |
+| 22 | Валидация REQ-0019 backend: 422/200+warnings/graceful | Dev2 | uncommitted |
+| 23 | Diverse-seed: CISO-009 grep, 10+ синт. сотрудников | Dev2 | ⏳ in-progress |
+
+### [signal-arch] QA-gate перед merge
+
+Arch: smoke-кейсы готовы. До merge Волны 2 нужен **QA-прогон §12–§23** (или формальный sign-off что smoke → после gate).
+
+Вопрос arch: smoke-прогон запускать **до** или **после** `app sync`? Если после — зафиксировать в gate-чеклисте.
+
+---
+
+**[Аналитик · итерация 69 · 2026-06-22]**
+
+### Dev1 [taking] timesheet-t13 — принято
+
+Заказчик подтвердил. Dev1 берёт экран Табель Т-13 (front-component). Бэк готов (`/s/reports groupBy=timesheet-grid` — Dev2 tabel-T13 в 20 блоках). UUID локально в def-файлах — **правильно**: `constants.ts` hot (sidebar-reorg/REQ-0016 in-progress). Зона изолирована: `front-components/reports/timesheet-grid/` новая папка.
+
+**+1 блок Dev1 (сделано до taking):** DP-0006 R3 (разделители месяцев period-header) — Dev1 упомянул как уже готовое. Новый uncommitted блок.
+
+**Коллизионный контроль ✅:** nav-item top-level, arch свернёт в папку «Отчёты» при консолидации — Dev1 не цепляется за чужой folder-reports. Паттерн соблюдён.
+
+Жду [report] от Dev1. diverse-seed (Dev2) ещё в работе.
+
+### Текущее состояние: 21 uncommitted блок + 2 in-progress
+
+```
+Dev1 (14): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+
+In-progress: Dev1 timesheet-t13 (фронт Т-13) · Dev2 diverse-seed (прод-сид)
+```
+
+— Аналитик
+
+**[Аналитик · итерация 68 · 2026-06-21]**
+
+### Dev2 [taking] diverse-seed — принято, ждём [report]
+
+Dev2 взял SEED_DIVERSE: ~6800 записей факта + 14 брони (SOFT/HARD) + расширение absences/dept-plans/employee-dept. Идемпотентно (ключ employeeId|projectId|workTypeId|date). Прогон против прода — arch разрешил.
+
+**Архитектурное наблюдение:** PATCH factHours/budgetRemaining вручную после REST-создания записей — подтверждает SDK ограничение #1 (database-event rollup НЕ срабатывает от внешних REST, только внутри logic-function). Dev2 знает и обходит — правильно.
+
+**⚠️ CISO-009 флаг (до [report]):** проверить что в SEED_DIVERSE_TZ.md §2c наименования проектов синтетические (не реальные клиенты/контракты Кредос-С). Реальные проекты в сиде = CISO-009 нарушение, даже на проде. Заказчик vs@credos.ru = его собственные записи, не ПДн третьих лиц — ок.
+
+### Текущее состояние: 20 uncommitted блоков + 1 in-progress
+
+```
+Dev1 (13): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit
+Dev2  (7): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill
+
+In-progress: Dev2 diverse-seed (прод-сид, ждём [report])
+```
+
+— Аналитик
 
 **[Аналитик · итерация 67 · 2026-06-21]**
 
@@ -6602,6 +7089,10 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
+### 2026-06-21 08:32 — [observed] nav-блокер ЗАКРЫТ (001b2f9) — dry-run больше не падает
+
+Блокер 08:20 (15 ошибок navigationMenuItem) **снят**: arch закоммитил батч `001b2f9` (сайдбар 5 групп + UUID→ФИО + nav-фикс + project-team + ux-polish). dry-run теперь чист от ошибок → «11 created, 8 updated» (деплоябельно). WIP упал 70→23. Tree ещё грязное (23 WIP) → накат держу до чистого дерева/отмашки. Сервер green (1fd3a2d). Готов накатить батч, как дерево станет dry-run-чистым по committed-состоянию. — DevOps
+
 ### 2026-06-21 08:20 — [blocker] Деплой-блокер: 15 ошибок navigationMenuItem в текущем дереве (WIP сломан)
 
 Заказчик просил закоммитить готовое (потом отменил — НЕ коммичу). При верификации перед коммитом нашёл блокер: **рабочее дерево накопило 61 файл WIP**, lint 0/0, secret-scan чисто, НО:
@@ -7624,6 +8115,112 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-finding] timesheet-t13 CISO-010: тоггл кодів без role-guard
+
+Перевірив `timesheet-grid.tsx`:
+- L73: `<button onClick={() => setWithCodes(v => !v)}` — доступний будь-якому авторизованому
+- Нема isManager/role перевірки перед показом кодів
+- `withCodes=true` → код `Б` (SICK/хворіє) видний у клітинці + CSV
+
+**Ризик:** будь-який авторизований бачить медПДн (код `Б` = хворіє) = 152-ФЗ ст. 10 спецкатегорія.
+**CISO-010 підтверджено у фронті (раніше був тільки бекенд concern).**
+
+**Required guard (до прод-деплою):**
+```tsx
+// До рендеру кнопки тоглу:
+const { isManager } = useCurrentEmployee(); // або з контексту
+// ...
+{isManager && (
+  <button onClick={() => setWithCodes(v => !v)} ...>
+    Буквенные коды Т-13
+  </button>
+)}
+```
+Або: `codes=true` блокується на бекенді якщо actor не isManager → помилка у відповіді.
+
+QA §19 smoke-кейс (мій попередній [ciso-note]) — додати перевірку toggle недоступний для не-менеджера.
+
+Dev1 (зона front-components/reports/timesheet-grid/): додати role-guard на кнопку тоглу. Залежить від CISO-005 (isManager з event) або тимчасово від workspaceMemberRef.
+
+CISO-010 статус залишається OPEN до реалізації guard.
+
+— CISO
+### 2026-06-22 — [ciso-note] іт.73: canDestroyObjectRecords + isManager confirmations
+
+**1. CISO-007 документація — вже виконано:**
+RISK_REGISTER → ACCEPTED, CISO_POLICY §8 оновлено, PII_INVENTORY оновлено (все у [ciso-ok] раніше в цій секції). Dev2: не потрібно повторно.
+
+**2. isManager←head (Dev2 #3) — [ciso-ok]:**
+Dev2 правильно зупинив через CISO-005 blocker. Без server-side identity `PATCH department.head` → `isManager=true` = ескалація привілеїв (будь-хто може стати менеджером). Рішення вірне.
+
+**3. [ciso-note] `canDestroyObjectRecords: true` для credosTimeEntries (дифф B):**
+Оцінка:
+- Без цього права REST DELETE → 400 = базова функція зламана. Виправлення обгрунтоване.
+- Least-privilege ✅ (тільки credosTimeEntries, не всі об'єкти).
+- CISO-011 L1 guard (cannot_modify_approved) в `/s/time-entry` — спрацьовує тільки при маршрутизації через logic-function. Прямий REST DELETE APPROVED — обходить guard.
+- **Залишковий ризик**: прямий REST DELETE мимо `/s/time-entry` = обхід CISO-011. Клас CISO-012 (вже в RISK_REGISTER, закривається RBAC-волною). Нового окремого finding не реєструю.
+- Arch: дифф B приймати — потрібний для базової функціональності. CISO не блокує.
+
+— CISO
+### 2026-06-22 — [ciso-ok] CISO-007 документация обновлена (3 файла)
+
+Виконано всі пункти іт.71:
+
+1. ✅ **RISK_REGISTER.md** — CISO-007 → ACCEPTED (оновлено раніше)
+2. ✅ **CISO_POLICY.md §8** — додано [user-direct] виняток з 152-ФЗ обоснованием (ст. 91 + ст. 88 ТК РФ). Цільовий стан після CISO-005 = тільки isManager/HR.
+3. ✅ **PII_INVENTORY.md** — таблиця доступу + caveat: ФИО всіх 42 видні БУДЬ-ЯКОМУ auth до RBAC-волни.
+
+**Зауваження щодо статусу:** RE-OPENED ≠ правильний статус в нашому реєстрі. ACCEPTED = власник системи свідомо прийняв ризик (що й відбулось). RISK_REGISTER відображає ACCEPTED.
+
+**Dev2:** задача [задача-dev2-ciso007] — ок, реалізуй. Тести на `reveal=false` не видаляти (тестують явний false).
+
+— CISO
+### 2026-06-22 — [ciso-note] QA §19 Т-13: smoke пропускает role-guard на codes=true
+
+QA-smoke §19 «Табель Т-13» — CISO-010 concern активный (зафиксирован в [ciso-finding]).
+
+**Gap в smoke-кейсе:** нет проверки что `codes=true` доступен ТОЛЬКО HR/isManager.
+Без role-guard — любой авторизованный видит код «Б» (SICK) = медПДн 152-ФЗ ст. 10.
+
+**Добавить в §19 smoke-кейс (до gate):**
+- [ ] `codes=true` без роли → 403 / коды не возвращаются (backend guard)
+- [ ] `codes=true` с ролью isManager=true → коды отдаются
+
+До реализации role-guard — `codes=true` в UI скрыть или заблокировать.
+CISO-010 остаётся OPEN до появления guard.
+
+— CISO
+### 2026-06-22 — [ciso-note] revealNames=true по умолчанию — CISO-007 ACCEPTED
+
+Получил [user-direct ‼️]. Заказчик принял решение: `revealNames=true` по умолчанию.
+
+**152-ФЗ обоснование (CISO подтверждает):**
+- Обработка ФИО сотрудников в системе учёта рабочего времени = исполнение трудового договора (ст. 6 ч. 5 п. 5 152-ФЗ) + законный интерес работодателя
+- Все авторизованные пользователи = сотрудники Кредос-С (внутренний инструмент, не публичный)
+- ФИО коллег в табельном учёте ≠ утечка (рабочая необходимость)
+- Нарушений 152-ФЗ нет
+
+**CISO-007 → ACCEPTED (решение владельца системы). RISK_REGISTER обновлён.**
+
+**Кавеат до RBAC-волны (CISO-005):**
+- ФИО всех 42 сотрудников видны ЛЮБОМУ авторизованному (не только менеджеру)
+- При dev/staging с 1-15 реальными юзерами — приемлемо
+- RBAC-волна уточнит: ФИО только менеджеру/HR (CISO-003/005 scope)
+
+**@Dev2:** `defaultValue: true` + PATCH singleton — ок, реализуй. CISO-007 не блокирует.
+
+— CISO
+### 2026-06-22 — [ciso-ok] SEED_DIVERSE CISO-009 — синтетика ✅
+
+Перевірив SEED_DIVERSE_TZ.md §2c + seed-diverse.mjs:
+- Всі проекти = синтетичні коди (OV-2026-DONE-01, OIB-2026-ACT-01, OPR-INT тощо)
+- Жодних реальних юрособ (ООО/ГУП/ФГБУ/АО)
+- SEED_DIVERSE_TZ.md L4 явно: «ФИО/клиенты — синтетические (152-ФЗ)» ✅
+- `CUSTOMER_EMAIL = 'vs@credos.ru'` — заказчик, його власні записи, не ПДн третіх осіб ✅
+
+CISO-009 concern по SEED_DIVERSE закрито. Прогон проти проду — ок.
+
+— CISO
 ### 2026-06-22 — [ciso-ok] ADR-0005/0006 C1 — 152-ФЗ review ✅
 
 **ADR-0005** (прод-топология): формулировки 152-ФЗ (ст.18.5, РФ-контур, ЛНА) — подтверждены ✅ (зафиксировано в секции «Замечания CISO» ADR-0005 ещё при принятии).
@@ -10301,3 +10898,107 @@ main-page (pos -1) — вне папок, как было. Нативные CRM-
 ПРИМЕЧАНИЕ: те же 15 ошибок упоминал параллельный Dev1-поток (запись fix-capacity-metric) как «пред-существующие, серверное состояние» — пересекается с REQ-0016 (DEPARTMENT/EMPLOYEE/PROJECT nav). Синк делать через ОДНУ очередь (doc: «avoid concurrent syncs»). НЕ коммитил, НЕ деплоил.
 
 — Dev 1
+
+## Dev 1 → arch
+[taking] ts-actions — обнаруживаемость действий таймшита (grid/ only). Спека docs/analysis/TIMESHEET_UX_ANALYSIS.md + impeccable-P2 (docs/qa/IMPECCABLE_AUDIT.md).
+Делаю: (1) меню строки ⋯ с подписями [Дублировать·Заполнить будни·Очистить строку·Удалить строку] вместо немого ⧉; (2) чип «8» (норма дня) в активной пустой ячейке; (3) dropdown «Копировать ▾» вверху [Только строки·Строки и часы·⚠Очистить неделю]; (4) комментарий к ячейке в режиме Неделя (commitDescription уже есть); (5) P2: hour-cell fill-кнопка глиф+хит-зона ≥16px, hover у «Добавить».
+Зона: grid/ ТОЛЬКО (toolbar, hour-cell, grid-row, week-grid, weekly-grid, add-row, use-timesheet-actions + новые row-menu/copy-menu/cell-comment). НЕ трогаю navigation/objects/constants. dry-run, НЕ коммит, НЕ деплой.
+— Dev 1
+
+## Dev 2 → arch
+[taking] fields-p1 — поля-фиксы P1/P2 из FIELDS_COLUMNS_AUDIT.md (заказчик выбрал). Зона: objects/fields/views/constants. НЕ сид, НЕ scripts/, НЕ деплой.
+
+[report] fields-p1 — ГОТОВО (dry-run apply-ready, НЕ коммичено).
+
+Сделано (5 правок метаданных + 3 поля + колонки):
+1. WorkType.name (P1 КРИТ): добавлено TEXT-поле `name` (label «Наименование», UUID 166ee92b…), назначено labelIdentifier карточки. Колонка name = position 0 в реестре (group/department сдвинуты). Теперь виды работ различимы. Бэкфилл существующих записей — НЕ мой (live-вставка сидом в проде); поле создаётся пустым, заполнится через UI/сид. labelIdentifier=name (вместо авто-поля name) — заголовки новых записей берут наименование.
+2. Department.headcount (P1): РЕШЕНИЕ — ручное INT-поле УДАЛЕНО из объекта + из реестра + (в обзоре его и не было). SSOT численности = reports-calc (headcount = Σ(ftePercent/100) активных FTE-назначений в периоде, REQ-0011). reports-calc уже НЕ использовал ручное поле (комм. стр.57) → расхождение устранено. SDK декларативного computed-поля для objects не даёт, поэтому не плодим ручной дубль. capacity-rest/calc-load вычисляют headcount из FTE — НЕ ломаются (не читали объектное поле). В реестр вместо headcount добавлен capacityFactor (P2). dry-run: deleted fieldMetadata 4837bf7d.
+3. Project.description (P2): TEXT-поле `description` (label «Описание», UUID 991f5621…), nullable. Добавлено в карточку «Обзор» (position 10, size 360).
+4. Stage.name (P2): TEXT-поле `name` (label «Название», UUID 1732bf5b…), nullable. labelIdentifier остался code (заполнен у всех). Колонка name = position 1 в реестре (после code).
+
+UUID: все новые — v4, без дублей (проверено grep по src/). Новые: 166ee92b/6aab7b4a (WorkType name+col), 1732bf5b/2552e2f8 (Stage name+col), 991f5621/c454acd1 (Project descr+col). capacityFactor-константа = реюз inline-UUID ec699c59 поля.
+
+Валидация: yarn lint — мои 9 файлов 0 ошибок (общий lint падает на front-components/grid/grid-row.tsx:253 «Expected } but found EOF» — ЧУЖОЕ, незавершённый файл Dev 1, не моя зона). yarn test:unit — 66 файлов, 1859 passed, 0 failed, 15 todo. yarn twenty dev --once --dry-run — typecheck OK, «Dry run complete, no changes applied»: 6 created / 8 updated / 3 deleted (мои: +3 fieldMetadata name/name/description, +3 viewField, −1 headcount, capacityFactor-колонка updated). apply-готово.
+
+НЕ коммичено (по инструкции). grid-row.tsx (Dev 1) сейчас сломан — общий lint красный из-за него, не из-за моих файлов.
+— Dev 2
+
+## Dev 1 → arch
+[report] ts-actions ГОТОВО (grid/ only, dry-run, НЕ коммит). Корень жалобы «мало кнопок в месте ввода» = обнаруживаемость, не количество. Сделано по спеке TIMESHEET_UX_ANALYSIS (топ-рекомендации) + impeccable-P2.
+
+ДОБАВЛЕНО:
+1. **Меню строки ⋯** (новый row-menu.tsx) вместо немого «⧉»: Дублировать · Заполнить будни (8 ч) · Очистить строку · Удалить строку — с подписями+хинтами, разделители кластеров, danger-цвет у удаления. lock-approved строка → правящие пункты скрыты, остаётся только Дублировать. Триггер ⋯ всегда виден у названия проекта (grid-row.tsx). Собрал разбросанное (⧉ у проекта + 10px-квадрат в ячейке).
+2. **Чип нормы дня** в активной ПУСТОЙ ячейке (hour-cell.tsx): берёт норму из useDailyNorm (проброшен normFor через grid-row), 1 клик → onCommit(norm). Пилюля accentSoft→accent на hover, tabular-nums. «Кнопка в месте ввода».
+3. **Dropdown «Копировать ▾»** (новый copy-menu.tsx) в тулбаре: «Только строки» / «Строки и часы» (лечит непонятное «…с часами») + разделитель + «Очистить неделю» (danger, inline-confirm). Свернул 3 кнопки в 1 (P2 toolbar overflow).
+4. **Комментарий к ячейке в Неделя** (новый cell-comment.tsx): триггер ✎ + поповер-инпут на активной ячейке с часами; индикатор-точка если коммент есть. commitDescription уже был в actions — выведен в Неделю (был разрыв, только День).
+5. **P2 impeccable:** fill-кнопка строки — глиф ⇥ + хит-зона 18×18 (была слепой квадрат 10px), hover accentSoft; кнопка «Добавить» (add-row) — hover accentHover у primary.
+
+ЛОГИКА (use-timesheet-actions.ts): чистые calcClearRow/calcClearWeek (id записей на удаление, согласованные пропускают + skippedLocked) + хук-обёртки clearRow/clearWeek через removeManyResult (Promise.all + агрегат). Удаление строки = clearRow + снять из extraRowKeys. Всё уважает lock-approved (notifyLocked).
+
+ПАТТЕРНЫ: поповеры на useState + fixed-overlay inset:0 (как cheatsheet/autocomplete), Remote DOM-safe, host-DOM не трогал. Новые id не объявлял (компоненты, не nav/objects). НЕ трогал navigation/objects/constants/universal-identifiers.
+
+ВАЛИДАЦИЯ:
+- yarn lint — 0 warnings / 0 errors (342 файла).
+- yarn test:unit — 66 файлов passed, 1870 passed, 0 failed (+15 новых тестов calcClearRow/calcClearWeek).
+- yarn twenty dev --once --dry-run — typecheck PASS, build PASS. На metadata-diff 3× NAVIGATION_MENU_ITEM_NOT_FOUND (parent FOLDER не найден) — ЭТО НЕ МОЯ ЗОНА: uncommitted nav-restructure параллельной волны (известное ограничение инкрементального dry-run-валидатора, уже задокументировано выше в SIGNALS). Мои изменения — только grid/ (8 изм + 3 новых файла), nav-файлы не трогал.
+
+standards-auditor: PASS, 0 критичных. Рефактор: вынес CellComment из hour-cell (402→295 стр).
+
+ФАЙЛЫ (grid/ ТОЛЬКО):
+- НОВЫЕ: row-menu.tsx, copy-menu.tsx, cell-comment.tsx.
+- ИЗМЕНЕНЫ: hour-cell.tsx, grid-row.tsx, toolbar.tsx, week-grid.tsx, weekly-grid.tsx, add-row.tsx, use-timesheet-actions.ts, use-timesheet-actions.test.ts.
+
+НЕ коммитил, НЕ деплоил.
+— Dev 1
+
+## Dev 1 → arch
+[taking] nav-groups-v2 — пересборка 5-групп сайдбара НАДЁЖНО (после отката 50130e6).
+
+[report] nav-groups-v2 ГОТОВО к деплою (TWO-PHASE, dry-run, НЕ коммит). Zone: navigation-menu-items/ ТОЛЬКО.
+
+### МЕХАНИЗМ SYNC — топосортит ли FOLDER→дети? НЕТ.
+Версия стека: Twenty + twenty-sdk **2.14.0**.
+- Доказано dry-run (`yarn twenty dev --once --dry-run`) на ПОЛНОМ состоянии: **Sync failed 15 errors, все NAVIGATION_MENU_ITEM_NOT_FOUND** — «Parent navigation menu item not found». UUID в ошибках = РОВНО 15 детей, которых я перевёл на 4 НОВЫЕ (ещё не созданные на сервере) папки.
+- Дети, оставшиеся в УЖЕ существующей в БД папке (Ввод времени: Таймшиты/Мои таймшиты/Согласование) — НЕ в списке ошибок. Сами 4 новые folder-UUID — тоже НЕ в ошибках (видны как создаваемые).
+- Вывод: SDK 2.14 при apply НЕ создаёт родительский FOLDER раньше ребёнка в одном sync. Ровно та же причина, что свалила прошлую попытку (001b2f9). Гипотеза агента про «topo-sort в Twenty с какой-то версии» — для navigationMenuItem folder-связи в 2.14 НЕ работает (эмпирически опровергнуто).
+- Идемпотентность («re-running clean manifest часто решает hiccup», офиц.доки) — на dry-run не проверяема, на это полагаться НЕ рекомендую как на основной механизм.
+
+### ВЫБРАН ВАРИАНТ A — TWO-PHASE (детерминированно, без угадывания).
+Структура (5 групп) в рабочем дереве УЖЕ финальная. Деплой разбит на 2 фазы — на каждой родитель уже существует в БД, NOT_FOUND невозможен.
+
+**ТОЧНЫЕ ШАГИ ДЕПЛОЯ ДЛЯ ARCH:**
+
+Фаза 1 — создать 4 новые папки на сервере + переименовать существующую. Задеплоить ТОЛЬКО folder-файлы (дети пока висят на старой папке «Ввод времени» = бывш. «Трудозатраты», это валидно):
+- файлы фазы 1: `credos-time-folder` (переименование «Трудозатраты»→«Ввод времени»), `folder-planning`, `folder-reports`, `folder-directories`, `folder-settings`.
+- ВАЖНО: SDK деплоит весь манифест целиком (нет per-file деплоя). Чтобы изолировать фазу 1, временно отложить остальные изменённые child-файлы: `git stash push -- <13 child-файлов>` (см. список ниже), оставив в дереве только 5 folder-файлов, затем `yarn twenty dev --once` (или app:publish). После успеха — `git stash pop`.
+  Альтернатива без stash: вручную вернуть 13 child-файлов к HEAD (`git checkout HEAD -- <child>`), задеплоить, потом повторно применить мои правки (есть в этом отчёте/диффе).
+
+Фаза 2 — перевести детей на новые папки. После успеха фазы 1 (4 папки уже в БД) задеплоить полное дерево:
+- `yarn twenty dev --once` (или app:publish). Теперь все folderUniversalIdentifier разрешаются → 0 ошибок.
+
+child-файлы фазы 2 (помечены комментом `ФАЗА 2`): capacity-board, credos-time-dept-plan, credos-time-booking, credos-time-absence (→Планирование); reports-dashboard (→Отчёты); credos-time-project, credos-time-work-type, credos-time-stage, credos-time-department, credos-time-employee, credos-time-workday-calendar, calendar-monthly, credos-time-billing-link (→Справочники); credos-settings, credos-time-settings (→Настройки). + entry/my-time остаются в «Ввод времени» (имена обновлены Таймшиты/Мои таймшиты).
+
+### СТРУКТУРА (как в ЦЕЛИ):
+1. **Ввод времени** (existing folder, переименован): Таймшиты · Мои таймшиты · Согласование
+2. **Планирование** (new, локальный UUID c1969fe8…): Планирование · Плановые загрузки · Брони ресурсов · Отсутствия
+3. **Отчёты** (new, ac736122…): Отчёты
+4. **Справочники** (new, cdc6a8bf…): Проекты · Виды работ · Этапы · Отделы · Сотрудники · Произв. календарь · Производственный календарь · Связи с 1С
+5. **Настройки** (new, 189e0deb…): Настройки · Настройки модуля
+
+Прим.: «Производственный календарь» (calendar-monthly, PAGE_LAYOUT) в ЦЕЛИ явно не указан — положил в Справочники рядом с «Произв. календарь» (workday-calendar VIEW), чтобы пункт не осиротел. Arch — скажи, если убрать/переместить.
+
+### ZONE-COMPLIANCE:
+- folder-UUID объявлены **ЛОКАЛЬНО** в folder-файлах (export const в самом файле), child импортируют из `./folder-*.navigation-menu-item`. constants/universal-identifiers.ts (зона Dev2) — НЕ трогал (существующая «Ввод времени» использует прежнюю Dev2-константу CREDOS_TIME_FOLDER, не менял её UUID).
+- Нативные CRM-пункты не трогал. grid/objects/roles — не трогал.
+
+### ВАЛИДАЦИЯ:
+- `yarn lint` — **0 warnings / 0 errors** (342 файла).
+- `yarn test:unit` — **1 failed / 1869 passed / 15 todo**. Единственный failed = `src/__tests__/role-guard.test.ts` (canDestroyObjectRecords, зона Dev2/roles) — ПРЕДСУЩЕСТВУЮЩИЙ, падает и без моих изменений (проверено git stash). К nav не относится, регрессий от меня НЕТ.
+- `yarn twenty dev --once --dry-run` — typecheck PASS, build PASS. Metadata-diff: **15× NAVIGATION_MENU_ITEM_NOT_FOUND — ЭТО ОЖИДАЕМО** (фаза 2 в дереве, фаза 1 ещё не задеплоена). Это НЕ чистый прогон и я не выдаю его за чистый — это ДОКАЗАТЕЛЬСТВО, что нужен two-phase. После фазы 1 эти 15 исчезнут.
+
+НЕ коммитил, НЕ деплоил (dry-run only).
+— Dev 1
+
+## QA → arch [09:16]
+role-guard.test.ts — падает на import (нет src/default-role), предсуществующий с коммита 1ab2956. Dev 1 не виноват. Задача: Dev 2 разобраться с default-role после деплоя фазы 1 (arch-зона).
+— QA

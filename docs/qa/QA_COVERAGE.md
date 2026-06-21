@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1853 + 15 todo** (57 файл, все зелёные) |
+| unit-тестов | **1870 + 15 todo** (66 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -39,6 +39,7 @@
 | `front-components/capacity/capacity-rest.ts` | `resolveSelfIsManager`/`fetchDepartments`/`fetchProjects`/`fetchDeptPlans`/`fetchEmployees`/`fetchCalendar`/`patchProject`/`patchDeptPlan` + mockPatch | ✅ 23 тестов + 1 todo [bug]#3 | `front-components/capacity/capacity-rest.test.ts` |
 | **SSOT-guard категорий** | `domain-types → select-options → tag-color-hex → category-meta` | ✅ 13 тестов + 2 todo | `__tests__/ssot-categories.test.ts` |
 | `front-components/shared/category-meta.ts` | `categoryMeta` SSOT-резолв + fallback OTHER/неизвестный | ✅ 7 тестов | `front-components/shared/category-meta.test.ts` |
+| `front-components/shared/tag-meta.ts` | `tagMeta`/`sortTags`/`TAG_ORDER` — SSOT-метаданные тегов + fallback + сортировка | ✅ 16 тестов | `front-components/shared/tag-meta.test.ts` |
 | `front-components/reports/category-bar.ts` | `toSegments` — порядок/ширина/цвет/фильтрация ([bug]#4 регресс-guard) | ✅ 7 тестов | `front-components/reports/category-bar.test.ts` |
 | `front-components/reports/bar.ts` | `pctOfNorm` — форматирование % (null/0/over-100) | ✅ 8 тестов | `front-components/reports/bar.test.ts` |
 | `front-components/capacity/cap-tokens.ts` | `loadTone`/`formatPct`/`formatCell` — тон ёмкости/метрики | ✅ 15 тестов | `front-components/capacity/cap-tokens.test.ts` |

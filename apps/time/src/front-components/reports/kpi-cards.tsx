@@ -4,8 +4,12 @@ import type { ReportRow } from 'src/front-components/reports/report-types';
 
 // Сводные показатели периода (totals): утилизация, факт, норма, недогруз.
 // Плоские карточки-метрики (без hero-плашек/градиентов): подпись + крупное число.
+//
+// totals отражает ТЕКУЩИЙ скоуп: на корне — глобал (3-срезовый ответ), при drill —
+// агрегат отфильтрованного OLAP-среза (Итого по filters[]). scope — путь дрилла
+// для подписи («Отдел: ОПИБ › Проект: X»), пусто на корне.
 
-type Props = { totals: ReportRow };
+type Props = { totals: ReportRow; scope?: string };
 
 const Card = ({
   label,
@@ -46,12 +50,12 @@ const Card = ({
   </div>
 );
 
-export const KpiCards = ({ totals }: Props) => {
+export const KpiCards = ({ totals, scope }: Props) => {
   const under = underTone(totals.under);
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '12px 14px' }}>
       <Card
-        label="Утилизация"
+        label={scope ? `Утилизация · ${scope}` : 'Утилизация'}
         value={fmtUtil(totals.util)}
         hint="доля клиентских часов"
         color={T.accent}
