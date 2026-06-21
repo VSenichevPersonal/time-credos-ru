@@ -184,9 +184,11 @@ export const DayRow = ({
         />
       ) : (
         <div
+          aria-disabled={locked || undefined}
+          aria-label={locked ? `Согласовано, только чтение: ${fmtHours(hours)} ч` : undefined}
           title={
             locked
-              ? 'Согласовано — только чтение'
+              ? 'Согласовано — правка запрещена'
               : isOvertime(hours, overtimeThreshold)
                 ? 'Переработка: часов больше порога'
                 : undefined
@@ -202,6 +204,7 @@ export const DayRow = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-end',
+            gap: 5,
             padding: '0 12px',
             fontSize: 16,
             fontWeight: hours > 0 ? 600 : 400,
@@ -213,13 +216,32 @@ export const DayRow = ({
                 : hours > 0
                   ? T.text
                   : T.textFaint,
-            background: hours > 0 ? cellFill(hours) : T.panelBg,
+            // Read-only: тихий нейтральный фон, статус не только цветом (замок).
+            background: locked ? T.panelBg : hours > 0 ? cellFill(hours) : T.panelBg,
             border: `1px solid ${T.border}`,
             borderRadius: 8,
             cursor: locked ? 'default' : 'text',
             boxSizing: 'border-box',
           }}
         >
+          {locked && (
+            <svg
+              aria-hidden
+              width="11"
+              height="11"
+              viewBox="0 0 10 10"
+              fill="none"
+              style={{ opacity: 0.55, flexShrink: 0 }}
+            >
+              <rect x="1.5" y="4.5" width="7" height="5" rx="1" fill={T.textMuted} />
+              <path
+                d="M3 4.5V3a2 2 0 0 1 4 0v1.5"
+                stroke={T.textMuted}
+                strokeWidth="1.1"
+                fill="none"
+              />
+            </svg>
+          )}
           {hours > 0 ? fmtHours(hours) : '·'}
         </div>
       )}

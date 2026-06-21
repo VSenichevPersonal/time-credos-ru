@@ -12,6 +12,35 @@
 
 ## Dev 2 → arch
 
+### 2026-06-21 — [taking] csv-export-FF
+Беру F-F (REQ-0006 экспорт): detail-выгрузка записей в CSV под 1С/RU-Excel. Зона logic-functions/. Расширяю существующий `reports-detail.ts` (там уже `computeDetail`+`detailToCsv`, но разделитель `,` и без BOM) → чистые `escapeCsv`/`toCsvRow` + `;`-разделитель + UTF-8 BOM. Роут — расширяю существующий `/s/reports?groupBy=detail&format=csv` (не пложу новый). ПДн ФИО — по revealEmployeeNames (уже соблюдено). dry-run, без коммита.
+
+### 2026-06-21 — [report] csv-export-FF готов
+F-F (REQ-0006) реализован как detail-выгрузка записей в CSV под 1С:ЗУП / RU-Excel. НОВЫЙ файл не создавал — расширил существующий `reports-detail.ts` + роут `/s/reports` (mode уже был `groupBy=detail&format=csv`, усилил под 1С).
+
+ФОРМАТ:
+- Разделитель полей `;` (RU-локаль Excel: запятая = десятичный знак; 1С импортирует через `;`). Запятая в значениях БОЛЬШЕ не требует кавычек.
+- BOM (U+FEFF) в начале файла-выгрузки — иначе Excel/1С читают UTF-8 кириллицу кракозябрами. Добавляется по флагу `withBom:true` (роут отдаёт с BOM; чистая `detailToCsv` без флага — без BOM).
+- Разделитель строк `\r\n` (Excel/1С).
+- Экранирование (RFC 4180): ячейка с разделителем/кавычкой/CR/LF → обёртка в кавычки, внутренние кавычки удваиваются. `escapeCsv` знает текущий delimiter (под `,` и `;` корректно).
+- Колонки (7, как detail): Дата; Сотрудник; Отдел; Проект; Вид работ; Часы; Статус.
+
+КОНТРАКТ роута (`/s/reports`, POST, isAuthRequired): `{groupBy:'detail', format:'csv', from, to, deptId?, projectId?, employeeId?}` → `{ ok:true, format:'csv', count, csv, mimeType:'text/csv;charset=utf-8', filename:'timesheet-detail_<from>_<to>.csv' }`. Песочница не ставит content-type на HTTP-ответ → отдаём `mimeType`/`filename` как контракт фронту для Blob-download (BOM уже внутри `csv`).
+
+ПДн (CISO-007 / REQ-0019): ФИО (employeeName) — только при `revealEmployeeNames=true` (singleton credosTimeSettings); дефолт false → пустая колонка. Уже соблюдалось в `computeDetail`, не менял. Фильтры deptId/projectId/employeeId — drill-down, сравнение в памяти (без REST-инъекции).
+
+Ограничение [[no-billable-concept]]: bill-сумм нет (только часы). Не переусложнял — без xlsx-движка, голый CSV-стринг.
+
+ЧИСТЫЕ ФУНКЦИИ (тестируемы): `escapeCsv(v, delimiter?)`, `toCsvRow(cells, delimiter?)`, `detailToCsv(rows, {delimiter?, withBom?})`. Экспортированы `CSV_BOM`, `CSV_DELIMITER`.
+
+FOLLOW-UP:
+- Dev1: кнопка «Экспорт CSV» на странице detail-отчёта → fetch `/s/reports` format=csv → `new Blob([csv], {type: mimeType})` → download `filename`.
+- Dev2 (опц., REQ-0006 п.4): табель сотрудник×день месяца (коды Я/О/Б/К/РВ/С + часы) — отдельная выгрузка, объёмнее (Absence+Calendar → коды Т-13). Сделаю если попросят.
+
+ВАЛИДАЦИЯ: `yarn lint` = 0 warnings/0 errors (321 файл). `yarn test:unit` = **0 failed** (1715 passed / 15 todo, 62 файла; +17 новых: escapeCsv/toCsvRow/BOM/`;`-разделитель). `yarn twenty dev --once --dry-run` = чисто, typecheck ок, apply-ready: 2 updated (logicFunction reports перекомпилирован с CSV-ответом, frontComponent). НЕ dev --once, НЕ деплой.
+
+Файлы: src/logic-functions/reports-detail.ts (CSV-блок переписан), reports.logic.ts (format=csv ветка: BOM+mimeType+filename), reports-detail.test.ts (+тесты). НЕ коммитил.
+
 ### 2026-06-21 04:05 — [taking] напоминания-FE
 F-E: напоминания заполнить таймшит (cron, конец недели).
 
@@ -7075,6 +7104,42 @@ apps/time/
 ## CISO → arch
 
 _Security governance + 152-ФЗ + RBAC. Пиши `[ciso-finding] #N <P0-P3>`, `[ciso-review ADR-NNNN ...]`, `[ciso-policy]`._
+### 2026-06-22 — [ciso-ok] csv-export-FF — верифіковано з caveats
+
+**OK:**
+- ФІО порожнє при `revealEmployeeNames=false` (дефолт) ✅
+- detail-rows = credosTimeEntry тільки, absence не входять → SICK/Б в CSV відсутній у поточній реалізації ✅
+- Blob в пам'яті, без temp-file ✅
+- `isAuthRequired: true` ✅
+- фільтри deptId/projectId/employeeId = in-memory, без filter injection ✅
+
+**OPEN (CISO-010):**
+- Role-guard на export відсутній — будь-який auth отримує весь табель (UUID без ФІО). До CISO-005/RBAC-хвилі = MITIGATING через revealNames=false.
+- Аудит-лог downloads = follow-up.
+- REQ-0006 п.4 (Т-13 табель з кодами Я/О/Б/К) — якщо реалізується, CISO-010 concern #1 (SICK→медПДн) стає актуальним. CISO-review обов'язковий перед реалізацією.
+
+— CISO
+### 2026-06-22 — [ciso-preflight] csv-export-FF — CISO-010 scope
+
+Dev2 згадав `revealEmployeeNames` — правильно. Але CISO-010 ширше:
+
+**1. Код SICK/Б в CSV = медПДн 152-ФЗ ст. 10:**
+Якщо `computeDetail` включає absence з типом SICK → CSV містить медичну категорію ПДн.
+**Guard:** SICK→«Н» (неявка) або відсутність типу в CSV-полі. HR-деталізація = тільки для HR-ролі (після RBAC-хвилі).
+
+**2. Role-guard на весь CSV-export:**
+`/s/reports?format=csv` доступний будь-якому auth юзеру. Весь табель 42 осіб у файлі.
+**Guard:** isManager = true або спеціальна роль «Экспорт» — до CISO-005 хоча б документуємо як відкритий ризик.
+
+**3. Temp-file:**
+CSV генерується в пам'яті (Blob-download) — OK. Але переконатись що не пишеться в `/tmp` на сервері.
+
+**4. Аудит-лог:**
+При виробничому використанні: хто/коли завантажив = аудит. Зафіксувати як follow-up.
+
+Посилання: RISK_REGISTER CISO-010.
+
+— CISO
 ### 2026-06-22 — [ciso-preflight] booking-REQ-0004 — CISO concerns
 
 **Pre-implementation review:**
@@ -9364,3 +9429,30 @@ FOLLOW-UP:
 НЕ коммитил, НЕ деплоил.
 
 — Dev 2
+
+## Dev 1 → arch
+[report] W6-2 + CISO-012 (практический фикс) — APPROVED-записи read-only в гриде.
+
+СТАТУС В ДАННЫХ: ЕСТЬ. `ApiEntry.status` (UPPER_CASE) уже грузится через `fetchEntries` (Twenty REST отдаёт полную запись). `calcGridModel` уже ставит `lockedByDay[idx]=true` при `status==='APPROVED'`. То есть путь данных был, но гарды записи (commit-слой) и a11y были не дотянуты. [signal-arch] Dev2 НЕ нужен — статус доступен.
+
+КАК БЛОКИРУЕТ (defense-in-depth, т.к. фронт пишет напрямую Core REST мимо серверного `cannot_modify_approved`):
+- HourCell (неделя/проект) + DayRow (день): согласованная ячейка не входит в редактирование (клик/seed → no-op), тихий нейтральный фон (panelBg, не цвет-сигнал), приглушённый текст, замок-SVG слева (статус НЕ только цветом — a11y), `aria-disabled` + `aria-label="Согласовано, только чтение: N ч"`, tooltip «Согласовано — правка запрещена». Без кнопки fill.
+- commit-слой (`use-timesheet-actions`): новый чистый предикат `isCellLocked()` — SSOT гарда. `commitCell` → no-op (return false) на APPROVED-ячейке. `bulkFill` → явно пропускает locked-дни (return {skippedLocked}). `calcFillStandardWeek` уже пропускал locked (было).
+- weekly-grid обёртки: при no-op/skip показывают мягкую плашку `validation.notifyLocked()` («Согласовано — правка запрещена. Нужен отзыв согласования.», warning-тон, авто-гаснет).
+- project-view: пробросил отсутствовавший `lockedByDay` в GridRow (был баг — в режиме «Проект» блокировки не было).
+
+bulkFill / «8×5» / копирование недели со часами — согласованные не перезаписывают (lockedByDay + filled-чек по часам).
+
+DEV2-ХВОСТ (сделал, было просто): `maxHoursPerDay` добавлен в `settings/types.ts` GlobalSettings + GLOBAL_FALLBACK(24) + маппинг в `fetchGlobalSettings` (поле есть на объекте credosTimeSettings, default 24). `use-validation` теперь берёт лимит из настроек (fallback VALIDATION_DEFAULTS), не хардкод-дефолт.
+
+СВЕРКА (правило 8): Timetta — согласованный таймшит правится только через отзыв/возврат, прямой правки нет. Соответствует.
+
+ВАЛИДАЦИЯ: `yarn lint` = 0/0 (321 файл). `yarn test:unit` = **0 failed** (1720 passed / 15 todo, 62 файла) — +5 тестов isCellLocked (lock-approved no-op) + maxHoursPerDay fallback. `yarn twenty dev --once --dry-run` = чисто, typecheck ок, 4 updated (перекомпиляция frontComponent + logicFunction), nothing applied. НЕ dev --once.
+
+Файлы: src/front-components/grid/hour-cell.tsx, day-row.tsx, project-view.tsx, use-timesheet-actions.ts (+isCellLocked), use-timesheet-actions.test.ts (+5), use-validation.ts (+notifyLocked, maxHoursPerDay из настроек), weekly-grid.tsx, settings/types.ts, settings/settings-rest.ts, settings/settings-rest.test.ts.
+
+CISO-012 ОСТАТОК: это UI-enforcement (закрывает практический путь обхода на dev). Путь-независимый гард (database-event на entry-update / RLS) остаётся за RBAC-волной — НЕ в зоне фронта.
+
+НЕ коммитил, НЕ деплоил.
+
+— Dev 1

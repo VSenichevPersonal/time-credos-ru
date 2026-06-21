@@ -20,6 +20,19 @@ type Args = {
 
 const isoDay = (date: string): string => date.slice(0, 10);
 
+// W6-2/CISO-012: согласована ли (APPROVED → read-only) ячейка строки на дату.
+// Чистый предикат — SSOT для гардов commitCell. true → правка/удаление no-op.
+export const isCellLocked = (
+  rowList: GridRowModel[],
+  days: WeekDay[],
+  rowKey: string,
+  dayIso: string,
+): boolean => {
+  const row = rowList.find((r) => r.key === rowKey);
+  const dayIdx = days.findIndex((d) => d.iso === dayIso);
+  return dayIdx >= 0 && (row?.lockedByDay[dayIdx] ?? false);
+};
+
 // Чистая calc: копирование прошлой недели со часами (без side-effects, тестируема).
 // days[0].iso = Пн текущей недели. Записи прошлой недели → тот же день-недели текущей.
 // Не перетирает filled (уже есть запись тек.нед), не льёт в выходные.
@@ -96,17 +109,25 @@ export const useTimesheetActions = ({
   remove,
 }: Args) => {
   // Правка одной ячейки: 0 → удалить запись, иначе upsert.
+  // W6-2/CISO-012: согласованная (APPROVED) ячейка — read-only. Фронт пишет
+  // напрямую Core REST мимо серверного гарда cannot_modify_approved, поэтому
+  // блок ДОЛЖЕН стоять и здесь (последняя линия на dev). Возвращает true, если
+  // правка/удаление выполнены; false — если заблокировано (вызывающий покажет
+  // мягкое сообщение). Сверка (Timetta): согласованный таймшит правится только
+  // через отзыв/возврат, прямой правки нет.
   const commitCell = useCallback(
-    (rowKey: string, dayIso: string, hours: number) => {
+    (rowKey: string, dayIso: string, hours: number): boolean => {
+      if (isCellLocked(rowList, days, rowKey, dayIso)) return false; // APPROVED → no-op
       const { projectId, workTypeId } = splitRowKey(rowKey);
       const row = rowList.find((r) => r.key === rowKey);
       const dayIdx = days.findIndex((d) => d.iso === dayIso);
       const existingId = row?.entryIdByDay[dayIdx] ?? undefined;
       if (hours === 0) {
         if (existingId) void remove(existingId);
-        return;
+        return true;
       }
       void upsert({ id: existingId, date: dayIso, hours, projectId, workTypeId });
+      return true;
     },
     [rowList, days, upsert, remove],
   );
@@ -134,18 +155,28 @@ export const useTimesheetActions = ({
   );
 
   // Bulk-fill: применить часы на все будни строки (где ещё нет значения).
+  // W6-2/CISO-012: согласованные (APPROVED) ячейки пропускаем явно. APPROVED
+  // всегда имеет hours>0 → отсекается и проверкой ниже, но явный lockedByDay-
+  // гард делает намерение очевидным и закрывает edge-cases. Возвращает true,
+  // если хоть одна согласованная ячейка была пропущена (для мягкого сообщения).
   const bulkFill = useCallback(
-    (rowKey: string, hours: number) => {
+    (rowKey: string, hours: number): { skippedLocked: boolean } => {
       const { projectId, workTypeId } = splitRowKey(rowKey);
       const row = rowList.find((r) => r.key === rowKey);
-      if (!row) return;
+      if (!row) return { skippedLocked: false };
       const inputs: UpsertInput[] = [];
+      let skippedLocked = false;
       days.forEach((d, i) => {
         if (d.isWeekend) return;
+        if (row.lockedByDay[i]) {
+          skippedLocked = true; // согласованную ячейку не трогаем
+          return;
+        }
         if (row.hoursByDay[i] > 0) return; // не перетираем заполненное
         inputs.push({ id: undefined, date: d.iso, hours, projectId, workTypeId });
       });
       void upsertMany(inputs);
+      return { skippedLocked };
     },
     [rowList, days, upsertMany],
   );

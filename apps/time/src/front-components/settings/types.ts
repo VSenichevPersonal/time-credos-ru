@@ -23,6 +23,7 @@ export type GlobalSettings = {
   normHoursPerDay: number;
   fillTemplateHours: number;
   overtimeWarnHours: number;
+  maxHoursPerDay: number; // жёсткий лимит часов/день (ERROR при превышении)
   // Планирование
   weekStartsOn: string;
   planningHorizonWeeks: number;

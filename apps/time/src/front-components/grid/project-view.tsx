@@ -101,6 +101,7 @@ export const ProjectView = ({
                   workTypeName=""
                   days={days}
                   hoursByDay={row.hoursByDay}
+                  lockedByDay={row.lockedByDay}
                   overtimeThreshold={overtimeThreshold}
                   rowTotal={row.rowTotal}
                   alt={i % 2 === 1}

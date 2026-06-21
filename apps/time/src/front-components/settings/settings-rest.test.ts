@@ -127,6 +127,7 @@ describe('fetchGlobalSettings', () => {
     expect(res!.normHoursPerDay).toBe(8);
     expect(res!.tentativeBookingEnabled).toBe(true);
     expect(res!.weekStartsOn).toBe('MONDAY');
+    expect(res!.maxHoursPerDay).toBe(24); // лимит часов/день → дефолт
   });
 
   it('пустой список (сид не прошёл) → null', async () => {

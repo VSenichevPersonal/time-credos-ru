@@ -77,13 +77,15 @@ export const WeeklyGrid = () => {
   const overtimeThreshold = useGlobalSettings()?.overtimeWarnHours;
 
   // Обёртки над действиями: проверяем часы → блокируем при ERROR, иначе пишем.
+  // W6-2/CISO-012: согласованную (APPROVED) ячейку actions-слой не пишет (no-op);
+  // здесь показываем мягкое уведомление «правка запрещена».
   const commitCell = (rowKey: string, dayIso: string, hours: number) => {
     if (validation.checkAndNotify(hours).blocked) return; // ERROR → не сохраняем
-    actions.commitCell(rowKey, dayIso, hours);
+    if (!actions.commitCell(rowKey, dayIso, hours)) validation.notifyLocked();
   };
   const bulkFill = (rowKey: string, hours: number) => {
     if (validation.checkAndNotify(hours).blocked) return;
-    actions.bulkFill(rowKey, hours);
+    if (actions.bulkFill(rowKey, hours).skippedLocked) validation.notifyLocked();
   };
 
   // Согласование периода (отключаемое): бейдж + действия в подвале.

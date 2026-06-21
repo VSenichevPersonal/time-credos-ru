@@ -265,8 +265,20 @@ const run = async (event: RoutePayload) => {
       },
       reveal,
     );
+    // F-F (REQ-0006): экспорт под 1С:ЗУП / RU-локаль Excel — разделитель `;`,
+    // UTF-8 BOM (кириллица). content-type песочница не проставляет на ответе,
+    // поэтому отдаём CSV + mimeType/filename как контракт фронту (Blob-download
+    // 'text/csv;charset=utf-8'). BOM уже в строке csv → фронт пишет её как есть.
     if (params.format === 'csv') {
-      return { ok: true, format: 'csv', count: rows.length, csv: detailToCsv(rows) };
+      const csv = detailToCsv(rows, { withBom: true });
+      return {
+        ok: true,
+        format: 'csv',
+        count: rows.length,
+        csv,
+        mimeType: 'text/csv;charset=utf-8',
+        filename: `timesheet-detail_${from.slice(0, 10)}_${to.slice(0, 10)}.csv`,
+      };
     }
     return { ok: true, groupBy: 'detail', period: { from, to }, count: rows.length, rows };
   }

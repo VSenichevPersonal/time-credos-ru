@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeDetail, detailToCsv } from './reports-detail';
+import { CSV_BOM, computeDetail, detailToCsv, escapeCsv, toCsvRow } from './reports-detail';
 import type { DetailRow } from './reports-detail';
 import type { ReportsInput } from './reports-calc';
 
@@ -162,27 +162,36 @@ describe('detailToCsv', () => {
     status: 'DRAFT',
   };
 
-  it('первая строка — заголовки', () => {
+  // F-F (REQ-0006): 1С/RU-Excel → разделитель `;`, BOM (флаг).
+  it('первая строка — заголовки (разделитель `;`)', () => {
     const csv = detailToCsv([row]);
     const lines = csv.split('\r\n');
-    expect(lines[0]).toBe('Дата,Сотрудник,Отдел,Проект,Вид работ,Часы,Статус');
+    expect(lines[0]).toBe('Дата;Сотрудник;Отдел;Проект;Вид работ;Часы;Статус');
   });
 
   it('данные-строка соответствует порядку колонок', () => {
     const csv = detailToCsv([row]);
     const dataLine = csv.split('\r\n')[1];
-    expect(dataLine).toBe('2026-06-10,Иванов Иван,OPIB,PA-001 — Проект А,Разработка,8,DRAFT');
+    expect(dataLine).toBe('2026-06-10;Иванов Иван;OPIB;PA-001 — Проект А;Разработка;8;DRAFT');
   });
 
   it('пустой список → только заголовок', () => {
     const csv = detailToCsv([]);
-    expect(csv).toBe('Дата,Сотрудник,Отдел,Проект,Вид работ,Часы,Статус');
+    expect(csv).toBe('Дата;Сотрудник;Отдел;Проект;Вид работ;Часы;Статус');
   });
 
-  it('значение с запятой → обёртка в кавычки', () => {
+  // RU-локаль: запятая в значении НЕ требует кавычек (разделитель `;`).
+  it('значение с запятой при `;`-разделителе НЕ оборачивается', () => {
     const r: DetailRow = { ...row, projectName: 'Иванов, А.' };
     const csv = detailToCsv([r]);
-    expect(csv).toContain('"Иванов, А."');
+    expect(csv).toContain('Иванов, А.');
+    expect(csv).not.toContain('"Иванов, А."');
+  });
+
+  it('значение с `;` → обёртка в кавычки', () => {
+    const r: DetailRow = { ...row, projectName: 'A; B' };
+    const csv = detailToCsv([r]);
+    expect(csv).toContain('"A; B"');
   });
 
   it('значение с кавычкой → двойные кавычки (RFC 4180)', () => {
@@ -195,5 +204,67 @@ describe('detailToCsv', () => {
     const csv = detailToCsv([row, row]);
     expect(csv.split('\r\n')).toHaveLength(3);
     expect(csv).not.toContain('\n\r');
+  });
+
+  // BOM — только по флагу withBom (для файла-выгрузки 1С/Excel).
+  it('withBom=false (дефолт) → без BOM', () => {
+    expect(detailToCsv([row]).startsWith(CSV_BOM)).toBe(false);
+  });
+
+  it('withBom=true → строка начинается с UTF-8 BOM', () => {
+    const csv = detailToCsv([row], { withBom: true });
+    expect(csv.startsWith(CSV_BOM)).toBe(true);
+    expect(csv.charCodeAt(0)).toBe(0xfeff);
+  });
+
+  it('кастомный разделитель `,` (обратная совместимость)', () => {
+    const csv = detailToCsv([row], { delimiter: ',' });
+    expect(csv.split('\r\n')[0]).toBe('Дата,Сотрудник,Отдел,Проект,Вид работ,Часы,Статус');
+  });
+});
+
+// ─── escapeCsv / toCsvRow (чистые) ──────────────────────────────────────────
+
+describe('escapeCsv', () => {
+  it('простое значение — без изменений', () => {
+    expect(escapeCsv('Иванов')).toBe('Иванов');
+    expect(escapeCsv(8)).toBe('8');
+  });
+
+  it('null/undefined → пустая строка', () => {
+    expect(escapeCsv(null as unknown as string)).toBe('');
+    expect(escapeCsv(undefined as unknown as string)).toBe('');
+  });
+
+  it('значение с разделителем `;` → кавычки', () => {
+    expect(escapeCsv('a;b')).toBe('"a;b"');
+  });
+
+  it('кавычка → удвоение + обёртка', () => {
+    expect(escapeCsv('a"b')).toBe('"a""b"');
+  });
+
+  it('перевод строки (CR/LF) → кавычки', () => {
+    expect(escapeCsv('a\nb')).toBe('"a\nb"');
+    expect(escapeCsv('a\r\nb')).toBe('"a\r\nb"');
+  });
+
+  it('запятая при дефолтном `;`-разделителе НЕ экранируется', () => {
+    expect(escapeCsv('a,b')).toBe('a,b');
+  });
+
+  it('кастомный разделитель `,` → запятая экранируется', () => {
+    expect(escapeCsv('a,b', ',')).toBe('"a,b"');
+    expect(escapeCsv('a;b', ',')).toBe('a;b');
+  });
+});
+
+describe('toCsvRow', () => {
+  it('собирает строку через `;` с экранированием', () => {
+    expect(toCsvRow(['2026-06-10', 'A; B', 8])).toBe('2026-06-10;"A; B";8');
+  });
+
+  it('кастомный разделитель', () => {
+    expect(toCsvRow(['a', 'b'], ',')).toBe('a,b');
   });
 });

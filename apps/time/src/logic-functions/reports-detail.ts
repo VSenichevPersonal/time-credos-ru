@@ -85,24 +85,50 @@ export const computeDetail = (
   return rows;
 };
 
-// CSV-сериализация (RFC 4180): экранируем ячейки с запятой/кавычкой/переводом
-// строки (оборачиваем в кавычки, внутренние кавычки удваиваем). Разделитель строк
-// \r\n (Excel-совместимо). Заголовки человекочитаемые.
+// ─── CSV-сериализация (RFC 4180 + 1С/RU-Excel) ──────────────────────────────
+// F-F (REQ-0006): выгрузка под 1С:ЗУП / RU-локаль Excel.
+//   · Разделитель полей `;` — в русской локали Excel запятая = десятичный знак,
+//     поэтому стандарт RU-выгрузки — точка с запятой (1С импортирует так же).
+//   · BOM (﻿) в начале файла — иначе Excel/1С читают UTF-8 кириллицу как
+//     кракозябры. Добавляется при отдаче файла (флаг withBom), не в чистой строке.
+//   · Экранирование: ячейка с разделителем/кавычкой/переводом строки оборачивается
+//     в кавычки, внутренние кавычки удваиваются (RFC 4180). Экранируем под ЛЮБОЙ
+//     разделитель — escapeCsv знает текущий delimiter.
+//   · Разделитель строк \r\n (Excel/1С-совместимо).
+
+export const CSV_BOM = '﻿';
+export const CSV_DELIMITER = ';'; // RU-локаль Excel / 1С
 const CSV_HEADERS = ['Дата', 'Сотрудник', 'Отдел', 'Проект', 'Вид работ', 'Часы', 'Статус'];
 
-const csvCell = (v: string | number): string => {
-  const s = String(v);
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+// Чистая, тестируемая. Оборачивает в кавычки, если в значении есть разделитель,
+// кавычка или перевод строки; удваивает внутренние кавычки.
+export const escapeCsv = (v: string | number, delimiter: string = CSV_DELIMITER): string => {
+  const s = String(v ?? '');
+  // спецсимволы: текущий разделитель, кавычка, CR, LF
+  const needsQuote = s.includes(delimiter) || /["\r\n]/.test(s);
+  return needsQuote ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
-export const detailToCsv = (rows: DetailRow[]): string => {
-  const lines = [CSV_HEADERS.join(',')];
+// Чистая, тестируемая. Собирает одну CSV-строку из ячеек с экранированием.
+export const toCsvRow = (cells: Array<string | number>, delimiter: string = CSV_DELIMITER): string =>
+  cells.map((c) => escapeCsv(c, delimiter)).join(delimiter);
+
+export type CsvOptions = {
+  delimiter?: string; // по умолчанию `;` (1С/RU-Excel)
+  withBom?: boolean; // префикс ﻿ (по умолчанию false — чистая строка)
+};
+
+export const detailToCsv = (rows: DetailRow[], opts: CsvOptions = {}): string => {
+  const delimiter = opts.delimiter ?? CSV_DELIMITER;
+  const lines = [toCsvRow(CSV_HEADERS, delimiter)];
   for (const r of rows) {
     lines.push(
-      [r.date, r.employeeName, r.deptName, r.projectName, r.workTypeName, r.hours, r.status]
-        .map(csvCell)
-        .join(','),
+      toCsvRow(
+        [r.date, r.employeeName, r.deptName, r.projectName, r.workTypeName, r.hours, r.status],
+        delimiter,
+      ),
     );
   }
-  return lines.join('\r\n');
+  const body = lines.join('\r\n');
+  return opts.withBom ? CSV_BOM + body : body;
 };

@@ -56,9 +56,9 @@ export const useValidation = () => {
   const checkAndNotify = useCallback(
     (hours: number): { blocked: boolean } => {
       const thresholds = {
-        // Лимит часов/день (ERROR) — поля нет в клиентских GlobalSettings
-        // (бэкенд-only credosTimeSettings.maxHoursPerDay), берём SSOT-дефолт.
-        maxHoursPerDay: VALIDATION_DEFAULTS.maxHoursPerDay,
+        // Лимит часов/день (ERROR) — из настроек (credosTimeSettings.maxHoursPerDay),
+        // fallback SSOT-дефолт, если запись не засижена/поле пустое.
+        maxHoursPerDay: settings?.maxHoursPerDay ?? VALIDATION_DEFAULTS.maxHoursPerDay,
         // Порог переработки (WARNING) — из настроек, fallback дефолт.
         overtimeWarnHours:
           settings?.overtimeWarnHours ?? VALIDATION_DEFAULTS.overtimeWarnHours,
@@ -75,5 +75,18 @@ export const useValidation = () => {
     [push, settings],
   );
 
-  return { notices, checkAndNotify, dismiss };
+  // W6-2/CISO-012: мягкое уведомление при попытке правки согласованной ячейки.
+  // Уровень warning (янтарь, авто-гаснет): это не ошибка ввода, а информирование
+  // о read-only-статусе. Дедуп: не плодим одинаковые плашки, если уже висит.
+  const notifyLocked = useCallback(() => {
+    // code обязателен типом ValidationFinding, но в плашке не отображается
+    // (toast рендерит только level+message). overtime_per_day — заглушка.
+    push({
+      level: 'warning',
+      code: 'overtime_per_day',
+      message: 'Согласовано — правка запрещена. Нужен отзыв согласования.',
+    });
+  }, [push]);
+
+  return { notices, checkAndNotify, notifyLocked, dismiss };
 };

@@ -123,9 +123,11 @@ export const HourCell = ({
   return (
     <div
       tabIndex={-1}
+      aria-disabled={locked || undefined}
+      aria-label={locked ? `Согласовано, только чтение: ${fmtHours(value)} ч` : undefined}
       title={
         locked
-          ? 'Согласовано — только чтение'
+          ? 'Согласовано — правка запрещена'
           : over
             ? 'Переработка: часов больше порога'
             : undefined
@@ -141,13 +143,16 @@ export const HourCell = ({
         ...base,
         position: 'relative',
         cursor: locked ? 'default' : 'text',
-        background: value > 0 ? cellFill(value) : bg,
+        // Read-only: тихий нейтральный фон (не цвет-сигнал), приглушённый текст.
+        background: locked ? T.panelBg : value > 0 ? cellFill(value) : bg,
         color: locked ? T.textMuted : over ? T.warn : value > 0 ? T.text : T.textFaint,
         fontWeight: value > 0 ? 500 : 400,
         boxShadow: active ? `inset 0 0 0 2px ${T.accent}` : 'none',
         borderRadius: active ? 4 : 0,
       }}
     >
+      {/* W6-2: замок — статус read-only не только цветом (a11y). Слева, тихо. */}
+      {locked && <LockGlyph />}
       {value > 0 ? fmtHours(value) : '·'}
       {active && !locked && value > 0 && onFill && (
         <button
@@ -177,3 +182,25 @@ export const HourCell = ({
     </div>
   );
 };
+
+// Тихий замок для read-only (согласованной) ячейки. Маленький, приглушённый,
+// слева от числа. Несёт статус не только цветом (a11y): aria-hidden, т.к.
+// смысл уже в aria-label контейнера.
+const LockGlyph = () => (
+  <svg
+    aria-hidden
+    width="9"
+    height="9"
+    viewBox="0 0 10 10"
+    fill="none"
+    style={{ marginRight: 5, opacity: 0.55, flexShrink: 0 }}
+  >
+    <rect x="1.5" y="4.5" width="7" height="5" rx="1" fill={T.textMuted} />
+    <path
+      d="M3 4.5V3a2 2 0 0 1 4 0v1.5"
+      stroke={T.textMuted}
+      strokeWidth="1.1"
+      fill="none"
+    />
+  </svg>
+);

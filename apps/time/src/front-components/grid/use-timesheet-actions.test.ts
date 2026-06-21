@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { calcCopyWithHours, calcFillStandardWeek } from './use-timesheet-actions';
+import { calcCopyWithHours, calcFillStandardWeek, isCellLocked } from './use-timesheet-actions';
 import type { WeekDay } from './use-week';
 import type { ApiEntry } from './types';
 import type { GridRowModel } from './use-grid-model';
@@ -171,5 +171,37 @@ describe('calcFillStandardWeek', () => {
   it('id всегда undefined (новые записи)', () => {
     const inputs = calcFillStandardWeek([row(Array(7).fill(0))], CUR_WEEK);
     expect(inputs.every((i) => i.id === undefined)).toBe(true);
+  });
+});
+
+// W6-2/CISO-012: lock-approved — read-only согласованной ячейки в гриде.
+// isCellLocked — SSOT-предикат, на котором стоит no-op гард commitCell
+// (фронт пишет напрямую Core REST мимо серверного cannot_modify_approved).
+describe('isCellLocked', () => {
+  const LOCKED_MON = [true, false, false, false, false, false, false];
+
+  it('согласованная (APPROVED) ячейка → locked', () => {
+    const rows = [row(Array(7).fill(8), LOCKED_MON)];
+    expect(isCellLocked(rows, CUR_WEEK, 'proj-1|wt-1', '2026-06-22')).toBe(true);
+  });
+
+  it('несогласованная ячейка той же строки → не locked', () => {
+    const rows = [row(Array(7).fill(8), LOCKED_MON)];
+    expect(isCellLocked(rows, CUR_WEEK, 'proj-1|wt-1', '2026-06-23')).toBe(false);
+  });
+
+  it('строка без блокировок → не locked', () => {
+    const rows = [row(Array(7).fill(8))];
+    expect(isCellLocked(rows, CUR_WEEK, 'proj-1|wt-1', '2026-06-22')).toBe(false);
+  });
+
+  it('неизвестный rowKey → не locked (без падения)', () => {
+    const rows = [row(Array(7).fill(8), LOCKED_MON)];
+    expect(isCellLocked(rows, CUR_WEEK, 'нет|такой', '2026-06-22')).toBe(false);
+  });
+
+  it('дата вне недели → не locked', () => {
+    const rows = [row(Array(7).fill(8), LOCKED_MON)];
+    expect(isCellLocked(rows, CUR_WEEK, 'proj-1|wt-1', '2030-01-01')).toBe(false);
   });
 });
