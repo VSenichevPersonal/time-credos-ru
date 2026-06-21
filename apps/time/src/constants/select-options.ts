@@ -259,3 +259,12 @@ export const DAY_OF_WEEK_OPTIONS: SelectOption[] = [
   { value: 'SUNDAY', label: 'Воскресенье', position: 6, color: 'orange' },
 ];
 export const DAY_OF_WEEK_DEFAULT = "'FRIDAY'";
+
+// REQ-0004 Часть C: тип брони ресурса. SOFT = предварительная (пресейл, не
+// потребляет ёмкость, в Demand отдельно/пунктиром); HARD = подтверждённая
+// (твёрдо потребляет ёмкость). Сверка: Timetta booking soft/hard.
+export const BOOKING_TYPE_OPTIONS: SelectOption[] = [
+  { value: 'SOFT', label: 'Предварительная (soft)', position: 0, color: 'orange' },
+  { value: 'HARD', label: 'Подтверждённая (hard)', position: 1, color: 'green' },
+];
+export const BOOKING_TYPE_DEFAULT = "'SOFT'";

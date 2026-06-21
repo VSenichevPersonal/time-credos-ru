@@ -6,6 +6,9 @@ import { ErrorState } from 'src/front-components/shared/error-state';
 import { usePeriod, type PeriodGran } from 'src/front-components/reports/use-period';
 import { useReports } from 'src/front-components/reports/use-reports';
 import { useMyHours } from 'src/front-components/my-time/use-my-hours';
+import { useReminders } from 'src/front-components/my-time/use-reminders';
+import { ReminderBanner } from 'src/front-components/my-time/reminder-banner';
+import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 import { Bar } from 'src/front-components/reports/bar';
 import type { EmployeeRow, ReportRow } from 'src/front-components/reports/report-types';
 
@@ -71,6 +74,10 @@ export const MyHours = ({ employeeId }: { employeeId: string }) => {
   const { period, gran, isCurrent, prev, next, setGran } = usePeriod();
   const reports = useReports(period.from, period.to, 'employee');
   const hours = useMyHours(employeeId, period.from, period.to);
+  // Напоминание заполнить ТЕКУЩУЮ неделю (детект /s/reminders). Не зависит от
+  // выбранного периода KPI — всегда про текущую неделю (Timetta-семантика).
+  const { isManager } = useSelfEmployee();
+  const reminders = useReminders(employeeId);
 
   // Моя строка из byEmployee (сервис считает всех — фильтруем self клиентом).
   const me: ReportRow =
@@ -84,6 +91,15 @@ export const MyHours = ({ employeeId }: { employeeId: string }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <Header label={period.label} isCurrent={isCurrent} gran={gran} onPrev={prev} onNext={next} onGran={(g) => setGran(g)} />
+
+      {reminders.enabled && (
+        <ReminderBanner
+          mine={reminders.mine}
+          team={reminders.team}
+          week={reminders.week}
+          isManager={isManager}
+        />
+      )}
 
       {reports.loading ? (
         <Center>Загрузка часов…</Center>

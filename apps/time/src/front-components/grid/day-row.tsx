@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { T, cellFill } from 'src/front-components/grid/tokens';
-import { fmtHours, parseHours } from 'src/front-components/grid/format';
+import { fmtHours, isOvertime, parseHours } from 'src/front-components/grid/format';
 import { categoryMeta } from 'src/front-components/shared/category-meta';
 
 // Строка дня: цвет-точка категории · проект (600) · вид работ (400) · описание · ячейка часов.
@@ -13,6 +13,7 @@ type Props = {
   workTypeName: string;
   hours: number;
   locked?: boolean; // W6-2: согласованная запись — только чтение
+  overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   description: string | null;
   onCommit: (hours: number) => void;
   onCommitDescription?: (text: string) => void; // U11: инлайн-комментарий
@@ -25,6 +26,7 @@ export const DayRow = ({
   workTypeName,
   hours,
   locked,
+  overtimeThreshold,
   description,
   onCommit,
   onCommitDescription,
@@ -182,7 +184,13 @@ export const DayRow = ({
         />
       ) : (
         <div
-          title={locked ? 'Согласовано — только чтение' : undefined}
+          title={
+            locked
+              ? 'Согласовано — только чтение'
+              : isOvertime(hours, overtimeThreshold)
+                ? 'Переработка: часов больше порога'
+                : undefined
+          }
           onClick={() => {
             if (locked) return; // W6-2: согласованную не редактируем
             setDraft(fmtHours(hours));
@@ -198,7 +206,13 @@ export const DayRow = ({
             fontSize: 16,
             fontWeight: hours > 0 ? 600 : 400,
             fontVariantNumeric: 'tabular-nums',
-            color: locked ? T.textMuted : hours > 0 ? T.text : T.textFaint,
+            color: locked
+              ? T.textMuted
+              : isOvertime(hours, overtimeThreshold)
+                ? T.warn
+                : hours > 0
+                  ? T.text
+                  : T.textFaint,
             background: hours > 0 ? cellFill(hours) : T.panelBg,
             border: `1px solid ${T.border}`,
             borderRadius: 8,

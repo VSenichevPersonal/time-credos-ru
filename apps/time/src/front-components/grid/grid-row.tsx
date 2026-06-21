@@ -19,6 +19,7 @@ type Props = {
   days: WeekDay[];
   hoursByDay: number[];
   lockedByDay?: boolean[];
+  overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   rowTotal: number;
   alt: boolean;
   nav: Nav;
@@ -36,6 +37,7 @@ export const GridRow = ({
   days,
   hoursByDay,
   lockedByDay,
+  overtimeThreshold,
   rowTotal,
   alt,
   nav,
@@ -102,6 +104,7 @@ export const GridRow = ({
         weekend={day.isWeekend}
         today={day.isToday}
         locked={lockedByDay?.[i]}
+        overtimeThreshold={overtimeThreshold}
         active={nav.isActive(rowIndex, i)}
         seed={nav.isActive(rowIndex, i) ? nav.editSeed : null}
         onActivate={() => nav.setActive({ row: rowIndex, col: i })}

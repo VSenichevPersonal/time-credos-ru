@@ -26,6 +26,7 @@ type Props = {
   selectedProjectId: string | null;
   onSelectProject: (id: string | null) => void;
   loading: boolean;
+  overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onAddRow: (rowKey: string) => void;
 };
@@ -40,6 +41,7 @@ export const ProjectView = ({
   selectedProjectId,
   onSelectProject,
   loading,
+  overtimeThreshold,
   onCellCommit,
   onAddRow,
 }: Props) => {
@@ -99,6 +101,7 @@ export const ProjectView = ({
                   workTypeName=""
                   days={days}
                   hoursByDay={row.hoursByDay}
+                  overtimeThreshold={overtimeThreshold}
                   rowTotal={row.rowTotal}
                   alt={i % 2 === 1}
                   nav={nav}

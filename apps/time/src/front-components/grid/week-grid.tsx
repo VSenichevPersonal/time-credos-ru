@@ -25,6 +25,7 @@ type Props = {
   recentProjectIds: string[];
   lastWorkTypeByProject?: Record<string, string>;
   normFor: NormForDay;
+  overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
@@ -41,6 +42,7 @@ export const WeekGrid = ({
   recentProjectIds,
   lastWorkTypeByProject,
   normFor,
+  overtimeThreshold,
   loading,
   onCellCommit,
   onBulkFill,
@@ -106,6 +108,7 @@ export const WeekGrid = ({
               days={days}
               hoursByDay={row.hoursByDay}
               lockedByDay={row.lockedByDay}
+              overtimeThreshold={overtimeThreshold}
               rowTotal={row.rowTotal}
               alt={i % 2 === 1}
               nav={nav}

@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { ENTRY_STATUS } from 'src/constants/approval';
 import {
   BILLING_DOC_TYPE_OPTIONS,
+  BOOKING_TYPE_DEFAULT,
+  BOOKING_TYPE_OPTIONS,
   DEPARTMENT_CODE_OPTIONS,
   ENTRY_STATUS_DEFAULT,
   ENTRY_STATUS_OPTIONS,
@@ -138,5 +140,30 @@ describe('ENTRY_TAG_OPTIONS — SSOT cross-check (W3-2)', () => {
 
   it('все label непустые строки в ENTRY_TAG_LABELS', () => {
     expect(Object.values(ENTRY_TAG_LABELS).every((l) => typeof l === 'string' && l.length > 0)).toBe(true);
+  });
+});
+
+describe('BOOKING_TYPE_OPTIONS (REQ-0004)', () => {
+  it('содержит SOFT и HARD', () => {
+    const values = BOOKING_TYPE_OPTIONS.map((o) => o.value);
+    expect(values).toContain('SOFT');
+    expect(values).toContain('HARD');
+  });
+
+  it('позиции уникальны и начинаются с 0', () => {
+    const positions = BOOKING_TYPE_OPTIONS.map((o) => o.position);
+    expect(new Set(positions).size).toBe(positions.length);
+    expect(Math.min(...positions)).toBe(0);
+  });
+
+  it('BOOKING_TYPE_DEFAULT = SOFT (соответствует draftBooking UX)', () => {
+    expect(BOOKING_TYPE_DEFAULT).toContain('SOFT');
+  });
+
+  it('все options имеют label и color', () => {
+    for (const o of BOOKING_TYPE_OPTIONS) {
+      expect(o.label.length).toBeGreaterThan(0);
+      expect(o.color).toBeTruthy();
+    }
   });
 });

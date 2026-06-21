@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { T, cellFill } from 'src/front-components/grid/tokens';
-import { fmtHours, parseHours } from 'src/front-components/grid/format';
+import { fmtHours, isOvertime, parseHours } from 'src/front-components/grid/format';
 
 // Ячейка часов: tabular-nums, правое выравнивание. Активная (по клавиатуре)
 // подсвечена кольцом. Печать цифры → сразу ввод (seed). Enter/Tab подтверждают
@@ -13,6 +13,7 @@ type Props = {
   today: boolean;
   active: boolean;
   locked?: boolean; // W6-2: согласованная запись — только чтение
+  overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек (fallback 12)
   seed: string | null; // символ, с которого начали печатать
   onActivate: () => void;
   onCommit: (hours: number) => void;
@@ -27,6 +28,7 @@ export const HourCell = ({
   today,
   active,
   locked,
+  overtimeThreshold,
   seed,
   onActivate,
   onCommit,
@@ -64,7 +66,9 @@ export const HourCell = ({
     return true;
   };
 
-  const over12 = value > 12;
+  // REQ-0019: порог переработки — из настроек (overtimeThreshold), не хардкод 12.
+  // isOvertime сам подставит дефолт OVERTIME_WARN_HOURS_DEFAULT, если порог не задан.
+  const over = isOvertime(value, overtimeThreshold);
   const bg = today ? T.todayCol : weekend ? T.weekendBg : 'transparent';
   const base = {
     height: 32,
@@ -119,7 +123,13 @@ export const HourCell = ({
   return (
     <div
       tabIndex={-1}
-      title={locked ? 'Согласовано — только чтение' : undefined}
+      title={
+        locked
+          ? 'Согласовано — только чтение'
+          : over
+            ? 'Переработка: часов больше порога'
+            : undefined
+      }
       onClick={() => {
         onActivate();
         if (locked) return; // W6-2: согласованную не редактируем
@@ -132,7 +142,7 @@ export const HourCell = ({
         position: 'relative',
         cursor: locked ? 'default' : 'text',
         background: value > 0 ? cellFill(value) : bg,
-        color: locked ? T.textMuted : over12 ? T.warn : value > 0 ? T.text : T.textFaint,
+        color: locked ? T.textMuted : over ? T.warn : value > 0 ? T.text : T.textFaint,
         fontWeight: value > 0 ? 500 : 400,
         boxShadow: active ? `inset 0 0 0 2px ${T.accent}` : 'none',
         borderRadius: active ? 4 : 0,

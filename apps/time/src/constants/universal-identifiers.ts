@@ -679,3 +679,35 @@ export const CREDOS_TIME_EMPLOYEE_CARD_VF_3 =
   'f0a4d1ce-f2fe-462c-ad1a-e200dd02d8d0';
 export const CREDOS_TIME_EMPLOYEE_CARD_VF_4 =
   'de2bdc80-0359-4ce0-88cd-fef67784a3a6';
+
+// REQ-0004 Часть C (gap-аудит v3 #2): Booking — бронь ёмкости ресурса
+// (сотрудник × проект × период) типа SOFT/HARD. ОТДЕЛЬНАЯ сущность от
+// план-оценки (credosTimePlanAllocation) и от факта (credosTimeEntry) —
+// инвариант Timetta «оценка ≠ резерв». Сверка: Timetta booking soft/hard.
+export const CREDOS_TIME_BOOKING_OBJECT_UNIVERSAL_IDENTIFIER =
+  '17cf698d-a466-423b-a521-4918f4911c94';
+export const CREDOS_TIME_BOOKING_LABEL_FIELD_ID =
+  '02b760fa-8626-42f6-bd77-634eeb61774f';
+export const CREDOS_TIME_BOOKING_TYPE_FIELD_ID =
+  '1149359e-9845-43d6-a8ee-21a2e59809cf';
+export const CREDOS_TIME_BOOKING_HOURS_FIELD_ID =
+  'f65f5889-e428-403a-b530-0c9c21bffefb';
+export const CREDOS_TIME_BOOKING_START_DATE_FIELD_ID =
+  'f8b6abe3-ea77-468f-b4a3-6bf4b731df02';
+export const CREDOS_TIME_BOOKING_END_DATE_FIELD_ID =
+  'f65c0ea3-81ae-4176-aec8-20a58213c995';
+export const CREDOS_TIME_BOOKING_NOTE_FIELD_ID =
+  'f7bfcf37-f858-4fef-b570-c69933136a93';
+export const CREDOS_TIME_BOOKING_EMPLOYEE_FIELD_ID =
+  '155faf6c-677c-40ab-b31b-f04fb5525526';
+export const CREDOS_TIME_BOOKING_PROJECT_FIELD_ID =
+  'f9062c1a-2c9a-4bac-b6fc-52adeca4b6e7';
+export const CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER =
+  '38190eb0-b050-4df3-ab2f-016bd104597c';
+export const CREDOS_TIME_BOOKING_NAV_UNIVERSAL_IDENTIFIER =
+  'db348c81-701e-4aa1-8bbe-65d8a027ecbd';
+// Обратные стороны брони на Employee / Project (ONE_TO_MANY, в src/fields/).
+export const CREDOS_TIME_EMPLOYEE_BOOKINGS_FIELD_ID =
+  '0cd5f16c-dbb3-4da9-8fe2-1e80cf249d8b';
+export const CREDOS_TIME_PROJECT_BOOKINGS_FIELD_ID =
+  '5dd2ba93-7ac9-4571-a49d-b61aa36bc8c1';

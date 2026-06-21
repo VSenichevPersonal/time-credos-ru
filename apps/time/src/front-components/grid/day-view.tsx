@@ -27,6 +27,7 @@ type Props = {
   recentProjectIds: string[];
   lastWorkTypeByProject?: Record<string, string>;
   normFor: NormForDay;
+  overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onCommitDescription?: (rowKey: string, dayIso: string, text: string) => void;
@@ -42,6 +43,7 @@ export const DayView = ({
   recentProjectIds,
   lastWorkTypeByProject,
   normFor,
+  overtimeThreshold,
   loading,
   onCellCommit,
   onCommitDescription,
@@ -73,6 +75,7 @@ export const DayView = ({
               workTypeName={row.workTypeName}
               hours={row.hoursByDay[dayIndex]}
               locked={row.lockedByDay[dayIndex]}
+              overtimeThreshold={overtimeThreshold}
               description={row.descByDay[dayIndex]}
               onCommit={(h) => onCellCommit(row.key, day.iso, h)}
               onCommitDescription={

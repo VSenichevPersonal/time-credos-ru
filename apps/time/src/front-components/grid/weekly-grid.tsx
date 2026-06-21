@@ -15,10 +15,13 @@ import { calcWeekGaps } from 'src/front-components/grid/gaps';
 import { useTimesheetActions } from 'src/front-components/grid/use-timesheet-actions';
 import { useApproval } from 'src/front-components/grid/use-approval';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
+import { useValidation } from 'src/front-components/grid/use-validation';
+import { ValidationToast } from 'src/front-components/grid/validation-toast';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
+import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
 
 // Корневой компонент таймшита. Виджет фиксированного размера: скроллится только
 // тело таблицы. 3 режима (День/Неделя/Проект), клавиатура, мультиселект-фильтры.
@@ -65,6 +68,23 @@ export const WeeklyGrid = () => {
     upsertMany: data.upsertMany,
     remove: data.remove,
   });
+
+  // REQ-0019-UI: валидация при вводе. ERROR (лимит часов/день) блокирует запись и
+  // держит красную плашку; WARNING (переработка > порога настроек) не блокирует —
+  // запись сохраняется, янтарная плашка авто-гаснет. Та же чистая validateEntry,
+  // что на бэке (SSOT), пороги из useGlobalSettings.
+  const validation = useValidation();
+  const overtimeThreshold = useGlobalSettings()?.overtimeWarnHours;
+
+  // Обёртки над действиями: проверяем часы → блокируем при ERROR, иначе пишем.
+  const commitCell = (rowKey: string, dayIso: string, hours: number) => {
+    if (validation.checkAndNotify(hours).blocked) return; // ERROR → не сохраняем
+    actions.commitCell(rowKey, dayIso, hours);
+  };
+  const bulkFill = (rowKey: string, hours: number) => {
+    if (validation.checkAndNotify(hours).blocked) return;
+    actions.bulkFill(rowKey, hours);
+  };
 
   // Согласование периода (отключаемое): бейдж + действия в подвале.
   const approval = useApproval({
@@ -129,6 +149,7 @@ export const WeeklyGrid = () => {
         fontFamily: FONT,
         color: T.text,
         overflow: 'hidden',
+        position: 'relative', // якорь для плашек валидации
       }}
     >
       <Toolbar
@@ -192,9 +213,10 @@ export const WeeklyGrid = () => {
           recentProjectIds={recentProjectIds}
           lastWorkTypeByProject={lastWorkTypeByProject}
           normFor={normFor}
+          overtimeThreshold={overtimeThreshold}
           loading={data.loading}
-          onCellCommit={actions.commitCell}
-          onBulkFill={actions.bulkFill}
+          onCellCommit={commitCell}
+          onBulkFill={bulkFill}
           onAddRow={addRow}
         />
       )}
@@ -209,8 +231,9 @@ export const WeeklyGrid = () => {
           recentProjectIds={recentProjectIds}
           lastWorkTypeByProject={lastWorkTypeByProject}
           normFor={normFor}
+          overtimeThreshold={overtimeThreshold}
           loading={data.loading}
-          onCellCommit={actions.commitCell}
+          onCellCommit={commitCell}
           onCommitDescription={actions.commitDescription}
           onAddRow={addRow}
         />
@@ -228,7 +251,8 @@ export const WeeklyGrid = () => {
           selectedProjectId={selectedProjectId}
           onSelectProject={setSelectedProjectId}
           loading={data.loading}
-          onCellCommit={actions.commitCell}
+          overtimeThreshold={overtimeThreshold}
+          onCellCommit={commitCell}
           onAddRow={(key) => {
             const { projectId } = splitRowKey(key);
             if (projectId) setSelectedProjectId(projectId);
@@ -251,6 +275,8 @@ export const WeeklyGrid = () => {
         onApprove={approval.approve}
         onReject={approval.reject}
       />
+
+      <ValidationToast notices={validation.notices} onDismiss={validation.dismiss} />
     </div>
   );
 };
