@@ -150,24 +150,34 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
               }
             }}
             style={{
+              // Защита от переполнения: кнопка «План» стоит у правого края строки,
+              // поэтому якорим панель ВПРАВО (right:0 → раскрытие влево от кнопки) —
+              // так она не уходит за правый край viewport. Ширина зажата по экрану
+              // (clamp на 100vw), чтобы на узком экране не вылезла и за левый край.
+              // Remote DOM: чистый CSS, без getBoundingClientRect.
               position: 'absolute',
               top: 28,
-              left: 0,
+              right: 0,
               zIndex: 21,
-              width: 360,
+              width: 'min(360px, calc(100vw - 32px))',
+              maxHeight: 'min(560px, calc(100vh - 96px))',
+              display: 'flex',
+              flexDirection: 'column',
               background: T.surface,
               border: `1px solid ${T.borderStrong}`,
               borderRadius: 10,
               boxShadow: '0 10px 30px rgba(29,31,38,0.16)',
-              padding: 12,
             }}
           >
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, marginBottom: 10 }}>
+            {/* Прокручиваемое тело: высокий контент (длинное превью) скроллится тут,
+                футер с кнопками остаётся закреплён снизу и всегда виден. */}
+            <div style={{ overflowY: 'auto', padding: '12px 12px 4px' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, marginBottom: 12 }}>
               План проекта
             </div>
 
             {/* Способ */}
-            <div style={{ display: 'flex', gap: 14, marginBottom: 10 }} role="radiogroup" aria-label="Способ распределения">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }} role="radiogroup" aria-label="Способ распределения">
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: T.text, cursor: 'pointer' }}>
                 <input
                   type="radio"
@@ -187,32 +197,33 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
               </label>
             </div>
 
-            {/* Период */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            {/* Период. Поля переносятся и сжимаются (flex + flexWrap), чтобы date-инпуты
+                не обрезались на узкой панели и не вылезали за её правый край. */}
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flex: '1 1 140px', minWidth: 0 }}>
                 <span style={{ fontSize: 11, color: T.textMuted }}>С</span>
                 <input
                   type="date"
                   value={start}
                   aria-label="Дата начала плана"
                   onChange={(e) => setStart(e.target.value)}
-                  style={{ ...fieldStyle, width: 130 }}
+                  style={{ ...fieldStyle, flex: 1, minWidth: 0 }}
                 />
               </label>
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flex: '1 1 140px', minWidth: 0 }}>
                 <span style={{ fontSize: 11, color: T.textMuted }}>ПО</span>
                 <input
                   type="date"
                   value={end}
                   aria-label="Дата завершения плана"
                   onChange={(e) => setEnd(e.target.value)}
-                  style={{ ...fieldStyle, width: 130, borderColor: rangeError ? T.over : T.border }}
+                  style={{ ...fieldStyle, flex: 1, minWidth: 0, borderColor: rangeError ? T.over : T.border }}
                 />
               </label>
             </div>
 
             {/* Объём */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
               <span style={{ fontSize: 11, color: T.textMuted, width: 48 }}>Объём</span>
               <input
                 value={hours}
@@ -226,7 +237,7 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
             </div>
 
             {rangeError && (
-              <div style={{ fontSize: 11, color: T.over, marginBottom: 10 }}>⚠ {rangeError}</div>
+              <div style={{ fontSize: 11, color: T.over, marginBottom: 12 }}>⚠ {rangeError}</div>
             )}
 
             {/* Живое превью */}
@@ -234,23 +245,35 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
               <div
                 style={{
                   borderTop: `1px solid ${T.border}`,
-                  paddingTop: 8,
-                  marginBottom: 10,
+                  paddingTop: 10,
+                  marginBottom: 4,
                 }}
               >
-                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 6 }}>
+                {/* Описание переносится (white-space:normal), а не обрезается —
+                    название отдела может быть длинным. */}
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: T.textMuted,
+                    marginBottom: 8,
+                    whiteSpace: 'normal',
+                    lineHeight: 1.4,
+                  }}
+                >
                   Раскид по рабочим дням{dept && dept.headcount > 0 ? ` (ёмкость отдела ${dept.name})` : ''}:
                 </div>
-                <div style={{ maxHeight: 168, overflowY: 'auto' }}>
+                {/* Без вложенного скролла: панель скроллится целиком, двойной скролл
+                    (nested) — антипаттерн и прятал бы кнопки. */}
+                <div>
                   {preview.rows.map((r) => {
                     const w = preview.maxHours > 0 ? Math.round((r.hours / preview.maxHours) * 100) : 0;
                     return (
                       <div
                         key={r.key}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 11 }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 11, minWidth: 0 }}
                       >
-                        <span style={{ width: 56, color: T.textMuted }}>{r.label}</span>
-                        <span style={{ flex: 1, height: 8, background: T.headerBg, borderRadius: 3, overflow: 'hidden' }}>
+                        <span style={{ width: 56, flexShrink: 0, color: T.textMuted }}>{r.label}</span>
+                        <span style={{ flex: 1, minWidth: 0, height: 8, background: T.headerBg, borderRadius: 3, overflow: 'hidden' }}>
                           <span
                             style={{
                               display: 'block',
@@ -261,12 +284,13 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
                             }}
                           />
                         </span>
-                        <span style={{ width: 44, textAlign: 'right', color: T.text, ...tnum }}>
+                        <span style={{ width: 44, flexShrink: 0, textAlign: 'right', color: T.text, ...tnum }}>
                           {round(r.hours)} ч
                         </span>
                         {r.over && (
                           <span
                             style={{
+                              flexShrink: 0,
                               fontSize: 10,
                               color: T.warnSolid,
                               background: T.warnTint,
@@ -302,9 +326,20 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
                 </div>
               </div>
             )}
+            </div>
 
-            {/* Действия */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            {/* Действия — закреплённый футер вне зоны скролла: кнопки всегда видны,
+                даже когда превью длинное. Граница сверху отделяет от тела. */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: 8,
+                flexShrink: 0,
+                padding: '10px 12px 12px',
+                borderTop: `1px solid ${T.border}`,
+              }}
+            >
               <button
                 type="button"
                 onClick={close}
