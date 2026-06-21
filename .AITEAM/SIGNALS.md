@@ -12,6 +12,62 @@
 
 ## Dev 1 → arch
 
+### 2026-06-22 20:45 — [report] person-plan-ui — план НА ЧЕЛОВЕКА в срезе «Люди» ГОТОВ
+
+Заказчик: «планировать сейчас можно только на уровне отдела — надо на уровне человека; в режиме Люди Планировать неактивно/перекидывает на отдел». Закрыл — персональный план прямо на строке сотрудника.
+
+**Как включил план-на-человека (MVP, §5-шаг3, keep-it-simple):**
+- Раньше `capacity-board.tsx:39` форсил `effectiveAxis = planning ? 'dept' : axis` + `board-toolbar` блокировал сегмент срезов в планировании (`if(planning) return`). Это и был «перекидывает на отдел». **Снял оба** — планирование теперь доступно в ОБОИХ срезах.
+- Новый чистый компонент `capacity/employee-plan-panel.tsx` — инлайн-поповер «✎ План» на строке сотрудника (паттерн project-plan-panel: useState + токены, без host-DOM/портала). Один экран: выбор проекта (персональный слот = project×emp×month, проект обязателен) → диапазон С/ПО → помесячный ввод часов + живая Σ. Тот же MANUAL-механизм (`monthsInRange`/`reconcileSlots`/`validateRange` из plan-preview), но слоты несут `employeeId`.
+- Кнопка показывается только в `planning && axis==='employee'` (проброс `planning`/`projects`/`onSavedPlan` через board → board-rows → employee-row). После сохранения — `reload` доски.
+
+**employeeId в контракте (по Dev2 /s/plan-slots, дедуп month|dept|emp):**
+- `plan-slots-rest.ts`: `PlanSlotInput += employeeId?: string|null`; read возвращает `employeeId` (null=отдельский), upsert шлёт его (null→undefined, не шлём пустое поле). Персональный слот пишется с `employeeId=emp.id` + `departmentId=отдел сотрудника` (rollup отдела вычитает персональные из остатка — анти-двойной-счёт).
+
+**Что НЕ сломано:**
+- Dept-уровень нетронут: project-plan-panel пишет слоты БЕЗ employeeId (отдельские) — другой дедуп-ключ, не схлопывается с персональными. EVEN-режим не задет.
+- Префилл персональной панели: `fetchPlanSlots(projectId)` + фильтр `s.employeeId === emp.id` — отдельские слоты не подмешиваются.
+- Σ-сверка персональных слотов в панели (Σ персональный план = N ч).
+
+**impeccable:** имя сотрудника в заголовке панели (кто планируется — явно, акцент-цвет), AA-контраст (T.textMuted/T.over), tabular-nums на часах/Σ, без англицизмов. Имя-строка с ellipsis+title. Строка сотрудника растёт (minHeight) под кнопку без разъезжания ячеек (align-items:stretch + minHeight:40 на data/Σ-ячейках).
+
+**Тесты (чистые ф-ции):** `employee-plan-panel.test.ts` (+8: parsePlanHours — запятая/точка/0/отриц/округл) · `plan-slots-rest.test.ts` (+3: employeeId в read/upsert, null→undefined).
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0/0 (389 файлов) · `yarn test:unit` 78 файлов, 2211 passed, 0 failed (15 todo) · `yarn twenty dev --once --dry-run` чисто (typecheck ОК, метадиф = 1 updated frontComponent мой + 2 чужих viewField/viewSort из параллельной работы дерева — objects/fields/views НЕ трогал). НЕ dev --once, НЕ коммитил.
+
+**Зона:** только capacity/ (board-rows, board-toolbar, capacity-board, employee-row, plan-slots-rest + 2 новых: employee-plan-panel.tsx, .test.ts; plan-slots-rest.test.ts расширен). ADDITIVE.
+
+**Открытые UX (для арха/заказчика):**
+- (1) Персональные слоты СОХРАНЯЮТСЯ, но на доске ПОКА не визуализируются: board НЕ грузит slots в `employeeLoadCells`/`deptLoadCells` (бэк calc-load всё умеет — `employeePersonalHoursInPeriod`/rollupCtx — но `use-capacity` слоты не фетчит). Это отдельное звено (§5-шаг2 + analyst итер.122 п.1: «передавать rollupCtx{assignments,employees} в employeeLoadCells»). Подключить — следующий шаг (нужен fetch слотов горизонта + проводка rollupCtx). Кому брать?
+- (2) Мэтчинг-индикатор «Σ назначено / план отдела · остаток» (§7.5, analyst п.2) — не делал на MVP (нужны данные доски).
+- (3) в.3 заказчику: кто планирует по людям (РП vs руководитель отдела) — сейчас кнопка под `isManager` (как dept-планирование). в.4: переаллокация Σслотов>план — warning (не блок), пока не реализован (зависит от (1)).
+
+— Dev 1
+
+### 2026-06-21 20:32 — [report] timesheet-legend — легенда сигналов сетки ГОТОВА
+
+Заказчик: в таймшите НЕТ легенды значка 🔒 — пользователь не понимал залоченную (согласованную) ячейку. Добавил компактную сворачиваемую легенду.
+
+**Где:** новый чистый компонент `grid/grid-legend.tsx`, вписан в `grid/weekly-grid.tsx` между FiltersBar и сеткой, показ при `mode !== 'day'` (в режиме День сетки нет → легенда не нужна). По образцу `capacity/board-legend.tsx` (его НЕ трогал).
+
+**Что пояснил** (только реально используемые в hour-cell сигналы, не перегружал — 4 шт):
+1. 🔒 глиф (тот же, что LockGlyph ячейки) → «Согласовано (только чтение)» — D4.15 словарь, смысл тултипа ячейки.
+2. Тинт-свотч `cellFill(8)` → «Цвет = заполненные часы».
+3. Цифра T.warn → «Переработка (больше нормы)».
+4. Бледная цифра T.textFaint → «Норма дня (подсказка)» (норма-хинт пустой ячейки).
+
+**Компактность:** одна строка, мелкий кегль (11px), flex-wrap; по умолчанию СВЁРНУТА (триггер «▾ Обозначения», useState) → не съедает фикс-высоту виджета. Remote DOM-safe (useState + токены, без host-DOM).
+
+**impeccable** (product-register): earned familiarity, формат = как board-legend, AA-контраст (T.textMuted), tabular-nums на цифрах-образцах, без англицизмов.
+
+**Зону-lock соблюдал:** hour-cell.tsx/approval.logic/capacity/* НЕ редактировал (читал hour-cell только для глифа-референса).
+
+**Тест:** `grid/grid-legend.test.ts` (6 шт) — экспортнул `LEGEND_LABELS` (SSOT-подписи) для проверки без рендера (env=node): ровно 4 сигнала, без латиницы, синхрон с ENTRY_STATUS_LABELS.Approved.
+
+**Валидация:** `yarn lint` 0/0 · `yarn test:unit` 76 файлов passed, 0 failed (мой +6) · `yarn twenty dev --once --dry-run` чисто (typecheck ok; метадата-диффы в выводе — от параллельных потоков approval/REQ-0011, не моё). НЕ коммитил.
+
+— Dev 1
+
 ### 2026-06-22 08:40 — [user-direct] @Dev2 @arch — «Companies» → «Организации» (i18n-ядро)
 
 Заказчик: переименовать стандартный объект **Company → «Организация» / «Организации»** (сайдбар-пункт «Companies»).
@@ -601,6 +657,26 @@ oxlint 0/0, tsc мои чисто, DOM-free. dry-run, НЕ коммитил.
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [escalation ‼️‼️ @arch] BACKEND-ГЕЙТ-ГОЛОДАНИЕ — tree-sweep уничтожает мою работу до гейта
+
+**ПРОБЛЕМА (воспроизведено 5×):** рабочее дерево ресетится непрерывно (UI-мегаволна: WI-*, UI_ANSWERS, person-level). Мои backend-правки сметаются за минуты — ДО твоего гейта. Re-apply бесполезен (сметается в тот же ход). Параллельные фронт-потоки коммитятся, мой backend — нет.
+
+**ПОДТВЕРЖДЕНО:** раннее моё лёгло (REQ-0018/reject-comment/CISO-009/OLAP — в HEAD, ты гейтил). Сейчас НИ ОДНА из 3 backend-правок не держится. Не код (build✓/lint0 у всех 3) — тайминг гейта.
+
+**ПРОШУ: ОДИН backend-гейт-проход** — применить 3 готовых диффа (вербатим-код в [ping-arch КОНСОЛИД] выше, всё валидировано):
+1. **ФИО ВКЛ** — `settings.object` revealEmployeeNames default=true + post-install singleton-миграция. **user-direct ‼️ заказчик «сразу» (05:00) — ЖДЁТ.**
+2. **op:delete 400** — `default-role` canDestroy на credosTimeEntries. **P1 баг (UC-TS-07) — юзер не удалит запись.**
+3. **#6 Booking-2** — `booking.object`+view role/probability/employee-nullable. План-очередь #6.
+
+**Как:** в твоём след. коммите `git apply` мои диффы ИЛИ дай мне 2-мин окно без tree-reset → я приложу, ты сразу `git add`+commit. ЛИБО назначь backend-owner-слот.
+
+**Промежуточно заказчику:** ФИО доступно админ-тогглом «Показывать ФИО» (Настройки, 1 клик) — не ждёт гейта.
+
+Без backend-гейт-прохода мой Dev2-backend заблокирован средой. Жду твоего ответа.
+
+— Dev 2
+
+
 ### 2026-06-21 21:20 — [taking] ciso-005-usermap
 
 Беру CISO-005 (IDOR/impersonation в approval): server-identity маппинг при действии. Зона: credos-time-employee.object.ts + approval.logic.ts + constants. dry-run, НЕ деплой.
@@ -1025,6 +1101,140 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 123 · 2026-06-21]**
+@arch @Dev1 [signal-arch]
+
+**Проактивный фидбек под ТЕКУЩУЮ разработку (персональный план UI + доска).** Докопал разведку Timetta по UX ресурсного плана — конкретные паттерны для UI, который Dev1 строит следующим (строки сотрудников × месяц).
+
+**1. Структура таблицы плана (берём 1:1):**
+- Строки: **отдел → раскрытие → сотрудники** (= Timetta «ресурс→роль→работы», у нас на уровень короче). Паттерн раскрытия группы уже есть на доске.
+- **Итоги ОБЯЗАТЕЛЬНЫ в 2 осях:** (а) строка-Σ за ВСЕ периоды (не только видимые), (б) колонка-Σ месяца (все сотрудники), (в) grand total. → для нас: строка-итог отдела = Σ людей + колонка-Σ + общий. Это и есть визуальный мэтчинг I4.
+
+**2. Σ-сверка отдел↔сотрудники (визуально):**
+- При раскрытии отдела строка-итог отдела ДОЛЖНА = Σ строк сотрудников. Расхождение (MANUAL-ввод отдела vs Σ людей) — подсветить. Это наш индикатор остатка/переаллокации (§7.5, итер.122 п.2). Timetta складывает снизу-вверх — итог группы = сумма детей.
+
+**3. ⚠️ Heatmap-пороги — РАСХОЖДЕНИЕ с нашими:**
+Timetta Gap%: синий <−10% избыток · зелёный −10..+10% баланс · оранжевый +10..+20% дефицит · красный >+20% перегруз. **У нас сейчас ±5%/±15%** (cap-tokens GAP_OK=0.05/GAP_NEAR=0.15, W6A.20). Расхождение порогов. @arch — свериться: оставить наши ±5/15 или принять Timetta ±10/20? Это влияет на цвет ячеек доски. Вопрос заказчику (целевые пороги, связь W6B.30).
+
+**4. Bulk-edit — ТОЛЬКО в списке, НЕ на доске:**
+Timetta: массовое заполнение через режим Список (чекбоксы→Изменить), на Доске bulk НЕ поддерживается. → наш массовый ввод плана делать формой/методом (EVEN/равномерно), не drag по доске. Подтверждает наш EVEN-дефолт + MANUAL-таблицу.
+
+**5. Generic-ресурс (роль без человека) — паттерн для будущего:**
+Timetta: план на generic (роль+уровень, флаг IsGenericResource) → позже «замена на сотрудника». У нас аналог = slot без employee (отдел-уровень) → slot с employee. Уже заложено в модели Dev2 (employee nullable). Roadmap: жест «назначить человека» переносит часы.
+
+**6. RemDOM-границы (важно для Dev1):**
+- ✅ Реалистично: inline-ввод в ячейки (controlled useState), раскрытие отдел→emp, строки-итоги/Σ, heatmap (style), переключатель масштаба, поповеры useState, **undo/redo через стейт-стек** (undo-toast уже есть, переиспользовать).
+- ❌ [RemDOM-нельзя]: drag-плашки брони по таймлайну (берём ТОЛЬКО детальный режим часы-в-ячейки, он без drag); надёжная Excel-навигация Tab/Enter между ячейками (без host-DOM-фокуса ненадёжно — упростить).
+
+**7. Масштаб день/нед/месяц:** переключатель + фиксировать глобально (иначе конфликт у разных юзеров). Пересчёт при смене — пропорционально рабочим дням (у нас уже WI-05 раскид по рабочим дням — консистентно).
+
+**Главный вывод для Dev1:** строим «детальный режим» Timetta — таблица часы×период со строками-итогами Σ снизу-вверх + gap-heatmap. Drag и Excel-навигацию отбросить (RemDOM). Undo через существующий стейт-стек.
+
+@arch — вопрос по heatmap-порогам (п.3) требует решения до UI. Остальное — готовый паттерн.
+
+---
+
+**[Аналитик · итерация 122 · 2026-06-21]**
+@Dev2 @Dev1 @arch [signal-arch]
+
+person-plan-backend + planmethod-ssot ПРИНЯТЫ — реализовали PLANNING_EMPLOYEE_LEVEL почти целиком. Сверка с анализом/инвариантами:
+
+**Dev2 person-plan-backend — попадание 1:1 в рекомендации:**
+- +`employee` nullable SET_NULL на plan-slot → `{project,dept?,emp?,month}` ✓ (§3.1, мой вопрос 9 «employee ДО пламбинга» — сделано так). История сохраняется (SET_NULL) ✓.
+- Дедуп `month|dept|employee` — персональный ≠ отдельский слот, не схлопываются ✓.
+- **Rollup = Σ персональных + остаток по FTE** ✓ (§3.2). Полуставочник 50% получает 1/3 от пары 100%+50%, НЕ половину — **фикс W5B.13** (мой вопрос 2 «остаток по FTE» — выбран рекомендованный). Инвариант **I4 Σ_emp=deptLoad держится (тест есть)** ✓.
+- Вычитание персональных из остатка = **анти-двойной-счёт §7.2/I6** ✓.
+- **SSOT booking: `personalDemand = max(Σслотов, ΣHARD)`** ✓ — мой вопрос 7 решён РЕКОМЕНДОВАННЫМ MAX (§8.3/I8). hard как индикатор-плашка отдельно, в Demand не дублируется. Timetta-канон.
+- EVEN/dept back-compat (employee/rollupCtx опциональны) ✓ — I-инварианты не ломают старое.
+
+**Dev1 planmethod-ssot ✓:** round-trip project.planMethod (SSOT на проекте), MANUAL→панель в ручном режиме+префилл слотов, calc-load применяет Σ-слотов. **Это активирует «нерабочий endpoint» из итер.119** — /s/plan-slots теперь достижим из UI. EVEN не сломан.
+
+**ИТОГ: SSOT-модель плана собрана.** Хранятся атомы (slot с employee/dept/project + dept-plan + booking + назначения), Demand = max(план,бронь)+остаток-по-FTE одной функцией. Двойного счёта нет. Σ=отдел держится. Фикс W5B.13 попутно.
+
+**Остаётся для полноты (UI + инварианты-страховка):**
+1. **UI персонального ввода** — в панели при раскрытии отдела строки сотрудников × месяц (Dev1, контракт employeeId готов у Dev2). Передавать rollupCtx{assignments,employees} в employeeLoadCells (10/11 арг).
+2. **Мэтчинг-индикатор** «Σ назначено / план отдела · остаток N ч» (§7.5) — UI бейдж рассинхрона.
+3. **Инвариант I3** (emp-слот ⟹ активное employee-department в периоде) — валидация в upsert /s/plan-slots, чтобы не было слотов-сирот вне отдела. @Dev2 — есть?
+4. **Инварианты I1-I12 как unit-тесты** (защита формул от регрессии) — частично есть (Σ=отдел, max, FTE), добить I9/I10/I3.
+
+**Открытые вопросы заказчику/арху (из §6/§8.6, не код):**
+- в.3 кто планирует по людям (РП vs руководитель отдела, W4B.2);
+- в.4 переаллокация Σслотов>план: warning/блок (рекомендую warning);
+- в.8 dept-plan «Плановые загрузки» — отдельная ось vs путаница терминов (Planning-Records #10).
+
+**P0:** 3/4 + harden + person-plan. Остаётся detail-CSV-PII (W5C.19). Тесты 2184 passed. Монитор держу.
+
+---
+
+**[Аналитик · итерация 121 · 2026-06-21]**
+@Dev2 @Dev1 @arch [signal-arch]
+
+wi55-57-approval-harden принят — закрыл 3 HIGH-бага из W5A. Сверка:
+
+**WI-55 гонки ✓** (W5A.7/29): `casApply` оптимистичный CAS (read-check-expected-then-write, статус сменился→skip=no-op) + collect-errors (try/catch per-item, батч не падает, `failed:[{id,error}]`). Эталон Timetta single-resolver (повторное approve no-op). Формат ответа `{ok,updated,skippedOwn,skipped,failed}` — корректно. = W5A.7(б)+W5A.29(в).
+
+**WI-56 аудит ✓** (W5A.10/11/12/24): `resolvedBy/resolvedAt` (решение approve+reject) + `revokedBy/revokedAt` (отзыв revoke/recall) ADDITIVE. Семантика разведена: reject больше НЕ пишет approvedBy (двойная семантика устранена — W5A.12) ✓; revoke без нового статуса (отозвано = approvedAt пуст И revokedBy задан — W5A.24) ✓; recall теперь фиксирует «кто отозвал» (раньше терялось — W5A.11) ✓. **Источник «кто» = actorId (event.userWorkspaceId), не client** — ровно паттерн DEEP_VALUE №1 (server-truth).
+
+**WI-57 reject-defense ✓** (W5A.5): `findIncompleteRejectEmployees` проверяет полноту submit перед reject (не доверяем клиентским ids, класс CISO-005). Обратная совместимость ids-only сохранена. = W5A.5(б).
+
+**🟢 КЛЮЧЕВОЕ — CISO-005 в работе:** «CISO-005 (resolveActor/TOFU/деградация) не тронут, +10 тестов зелёные» + actorId из event.userWorkspaceId. Значит **server-identity резолв УЖЕ есть** (resolveActor). Это ровно образец DEEP_VALUE №1 (lifecycleRoleResolver server-truth). Сквозной блокер закрывается. @CISO/@arch — подтвердите статус CISO-005 (resolveActor покрывает submit/recall/revoke/approve? plan-write/delete тоже?).
+
+**P0-СТАТУС: 3/4 + harden.** submit-REJECTED · capacityFactor · CASCADE-RESTRICT ✓ + гонки/аудит/defense ✓. **Остаётся detail-CSV-PII (W5C.19)** — единственный незакрытый P0. Статус?
+
+**Dev1 planmethod-ssot** — round-trip project.planMethod. Это **прямое звено к активации MANUAL-слотов** (моя итер.119 §8.1: endpoint /s/plan-slots готов, нужен planMethod round-trip + UI-пламбинг). После planmethod-ssot → можно подключать «Вручную по месяцам» в панели. **Напоминание (итер.119 вопрос 9): добавить `employee` в plan-slot ДО UI-пламбинга MANUAL, чтобы не переделывать персональный план дважды.** @Dev2 — если будешь трогать plan-slot для employee-измерения, координируй с Dev1 planmethod.
+
+Тесты 2169 passed / 0 failed. Монитор держу.
+
+---
+
+**[Аналитик · итерация 120 · 2026-06-21]**
+[signal-arch]
+
+[bug]#5 CLOSED (QA 20:18) — Dev1 создал employee-projects.tsx, тесты зелёные 2143 passed. Регрессия 443-тестов снята. Это и был front-component B2.20/W4B.20 «Проекты, где работал».
+
+**Картина (актуализация):**
+- ✅ Закрыто: P0 3/4 (submit-REJECTED · capacityFactor · CASCADE-RESTRICT) · bug#5 регрессия · W6A copy · approval-петля · grid-SSOT · план-раскид.
+- ⚠️ Остаётся: bug#4 `role` reserved (Dev-booking переименовать) · role-guard.test предсуществующий fail (default-role, Dev2-зона) · P0#4 detail-CSV-PII W5C.19 (статус?) · CISO-010 codes-guard · CISO-005 (образец lifecycleRoleResolver дан, ждёт арха).
+- 📋 Анализ передан: PLANNING_EMPLOYEE_LEVEL (план-по-сотруднику + SSOT + стыковка 3 осей §8) — 9 вопросов арху, жду.
+
+Монитор держу.
+
+---
+
+**[Аналитик · итерация 119 · 2026-06-21]**
+@arch [signal-arch]
+
+**Стыковка 3 осей плановой нагрузки + статус «нерабочего endpoint». Дополнил `PLANNING_EMPLOYEE_LEVEL.md` §8.**
+
+**1. РАЗГАДКА «нерабочего планового распределения»:**
+`/s/plan-slots` (=«Плановое распределение по месяцам», WI-47) ТЕХНИЧЕСКИ ГОТОВ (read/upsert, plan-slots.logic.ts, plan-slots-rest.ts). НО **в панели «Планировать» режим «Вручную по месяцам» = disabled-заглушка «скоро»** (фаза-2). Слоты из UI не создаются → реестр пуст → выглядит нерабочим. **Активация = протянуть MANUAL-радио + таблицу месяц×часы в project-plan-panel → вызвать готовый plan-slots-rest.** Это недостающее звено.
+
+**2. Композиция Demand сейчас (calc-load.composeCell):**
+`Demand = planLoad + hardBooking`, где `planLoad = Σплан-проектов(slot|EVEN) + Σплан-отдела-без-проекта(dept-plan REQ-0012)`. SOFT отдельно.
+
+**3. 🔴 ГЛАВНЫЙ РИСК — ДВОЙНОЙ СЧЁТ (угроза консистентности):**
+Три оси СУММИРУЮТСЯ → один ресурс×проект×период, покрытый двумя осями, потребляет ёмкость дважды:
+- **plan-slot(project) + hard-booking(тот же emp+project)** → ×2 (W6C.25). Частый: РП и забронировал, и расписал план.
+- dept-plan + project-slot того же отдела → ×2 если дублируют.
+- emp-slot + dept-slot → решено правилом «детальный вычитается из остатка» (§7.2).
+
+**4. SSOT-правило стыковки (детерминированное):**
+- **ПЛАН** = одна величина по детальности: empSlot ⊂ deptSlot ⊂ projectSlot ⊂ EVEN; dept-plan(без проекта) суммируется (иная работа).
+- **БРОНЬ** = отдельная ось (Timetta-канон). При плане И брони на emp×project: **Demand = MAX(план, бронь), НЕ сумма** — это ОДНА занятость двумя способами (оценка PM vs резерв). Складывать = считать человека занятым дважды.
+
+**5. Инварианты стыковки (I8-I12):** план+бронь=MAX не оба (I8) · dept-plan не дублирует проектный (I9) · Σ долей отделов=план проекта (I10) · SOFT не в Demand (I11✓) · пресейл-бронь без проекта отдельный пул (I12).
+
+**6. UX чтобы «билось»:** тултип ячейки «Demand N = план M + бронь K (max)» / разбивка по проектам; при создании dept-plan подсказка «это план БЕЗ проекта, не дубль проектного» (снять путаницу Planning-Records #10).
+
+**3 вопроса к тебе (доп. к §6, итого 9):**
+7. план-slot + HARD-бронь на emp×project: **MAX или сумма?** (рекомендую MAX — Timetta, нет двойного счёта).
+8. dept-plan «Плановые загрузки» — отдельная ось ИЛИ заказчик это и хотел как «плановое распределение проектов»? (вероятно путаница терминов, Planning-Records #10).
+9. **активировать MANUAL-слоты сейчас ИЛИ разом с employee-измерением** (§3.1)? Рекомендую разом: +employee в slot ДО UI-пламбинга, чтобы не переделывать.
+
+Полный SSOT: хранить атомы (slot/dept-plan/booking/назначение/факт), Demand считать ОДНОЙ функцией composeCell с правилом MAX(план,бронь)+остаток-вычитание. Никаких независимых дублей одной величины. Жду твои вопросы — отвечу всё.
+
+---
 
 **[Аналитик · итерация 118 · 2026-06-21]**
 @arch [signal-arch]
@@ -6916,6 +7126,14 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch→Dev2] BACKEND-OWNER-СЛОТ ОТКРЫТ (эскалация принята)
+Извиняюсь — мои backend-агенты (ab589 person-plan, a1119 approval) затирали твои правки на общих файлах (universal-identifiers/approval.logic/objects). Признаю, фронт-мегаволна голодала backend. Исправляю процессом:
+🟢 **СЛОТ ОТКРЫТ СЕЙЧАС.** Backend-зона СВОБОДНА: в дереве только ae0fc (capacity-ФРОНТ, не трогает logic-functions/objects). Я ПАУЗИРУЮ все backend-агенты, пока твои 3 диффа не сядут.
+ДЕЙСТВИЕ Dev2: применяй свои 3 валидированных диффа в дерево СЕЙЧАС, сигналь `[ready] backend-3diffs` → я СРАЗУ гейт+коммит точечно+деплой+push, без любого backend-churn между твоим ready и моим коммитом.
+Очередь приёма (приоритет): (1) ФИО-ВКЛ user-direct ‼️ (на проде revealEmployeeNames=TRUE уже; твой дифф = конкретный путь где ФИО не доходит — опиши путь); (2) op:delete 400 P1; (3) #6 Booking-2.
+⚠️ #6 Booking: имена полей НЕ резерв — `role`→`teamRole`/`bookingRole`, `probability`→`winChance`/иное (был bug#4 INVALID_FIELD_INPUT). В stash@{0} лежит СТАРЫЙ сломанный booking-role — НЕ бери оттуда, твой новый дифф с не-резерв-именами его замещает; я потом дропну stash-booking.
+Правило на будущее: backend-диффы принимаю в выделенном слоте, без параллельных backend-агентов. — arch
+
 ### 2026-06-22 — [arch] PERSON-LEVEL планирование: 2 аналитика СОШЛИСЬ → дизайн принят, в работе
 Два независимых разбора (PLANNING_EMPLOYEE_LEVEL.md заказчика + PERSON_LEVEL_PLANNING.md мой) дали ОДИНАКОВУЮ рекомендацию:
 - **+`employee` nullable relation в plan-slot** → {project, department?, employee?, periodMonth, plannedHours}. C-модель надмножество, ADDITIVE (миграции нет).
@@ -10105,6 +10323,34 @@ Dev1 — контракт для кнопок: recall { op:recall, ids, workspac
 ---
 
 ## CISO → arch
+
+### 2026-06-21 20:30 — [ciso-note] CISO-005 + detail-CSV статус (іт.121)
+
+@аналітик — відповідь на @CISO питання.
+
+**CISO-005 — OPEN (не закрито).**
+`resolveActor(params.workspaceMemberRef)` = client-supplied. RBAC-перевірки (isManager, entry.employeeId == actor.employeeId) залежать від actor що клієнт передав. actorId (event.userWorkspaceId) = тільки аудит-actor (хто записаний в approvedBy/revokedBy) — серверний ✅, але НЕ actor для access-guard. lifecycleRoleResolver (DEEP_VALUE №1) = окремий патерн що треба реалізувати (server resolves role relative to record). Покриває: approve/reject/recall/revoke ✅ (structure). plan-write/delete — те саме client-supplied, через UC-PLN-13 (scope CISO-005).
+
+TOFU-деградація (якщо workspaceMemberRef пустий → guard пропускається) = ключовий ризик. Реалізація lifecycleRoleResolver = event.userWorkspaceId→workspaceMember→employee маппінг server-side.
+
+**detail-CSV-PII — CLOSED** (перевірено 20:01, [ciso-note] в секції). `reports.logic.ts:306` + `reports-detail.ts:45` guard реалізований. Аналітик-флаг = false alarm.
+
+P0-блокер: **CISO-010** (codes=true без role-guard = мед.ПДн 152-ФЗ ст.10).
+**person-plan-backend** (Dev2): employeeId=validUuidParam ✅, isAuthRequired ✅. Нових gaps немає.
+— CISO
+
+### 2026-06-21 20:27 — [ciso-review] wi55-57-approval-harden — ПРИЙНЯТО
+
+**WI-55 CAS (CISO-013 MITIGATING):** `casApply(id, expectedFrom)` — статус перевіряється перед PATCH. Якщо змінився → `skipped` (ідемпотентно, Timetta-патерн). collect-errors: батч не падає, `failed:[]`. ✅ CISO-013 → MITIGATING.
+
+**WI-56 аудит (CISO-014 RESOLVED):** 4 поля additive: `resolvedBy/resolvedAt` (approve+reject) + `revokedBy/revokedAt` (revoke+recall). Семантика розведена (approve ≠ reject). Джерело: `actorId = event.userWorkspaceId` (server-truth). ✅ CISO-014 → RESOLVED.
+
+**WI-57 reject-defense:** неповна виборка reject → `{ok:false, incompleteEmployees}`. Server-side guard (CISO-005 клас). ✅
+
+⚠️ **CISO-005 caveat:** resolveActor ще client-supplied (не тронуто, OPEN). Аудит-actor (revokedBy/approvedBy) = userWorkspaceId серверний ✅, але RBAC-actor (isManager, employeeId) ще client. Виправиться в RBAC-волні.
+
+CISO-013 MITIGATING · CISO-014 RESOLVED. RISK_REGISTER оновлено.
+— CISO
 
 ### 2026-06-21 20:01 — [ciso-note] detail-CSV-PII = FALSE ALARM (іт.116)
 
@@ -13659,3 +13905,80 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 ## QA → arch [20:18]
 [bug]#5 CLOSED: `project-team/employee-projects.tsx` существует, файл был создан Dev 1 позже. Тесты зелёные: 2143 passed, 74 файла, 0 failed (кроме предсуществующего role-guard).
 — QA
+
+## Dev 2 → arch [taking] wi55-57-approval-harden
+Беру P0-остаток волны-5: WI-55 (гонки/CAS+collect-errors), WI-56 (аудит revoke/resolver), WI-57 (reject-defense). Зона: approval.logic.ts + constants/universal-identifiers.ts + objects/credos-time-entry.object.ts. dry-run, НЕ деплой, НЕ коммит. Строю поверх CISO-005 (resolveActor), не ломаю.
+— Dev 2
+
+## Dev 2 → arch [report] wi55-57-approval-harden ГОТОВО (НЕ коммичу)
+
+**WI-55 гонки (W5A.7/29) — оптимистичный CAS + collect-errors:**
+- Введён общий хелпер `casApply(id, expectedFrom, action, targetStatus, …)`: read-then-write с проверкой ОЖИДАЕМОГО статуса перед PATCH. Если статус уже сменился (не expectedFrom) ИЛИ записи нет → `skipped` (идемпотентно, повторное approve = no-op, эталон Timetta single-resolver), запись НЕ затираем.
+- collect-errors: каждый PATCH в try/catch — батч НЕ падает на середине, ошибки копятся в `failed: [{id, error}]`. runResolve/runRevoke/runRecall/runSubmit все возвращают сводку.
+- Новый формат ответа батчей: `{ ok, updated, skippedOwn|skippedForeign, skipped, failed }` (skipped = CAS-устаревшие; failed = per-item сбои). НЕ распределённая транзакция (SDK не даёт) — оптимистичный CAS, как и просили.
+
+**WI-56 аудит (W5A.10/11/12/24) — итоговые имена полей + разведённая семантика:**
+- Добавлены 4 ADDITIVE-поля на `credosTimeEntry` (TEXT/DATE_TIME, isNullable, default null): `resolvedBy`/`resolvedAt` (кто/когда вынес РЕШЕНИЕ — approve+reject, resolver-аудит) и `revokedBy`/`revokedAt` (кто/когда отозвал согласование revoke ИЛИ отправку recall). UUID v4, имена не зарезервированы.
+- Семантика разведена в `setStatus(action)`:
+  - **approve** → approvedBy + approvedAt + resolvedBy + resolvedAt = server-actor; revoked* = null.
+  - **reject** → resolvedBy + resolvedAt = server-actor; **approvedBy = null** (раньше нёс двойную семантику «отклонивший» — устранено); rejectComment сохранён.
+  - **revoke** (APPROVED→SUBMITTED) → revokedBy + revokedAt = server-actor; approve+resolve-аудит обнулён. БЕЗ нового статуса (W5A.24: «отозвано» = approvedAt пуст И revokedBy задан; 4 статуса сохранены).
+  - **recall** (SUBMITTED→DRAFT) → revokedBy + revokedAt = server-actor (сотрудник отозвал свою отправку); resolve-аудит null. РАНЬШЕ recall писал actor=null → «кто отозвал» терялось; теперь фиксируется.
+- Источник «кто» = `actorId` (event.userWorkspaceId, server-truth от CISO-005), не client-supplied.
+
+**WI-57 reject-defense (W5A.5):** при reject c периодом (from/to) `findIncompleteRejectEmployees` сверяет, что переданы ВСЕ SUBMITTED-записи каждого затронутого сотрудника. Неполная выборка → `{ ok:false, error:'...весь submit...', incompleteEmployees:[…] }` (не доверяем клиенту, класс CISO-005). Без from/to defense неприменима → обратная совместимость с текущим UI-контрактом (ids-only). Сетевой сбой defense = best-effort (не блокирует, CAS ниже всё равно проверит статусы). reject-ветка консистентна с CAS+аудитом.
+
+**Что НЕ сломано:** CISO-005 (resolveActor/TOFU/деградация) не тронут, +10 его тестов зелёные. RBAC (isManager), SoD (не своё), ownership recall, submit-REJECTED (WI-6/30), rejectComment — всё на месте.
+
+**Валидация:** `yarn lint` 0/0; `yarn test:unit` 90 в approval (было 45→55, +10 новых: CAS-skip/collect-errors/failed, resolver/revoke-аудит, reject-defense полнота), всего 2169 passed / 0 failed; `yarn twenty dev --once --dry-run` ЧИСТО — 4 поля аудита `created` (additive, без INVALID/reserved), typecheck ок. НЕ коммитил, НЕ деплоил.
+— Dev 2
+
+## Dev 1 → arch
+[taking] planmethod-ssot — фикс round-trip project.planMethod. Зона: capacity/{project-plan-panel.tsx, capacity-rest.ts, use-plan-edit.ts, types.ts(ТОЛЬКО ProjectPatch)}. PlanSlot/slot-поля/calc-load/plan-slots.logic НЕ трогаю (Dev2 параллельно).
+— Dev 1
+
+## Dev 2 → arch [taking] person-plan-backend
+Беру ТОП-приоритет заказчика: планирование до СОТРУДНИКА + SSOT (PLANNING_EMPLOYEE_LEVEL §3/§7). Зона: objects/credos-time-plan-slot.object.ts + fields/employee-plan-slots.field.ts + logic-functions/plan-slots.logic.ts + front-components/capacity/{calc-load.ts, types.ts(PlanSlot/PlanRollupCtx)}. approval.logic НЕ трогаю (WI-55/57). dry-run, НЕ деплой, НЕ коммит.
+— Dev 2
+
+## Dev 2 → arch [report] person-plan-backend ГОТОВО (НЕ коммичу)
+
+**1. Поле `employee` на plan-slot (ADDITIVE):**
+- RELATION `employee` → credos-time-employee (MANY_TO_ONE, isNullable, onDelete SET_NULL, joinColumnName `employeeId`). Обратная ONE_TO_MANY `employee.planSlots` — отдельным `defineField` (src/fields/employee-plan-slots.field.ts, паттерн department-plan-slots.field.ts), НЕ инлайн в employee.object (его не трогал).
+- Field-id константы: `CREDOS_TIME_PLAN_SLOT_EMPLOYEE_FIELD_ID`, `CREDOS_TIME_EMPLOYEE_PLAN_SLOTS_FIELD_ID` (UUID v4). Имя `employee` — НЕ резерв (relation ок). НЕ labelIdentifier. Слот теперь {project, department?, employee?, periodMonth, plannedHours}. SET_NULL: удаление сотрудника не сносит слот (часы → нераспределённый остаток отдела/проекта, история).
+
+**2. Дедуп-ключ расширен (project, department?, employee?, periodMonth):**
+- `slotKey(periodMonth, departmentId, employeeId)` = `month|dept|employee`. Персональный слот (employeeId) ≠ отдельский (тот же month+dept без employee) → разные ключи, не схлопываются. parseInputSlots валидирует employeeId как UUID|null. POST/PATCH/read несут employeeId. read/upsert сортировка: month→dept→employee.
+
+**3. Rollup (ядро, фикс бага W5B.13 «деление поровну»):**
+- `employeeLoad(emp,period) = Σ персональных слотов сотрудника (employeeId=emp по всем проектам) + доля нераспределённого остатка отдела по FTE`.
+- Нераспределённый остаток отдела = `Σ загрузок отдела (проекты по слотам/долям + dept-plans) − Σ ВСЕХ персональных слотов отдела` (вычитание = анти-двойной-счёт §7.2: персональные уже отнесены людям, в остаток не попадают; floor 0).
+- Доля остатка = по FTE: `fte(emp)/Σ fte(коллеги по отделу, активные в периоде)` (helper `remainderShare`, использует `isAssignmentActive`+`fteUnits`, fallback на состав-100% как fteHeadcountByDept). Полуставочник 50% получает 1/3 от пары 100%+50%, НЕ половину — фикс W5B.13.
+- Иерархия employee>dept>EVEN детерминирована: загрузка (project,period) считается ОДИН раз; верхние уровни = только остаток. Инвариант Σ_emp = deptLoad держится (тест есть).
+- Новые helpers: `employeePersonalHoursInPeriod` (экспорт), `deptPersonalHoursInPeriod`, `remainderShare`; тип `PlanRollupCtx {assignments, employees}`.
+
+**4. SSOT booking (анти-двойной-счёт §3.4/§6.6):**
+- В Demand на (person,project,period) ОДИН источник: `personalDemand = max(Σ персональных слотов, Σ HARD-броней)`. Бронь есть → берётся бОльшая из двух; max исключает суммирование slot+booking повторно. `load = personalDemand + остаток_по_FTE`. composeCell получает hard=0 (уже в personalDemand), но `hardBooking`-индикатор сохраняется отдельной плашкой. SOFT — прежний пунктир. Реализовано так, потому что персональный слот = оценка, hard-бронь = резерв той же ёмкости того же человека/проекта — это одна ось, не две (Timetta-канон, §6.6 рекомендация).
+
+**5. EVEN/dept-уровень НЕ сломан:** employee/rollupCtx опциональны. Без персональных слотов остаток = весь deptLoad; без rollupCtx делится поровну 1/headcount (прежнее). EVEN-проект без слотов — деление поровну как раньше. Все старые capacity-тесты зелёные без правок логики (обновил только PlanSlot-фикстуры: +employeeId:null).
+
+**КОНТРАКТ /s/plan-slots для Dev1 (точные поля):**
+- `mode='read'` ЗАПРОС `{ mode?, projectId:UUID }` → ОТВЕТ `{ ok, mode:'read', projectId, slots:[{ id, projectId, departmentId, employeeId, periodMonth, plannedHours }] }`.
+- `mode='upsert'` ЗАПРОС `{ mode:'upsert', projectId:UUID, slots:[{ periodMonth:'YYYY-MM', plannedHours:number, departmentId?:UUID|null, employeeId?:UUID|null }] }` (slots строкой или массивом; plannedHours 0/пусто → удаление по ключу) → ОТВЕТ `{ ok, mode:'upsert', projectId, created, updated, deleted, slots:[...как read] }`.
+- Дедуп-ключ (projectId, departmentId|null, employeeId|null, periodMonth). Персональный слот можно слать БЕЗ departmentId (персональный без отдела) ИЛИ с departmentId (для учёта в остатке отдела при детализации — UI при раскрытии отдела проставляет departmentId).
+- Для FTE-распределения остатка на доске передавать в `employeeLoadCells(..., slotsByProject, rollupCtx)` где `rollupCtx={assignments: EmpDeptAssignment[], employees: EmployeeRef[]}` (10-й и 11-й позиц. аргументы, опциональны).
+
+**Валидация:** `yarn lint` 0/0; `yarn test:unit` 74 файла, 2178 passed / 0 failed (+10 новых: персональный слот, остаток по FTE полуставочник≠полный, инвариант Σ=отдел, booking max-один-источник ×2, EVEN не сломан, employeePersonalHoursInPeriod); `yarn twenty dev --once --dry-run` ЧИСТО — `created fieldMetadata employee` (additive, без INVALID/reserved), typecheck ок. НЕ коммитил, НЕ деплоил.
+— Dev 2
+
+## Dev 1 → arch
+[report] planmethod-ssot ГОТОВО. Прокинут round-trip project.planMethod (SSOT — хранится на проекте, читается/пишется везде):
+- capacity-rest.ts: fetchProjects маппит planMethod (MANUAL → 'MANUAL', иначе/мусор/пусто → 'EVEN'); patchProject шлёт planMethod когда он в patch. patchDeptPlan НЕ трогал (у DeptPlan поля нет).
+- project-plan-panel.tsx: добавлен export methodOf(project); init useState(:78) и reset openPanel(:164) берут способ из methodOf(project). save: ветка MANUAL шлёт planMethod:'MANUAL', ветка EVEN — planMethod:'EVEN'.
+- types.ts ProjectPatch: добавлено planMethod?: 'EVEN'|'MANUAL'|null (больше ничего не трогал — PlanSlot/slot-поля Dev2).
+- use-plan-edit.ts: правок не потребовалось — save прокидывает patch целиком в patchProject, planMethod проходит автоматически.
+Поле planMethod уже есть в схеме (credos-time-project.object.ts:129) → round-trip замкнут, dry-run диффа по нему нет.
+Эффект: сохранённый MANUAL-проект при открытии «План» сразу в ручном режиме + префилл слотов (useEffect MANUAL грузит fetchPlanSlots); calc-load:322 (planMethod==='MANUAL' && slots>0) применяет ручной раскид. EVEN не сломан.
+Тесты: +4 panel (methodOf: MANUAL/EVEN/undefined/null), +1 fetchProjects маппинг planMethod (4 кейса), +2 patchProject (шлёт/не шлёт planMethod). project-plan-panel.test.tsx — новый файл (env=node, тест чистой methodOf, mount панели недоступен).
+ВАЛИДАЦИЯ: yarn lint = 0 warnings/0 errors; yarn test:unit = 75 files, 2184 passed, 0 failed; yarn twenty dev --once --dry-run = чисто (typecheck ok, no changes applied). НЕ коммитил, НЕ деплоил.
+— Dev 1
