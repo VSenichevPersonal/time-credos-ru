@@ -381,3 +381,179 @@ describe('approval.logic — rejectComment (UX-gap, op=reject хранит пр�
     expect(body.rejectComment).toBeNull();
   });
 });
+
+// WI-10 (A4.3/A4.4): сотрудник отзывает СВОЮ отправку SUBMITTED → DRAFT.
+describe('approval.logic — runRecall (A4.3/A4.4): SUBMITTED → DRAFT', () => {
+  const REF = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const ID = '00000000-0000-4000-8000-000000000001';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  // PATCH-body из записанных вызовов.
+  const patchBody = (mockFn: ReturnType<typeof mockFetch>): Record<string, unknown> => {
+    const call = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    if (!call) throw new Error('PATCH-вызов не найден');
+    return JSON.parse((call[1] as { body: string }).body);
+  };
+
+  it('ids пуст → ok:false ids required (без fetch)', async () => {
+    vi.stubGlobal('fetch', mockFetch([emptyEmployees]));
+    const result = await handler(event({ op: 'recall', ids: '' }));
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('ids required') });
+  });
+
+  it('сотрудник отзывает СВОЮ SUBMITTED → DRAFT (updated:1, approvedBy обнулён)', async () => {
+    const owner = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF }] },
+    };
+    const ownEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    const mockFn = mockFetch([owner, ownEntry, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+
+    const result = await handler(event({ op: 'recall', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 1, skippedForeign: 0 });
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('DRAFT');
+    expect(body.approvedBy).toBeNull();
+    expect(body.approvedAt).toBeNull();
+    expect(body.rejectComment).toBeNull();
+  });
+
+  it('сотрудник пытается отозвать ЧУЖУЮ запись → пропущена (skippedForeign:1)', async () => {
+    const owner = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF }] },
+    };
+    const foreignEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([owner, foreignEntry]));
+
+    const result = await handler(event({ op: 'recall', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skippedForeign: 1 });
+  });
+
+  it('запись не SUBMITTED (APPROVED) → recall пропускает (updated:0)', async () => {
+    const owner = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF }] },
+    };
+    const approvedEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e1', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([owner, approvedEntry]));
+
+    const result = await handler(event({ op: 'recall', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skippedForeign: 0 });
+  });
+
+  it('actor null (dev-bypass): нет workspaceMemberRef → ownership-guard пропущен, updated:1', async () => {
+    const ownEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    vi.stubGlobal('fetch', mockFetch([ownEntry, patchOk]));
+
+    const result = await handler(event({ op: 'recall', ids: ID }));
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+});
+
+// WI-10 (A4.25/A4.26): руководитель отзывает согласование APPROVED → SUBMITTED (Reopen).
+describe('approval.logic — runRevoke (A4.25/A4.26): APPROVED → SUBMITTED', () => {
+  const REF = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const ID = '00000000-0000-4000-8000-000000000001';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  const patchBody = (mockFn: ReturnType<typeof mockFetch>): Record<string, unknown> => {
+    const call = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    if (!call) throw new Error('PATCH-вызов не найден');
+    return JSON.parse((call[1] as { body: string }).body);
+  };
+
+  it('ids пуст → ok:false ids required', async () => {
+    vi.stubGlobal('fetch', mockFetch([emptyEmployees]));
+    const result = await handler(event({ op: 'revoke', ids: '' }));
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('ids required') });
+  });
+
+  it('actor НЕ менеджер → forbidden, fetch на entry НЕ вызывается', async () => {
+    const employeeRes = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF }] },
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(employeeRes),
+      text: () => Promise.resolve(''),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handler(event({ op: 'revoke', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('руководитель') });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // только resolveActor, без entry-fetch
+  });
+
+  it('руководитель отзывает ЧУЖОЕ согласование → APPROVED → SUBMITTED (updated:1, аудит обнулён)', async () => {
+    const manager = {
+      data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF }] },
+    };
+    const approvedOther = {
+      data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e-other', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    const mockFn = mockFetch([manager, approvedOther, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+
+    const result = await handler(event({ op: 'revoke', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 1, skippedOwn: 0 });
+    const body = patchBody(mockFn);
+    expect(body.status).toBe('SUBMITTED');
+    expect(body.approvedBy).toBeNull();
+    expect(body.approvedAt).toBeNull();
+  });
+
+  it('руководитель отзывает СВОЮ запись → SoD skip (skippedOwn:1)', async () => {
+    const manager = {
+      data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF }] },
+    };
+    const approvedOwn = {
+      data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e-mgr', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([manager, approvedOwn]));
+
+    const result = await handler(event({ op: 'revoke', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skippedOwn: 1 });
+  });
+
+  it('запись не APPROVED (SUBMITTED) → revoke пропускает (updated:0)', async () => {
+    const manager = {
+      data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF }] },
+    };
+    const submittedEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([manager, submittedEntry]));
+
+    const result = await handler(event({ op: 'revoke', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skippedOwn: 0 });
+  });
+
+  it('actor null (dev-bypass): нет workspaceMemberRef → RBAC-guard пропущен, updated:1', async () => {
+    const approvedEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e-other', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    vi.stubGlobal('fetch', mockFetch([approvedEntry, patchOk]));
+
+    const result = await handler(event({ op: 'revoke', ids: ID }));
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+});

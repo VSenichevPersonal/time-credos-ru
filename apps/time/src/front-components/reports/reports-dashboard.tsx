@@ -145,12 +145,18 @@ export const ReportsDashboard = () => {
     drilled,
   );
 
+  // Смена СРЕЗА (Отдел/Проект/Человек) меняет rootAxis → накопленный drill-стек
+  // становится бессмысленным (другая корневая ось), поэтому сбрасываем.
   const switchGroupBy = (g: GroupBy) => {
     reset();
     setGroupBy(g);
   };
+  // Смена ПЕРИОДА (‹ › / Месяц/Квартал/Год) НЕ трогает drill-стек и фильтры:
+  // скоуп (Отдел→Проект→Сотрудник) сохраняется, useOlap перезапрашивает тот же
+  // срез (childAxis + olapFilters) за новый period.from/to, KPI пересчитываются
+  // из нового olapData. Сброс drill — только явный (пилюля ✕ / клик корня крошек).
+  // Сверка: Timetta — срез/фильтр живёт при смене периода (правило 8).
   const onPeriodChange = (fn: () => void) => () => {
-    reset();
     fn();
   };
 
@@ -269,10 +275,7 @@ export const ReportsDashboard = () => {
                 { value: 'quarter', label: 'Квартал' },
                 { value: 'year', label: 'Год' },
               ]}
-              onChange={(g: PeriodGran) => {
-                reset();
-                setGran(g);
-              }}
+              onChange={(g: PeriodGran) => setGran(g)}
             />
             {groupBy === 'project' && (
               <FilterChip
@@ -309,10 +312,7 @@ export const ReportsDashboard = () => {
                 { value: 'quarter', label: 'Квартал' },
                 { value: 'year', label: 'Год' },
               ]}
-              onChange={(g: PeriodGran) => {
-                reset();
-                setGran(g);
-              }}
+              onChange={(g: PeriodGran) => setGran(g)}
             />
           </>
         )}

@@ -1,7 +1,14 @@
 import { defineLogicFunction } from 'twenty-sdk/define';
 import type { RoutePayload } from 'twenty-sdk/logic-function';
 
-import { ENTRY_STATUS, isApprovalRequired } from 'src/constants/approval';
+import {
+  ENTRY_STATUS,
+  isApprovalRequired,
+  RECALL_FROM,
+  RECALL_TO,
+  REVOKE_FROM,
+  REVOKE_TO,
+} from 'src/constants/approval';
 import { APPROVAL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import { isIsoDate, isUuid } from './params-validate';
@@ -10,6 +17,8 @@ import { isIsoDate, isUuid } from './params-validate';
 //   submit  — записи периода сотрудника (где требуется согласование) DRAFT → SUBMITTED.
 //   approve — выбранные записи SUBMITTED → APPROVED (+ approvedBy/approvedAt).
 //   reject  — выбранные записи SUBMITTED → REJECTED (+ approvedBy/approvedAt).
+//   recall  — СОТРУДНИК отзывает СВОЮ отправку: SUBMITTED → DRAFT (пока не решено). A4.3/A4.4.
+//   revoke  — РУКОВОДИТЕЛЬ отзывает согласование: APPROVED → SUBMITTED (Timetta Reopen). A4.25/A4.26.
 // Логика «нужно ли согласование» = Project.approvalRequired ?? Department.approvalRequired.
 // Работает поверх Core REST воркспейса (паттерн time-entry-api: /s/ на dev иногда
 // 500 — фронт имеет REST-фоллбэк; здесь фиксация actor возможна только серверно).
@@ -105,8 +114,14 @@ const setStatus = async (
     data.approvedBy = actor ?? null;
     data.approvedAt = new Date().toISOString();
   }
+  // Откат назад (recall SUBMITTED→DRAFT, revoke APPROVED→SUBMITTED) снимает прежнее
+  // решение руководителя — обнуляем аудит-поля, чтобы запись не выглядела согласованной.
+  if (status === ENTRY_STATUS.DRAFT || status === ENTRY_STATUS.SUBMITTED) {
+    data.approvedBy = null;
+    data.approvedAt = null;
+  }
   // rejectComment: при REJECT сохраняем причину (сотрудник видит что исправить);
-  // при approve/повторном submit очищаем прежнюю причину — запись «ожила».
+  // при approve/повторном submit/откате очищаем прежнюю причину — запись «ожила».
   data.rejectComment = status === ENTRY_STATUS.REJECTED ? comment ?? null : null;
   await restPatch(`/rest/credosTimeEntries/${id}`, data);
 };
@@ -184,6 +199,80 @@ const runResolve = async (
   return { ok: true, updated, skippedOwn };
 };
 
+// recall (A4.3/A4.4): СОТРУДНИК отзывает СВОЮ отправку SUBMITTED → DRAFT,
+// пока руководитель не вынес решение (запись ещё SUBMITTED). Право — владелец записи:
+// actor.employeeId == entry.employeeId. Чужие/не-SUBMITTED записи пропускаются.
+// Руководитель НЕ нужен (это действие сотрудника над собственными трудозатратами).
+const runRecall = async (params: Record<string, string>, actor: Actor): Promise<object> => {
+  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
+  if (ids.length === 0) return { ok: false, error: 'ids required' };
+
+  // dev-bypass: actor не сопоставлен (workspaceMemberRef пуст) — пропускаем ownership-гейт.
+  if (!actor) {
+    // eslint-disable-next-line no-console
+    console.warn('[approval] recall: actor не сопоставлен — ownership-guard пропущен (DEV)');
+  }
+
+  let updated = 0;
+  let skippedForeign = 0;
+  for (const id of ids) {
+    const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
+      '/rest/credosTimeEntries',
+      { filter: `id[eq]:${id}`, limit: '1' },
+    );
+    const entry = res.data?.credosTimeEntries?.[0];
+    if (entry?.status !== RECALL_FROM) continue; // отзыв отправки только из SUBMITTED
+    // Сотрудник отзывает ТОЛЬКО свои записи (нельзя дёрнуть чужую отправку).
+    if (actor && entry.employeeId !== actor.employeeId) {
+      skippedForeign += 1;
+      continue;
+    }
+    await setStatus(id, RECALL_TO, null);
+    updated += 1;
+  }
+  return { ok: true, updated, skippedForeign };
+};
+
+// revoke (A4.25/A4.26): РУКОВОДИТЕЛЬ отзывает выданное согласование APPROVED → SUBMITTED
+// («Reopen» в Timetta — запись возвращается в очередь согласования). RBAC = как approve:
+// требуется actor.isManager; SoD — нельзя отзывать собственные согласованные записи.
+const runRevoke = async (
+  params: Record<string, string>,
+  actorId: string | null,
+  actor: Actor,
+): Promise<object> => {
+  const ids = (params.ids ?? '').split(',').map((s) => s.trim()).filter(isUuid);
+  if (ids.length === 0) return { ok: false, error: 'ids required' };
+
+  if (actor && !actor.isManager) {
+    return { ok: false, error: 'forbidden: только руководитель может отзывать согласование' };
+  }
+  if (!actor) {
+    // eslint-disable-next-line no-console
+    console.warn('[approval] revoke: actor не сопоставлен — RBAC-guard пропущен (DEV)');
+  }
+
+  let updated = 0;
+  let skippedOwn = 0;
+  for (const id of ids) {
+    const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
+      '/rest/credosTimeEntries',
+      { filter: `id[eq]:${id}`, limit: '1' },
+    );
+    const entry = res.data?.credosTimeEntries?.[0];
+    if (entry?.status !== REVOKE_FROM) continue; // отзыв согласования только из APPROVED
+    // Separation of duties: руководитель не отзывает собственные записи.
+    if (actor && entry.employeeId === actor.employeeId) {
+      skippedOwn += 1;
+      continue;
+    }
+    // actorId передаём ради единообразия; setStatus для SUBMITTED обнулит approvedBy/At.
+    await setStatus(id, REVOKE_TO, actorId);
+    updated += 1;
+  }
+  return { ok: true, updated, skippedOwn };
+};
+
 const run = async (event: RoutePayload) => {
   const params = readParams(event);
   // actorId — для аудита approvedBy (userWorkspaceId фиксирует, кто нажал).
@@ -194,6 +283,8 @@ const run = async (event: RoutePayload) => {
   if (op === 'submit') return runSubmit(params);
   if (op === 'approve') return runResolve(params, ENTRY_STATUS.APPROVED, actorId, actor);
   if (op === 'reject') return runResolve(params, ENTRY_STATUS.REJECTED, actorId, actor);
+  if (op === 'recall') return runRecall(params, actor);
+  if (op === 'revoke') return runRevoke(params, actorId, actor);
   return { ok: false, error: `unknown op: ${op}` };
 };
 
@@ -208,7 +299,8 @@ const handler = async (event: RoutePayload) => {
 export default defineLogicFunction({
   universalIdentifier: APPROVAL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER,
   name: 'approval',
-  description: 'Согласование трудозатрат: submit/approve/reject (фиксирует руководителя)',
+  description:
+    'Согласование трудозатрат: submit/approve/reject/recall/revoke (фиксирует руководителя)',
   timeoutSeconds: 15,
   handler,
   httpRouteTriggerSettings: {
