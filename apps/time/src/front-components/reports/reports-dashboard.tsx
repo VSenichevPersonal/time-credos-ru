@@ -204,8 +204,12 @@ export const ReportsDashboard = () => {
   // KPI-карточки отражают ТЕКУЩИЙ скоуп дрилла. Корень — глобал (data.totals).
   // Drill — Итого OLAP-среза по накопленным filters[] (scopeKpiTotals: scoped
   // fact/client/util из olap totals + норма реконструирована из строк среза).
-  const scopedTotals: ReportRow =
-    drilled && olapData ? scopeKpiTotals(olapData.totals, olapData.rows) : data.totals;
+  // NB: вычисляется в теле компонента ДО JSX-гарда `!data` → data может быть null
+  // (загрузка/ошибка). Без null-гарда `data.totals` ронял весь дашборд (вне ErrorBoundary).
+  const scopedTotals: ReportRow | null =
+    drilled && olapData
+      ? scopeKpiTotals(olapData.totals, olapData.rows)
+      : data?.totals ?? null;
   // Подпись скоупа для карточек: путь дрилла (ось: значение › …). Пусто на корне.
   const kpiScope = drilled
     ? stack.map((l) => `${dimLabel(l.dim as OlapDim)}: ${l.valueLabel ?? l.label}`).join(' › ')
@@ -334,7 +338,7 @@ export const ReportsDashboard = () => {
           resetKeys={[groupBy, period.from, period.to, stack.length]}
         >
           <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-            <KpiCards totals={scopedTotals} scope={kpiScope} />
+            {scopedTotals && <KpiCards totals={scopedTotals} scope={kpiScope} />}
             {!drilled ? (
               <div
                 style={{
