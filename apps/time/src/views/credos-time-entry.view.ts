@@ -1,4 +1,4 @@
-import { defineView, ViewKey } from 'twenty-sdk/define';
+import { defineView, ViewKey, ViewSortDirection } from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_ENTRY_DATE_FIELD_ID,
@@ -8,14 +8,20 @@ import {
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
   CREDOS_TIME_ENTRY_STATUS_FIELD_ID,
+  CREDOS_TIME_ENTRY_TAGS_FIELD_ID,
   CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Index-view записей трудозатрат. Это же набор полей = карточка записи (FIELDS-
-// виджет RECORD_PAGE привязан к этой view). Колонки = дата, часы, проект, вид
-// работ, сотрудник, статус, состав работ. Нативные фильтры Twenty — по любой
-// колонке (богатая фильтрация — в таймшите, см. CARDS_VIEWS_AUDIT.md).
+// виджет RECORD_PAGE привязан к этой view) И реестр-вкладок «Трудозатраты»
+// карточек проекта/сотрудника (RECORD_TABLE-виджеты ссылаются на эту view —
+// см. CARDS_VIEWS_AUDIT §RECORD_TABLE: виджет показывает view целиком, по
+// родителю НЕ фильтруется; скоуп по проекту/сотруднику даёт соседний FIELDS-
+// виджет на relation). Колонки = полная инфа записи: дата, часы, проект, вид
+// работ (= категория), сотрудник, статус, теги, состав работ (= комментарий).
+// Сортировка по дате DESC (свежие сверху) — заказчик: реестр трудозатрат по дате.
+// Нативные фильтры Twenty — по любой колонке (богатая фильтрация — в таймшите).
 export default defineView({
   universalIdentifier: CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
   name: 'Все записи',
@@ -23,6 +29,14 @@ export default defineView({
   icon: 'IconClock',
   key: ViewKey.INDEX,
   position: 0,
+  // Свежие записи сверху (DESC по дате) — табличный реестр трудозатрат.
+  sorts: [
+    {
+      universalIdentifier: 'a1f3d7b2-6c84-4e51-9a0d-2f7b8c1e5d34',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_DATE_FIELD_ID,
+      direction: ViewSortDirection.DESC,
+    },
+  ],
   fields: [
     // Состав работ = labelIdentifier (заголовок карточки) → должен быть в
     // позиции 0 (требование ядра: label-поле в самой низкой позиции view).
@@ -74,6 +88,14 @@ export default defineView({
       position: 6,
       isVisible: true,
       size: 160,
+    },
+    // Теги (MULTI_SELECT) — метки записи для срезов. Завершает «полную инфу».
+    {
+      universalIdentifier: 'c8e4b9a1-7d52-4f63-8b1c-3a6d9e2f0c75',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_ENTRY_TAGS_FIELD_ID,
+      position: 7,
+      isVisible: true,
+      size: 180,
     },
   ],
 });
