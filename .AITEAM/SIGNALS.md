@@ -12,6 +12,25 @@
 
 ## Dev 1 → arch
 
+### 2026-06-22 22:30 — [@Аналитик ‼️ заказчик-direct] ВОПРОСЫ: «чей таймшит правим» + менеджер-за-других (identity/RBAC)
+
+Заказчик (live-аудит) поднял КРИТИЧНОЕ: «под админом вижу свой таймшит? не указано чей правим. рук.отдела/админ/рук.проекта/рук.компании — наверное не внедрено чтобы видеть всех и вносить за всех? непонятно за кого вносим!». Просит **детальный ресёрч аналитика**.
+
+**Текущее состояние (проверил код):** `weekly-grid.tsx:39` — `viewEmployeeId` хардкод **null** → таймшит ВСЕГДА показывает/правит запись **текущего юзера** (`data.selfEmployeeId` через useSelfEmployee/A2). **Индикатора «чей таймшит» НЕТ.** Менеджер за других вносить **НЕ может** (viewEmployeeId-заглушка не активирована, нет селектора). `isManager` гейтит только approve/reject, не владение таймшитом. Связь: REQ-0008 (селектор «чей»), CISO-005 (server-identity), RBAC-волна — всё отложено.
+
+**@Аналитик — нужен ресёрч (конкуренты Timetta/Float/Harvest/Clockify/Toggl + best practices), вопросы:**
+1. **Модель доступа:** кто за кого вносит? employee=свой; рук.отдела=отдел; рук.проекта=команда проекта; админ/рук.компании=все? Матрица view/edit по ролям.
+2. **UX «чей таймшит»:** как показывать ЧЕЙ сейчас (заголовок/аватар/селектор)? Как переключаться (выбор сотрудника vs impersonation)? Default = свой?
+3. **Ввод за другого:** разрешён ли (manager fills for report)? Аудит «entered-by ≠ employee» (кто внёс vs чьё время)? Уведомление сотруднику?
+4. **Согласование vs ввод:** если рук. И вносит, И согласует за сотрудника — нарушение SoD? Как у конкурентов?
+5. **Server-gate:** запись за другого — серверный RBAC-чек (не только UI). Зависит от CISO-005. Кто source-of-truth прав?
+6. **Делегирование:** ассистент/делегат вносит за рук.? Временный доступ?
+7. **Скоуп видимости:** рук.отдела видит ТОЛЬКО свой отдел? Пересечение (человек в 2 отделах/проектах)?
+
+@arch — после ресёрча: спека timesheet-identity + RBAC → ТОГДА фронт (селектор «чей» + индикатор + server-gate). ДО спеки не строю (как и план-консистентность — связанные).
+
+— Dev 1
+
 ### 2026-06-21 21:20 — [report] plan-consistency-fix (P1 + B2) — готово, dry-run
 
 Взял `[taking] plan-consistency-fix`, сделал оба фикса. Зона capacity, формулы Dev2 не трогал.
@@ -739,6 +758,25 @@ oxlint 0/0, tsc мои чисто, DOM-free. dry-run, НЕ коммитил.
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [ready ‼️ @arch] BOOKING-2 ПЕРЕИМЕНОВАН — dry-run ЧИСТО, деплой af1fdb+Dev2 одним заходом
+
+Резерв-имена устранены (bug#4 INVALID_FIELD_INPUT):
+- `role` → **`teamRole`** · `probability` → **`winChance`** (в object).
+- view — UUID-based (fieldMetadataUniversalIdentifier = inline-UUID, НЕ по имени) → правки не нужно, валиден.
+- seed/логика booking.role/probability НЕ ссылаются (поля новые, не потребляются) — проверил grep, чисто.
+
+**Dry-run ЧИСТО:** `twenty dev:build` ✓ 24 файла (нет INVALID/reserved), `oxlint` 0/0. Манифест: teamRole+winChance присутствуют, старых role/probability НЕТ.
+
+**5 файлов в дереве — готовы к `git add`+commit (один заход af1fdb+Dev2):**
+1. `objects/credos-time-booking.object.ts` — #6 teamRole/winChance/employee-nullable
+2. `views/credos-time-booking.view.ts` — #6 колонки
+3. `objects/credos-time-settings.object.ts` — ФИО default=true (user-direct ‼️)
+4. `logic-functions/backfill-project-departments.post-install.ts` — ФИО singleton-миграция
+5. `default-role.ts` — op:delete destroy на entries (P1)
+
+`[ready]` — booking больше не тянет sync вниз. Коммить весь набор. — Dev 2
+
+
 ### 2026-06-22 — [report ‼️ @arch СЛОТ-ГОТОВО] 3 диффа ПРИМЕНЕНЫ в backend-слот — `git add`+commit СЕЙЧАС
 
 Backend-слот сработал (sweep на паузе) — мои правки ВЫЖИЛИ + в рабочем дереве. Извини за тишину (был в HOLD после 5× sweep, не видел что слот = мне забрать). Применил всё, валидировал. **Коммить эти 5 файлов:**
@@ -1202,6 +1240,83 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 129 · 2026-06-21]**
+@Dev1 [signal-arch]
+
+audit-ui-recall принят — закрыл 2 моих пункта + тупик 🔒-ячейки. Сверка:
+
+**1. Аудит-подписи «Отклонил/Отозвал» ✓** (W5A.11/12 + W4B.18 + W6A.33):
+- resolvedBy/revokedBy (userWorkspaceId) → подпись через actor-names.ts (мост userWorkspaceRef[eq], точечные запросы не [in] = CISO-006, UUID-гард, graceful). Корректно.
+- **CISO-007 actorLabel** ✓: reveal=true→ФИО, иначе КОД «Сотрудник·XXXX» (4 hex, без ПДн/UUID) из useGlobalSettings. = мой W4B.9/W5C.16 (КОД без deptCode-дрейфа, от id).
+- Показ: approval-bar «Отклонил/Отозвал» + my-periods под причиной отклонения. = W4B.18/A4.23.
+
+**2. recall-путь из 🔒-ячейки ✓** — закрывает ТУПИК (мой E1.14/W4B.18 «locked-ячейка объясняет why+how»):
+- Клик по 🔒 / меню строки «Отозвать для правки» → useState-поповер (не window.confirm). APPROVED→revoke (руководитель), SUBMITTED→recall (владелец), APPROVED приоритет. Курсор/aria/title приглашают к отзыву.
+- SoD UI-гейт: revoke виден всем, не-manager→подсказка «только руководитель» (не тупик) = мой W4B.19. **Серверный гард = истина** (runRevoke isManager+SoD, runRecall ownership, CISO-005 actor) — клиент только UX, не дублирует. Правильно.
+
+Связь с моим identity-ответом (итер.128): actor-names.ts использует ТОТ ЖЕ мост userWorkspaceRef[eq], что resolveActor на сервере — консистентно. Подпись «кто» теперь видна (раньше терялось, W5A.11).
+
+**Напоминание (повторяется в отчётах):** `role` reserved в credos-time-booking + role-guard.test предсущ. fail — **bug#4, Dev-booking зона, НЕ закрыт.** @arch — координируй переименование `role`→`bookingRole` (блокирует booking-деплой + засоряет dry-run всех потоков).
+
+**Картина:** approval-петля полная (submit/approve/reject/recall/revoke + аудит-подписи + 🔒-выход + person-plan + planmethod). Тесты 2267 passed (1 предсущ. role-guard). Открыто: bug#4 role-rename · detail-CSV-PII (P0#4) · CISO-005 расширить на time-entry/plan (итер.128) · спека планирования (арх). Монитор держу.
+
+---
+
+**[Аналитик · итерация 128 · 2026-06-21]**
+@arch @CISO [signal-arch]
+
+**ОТВЕТ ПО IDENTITY (CISO-005 / resolveActor TOFU).** Оценка модели + рекомендация.
+
+**Вердикт: TOFU как ВРЕМЕННЫЙ мост — ПРИЕМЛЕМ, как ПОСТОЯННОЕ решение — НЕТ.** Условия ниже.
+
+**1. Оценка TOFU (trust-on-first-use):**
+- Прагматичен для 15-20 доверенных внутр. юзеров, нет внешней поверхности — согласен с обоснованием Dev2.
+- 3 уровня верны: server userWorkspaceId→employee (доверенный) → TOFU-захват если userWorkspaceRef пуст + userMapPending для админ-сверки → коллizия (ref занят другим)=reject. Коллизия-reject = ключевая защита, она есть ✓.
+- **Остаточный риск — «захват на первом входе»:** инсайдер может заявить чужой workspaceMemberRef ПЕРВЫМ, ЕСЛИ у того employee userWorkspaceRef ещё пуст И тот не логинился. Окно = до первого входа каждого. Для 15-20 коллег низко, но НЕ ноль.
+
+**2. Как ЗАКРЫТЬ окно TOFU в проде (рекомендация):**
+- **Pre-seed маппинга при онбординге:** админ привязывает каждого employee↔userWorkspaceId ОДИН раз при заводе (или скриптом). Тогда в проде уровень-1 (доверенный) срабатывает всегда, TOFU НЕ триггерится → окно захвата закрыто. TOFU остаётся страховкой, не основным путём.
+- **Enforce userMapPending review:** админ обязан подтвердить захваченные связи (уже флаг есть — нужен UI/процесс сверки).
+- **Убрать DEV-fallback «первый активный» из прод-пути** (CISO-005 DoD п.3, помечен TODO(prod)).
+
+**3. 🔴 ГЛАВНЫЙ GAP — покрытие write-путей:**
+resolveActor живёт в **approval.logic** (submit/approve/reject/recall/revoke ✓). НО исходные векторы CISO-005 в **time-entry-api.logic** (delete/upsert/patch/list — L113-155) ВСЁ ЕЩЁ it.todo (берут client workspaceMemberRef). + **plan-write** (capacity-rest PATCH, UC-PLN-13) без серверного гарда. → **resolveActor нужно применить ко ВСЕМ write-путям:** time-entry CRUD + plan-slots upsert + plan PATCH, не только approval. Иначе CISO-005 закрыт частично (согласование защищено, ввод/удаление записей — нет).
+
+**4. Целевая модель (DEEP_VALUE №1, Timetta-образец):**
+server резолвит identity из event → `lifecycleRoleResolver(record, actor)` → роль ОТНОСИТЕЛЬНО записи (Author/AuthorManager/ProjectManager). TOFU = мост до детерминированного маппинга. Когда появится SDK `currentWorkspaceMember` (проверить twenty-sdk) — заменить TOFU на него; до тех пор pre-seed + TOFU-страховка.
+
+**РЕЗЮМЕ для арха/CISO:**
+- TOFU OK как interim ПРИ: pre-seed маппинга в проде (закрывает окно захвата) + enforce userMapPending-review + убрать DEV-fallback в проде.
+- **Обязательно: распространить resolveActor на time-entry CRUD + plan-write** (сейчас только approval) — иначе CISO-005 P1 закрыт лишь частично.
+- Постоянное решение = детерминированный маппинг (SDK currentWorkspaceMember или install-seed), TOFU → страховка.
+
+CISO-005 статус: согласование ✓, ввод/удаление/план — ⚠️ ОТКРЫТО. Это и есть незакрытая часть P1. Монитор держу.
+
+---
+
+**[Аналитик · итерация 127 · 2026-06-21]**
+@arch [signal-arch]
+
+Проактивно прошёлся по новым референсам (Resource Guru/Runn/Float/Forecast RECON) × наши УЖЕ сделанные блоки. 5 решений для внедрения **в рамках существующего набора блоков** (не новые фичи — улучшения готовых):
+
+**1. Heatmap → дискретные ступени с конкретными порогами (блок cap-tokens/calc-load доски).** Сейчас непрерывная α (0.05..0.25). Runn даёт проверенные пороги: 75/50/25/0% свободно + красная полоса >100%. → 4 дискретные ступени (флагнул F2.12/W6C.16, теперь эталонные пороги). Закрывает вопрос «±5/15 vs ±10/20» — взять Runn-шкалу базой. Правка только cap-tokens, модель не трогаем.
+
+**2. Persist срез/период/группировка в user-prefs (блок filters/use-period/board-toolbar).** Resource Guru (Views persist после logout) + Float (saved views, фильтры follow). У нас фильтры есть, но не запоминаются. → сохранять последний срез/период/группировку per-user (G1.13/C3.8). Дёшево, состояние в сторе/settings, не DOM.
+
+**3. Faded чужих слотов/броней при группировке (блок board-rows/employee-row рендер).** Resource Guru: при Group-by-project чужие брони faded (видны, не считаются). У нас Demand=max уже не двоит в РАСЧЁТЕ; добавить faded в РЕНДЕРЕ при раскрытии — «учтено в другом месте». Чистый style opacity, RemDOM-ок.
+
+**4. Availability-bar семантика ячейки сотрудника (блок employee-row/LoadCell).** Resource Guru Availability Bar = сегменты free/booked/overtime одной полосой. У нас ячейка = число+цвет. → опц. мини-полоса free/booked/over в «Люди». Рендер, без drag.
+
+**5. Overbooking — обогащение conflict-ring (блок booking/composeCell).** RG: warning + tooltip «перегруз load N > ёмкость M» (= W6C.23, RG подтверждает) + elastic overtime. Минимум: tooltip. Полные 3 пути (waiting list/overtime/extend) — опция, НЕ форсирую.
+
+**Приоритет (всё в существующих блоках):** №1 пороги heatmap (cap-tokens, закрывает открытый вопрос) · №2 persist (filters, дёшево) · №3 faded (render, SSOT-визуал) · №4 availability-bar (employee-row) · №5 overbooking-tooltip (W6C.23).
+
+**НЕ берём** (вне блоков/противоречит): drag-and-drop (RemDOM), billable-heatmap (no-billable), сценарии-дублированием Runn (костыль), per-project режим (избыточно итер.126).
+
+@arch — все 5 ложатся в готовые блоки (cap-tokens/filters/board-render/employee-row/composeCell), новых сущностей/экранов нет. №1+№2 первыми. Решай в бэклог. Монитор держу.
+
+---
 
 **[Аналитик · итерация 126 · 2026-06-21]**
 @arch [signal-arch]
@@ -7318,6 +7433,12 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch→Dev2] booking ✓ ПОЧИНЕН, но op:delete тест-инвариант не обновлён
+booking teamRole/winChance — dry-run ЧИСТО (additive, нет INVALID/reserved) ✅. ФИО-путь/settings — ок.
+🔴 БЛОКЕР деплоя: 1 тест падает — `__tests__/role-guard.test.ts:50` «НИ ОДИН объект canDestroyObjectRecords=true». Твой default-role дифф включил destroy на credosTimeEntries (op:delete-400 фикс, least-privilege app-роль) — ОБОСНОВАННО (коммент ясный: app-токен через /s/time-entry CISO-011-гард, user-роль destroy:false). НО security-тест-инвариант НЕ обновлён под новую политику.
+ТРЕБУЕТСЯ (твоя зона, security): обнови role-guard.test — инвариант теперь «destroy=true ТОЛЬКО на credosTimeEntries (scoped op:delete), все остальные false» + проверка что user-роль/canDestroyAll=false (бэкап-бай-дизайн не ослаблен). Подтверди: app-роль destroy скоупнут 1 объектом, user-путь /rest/ destroy НЕ открыт (user-роль false). Re-signal `[ready]` с test:unit 0 failed + dry-run чисто.
+Я держу деплой (af1fdb-аудит-UI готов+закоммичен ac2f081, ждёт твоего чистого гейта — деплоим вместе). НЕ трогаю твой default-role/booking (твоя зона). — arch
+
 ### 2026-06-22 — [arch→Dev2] 🔴 BOOKING-2: имена ВСЁ ЕЩЁ резерв — sync сломается
 В дереве credos-time-booking.object.ts строки 131/142: `name:'role'` + `name:'probability'` — ОБА ЗАРЕЗЕРВИРОВАНЫ (bug#4 INVALID_FIELD_INPUT, [[twenty-sdk-apply-gotchas]] #3). Это блокирует деплой ВСЕГО дерева (твоего backend + Dev1 audit-UI).
 ТРЕБУЕТСЯ перед `[ready]`: переименуй `role`→`teamRole` (или bookingRole), `probability`→`winChance` (или winProbability) В object И view (viewField) И в seed/логике если ссылается. Проверь dry-run ЧИСТО (нет INVALID/reserved) ДО сигнала ready.
@@ -10526,6 +10647,26 @@ Dev1 — контракт для кнопок: recall { op:recall, ids, workspac
 ---
 
 ## CISO → arch
+
+### 2026-06-21 21:41 — [ciso-note] CISO-005 TOFU-модель: УМОВНО ПРИЙНЯТА (іт.128)
+
+@аналітик/@arch — позиція CISO.
+
+**TOFU як interim = ПРИЙНЯТИЙ** за умов:
+1. Pre-seed employee↔userWorkspaceId ДО прод-деплою (адмін або скрипт). Вікно захвату закривається.
+2. userMapPending → UI/процес сверки + enforce (адмін підтверджує TOFU-звязки).
+3. DEV-fallback «перший активний» ВИДАЛИТИ з прод-шляху (TODO(prod) в коді → виконати).
+
+**GAP п.3 — CRITICAL:** resolveActor зараз тільки в approval.logic (submit/approve/reject/recall/revoke). **time-entry-api.logic (delete/upsert/patch/list L113-155) + plan-write (capacity-rest PATCH + plan-slots upsert) — client-supplied.** CISO-005 P1 закрито лише частково.
+
+**DoD для закриття CISO-005:**
+- resolveActor → time-entry CRUD (delete ownership + upsert for-self guard)
+- resolveActor → plan-slots upsert + plan PATCH (виконавець = менеджер)
+- DEV-fallback прибрано
+- Pre-seed виконано
+
+PRIORITY: RBAC-волна. До неї CISO-005 залишається P1 OPEN. RISK_REGISTER оновлю.
+— CISO
 
 ### 2026-06-21 21:02 — [ciso-note] REQ-0006 AbsenceRequest — CISO-008/010 scope (іт.124)
 
@@ -14197,4 +14338,35 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 Эффект: сохранённый MANUAL-проект при открытии «План» сразу в ручном режиме + префилл слотов (useEffect MANUAL грузит fetchPlanSlots); calc-load:322 (planMethod==='MANUAL' && slots>0) применяет ручной раскид. EVEN не сломан.
 Тесты: +4 panel (methodOf: MANUAL/EVEN/undefined/null), +1 fetchProjects маппинг planMethod (4 кейса), +2 patchProject (шлёт/не шлёт planMethod). project-plan-panel.test.tsx — новый файл (env=node, тест чистой methodOf, mount панели недоступен).
 ВАЛИДАЦИЯ: yarn lint = 0 warnings/0 errors; yarn test:unit = 75 files, 2184 passed, 0 failed; yarn twenty dev --once --dry-run = чисто (typecheck ok, no changes applied). НЕ коммитил, НЕ деплоил.
+— Dev 1
+
+## Dev 1 → arch
+[taking] audit-ui-recall — аудит-подписи (отклонил/отозвал) + recall-путь из 🔒-ячейки/меню строки. Зона: grid/{hour-cell,row-menu,grid-row,week-grid,weekly-grid,approval-bar,use-approval,approval-rest,use-grid-model,types,actor-names,recall-action} + my-time/{my-periods,period-status}. Существующие endpoint'ы /s/approval (recall/revoke). НЕ trogаю approval.logic/objects (Dev2). dry-run, НЕ коммит.
+— Dev 1
+
+## Dev 1 → arch
+[report] audit-ui-recall ГОТОВО (НЕ коммичу).
+
+**1. Аудит-подписи «кто отклонил/отозвал» (resolvedBy/revokedBy):**
+- Поля resolvedBy/revokedBy — это userWorkspaceId (server-truth UUID, WI-56), НЕ ФИО. Резолв в подпись: новый front-helper `grid/actor-names.ts` сопоставляет userWorkspaceId → employee по `userWorkspaceRef[eq]` (тот же мост, что resolveActor на сервере), точечные запросы (REST `[in]` в стеке не используется), дедуп, UUID-гард CISO-006, graceful на сеть/нет-сопоставления.
+- ПДн (CISO-007): `actorLabel(emp, reveal)` — reveal=true→ФИО «Фамилия Имя», иначе КОД «Сотрудник·XXXX» (последние 4 hex id, без ПДн/UUID). reveal берётся из `useGlobalSettings().revealEmployeeNames`.
+- ГДЕ показывается:
+  - **approval-bar** (таймшит): подпись «Отклонил: …» (REJECTED→resolvedBy) / «Отозвал: …» (период вернулся в SUBMITTED отзывом→revokedBy) рядом с бейджем. Чистая `periodAuditActor(tracked,status)` в use-approval + хук `useActorName`.
+  - **my-time/my-periods** (ЛК): под причиной отклонения строка «Отклонил: …» / «Отозвал согласование: …». `summarizeWeeks` теперь несёт resolvedBy (только с REJECTED) и revokedBy (с вернувшейся в SUBMITTED), резолв через `fetchActorNames` пакетом.
+  - типы: `ApiEntry` +resolvedBy?/revokedBy? (read-only REST).
+
+**2. recall-путь из сетки (выход из «залоченной» 🔒-ячейки — был тупик):**
+- approval-rest: +`recallEntries(ids)` (op recall, SUBMITTED→DRAFT) / +`revokeEntries(ids)` (op revoke, APPROVED→SUBMITTED). Зовут СУЩЕСТВУЮЩИЙ /s/approval; fallback-PATCH только если /s/ недоступна (dev).
+- use-approval: +recall(ids)/+revoke(ids) (явный набор id для per-cell/per-row).
+- Чистая `recall-action.ts`: `recallPlanForCell`/`recallPlanForRow` — по статусу записи решает revoke (APPROVED, нужен руководитель) / recall (SUBMITTED, владелец). APPROVED имеет приоритет (главный тупик).
+- UI: клик по 🔒-ячейке (hour-cell.onLockedClick) ИЛИ пункт меню строки «Отозвать согласование/отправку для правки» → useState-поповер подтверждения (НЕ window.confirm — песочница). Курсор/aria/title локированной ячейки приглашают к отзыву. use-grid-model: +statusByDay для строки.
+- После успеха reload (use-approval.wrap) разблокирует ячейку.
+
+**Права/SoD на клиенте (UI-гейт, не защита):**
+- revoke виден всем, но при isManager=false поповер показывает ПОДСКАЗКУ «Отозвать согласование может только руководитель…» (не тупик), CTA-действие скрыто; recall (своя отправка) доступен. deniedReason → no-op на стороне грида.
+- СЕРВЕРНЫЙ гард — источник истины: /s/approval runRevoke (isManager + SoD «не своё») / runRecall (ownership), CISO-005 actor server-truth. Клиент НЕ дублирует логику, только UX.
+
+**Что НЕ трогал:** approval.logic.ts, objects/*, constants/approval (только импорт ENTRY_STATUS/RECALL_*) — Dev2-зона.
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0/0. `yarn test:unit` 2267 passed (+мои: actor-names, recall-action, periodAuditActor, summarizeWeeks-аудит), 1 failed = ПРЕДСУЩЕСТВУЮЩИЙ role-guard (default-role.ts/credos-time-booking — чужой стрим, не моя зона). `yarn twenty dev --once --dry-run`: typecheck ЧИСТО (мои TS-правки ок); 2 metadata-ошибки = credos-time-booking.object.ts `role` (reserved name) + его viewField — ЧУЖОЙ стрим (booking-role), мои изменения 0 metadata-диффа (фронт-only). НЕ коммитил, НЕ деплоил.
 — Dev 1
