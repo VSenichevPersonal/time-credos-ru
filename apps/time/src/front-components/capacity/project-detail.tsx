@@ -2,6 +2,7 @@ import { T } from 'src/front-components/capacity/cap-tokens';
 import { DeptPlanRow } from 'src/front-components/capacity/dept-plan-row';
 import { ProjectPlanRow } from 'src/front-components/capacity/project-plan-row';
 import { PlannedProjectRow } from 'src/front-components/capacity/planned-project-row';
+import type { PreviewSource } from 'src/front-components/capacity/plan-preview';
 import type { PlanSpread } from 'src/front-components/capacity/calc-load';
 import type {
   CapProject,
@@ -42,6 +43,8 @@ type Props = {
   currentDeptId?: string;
   // WI-11: текущий раскрытый отдел — для овербукинга в превью панели плана.
   dept?: DeptRef;
+  // WI-48: данные доски для превью vs СВОБОДНОЙ ёмкости отдела(ов) + мульти-отдел.
+  previewSource?: PreviewSource;
 };
 
 // План отдела без проекта → форма проекта (те же поля plannedEffort/start/end).
@@ -66,11 +69,13 @@ const PlanningList = ({
   onSaveDeptPlan,
   spread,
   dept,
+  previewSource,
 }: Required<Pick<Props, 'planned' | 'unplanned' | 'nameWidth' | 'periods' | 'onSave'>> & {
   deptPlans: DeptPlanLoad[];
   onSaveDeptPlan?: Props['onSaveDeptPlan'];
   spread?: PlanSpread;
   dept?: DeptRef;
+  previewSource?: PreviewSource;
 }) => {
   const projects = [...planned.map((pl) => pl.project), ...unplanned];
   const fieldsWidth = Math.max(360, periods.length * 56);
@@ -92,6 +97,7 @@ const PlanningList = ({
           onSave={onSave}
           spread={spread}
           dept={dept}
+          previewSource={previewSource}
         />
       ))}
       {deptPlans.length > 0 && onSaveDeptPlan && (
@@ -132,6 +138,7 @@ export const ProjectDetail = ({
   deptCells,
   currentDeptId,
   dept,
+  previewSource,
 }: Props) => {
   if (planning && onSave) {
     return (
@@ -145,6 +152,7 @@ export const ProjectDetail = ({
         onSaveDeptPlan={onSaveDeptPlan}
         spread={spread}
         dept={dept}
+        previewSource={previewSource}
       />
     );
   }

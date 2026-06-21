@@ -11,8 +11,8 @@ import type { Notice } from 'src/front-components/grid/use-validation';
 type Tone = { fg: string; bg: string; border: string; icon: string };
 
 const TONES: Record<Notice['level'], Tone> = {
-  error: { fg: T.over, bg: T.overSoft, border: '#f3c4ab', icon: '!' },
-  warning: { fg: T.warnSolid, bg: T.warnTint, border: '#f6da90', icon: '△' },
+  error: { fg: T.over, bg: T.overSoft, border: T.overBorder, icon: '!' },
+  warning: { fg: T.warnSolid, bg: T.warnTint, border: T.warnBorder, icon: '△' },
 };
 
 const ToastRow = ({ notice, onClose }: { notice: Notice; onClose: () => void }) => {

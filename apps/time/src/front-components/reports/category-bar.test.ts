@@ -37,10 +37,10 @@ describe('toSegments', () => {
       { category: 'CLIENT', hours: 1, share: 0.5 },
       { category: 'INTERNAL', hours: 1, share: 0.5 },
     ]);
-    // CLIENT=green #2f9e57, INTERNAL=blue #3b6fe0 (select-options + tag-color-hex)
+    // CLIENT=green #2f9e57, INTERNAL=blue #2e47d7 (бренд-индиго T.accent, WI-34)
     const byCat = Object.fromEntries(seg.map((s) => [s.category, s.color]));
     expect(byCat.CLIENT).toBe('#2f9e57');
-    expect(byCat.INTERNAL).toBe('#3b6fe0');
+    expect(byCat.INTERNAL).toBe('#2e47d7');
   });
 
   it('share=null или 0 → сегмент отбрасывается', () => {

@@ -48,8 +48,8 @@ describe('categoryMeta — неизвестные коды (fallback)', () => {
     expect(m.order).toBe(999);
   });
 
-  it('fallback цвета — нейтральный серый (#9a9ea8)', () => {
+  it('fallback цвета — нейтральный серый (#7c8089)', () => {
     const m = categoryMeta('NONEXISTENT');
-    expect(m.solid).toBe('#9a9ea8'); // tagColorHex(null).solid
+    expect(m.solid).toBe('#7c8089'); // tagColorHex(null).solid = T.textFaint (AA, WI-34)
   });
 });

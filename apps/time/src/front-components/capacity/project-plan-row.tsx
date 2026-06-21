@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { T } from 'src/front-components/capacity/cap-tokens';
 import { ProjectPlanPanel } from 'src/front-components/capacity/project-plan-panel';
+import type { PreviewSource } from 'src/front-components/capacity/plan-preview';
 import type { PlanSpread } from 'src/front-components/capacity/calc-load';
 import type { CapProject, DeptRef, ProjectPatch } from 'src/front-components/capacity/types';
 
@@ -17,7 +18,8 @@ type Props = {
   fieldsWidth: number;
   onSave: (id: string, patch: ProjectPatch) => Promise<boolean>;
   spread?: PlanSpread; // WI-11: рабочие дни для превью раскида
-  dept?: DeptRef; // WI-11: ёмкость отдела для овербукинга в превью
+  dept?: DeptRef; // WI-11: ёмкость отдела для овербукинга в превью (fallback)
+  previewSource?: PreviewSource; // WI-48: свободная ёмкость + мульти-отдел в превью
 };
 
 const isoToDate = (iso: string | null): string => (iso ? String(iso).slice(0, 10) : '');
@@ -51,7 +53,7 @@ const inputStyle = {
   boxSizing: 'border-box' as const,
 };
 
-export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread, dept }: Props) => {
+export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread, dept, previewSource }: Props) => {
   const [hours, setHours] = useState(project.plannedEffort != null ? String(project.plannedEffort) : '');
   const [end, setEnd] = useState(isoToDate(project.endDate));
 
@@ -169,7 +171,7 @@ export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread
           />
         </label>
         <span style={{ marginLeft: 'auto' }}>
-          <ProjectPlanPanel project={project} spread={spread} dept={dept} onSave={onSave} />
+          <ProjectPlanPanel project={project} spread={spread} dept={dept} previewSource={previewSource} onSave={onSave} />
         </span>
       </div>
     </div>

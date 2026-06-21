@@ -9,6 +9,7 @@ import {
   firstFreePeriod,
 } from 'src/front-components/capacity/calc-load';
 import type { AbsenceCtx, BookingCtx, PlanSpread } from 'src/front-components/capacity/calc-load';
+import type { PreviewSource } from 'src/front-components/capacity/plan-preview';
 import type {
   CapProject,
   CellMetric,
@@ -60,7 +61,20 @@ export const DeptRows = ({
   planning,
   onSavePlan,
   onSaveDeptPlan,
-}: DeptProps) => (
+}: DeptProps) => {
+  // WI-48 W3B.18/22: пакет данных доски для превью vs СВОБОДНОЙ ёмкости (все
+  // отделы + занятость др.проектами/планами/бронями + доли). Панель плана
+  // резолвит из него ctx под конкретный проект. horizonEnd — из spread (W3B.23).
+  const previewSource: PreviewSource = {
+    depts: departments,
+    projects,
+    deptPlans,
+    sharesByProject,
+    absenceCtx,
+    bookingCtx,
+    horizonEnd: spread?.horizonEnd,
+  };
+  return (
   <>
     {departments.map((dept) => {
       // REQ-0012: ячейки отдела учитывают план без проекта (deptPlans).
@@ -98,13 +112,15 @@ export const DeptRows = ({
               deptCells={cells}
               currentDeptId={dept.id}
               dept={dept}
+              previewSource={previewSource}
             />
           )}
         </div>
       );
     })}
   </>
-);
+  );
+};
 
 type EmpProps = {
   employees: EmployeeRef[];

@@ -28,9 +28,9 @@ describe('cellFill — заливка ячейки', () => {
     expect(cellFill(-1)).toBe('transparent');
   });
 
-  it('> 0 → rgba(59, 111, 224, ...)', () => {
+  it('> 0 → rgba(46, 71, 215, ...) — бренд-индиго ACCENT_RGB', () => {
     const result = cellFill(4);
-    expect(result).toMatch(/^rgba\(59, 111, 224, 0\.\d+\)$/);
+    expect(result).toMatch(/^rgba\(46, 71, 215, 0\.\d+\)$/);
   });
 
   it('8 часов → насыщеннее 4 часов (больший alpha)', () => {

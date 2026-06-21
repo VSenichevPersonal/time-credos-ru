@@ -1,4 +1,5 @@
 import { T, FONT } from 'src/front-components/grid/tokens';
+import { ACCENT_RGB } from 'src/front-components/shared/tokens';
 import type { CellMetric, LoadCell } from 'src/front-components/capacity/types';
 
 export { T, FONT };
@@ -56,9 +57,11 @@ export const gapTone = (pct: number | null): LoadTone => {
       ? { bg: T.warnTint, fg: T.warnSolid }
       : { bg: '#fbe4dd', fg: '#b3401a' };
   }
-  // профицит: близко → лёгкий синий, сильно → заметнее
-  const al = a <= GAP_NEAR ? '0.10' : '0.20';
-  return { bg: `rgba(59, 111, 224, ${al})`, fg: T.text };
+  // профицит: близко → лёгкий синий, сильно → заметнее. Ступени разведены
+  // (F2.14: 0.10 vs 0.20 едва различались без легенды) → 0.09 / 0.24 — шаг крупнее,
+  // глаз различает «близко/сильно» без чтения подписи. Бренд-индиго (ACCENT_RGB).
+  const al = a <= GAP_NEAR ? '0.09' : '0.24';
+  return { bg: `rgba(${ACCENT_RGB}, ${al})`, fg: T.text };
 };
 
 // Знак-иконка (не цвет) для доступности: ▲ дефицит, ▼ профицит, ● баланс.

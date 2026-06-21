@@ -2,11 +2,22 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computePreview,
+  openEndedHint,
   previewBuckets,
+  previewDeptsForProject,
   previewGranularity,
+  previewLoadCtxFor,
   validateRange,
+  type PreviewSource,
 } from 'src/front-components/capacity/plan-preview';
-import type { DeptRef } from 'src/front-components/capacity/types';
+import { buildBookingCtx, buildSharesByProject } from 'src/front-components/capacity/calc-load';
+import type {
+  Booking,
+  CapProject,
+  DeptRef,
+  EmployeeRef,
+  ProjectDeptShare,
+} from 'src/front-components/capacity/types';
 
 // Производственный календарь: будни (Пн–Пт) по 8 ч, выходные отсутствуют (=0 ч).
 const buildWeekdayCalendar = (startKey: string, days: number): Map<string, number> => {
@@ -33,10 +44,8 @@ describe('validateRange', () => {
     expect(validateRange('', '2026-07-31')).toBe('укажите дату начала «С»');
   });
 
-  it('обязывает дату ПО (иначе раскид неоднозначен)', () => {
-    expect(validateRange('2026-07-01', '')).toBe(
-      'укажите дату «ПО» — иначе план не попадёт на доску',
-    );
+  it('WI-48 W3B.23: пустой ПО больше НЕ ошибка (открытый план до горизонта)', () => {
+    expect(validateRange('2026-07-01', '')).toBeNull();
   });
 
   it('запрещает ПО раньше С', () => {
@@ -45,6 +54,15 @@ describe('validateRange', () => {
 
   it('валидный диапазон → null', () => {
     expect(validateRange('2026-07-01', '2026-09-13')).toBeNull();
+  });
+});
+
+describe('openEndedHint (W3B.23)', () => {
+  it('пустой ПО → подсказка «открытый план»', () => {
+    expect(openEndedHint('')).toBe('открытый план — раскид до конца горизонта доски');
+  });
+  it('заполненный ПО → нет подсказки', () => {
+    expect(openEndedHint('2026-09-13')).toBeNull();
   });
 });
 
@@ -107,6 +125,157 @@ describe('computePreview', () => {
   it('нулевой/пустой объём → раскид 0', () => {
     const cal = buildWeekdayCalendar('2026-07-01', 60);
     const res = computePreview(null, '2026-07-01', '2026-07-31', cal);
+    expect(res.total).toBe(0);
+  });
+
+  it('overCount считает периоды с овербукингом (W3B.21)', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 60);
+    const res = computePreview(2000, '2026-07-01', '2026-07-31', cal, dept);
+    expect(res.overCount).toBe(res.rows.filter((r) => r.over).length);
+    expect(res.overCount).toBeGreaterThan(0);
+  });
+});
+
+// ── WI-48 W3B.18: овербукинг vs СВОБОДНОЙ ёмкости (минус занятое) ──────────────
+describe('computePreview — свободная ёмкость (W3B.18)', () => {
+  const mkProject = (id: string, deptId: string, effort: number): CapProject => ({
+    id,
+    code: null,
+    name: id,
+    departmentId: deptId,
+    plannedEffort: effort,
+    startDate: '2026-07-01',
+    endDate: '2026-07-31',
+  });
+  const planned = mkProject('plan-me', 'd1', 0);
+
+  it('свободная ёмкость < полной, когда отдел занят другим проектом', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 40);
+    // Полная ёмкость июля: ~23 будня × 8 × 2 чел = ~368 ч.
+    // Другой проект отдела d1 занимает 300 ч в том же июле → свободно ~68 ч.
+    const other = mkProject('other', 'd1', 300);
+    const source: PreviewSource = { depts: [dept], projects: [other, planned] };
+    const free = computePreview(100, '2026-07-01', '2026-07-31', cal, previewLoadCtxFor(planned, source));
+    const fullOnly = computePreview(100, '2026-07-01', '2026-07-31', cal, dept);
+    const fRow = free.rows.find((r) => r.over !== undefined)!;
+    const fuRow = fullOnly.rows[0];
+    // capacity у free-варианта строго меньше полной (вычли 300 ч).
+    expect((fRow.capacity ?? 0)).toBeLessThan(fuRow.capacity ?? 0);
+    expect(fRow.fullCapacity).toBeCloseTo(fuRow.capacity ?? 0, 0);
+  });
+
+  it('план 100 ч: НЕ овербукинг против полной, НО овербукинг против свободной', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 40);
+    const other = mkProject('other', 'd1', 320); // почти вся ёмкость занята
+    const source: PreviewSource = { depts: [dept], projects: [other, planned] };
+    const full = computePreview(100, '2026-07-01', '2026-07-31', cal, dept);
+    const free = computePreview(100, '2026-07-01', '2026-07-31', cal, previewLoadCtxFor(planned, source));
+    expect(full.overCount).toBe(0); // 100 < 368 полной
+    expect(free.overCount).toBeGreaterThan(0); // 100 > свободной (~48)
+  });
+
+  it('сам планируемый проект НЕ вычитается из свободной ёмкости (excludeProjectId)', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 40);
+    // planned уже имеет 300 ч на доске, но при превью его старое значение игнорим.
+    const onBoard = mkProject('plan-me', 'd1', 300);
+    const source: PreviewSource = { depts: [dept], projects: [onBoard] };
+    const free = computePreview(100, '2026-07-01', '2026-07-31', cal, previewLoadCtxFor(onBoard, source));
+    // Свободная ≈ полная (себя не вычли) → 100 ч не овербукинг.
+    expect(free.overCount).toBe(0);
+  });
+
+  it('HARD-бронь потребляет ёмкость (вычитается), SOFT — нет', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 40);
+    const employees: EmployeeRef[] = [
+      { id: 'e1', name: 'A', departmentId: 'd1' },
+      { id: 'e2', name: 'B', departmentId: 'd1' },
+    ];
+    const hardBooking: Booking = {
+      id: 'b1', employeeId: 'e1', projectId: null, bookingType: 'HARD',
+      hours: 300, startDate: '2026-07-01', endDate: '2026-07-31',
+    };
+    const softBooking: Booking = {
+      id: 'b2', employeeId: 'e1', projectId: null, bookingType: 'SOFT',
+      hours: 300, startDate: '2026-07-01', endDate: '2026-07-31',
+    };
+    const srcHard: PreviewSource = {
+      depts: [dept], projects: [planned],
+      bookingCtx: buildBookingCtx([hardBooking], employees, true),
+    };
+    const srcSoft: PreviewSource = {
+      depts: [dept], projects: [planned],
+      bookingCtx: buildBookingCtx([softBooking], employees, true),
+    };
+    const withHard = computePreview(100, '2026-07-01', '2026-07-31', cal, previewLoadCtxFor(planned, srcHard));
+    const withSoft = computePreview(100, '2026-07-01', '2026-07-31', cal, previewLoadCtxFor(planned, srcSoft));
+    expect(withHard.overCount).toBeGreaterThan(0); // HARD съел ёмкость → 100 не влезает
+    expect(withSoft.overCount).toBe(0); // SOFT не потребляет → влезает
+  });
+});
+
+// ── WI-48 W3B.22: мульти-отдел (доли sharesByProject) ─────────────────────────
+describe('previewDeptsForProject + мульти-отдел (W3B.22)', () => {
+  const d1: DeptRef = { id: 'd1', name: 'ОПИБ', code: null, headcount: 2, capacityFactor: 1 };
+  const d2: DeptRef = { id: 'd2', name: 'Разработка', code: null, headcount: 3, capacityFactor: 1 };
+  const proj: CapProject = {
+    id: 'p1', code: null, name: 'Мульти', departmentId: 'd1',
+    plannedEffort: 0, startDate: '2026-07-01', endDate: '2026-07-31',
+  };
+
+  it('проект с долями → возвращает все долевые отделы, не один', () => {
+    const shares: ProjectDeptShare[] = [
+      { projectId: 'p1', departmentId: 'd1', plannedEffortShare: 100 },
+      { projectId: 'p1', departmentId: 'd2', plannedEffortShare: 100 },
+    ];
+    const sbp = buildSharesByProject(shares);
+    const depts = previewDeptsForProject(proj, [d1, d2], sbp);
+    expect(depts.map((d) => d.id).sort()).toEqual(['d1', 'd2']);
+  });
+
+  it('проект без долей → fallback на «родной» departmentId', () => {
+    const depts = previewDeptsForProject(proj, [d1, d2], undefined);
+    expect(depts.map((d) => d.id)).toEqual(['d1']);
+  });
+
+  it('свободная ёмкость = сумма ёмкостей долевых отделов (а не одного)', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 40);
+    const shares: ProjectDeptShare[] = [
+      { projectId: 'p1', departmentId: 'd1', plannedEffortShare: 100 },
+      { projectId: 'p1', departmentId: 'd2', plannedEffortShare: 100 },
+    ];
+    const source: PreviewSource = {
+      depts: [d1, d2], projects: [proj], sharesByProject: buildSharesByProject(shares),
+    };
+    const multi = computePreview(200, '2026-07-01', '2026-07-31', cal, previewLoadCtxFor(proj, source));
+    const singleOnly = computePreview(200, '2026-07-01', '2026-07-31', cal, d1);
+    // ёмкость 2 отделов (2+3=5 чел) больше, чем одного (2 чел).
+    expect((multi.rows[0].capacity ?? 0)).toBeGreaterThan(singleOnly.rows[0].capacity ?? 0);
+  });
+
+  it('previewLoadCtxFor → undefined, когда нет отделов', () => {
+    const orphan: CapProject = { ...proj, departmentId: null };
+    expect(previewLoadCtxFor(orphan, { depts: [d1], projects: [] })).toBeUndefined();
+    expect(previewLoadCtxFor(orphan, undefined)).toBeUndefined();
+  });
+});
+
+// ── WI-48 W3B.23: open-ended endDate (пусто → до горизонта) ────────────────────
+describe('computePreview — open-ended endDate (W3B.23)', () => {
+  it('пустой endKey + horizonEnd → раскид до горизонта (как доска)', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 120);
+    const ctx = previewLoadCtxFor(
+      { id: 'p', code: null, name: 'p', departmentId: 'd1', plannedEffort: 0, startDate: '2026-07-01', endDate: null },
+      { depts: [dept], projects: [], horizonEnd: '2026-09-30' },
+    );
+    const res = computePreview(480, '2026-07-01', '', cal, ctx);
+    expect(res.rows.length).toBeGreaterThan(0); // не пусто, хотя ПО пустая
+    expect(res.total).toBeCloseTo(480, 5); // инвариант Σ держится до горизонта
+  });
+
+  it('пустой endKey без horizonEnd → превью пусто (back-compat)', () => {
+    const cal = buildWeekdayCalendar('2026-07-01', 120);
+    const res = computePreview(480, '2026-07-01', '', cal, dept);
+    expect(res.rows).toEqual([]);
     expect(res.total).toBe(0);
   });
 });

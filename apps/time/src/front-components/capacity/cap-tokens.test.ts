@@ -18,8 +18,8 @@ const cell = (capacity: number, load: number): LoadCell => ({
 describe('loadTone', () => {
   it('null ratio → нейтральный (нет ёмкости)', () => {
     const t = loadTone(null);
-    // T.textFaint = '#9a9ea8' (hex из tokens)
-    expect(t.fg).toBe('#9a9ea8');
+    // T.textFaint = '#7c8089' (hex из tokens, поднят до AA — WI-34)
+    expect(t.fg).toBe('#7c8089');
     expect(t.bg).toBeTruthy();
   });
 
@@ -116,7 +116,7 @@ describe('gapTone (шкала ±5/15%)', () => {
   const alphaOf = (bg: string): number => parseFloat(bg.match(/[\d.]+\)$/)![0]);
 
   it('null → нейтральный (нет ёмкости)', () => {
-    expect(gapTone(null).fg).toBe('#9a9ea8'); // T.textFaint
+    expect(gapTone(null).fg).toBe('#7c8089'); // T.textFaint (AA, WI-34)
   });
 
   it('|gap| ≤ 5% → баланс (прозрачно)', () => {
@@ -131,7 +131,7 @@ describe('gapTone (шкала ±5/15%)', () => {
   });
 
   it('профицит → синий, сильнее при >15%', () => {
-    expect(gapTone(-0.1).bg).toMatch(/^rgba\(59, 111, 224,/);
+    expect(gapTone(-0.1).bg).toMatch(/^rgba\(46, 71, 215,/); // бренд-индиго ACCENT_RGB
     expect(alphaOf(gapTone(-0.2).bg)).toBeGreaterThan(alphaOf(gapTone(-0.1).bg));
   });
 });

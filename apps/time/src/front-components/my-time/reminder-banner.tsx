@@ -48,7 +48,7 @@ export const ReminderBanner = ({
           gap: 10,
           padding: '11px 13px',
           background: T.warnTint,
-          border: `1px solid #f6da90`,
+          border: `1px solid ${T.warnBorder}`,
           borderRadius: 10,
           fontSize: 13,
           color: T.warnSolid,

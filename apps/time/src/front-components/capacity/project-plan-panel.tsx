@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react';
 
 import { T } from 'src/front-components/capacity/cap-tokens';
-import { computePreview, validateRange } from 'src/front-components/capacity/plan-preview';
+import {
+  computePreview,
+  openEndedHint,
+  previewLoadCtxFor,
+  validateRange,
+  type PreviewSource,
+} from 'src/front-components/capacity/plan-preview';
 import type { PlanSpread } from 'src/front-components/capacity/calc-load';
 import type { CapProject, DeptRef, ProjectPatch } from 'src/front-components/capacity/types';
 
@@ -16,7 +22,10 @@ import type { CapProject, DeptRef, ProjectPatch } from 'src/front-components/cap
 type Props = {
   project: CapProject;
   spread?: PlanSpread; // WI-05: рабочие дни для раскида превью (без него — пусто)
-  dept?: DeptRef; // для овербукинга в превью (план периода > ёмкости отдела)
+  dept?: DeptRef; // back-compat: овербукинг vs ПОЛНОЙ ёмкости одного отдела
+  // WI-48 W3B.18/22: данные доски для овербукинга vs СВОБОДНОЙ ёмкости отдела(ов).
+  // Приоритетнее dept: даёт занятость др. проектами/планами/бронями + доли отделов.
+  previewSource?: PreviewSource;
   onSave: (id: string, patch: ProjectPatch) => Promise<boolean>;
 };
 
@@ -49,7 +58,7 @@ const fieldStyle = {
 
 const tnum = { fontVariantNumeric: 'tabular-nums' as const };
 
-export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
+export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave }: Props) => {
   const [open, setOpen] = useState(false);
   // Черновик независим от строки: Отмена/Esc отбрасывает без записи.
   const [method, setMethod] = useState<'EVEN' | 'MANUAL'>('EVEN');
@@ -62,14 +71,26 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
 
   const effort = parseEffort(hours);
   const rangeError = validateRange(start, end);
+  // W3B.23: пустой ПО — не ошибка, а «открытый план» (тянем до горизонта). Подсказка.
+  const endHint = openEndedHint(end);
+
+  // WI-48 W3B.18/22: контекст свободной ёмлости отдела(ов) под этот проект
+  // (резолвит долевые отделы, исключает сам проект из «занятого»). Fallback на dept.
+  const loadCtx = useMemo(
+    () => previewLoadCtxFor(project, previewSource),
+    [project, previewSource],
+  );
 
   const preview = useMemo(
     () =>
       spread?.hoursByDay && !rangeError && effort
-        ? computePreview(effort, start, end, spread.hoursByDay, dept)
+        ? computePreview(effort, start, end, spread.hoursByDay, loadCtx ?? dept)
         : null,
-    [spread, rangeError, effort, start, end, dept],
+    [spread, rangeError, effort, start, end, loadCtx, dept],
   );
+
+  // WI-48 W3B.21: число периодов с овербукингом (для инлайн-баннера; кнопка активна).
+  const overCount = preview?.overCount ?? 0;
 
   const close = () => setOpen(false);
 
@@ -240,6 +261,32 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
               <div style={{ fontSize: 11, color: T.over, marginBottom: 12 }}>⚠ {rangeError}</div>
             )}
 
+            {/* W3B.23: пустой ПО — открытый план (не блок), мягкая подсказка. */}
+            {!rangeError && endHint && (
+              <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 12 }}>↗ {endHint}</div>
+            )}
+
+            {/* WI-48 W3B.21: инлайн-баннер овербукинга. Кнопка остаётся активной —
+                планирование с перегрузом не блокируется (как доска), только предупреждение. */}
+            {overCount > 0 && (
+              <div
+                style={{
+                  fontSize: 11,
+                  color: T.warnSolid,
+                  background: T.warnTint,
+                  border: `1px solid ${T.warnSolid}`,
+                  borderRadius: 6,
+                  padding: '6px 8px',
+                  marginBottom: 12,
+                  lineHeight: 1.4,
+                }}
+                role="status"
+              >
+                ⚠ Овербукинг в {overCount}{' '}
+                {overCount === 1 ? 'периоде' : overCount < 5 ? 'периодах' : 'периодах'}: план превышает свободную ёмкость отдела. Можно сохранить — это предупреждение.
+              </div>
+            )}
+
             {/* Живое превью */}
             {preview && preview.rows.length > 0 && (
               <div
@@ -260,7 +307,13 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
                     lineHeight: 1.4,
                   }}
                 >
-                  Раскид по рабочим дням{dept && dept.headcount > 0 ? ` (ёмкость отдела ${dept.name})` : ''}:
+                  Раскид по рабочим дням{
+                    loadCtx
+                      ? ` (свободная ёмкость ${loadCtx.depts.map((d) => d.name).join(', ')})`
+                      : dept && dept.headcount > 0
+                        ? ` (ёмкость отдела ${dept.name})`
+                        : ''
+                  }:
                 </div>
                 {/* Без вложенного скролла: панель скроллится целиком, двойной скролл
                     (nested) — антипаттерн и прятал бы кнопки. */}
@@ -299,7 +352,7 @@ export const ProjectPlanPanel = ({ project, spread, dept, onSave }: Props) => {
                               whiteSpace: 'nowrap',
                               ...tnum,
                             }}
-                            title={`План ${round(r.hours)} ч > ёмкости ${round(r.capacity ?? 0)} ч`}
+                            title={`План ${round(r.hours)} ч > свободной ёмкости ${round(r.capacity ?? 0)} ч${r.fullCapacity != null ? ` (из ${round(r.fullCapacity)} ч полной)` : ''}`}
                           >
                             ⚠ +{round(r.hours - (r.capacity ?? 0))}
                           </span>

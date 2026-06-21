@@ -27,12 +27,12 @@ describe('TAG_COLOR_HEX', () => {
 describe('tagColorHex', () => {
   it('знакомый цвет → правильный hex', () => {
     expect(tagColorHex('green')).toEqual({ solid: '#2f9e57', tint: '#e6f4ec' });
-    expect(tagColorHex('blue')).toEqual({ solid: '#3b6fe0', tint: '#eaf0fd' });
+    expect(tagColorHex('blue')).toEqual({ solid: '#2e47d7', tint: '#eaedfb' });
   });
 
   it('null → fallback', () => {
     const f = tagColorHex(null);
-    expect(f.solid).toBe('#9a9ea8');
+    expect(f.solid).toBe('#7c8089'); // T.textFaint (поднят до AA, WI-34)
     expect(f.tint).toBe('#f0f1f3');
   });
 

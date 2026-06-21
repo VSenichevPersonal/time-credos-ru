@@ -319,7 +319,7 @@ export const projectShareHoursInPeriod = (
 // Если у проекта есть доли (sharesByProject) → Σ часов долей ЭТОГО отдела (раскид
 // по датам проекта). Fallback (обратная совместимость): у проекта нет ни одной
 // доли → старое поведение: весь plannedEffort на project.departmentId.
-const projectDeptHoursInPeriod = (
+export const projectDeptHoursInPeriod = (
   project: CapProject,
   deptId: string,
   period: Period,
@@ -411,7 +411,7 @@ export const buildBookingCtx = (
 };
 
 // Часы броней ОТДЕЛА за период = Σ броней его сотрудников (HARD/SOFT раздельно).
-const deptBookingHours = (
+export const deptBookingHours = (
   dept: DeptRef,
   ctx: BookingCtx | undefined,
   period: Period,
