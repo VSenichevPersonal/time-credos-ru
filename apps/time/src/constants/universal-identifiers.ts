@@ -147,6 +147,16 @@ export const CREDOS_TIME_EMPLOYEE_JOB_TITLE_FIELD_ID = 'bcfaaf12-5e9a-4eb1-b5d5-
 export const CREDOS_TIME_EMPLOYEE_ACTIVE_FIELD_ID = 'c2dca599-9ba4-4a03-aca4-75dd1008b079';
 // isManager — признак руководителя (для UI-gate approve/reject + резолва в logic).
 export const CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID = '2f8a6d31-4c7e-4b59-9a0d-7e1f3c2b5a48';
+// CISO-005: server-identity мост. userWorkspaceRef — серверный event.userWorkspaceId
+// (RoutePayload, клиент НЕ подделывает) → этот сотрудник. /s/approval резолвит actor
+// по нему (server-truth), а не по client-supplied workspaceMemberRef. nullable
+// (legacy/dev-сотрудники пусты → мягкая деградация). Заполняется TOFU при 1-м действии.
+export const CREDOS_TIME_EMPLOYEE_USER_WORKSPACE_REF_FIELD_ID =
+  '3a9b7c52-1d6e-4f08-9b2a-8c4d5e6f7a01';
+// userMapPending — TOFU-привязка userWorkspaceRef сделана автоматически (1-е действие),
+// требует сверки админом «этот userWorkspace = этот сотрудник?». Снимается вручную.
+export const CREDOS_TIME_EMPLOYEE_USER_MAP_PENDING_FIELD_ID =
+  '4b8c6d41-2e5f-4a19-8c3b-9d5e6f708b12';
 // Department
 export const CREDOS_TIME_DEPARTMENT_CODE_FIELD_ID = '474dd507-0969-4a74-a981-2da5ede39fe0';
 export const CREDOS_TIME_DEPARTMENT_APPROVAL_REQUIRED_FIELD_ID = 'b399c04e-af37-48cc-ae3e-b6899776c174';

@@ -639,3 +639,178 @@ describe('approval.logic — runRevoke (A4.25/A4.26): APPROVED → SUBMITTED', (
     expect(result).toMatchObject({ ok: true, updated: 1 });
   });
 });
+
+// CISO-005: server-truth актора по event.userWorkspaceId + TOFU-привязка + деградация.
+describe('approval.logic — CISO-005 server-identity actor', () => {
+  const REF = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const UW = 'ffffffff-1111-4fff-8fff-ffffffffffff'; // event.userWorkspaceId (server-truth)
+  const ID = '00000000-0000-4000-8000-000000000001';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  // Server-truth: userWorkspaceId уже замаплен на руководителя → actor резолвится
+  // по userWorkspaceRef, client workspaceMemberRef ИГНОРИРУЕТСЯ (даже если чужой).
+  it('замапленный userWorkspaceId → trusted actor, чужой client-ref не влияет (approve чужой → updated:1)', async () => {
+    const byUw = {
+      data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] },
+    };
+    const entryOther = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    // client прислал ЧУЖОЙ workspaceMemberRef — он должен быть проигнорирован.
+    const mockFn = mockFetch([byUw, entryOther, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+
+    const result = await handler(
+      event({ op: 'approve', ids: ID, workspaceMemberRef: 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa' }, { userWorkspaceId: UW }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    // resolveActor ходил ТОЛЬКО по userWorkspaceRef[eq] (1 employee-fetch), не по client-ref.
+    const empCalls = mockFn.mock.calls.filter(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes('/rest/credosTimeEmployees?'),
+    );
+    expect(empCalls.length).toBe(1);
+    expect((empCalls[0][0] as string)).toContain(`userWorkspaceRef%5Beq%5D%3A${UW}`);
+  });
+
+  // Server-truth: чужой actor отклонён. userWorkspaceId замаплен на НЕ-менеджера →
+  // approve forbidden, даже если client-ref указывает на менеджера.
+  it('замапленный userWorkspaceId на НЕ-менеджера → approve forbidden (подмена client-ref не помогает)', async () => {
+    const byUw = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF, userWorkspaceRef: UW }] },
+    };
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true, json: () => Promise.resolve(byUw), text: () => Promise.resolve(''),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await handler(
+      event({ op: 'approve', ids: ID, workspaceMemberRef: REF }, { userWorkspaceId: UW }),
+    );
+    expect(result).toMatchObject({ ok: false, error: expect.stringContaining('руководитель') });
+    expect(fetchMock).toHaveBeenCalledTimes(1); // только resolveActor
+  });
+
+  // recall: владелец (по server-truth) отзывает свою запись → ок.
+  it('recall: владелец по server-truth (userWorkspaceRef) → SUBMITTED→DRAFT updated:1', async () => {
+    const byUw = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF, userWorkspaceRef: UW }] },
+    };
+    const ownEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    vi.stubGlobal('fetch', mockFetch([byUw, ownEntry, patchOk]));
+
+    const result = await handler(event({ op: 'recall', ids: ID }, { userWorkspaceId: UW }));
+    expect(result).toMatchObject({ ok: true, updated: 1, skippedForeign: 0 });
+  });
+
+  // recall: чужой actor (server-truth) → чужая запись пропущена (skippedForeign).
+  it('recall: чужая запись по server-truth → skippedForeign:1 (не отзывает чужое)', async () => {
+    const byUw = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF, userWorkspaceRef: UW }] },
+    };
+    const foreignEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([byUw, foreignEntry]));
+
+    const result = await handler(event({ op: 'recall', ids: ID }, { userWorkspaceId: UW }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skippedForeign: 1 });
+  });
+
+  // SoD revoke: руководитель НЕ отзывает СВОЮ запись (server-truth владелец==actor).
+  it('revoke: автор-руководитель (server-truth) не отзывает свою → skippedOwn:1', async () => {
+    const byUw = {
+      data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] },
+    };
+    const ownApproved = {
+      data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e-mgr', projectId: 'p1' }] },
+    };
+    vi.stubGlobal('fetch', mockFetch([byUw, ownApproved]));
+
+    const result = await handler(event({ op: 'revoke', ids: ID }, { userWorkspaceId: UW }));
+    expect(result).toMatchObject({ ok: true, updated: 0, skippedOwn: 1 });
+  });
+
+  // TOFU: userWorkspaceId не замаплен, но client дал workspaceMemberRef, у employee
+  // userWorkspaceRef пуст → привязка (PATCH userWorkspaceRef + userMapPending) + действие.
+  it('TOFU: незамапленный userWorkspaceId привязывается к employee (PATCH userWorkspaceRef+pending) и actor работает', async () => {
+    const byUwEmpty = { data: { credosTimeEmployees: [] } }; // нет по userWorkspaceRef
+    const byRef = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF, userWorkspaceRef: null }] },
+    };
+    const tofuPatchOk = {}; // PATCH привязки
+    const ownEntry = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] },
+    };
+    const recallPatchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    const mockFn = mockFetch([byUwEmpty, byRef, tofuPatchOk, ownEntry, recallPatchOk]);
+    vi.stubGlobal('fetch', mockFn);
+
+    const result = await handler(
+      event({ op: 'recall', ids: ID, workspaceMemberRef: REF }, { userWorkspaceId: UW }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    // TOFU-PATCH на employee с userWorkspaceRef + userMapPending=true.
+    const tofuCall = mockFn.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string'
+        && c[0].includes('/rest/credosTimeEmployees/e1')
+        && (c[1] as { method?: string })?.method === 'PATCH',
+    );
+    expect(tofuCall).toBeTruthy();
+    const body = JSON.parse((tofuCall![1] as { body: string }).body);
+    expect(body.userWorkspaceRef).toBe(UW);
+    expect(body.userMapPending).toBe(true);
+  });
+
+  // TOFU-коллизия: employee по client-ref уже имеет ДРУГОЙ userWorkspaceRef → не
+  // перезаписываем, actor=null → approve без actor идёт по dev-bypass? Нет: actor=null
+  // при наличии userWorkspaceId означает «не смогли резолвить» → guard пропускается
+  // только при actor=null (как было). Проверяем что привязка НЕ перезаписана.
+  it('TOFU-коллизия: employee уже замаплен другим userWorkspaceId → НЕ перезаписываем (нет PATCH привязки)', async () => {
+    const OTHER_UW = '99999999-2222-4999-8999-999999999999';
+    const byUwEmpty = { data: { credosTimeEmployees: [] } };
+    const byRef = {
+      data: { credosTimeEmployees: [{ id: 'e1', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: OTHER_UW }] },
+    };
+    // actor=null → guard пропущен (как dev), entry fetch + patch для approve.
+    const entryOther = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    const mockFn = mockFetch([byUwEmpty, byRef, entryOther, patchOk]);
+    vi.stubGlobal('fetch', mockFn);
+
+    await handler(event({ op: 'approve', ids: ID, workspaceMemberRef: REF }, { userWorkspaceId: UW }));
+    // Привязки-PATCH на employee/e1 быть НЕ должно (коллизия).
+    const tofuCall = mockFn.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string'
+        && c[0].includes('/rest/credosTimeEmployees/e1')
+        && (c[1] as { method?: string })?.method === 'PATCH',
+    );
+    expect(tofuCall).toBeFalsy();
+  });
+
+  // NULL-деградация: event.userWorkspaceId пуст → старый путь по workspaceMemberRef,
+  // dev-flow не падает (RBAC/SoD по client-ref, trusted=false).
+  it('NULL userWorkspaceId → деградация на workspaceMemberRef, не падает (approve чужой менеджером → updated:1)', async () => {
+    const byRef = {
+      data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: null }] },
+    };
+    const entryOther = {
+      data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] },
+    };
+    const patchOk = { data: { updateCredosTimeEntry: { id: ID } } };
+    // userWorkspaceId не передаём (null) → ветка 3, один employee-fetch по workspaceMemberRef.
+    vi.stubGlobal('fetch', mockFetch([byRef, entryOther, patchOk]));
+
+    const result = await handler(event({ op: 'approve', ids: ID, workspaceMemberRef: REF }));
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+});

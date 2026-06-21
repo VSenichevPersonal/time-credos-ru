@@ -20,6 +20,8 @@ import {
   CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_USER_MAP_PENDING_FIELD_ID,
+  CREDOS_TIME_EMPLOYEE_USER_WORKSPACE_REF_FIELD_ID,
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
@@ -102,6 +104,31 @@ export default defineObject({
       label: 'Руководитель',
       icon: 'IconUserStar',
       description: 'Может согласовывать трудозатраты сотрудников',
+      defaultValue: false,
+    },
+    // CISO-005: server-identity мост. Серверный event.userWorkspaceId (RoutePayload —
+    // клиент НЕ подделывает) → этот сотрудник. /s/approval резолвит actor по нему
+    // (server-truth), а не по client-supplied workspaceMemberRef. Заполняется TOFU при
+    // первом действии сотрудника. nullable: legacy/dev пусты → мягкая деградация.
+    {
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_USER_WORKSPACE_REF_FIELD_ID,
+      name: 'userWorkspaceRef',
+      type: FieldType.TEXT,
+      label: 'ID сессии workspace',
+      icon: 'IconLock',
+      description: 'Серверный userWorkspaceId (CISO-005 actor-маппинг, не из клиента)',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // TOFU-пометка: userWorkspaceRef привязан автоматически при 1-м действии и ждёт
+    // сверки админом «этот userWorkspace = этот сотрудник?». Снимается вручную.
+    {
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_USER_MAP_PENDING_FIELD_ID,
+      name: 'userMapPending',
+      type: FieldType.BOOLEAN,
+      label: 'Маппинг ждёт сверки',
+      icon: 'IconAlertTriangle',
+      description: 'Автопривязка userWorkspaceRef (TOFU) — проверить админом',
       defaultValue: false,
     },
     // Employee.department -> Department.employees (MANY_TO_ONE).
