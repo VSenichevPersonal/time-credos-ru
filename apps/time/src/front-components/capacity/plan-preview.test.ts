@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import {
   computePreview,
+  monthsInRange,
   openEndedHint,
   previewBuckets,
   previewDeptsForProject,
   previewGranularity,
   previewLoadCtxFor,
+  reconcileSlots,
+  sumSlotHours,
   utilPct,
   validateRange,
   type PreviewSource,
@@ -293,5 +296,74 @@ describe('utilPct — утилизация периода', () => {
   it('нет ёмкости (null / 0) → null', () => {
     expect(utilPct({ hours: 40, capacity: null })).toBeNull();
     expect(utilPct({ hours: 40, capacity: 0 })).toBeNull();
+  });
+});
+
+describe('monthsInRange (WI-47)', () => {
+  it('месяцы внутри одного года, ключ YYYY-MM и метка', () => {
+    const out = monthsInRange('2026-02-10', '2026-04-20');
+    expect(out.map((m) => m.periodMonth)).toEqual(['2026-02', '2026-03', '2026-04']);
+    expect(out[0].label).toBe('фев 26');
+    expect(out[2].label).toBe('апр 26');
+  });
+
+  it('один месяц, когда С и ПО в одном месяце', () => {
+    expect(monthsInRange('2026-06-01', '2026-06-30').map((m) => m.periodMonth)).toEqual(['2026-06']);
+  });
+
+  it('переход через год', () => {
+    expect(monthsInRange('2025-11-15', '2026-02-01').map((m) => m.periodMonth)).toEqual([
+      '2025-11',
+      '2025-12',
+      '2026-01',
+      '2026-02',
+    ]);
+  });
+
+  it('пустой/невалидный диапазон → []', () => {
+    expect(monthsInRange('', '2026-04-01')).toEqual([]);
+    expect(monthsInRange('2026-04-01', '')).toEqual([]);
+    expect(monthsInRange('2026-05-01', '2026-04-01')).toEqual([]); // ПО раньше С
+    expect(monthsInRange('xxxx', '2026-04-01')).toEqual([]);
+  });
+
+  it('месяц с однозначным номером дополняется нулём (padStart)', () => {
+    expect(monthsInRange('2026-01-01', '2026-01-31')[0].periodMonth).toBe('2026-01');
+  });
+});
+
+describe('sumSlotHours (WI-47)', () => {
+  it('Σ часов, null/нечисло игнорируются', () => {
+    expect(sumSlotHours([{ plannedHours: 40 }, { plannedHours: null }, { plannedHours: 20 }])).toBe(60);
+  });
+
+  it('пустой список → 0', () => {
+    expect(sumSlotHours([])).toBe(0);
+  });
+
+  it('округление до 2 знаков (без плавающего хвоста)', () => {
+    expect(sumSlotHours([{ plannedHours: 0.1 }, { plannedHours: 0.2 }])).toBe(0.3);
+  });
+});
+
+describe('reconcileSlots (WI-47 Σ-сверка)', () => {
+  it('Σ совпадает с объёмом → ok', () => {
+    const r = reconcileSlots([{ plannedHours: 50 }, { plannedHours: 50 }], 100);
+    expect(r).toEqual({ sum: 100, target: 100, ok: true });
+  });
+
+  it('допуск 1 ч → ok', () => {
+    expect(reconcileSlots([{ plannedHours: 99.5 }], 100).ok).toBe(true);
+    expect(reconcileSlots([{ plannedHours: 101 }], 100).ok).toBe(true);
+  });
+
+  it('расхождение больше 1 ч → не ok', () => {
+    const r = reconcileSlots([{ plannedHours: 80 }], 100);
+    expect(r.sum).toBe(80);
+    expect(r.ok).toBe(false);
+  });
+
+  it('объём не задан (null) → не ok, target 0', () => {
+    expect(reconcileSlots([{ plannedHours: 40 }], null)).toEqual({ sum: 40, target: 0, ok: false });
   });
 });

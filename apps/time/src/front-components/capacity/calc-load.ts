@@ -10,6 +10,7 @@ import type {
   EmployeeRef,
   LoadCell,
   Period,
+  PlanSlot,
   ProjectDeptShare,
   ProjectLoad,
 } from 'src/front-components/capacity/types';
@@ -262,22 +263,108 @@ export const plannedHoursInPeriod = (
   return (plannedEffort * overlap) / totalDays;
 };
 
-// Часы проекта, попадающие в период: plannedEffort раскидан по периоду действия
-// проекта, пересечённому с колонкой. С PlanSpread — по РАБОЧИМ дням (WI-05);
-// без него — по календарным (back-compat). Проект без endDate тянется до
-// spread.horizonEnd (если задан).
+// ===========================================================================
+// WI-47: ручной раскид по месяцам (project.planMethod=MANUAL, credosTimePlanSlot).
+// Каждый слот = календарный месяц 'YYYY-MM' с plannedHours. Внутри месяца часы
+// раскидываются по РАБОЧИМ дням (та же plannedHoursInPeriod на границах месяца),
+// затем суммируется пересечение с колонкой периода. Инвариант: Σ слотов по
+// горизонту = Σ plannedHours заданных месяцев (а НЕ project.plannedEffort —
+// сверка мягкая, см. sumSlotHours/sumPlannedEffortGap для хелпера Dev1).
+// ===========================================================================
+
+// Границы календарного месяца 'YYYY-MM' → [первый день, последний день] (YYYY-MM-DD).
+// Невалидный ключ → null (слот игнорируется).
+export const monthRange = (
+  periodMonth: string | null | undefined,
+): { start: string; end: string } | null => {
+  if (!periodMonth || !/^\d{4}-\d{2}$/.test(periodMonth)) return null;
+  const [y, m] = periodMonth.split('-').map(Number);
+  if (m < 1 || m > 12) return null;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate(); // day 0 след. месяца = последний текущего
+  return { start: `${periodMonth}-01`, end: `${periodMonth}-${String(last).padStart(2, '0')}` };
+};
+
+// Карта projectId → его помесячные слоты. Слоты без projectId/без месяца отбрасываются.
+export const buildSlotsByProject = (
+  slots: PlanSlot[],
+): Map<string, PlanSlot[]> => {
+  const m = new Map<string, PlanSlot[]>();
+  for (const s of slots) {
+    if (!s.projectId || !monthRange(s.periodMonth)) continue;
+    const arr = m.get(s.projectId) ?? [];
+    arr.push(s);
+    m.set(s.projectId, arr);
+  }
+  return m;
+};
+
+// Часы НАБОРА слотов, попадающие в колонку периода: для каждого слота раскид
+// plannedHours по рабочим дням его месяца, пересечённый с period. Пустые/0 слоты
+// вклада не дают.
+export const slotsHoursInPeriod = (
+  slots: PlanSlot[] | undefined,
+  period: Period,
+  spread?: PlanSpread,
+): number => {
+  if (!slots || slots.length === 0) return 0;
+  let sum = 0;
+  for (const s of slots) {
+    const r = monthRange(s.periodMonth);
+    if (!r || !s.plannedHours) continue;
+    sum += plannedHoursInPeriod(s.plannedHours, r.start, r.end, period, spread);
+  }
+  return sum;
+};
+
+// MANUAL-режим активен у проекта, если planMethod='MANUAL' И есть хотя бы один
+// валидный слот (иначе fallback на EVEN — не оставлять проект пустым).
+const useManual = (project: CapProject, slots?: PlanSlot[]): boolean =>
+  project.planMethod === 'MANUAL' && !!slots && slots.length > 0;
+
+// Σ-сверка (хелпер Dev1, валидация МЯГКАЯ): сумма plannedHours всех слотов проекта
+// (валидный месяц) против project.plannedEffort. gap = Σслотов − plannedEffort
+// (null если plannedEffort пуст). matches=true при |gap|≤tol (по умолч. 0.01).
+// Не блокирует сохранение — только индикация рассинхрона в UI.
+export const sumSlotHours = (slots: PlanSlot[] | undefined): number => {
+  if (!slots) return 0;
+  let sum = 0;
+  for (const s of slots) {
+    if (monthRange(s.periodMonth) && s.plannedHours) sum += s.plannedHours;
+  }
+  return Number(sum.toFixed(2));
+};
+
+export const slotsVsPlannedEffort = (
+  slots: PlanSlot[] | undefined,
+  plannedEffort: number | null,
+  tol = 0.01,
+): { sum: number; gap: number | null; matches: boolean } => {
+  const sum = sumSlotHours(slots);
+  if (plannedEffort == null) return { sum, gap: null, matches: true };
+  const gap = Number((sum - plannedEffort).toFixed(2));
+  return { sum, gap, matches: Math.abs(gap) <= tol };
+};
+
+// Часы проекта, попадающие в период. EVEN (дефолт): plannedEffort раскидан по
+// периоду действия проекта (по рабочим дням с PlanSpread / календарным без).
+// MANUAL (WI-47): Σ помесячных слотов (slotsByProject). Проект без endDate в EVEN
+// тянется до spread.horizonEnd.
 export const projectHoursInPeriod = (
   project: CapProject,
   period: Period,
   spread?: PlanSpread,
-): number =>
-  plannedHoursInPeriod(
+  slotsByProject?: Map<string, PlanSlot[]>,
+): number => {
+  const slots = slotsByProject?.get(project.id);
+  if (useManual(project, slots)) return slotsHoursInPeriod(slots, period, spread);
+  return plannedHoursInPeriod(
     project.plannedEffort,
     project.startDate,
     project.endDate,
     period,
     spread,
   );
+};
 
 // ===========================================================================
 // REQ-0013 13b: загрузка отдела по ДОЛЯМ (credosTimeProjectDepartment).
@@ -327,7 +414,20 @@ export const projectDeptHoursInPeriod = (
   period: Period,
   sharesByProject?: Map<string, ProjectDeptShare[]>,
   spread?: PlanSpread,
+  slotsByProject?: Map<string, PlanSlot[]>,
 ): number => {
+  const slots = slotsByProject?.get(project.id);
+  // WI-47 MANUAL: слоты с departmentId=deptId → этому отделу; слоты без отдела →
+  // «родному» отделу проекта (project.departmentId). Источник истины — слоты,
+  // доли в ручном режиме не применяются.
+  if (useManual(project, slots)) {
+    const own = slots!.filter(
+      (s) =>
+        s.departmentId === deptId ||
+        (!s.departmentId && project.departmentId === deptId),
+    );
+    return slotsHoursInPeriod(own, period, spread);
+  }
   const shares = sharesByProject?.get(project.id);
   if (shares && shares.length > 0) {
     let sum = 0;
@@ -482,12 +582,20 @@ export const deptLoadCells = (
   sharesByProject?: Map<string, ProjectDeptShare[]>,
   bookingCtx?: BookingCtx,
   spread?: PlanSpread,
+  slotsByProject?: Map<string, PlanSlot[]>,
 ): LoadCell[] =>
   periods.map((period) => {
     const capacity = deptCapacity(dept, period, ctx);
     let planLoad = 0;
     for (const p of projects) {
-      planLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject, spread);
+      planLoad += projectDeptHoursInPeriod(
+        p,
+        dept.id,
+        period,
+        sharesByProject,
+        spread,
+        slotsByProject,
+      );
     }
     for (const dp of deptPlans) {
       if (dp.departmentId === dept.id) planLoad += deptPlanHoursInPeriod(dp, period, spread);
@@ -510,6 +618,7 @@ export const employeeLoadCells = (
   sharesByProject?: Map<string, ProjectDeptShare[]>,
   bookingCtx?: BookingCtx,
   spread?: PlanSpread,
+  slotsByProject?: Map<string, PlanSlot[]>,
 ): LoadCell[] => {
   const factor = resolveCapacityFactor(dept?.capacityFactor);
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
@@ -525,7 +634,14 @@ export const employeeLoadCells = (
     if (dept) {
       // REQ-0013 13b: загрузка отдела по долям проектов (fallback на plannedEffort).
       for (const p of projects) {
-        deptLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject, spread);
+        deptLoad += projectDeptHoursInPeriod(
+          p,
+          dept.id,
+          period,
+          sharesByProject,
+          spread,
+          slotsByProject,
+        );
       }
       // REQ-0012: плановые загрузки отдела без проекта тоже делятся поровну.
       for (const dp of deptPlans) {

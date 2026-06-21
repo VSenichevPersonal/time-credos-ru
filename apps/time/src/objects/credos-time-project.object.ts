@@ -8,6 +8,8 @@ import {
 } from 'twenty-sdk/define';
 
 import {
+  PLAN_METHOD_DEFAULT,
+  PLAN_METHOD_OPTIONS,
   PROJECT_CATEGORY_DEFAULT,
   PROJECT_STATUS_DEFAULT,
   PROJECT_STATUS_OPTIONS,
@@ -26,6 +28,7 @@ import {
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
+  CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_MANAGED_PROJECTS_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_OWNED_PROJECTS_FIELD_ID,
 } from 'src/constants/universal-identifiers';
@@ -117,6 +120,20 @@ export default defineObject({
       isNullable: true,
       defaultValue: null,
       universalSettings: { dataType: NumberDataType.FLOAT, decimals: 2 },
+    },
+    // WI-47: способ раскида плана. EVEN (дефолт) — равномерно из plannedEffort+дат
+    // на лету; MANUAL — Σ помесячных слотов credosTimePlanSlot. nullable → пусто
+    // трактуется как EVEN (миграция существующих проектов без значения).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID,
+      name: 'planMethod',
+      type: FieldType.SELECT,
+      label: 'Способ планирования',
+      icon: 'IconLayoutDistributeHorizontal',
+      description: 'EVEN — равномерно по сроку; MANUAL — вручную по месяцам (Σ слотов).',
+      isNullable: true,
+      defaultValue: PLAN_METHOD_DEFAULT,
+      options: PLAN_METHOD_OPTIONS,
     },
     {
       universalIdentifier: CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID,

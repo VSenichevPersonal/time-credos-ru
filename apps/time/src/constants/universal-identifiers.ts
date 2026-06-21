@@ -787,3 +787,42 @@ export const CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_REGISTRY_UNIVERSAL_IDENTIFIE
   '80766bd3-15f4-4772-b92f-7f2f52486cf2';
 export const CREDOS_TIME_EMPLOYEE_RP_W_BOOKINGS_REGISTRY_UNIVERSAL_IDENTIFIER =
   'abe3d2f5-67f7-4b35-805a-ea739c74b640';
+
+// --- WI-47 (MANUAL PLANNING): помесячный слот плана проекта ---
+// credosTimePlanSlot = редактируемая запись «проект [× отдел] × месяц → плановые
+// часы». Закрывает «Планирование вручную по месяцам» (PLANNING_RECORDS_CONSISTENCY
+// §5 уровень 1): в режиме MANUAL загрузка проекта = Σ слотов (вместо EVEN-раскида
+// из plannedEffort+дат). EVEN остаётся дефолтом (раскид считается на лету, слоты
+// не создаются). Гранулярность — проект×месяц, опц. department (стыковка REQ-0013).
+// onDelete CASCADE: слот — производная детализация плана проекта, без проекта
+// смысла не имеет (сирот-слотов быть не должно). Дедуп (project[,dept],periodMonth)
+// — в upsert-логике /s/plan-slots (read-by-key → PATCH | POST), как в коде уже
+// принято (SDK-индексов в объектах проекта нет).
+export const CREDOS_TIME_PLAN_SLOT_OBJECT_UNIVERSAL_IDENTIFIER =
+  '6f88ceb4-0b8a-488b-bb1e-497e15bb4212';
+// Скаляры.
+export const CREDOS_TIME_PLAN_SLOT_PERIOD_MONTH_FIELD_ID =
+  '092949c8-5306-42d8-870a-bd5b085ead51';
+export const CREDOS_TIME_PLAN_SLOT_PLANNED_HOURS_FIELD_ID =
+  '8ec64822-b0ba-4c54-9b82-ce3f20710f6c';
+// PlanSlot.project -> Project.planSlots (MANY_TO_ONE CASCADE + обратная ONE_TO_MANY).
+export const CREDOS_TIME_PLAN_SLOT_PROJECT_FIELD_ID =
+  'e47a57d0-41c0-4570-b912-b3f64a3a0a7f';
+export const CREDOS_TIME_PROJECT_PLAN_SLOTS_FIELD_ID =
+  '75837859-f204-456b-8459-c26ba63d2d5d';
+// PlanSlot.department -> Department.planSlots (MANY_TO_ONE nullable + обратная).
+export const CREDOS_TIME_PLAN_SLOT_DEPARTMENT_FIELD_ID =
+  'a26d956b-880b-49eb-92e1-9472fae20786';
+export const CREDOS_TIME_DEPARTMENT_PLAN_SLOTS_FIELD_ID =
+  '184ba47c-e6c6-45ad-9f7d-3bb570a9c8cd';
+// Index-view + nav.
+export const CREDOS_TIME_PLAN_SLOT_VIEW_UNIVERSAL_IDENTIFIER =
+  'bbbfbb26-35ff-4008-8ee4-106c84e6e3f1';
+export const CREDOS_TIME_PLAN_SLOT_NAV_UNIVERSAL_IDENTIFIER =
+  '7dcc2b69-7143-4733-b48a-0fcec5dd2433';
+// planMethod на проекте (EVEN | MANUAL) — выбор режима раскида плана.
+export const CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID =
+  '05128558-ef41-46c1-8c48-151ab4dbdace';
+// /s/plan-slots — read (byProjectId) + upsert помесячно.
+export const PLAN_SLOTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  '92237709-0601-438c-a4f0-21d115bd505b';

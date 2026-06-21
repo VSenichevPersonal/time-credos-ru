@@ -1,24 +1,37 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { T, loadTone, formatPct } from 'src/front-components/capacity/cap-tokens';
 import {
   computePreview,
+  monthsInRange,
   openEndedHint,
   previewLoadCtxFor,
+  reconcileSlots,
   utilPct,
   validateRange,
   type PreviewSource,
 } from 'src/front-components/capacity/plan-preview';
+import {
+  fetchPlanSlots,
+  savePlanSlots,
+  type PlanSlotInput,
+} from 'src/front-components/capacity/plan-slots-rest';
 import type { PlanSpread } from 'src/front-components/capacity/calc-load';
 import type { CapProject, DeptRef, ProjectPatch } from 'src/front-components/capacity/types';
 
 // WI-11 Фаза-1: inline-поповер «Планировать» на строке проекта (useState, паттерн
 // row-menu/cell-comment — host-DOM/модалок нет в Remote DOM). Один экран:
-// способ (Равномерно дефолт; Вручную — заглушка фаза-2) → диапазон С/ПО →
+// способ (Равномерно дефолт; Вручную по месяцам — WI-47) → диапазон С/ПО →
 // объём в часах → ЖИВОЕ превью раскида по рабочим дням (двойник доски через
 // plannedHoursInPeriod) + строка Σ-сверки + мягкая подсветка овербукинга.
 // Сохранение через usePlanEdit.save (plannedEffort+startDate+endDate). Esc/Отмена
 // без confirm. Сверка: Timetta resource-plan (диапазон + превью + Σ).
+//
+// WI-47 «Вручную по месяцам» (приоритет заказчика): радио MANUAL включает
+// редактируемые помесячные строки (месяцы из диапазона С..ПО, monthsInRange),
+// input plannedHours на месяц, живая Σ-сверка (reconcileSlots) вместо EVEN-превью.
+// Префилл из GET /s/plan-slots при открытии, сохранение upsert каждого месяца
+// (savePlanSlots). EVEN-режим — дефолт, не тронут. Контракт Dev2: plan-slots-rest.
 
 type Props = {
   project: CapProject;
@@ -69,6 +82,12 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
     project.plannedEffort != null ? String(project.plannedEffort) : '',
   );
   const [saving, setSaving] = useState(false);
+  // WI-47: ручной раскид. Сырые строки инпутов по месяцу (periodMonth → текст),
+  // парсятся parseEffort как объём. departmentId слота помним отдельно (префилл).
+  const [slotHours, setSlotHours] = useState<Record<string, string>>({});
+  const [slotDept, setSlotDept] = useState<Record<string, string | null>>({});
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
 
   const effort = parseEffort(hours);
   const rangeError = validateRange(start, end);
@@ -93,6 +112,51 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
   // WI-48 W3B.21: число периодов с овербукингом (для инлайн-баннера; кнопка активна).
   const overCount = preview?.overCount ?? 0;
 
+  // WI-47: месяцы ручного раскида из диапазона С..ПО (только когда ПО задан —
+  // помесячный режим требует конечный диапазон; открытый план тут не применим).
+  const months = useMemo(
+    () => (method === 'MANUAL' ? monthsInRange(start, end) : []),
+    [method, start, end],
+  );
+
+  // WI-47: живая Σ-сверка ручного раскида (Σ слотов vs объём проекта). Парсим
+  // сырые инпуты текущих месяцев через parseEffort. target = объём (effort).
+  const manualRecon = useMemo(() => {
+    const slots = months.map((m) => ({ plannedHours: parseEffort(slotHours[m.periodMonth] ?? '') }));
+    return reconcileSlots(slots, effort);
+  }, [months, slotHours, effort]);
+
+  // WI-47: префилл слотов проекта из бэка при первом переключении в MANUAL
+  // (один раз на открытие — если уже грузили или есть значения, не перезатираем).
+  useEffect(() => {
+    if (!open || method !== 'MANUAL') return;
+    let alive = true;
+    setSlotsError(null);
+    setSlotsLoading(true);
+    fetchPlanSlots(project.id)
+      .then((slots) => {
+        if (!alive) return;
+        const hoursMap: Record<string, string> = {};
+        const deptMap: Record<string, string | null> = {};
+        for (const s of slots) {
+          hoursMap[s.periodMonth] = String(s.plannedHours);
+          deptMap[s.periodMonth] = s.departmentId ?? null;
+        }
+        setSlotHours((prev) => ({ ...hoursMap, ...prev }));
+        setSlotDept((prev) => ({ ...deptMap, ...prev }));
+        setSlotsLoading(false);
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setSlotsError(e instanceof Error ? e.message : 'Ошибка загрузки слотов');
+        setSlotsLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, method, project.id]);
+
   const close = () => setOpen(false);
 
   // Открытие — синхронизируем черновик с актуальным состоянием строки.
@@ -101,21 +165,50 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
     setStart(isoToDate(project.startDate) || todayKey());
     setEnd(isoToDate(project.endDate));
     setHours(project.plannedEffort != null ? String(project.plannedEffort) : '');
+    setSlotHours({});
+    setSlotDept({});
+    setSlotsError(null);
     setOpen(true);
   };
 
-  const canSave = !rangeError && !saving;
+  // WI-47: в MANUAL нужен конечный диапазон (помесячные строки строятся из С..ПО).
+  // Пустой ПО в ручном режиме блокирует сохранение (нечего раскидывать помесячно).
+  const manualNeedsEnd = method === 'MANUAL' && !end;
+  const canSave = !rangeError && !manualNeedsEnd && !saving && !slotsLoading;
 
   const save = async () => {
     if (!canSave) return;
     setSaving(true);
-    const ok = await onSave(project.id, {
-      plannedEffort: effort,
-      startDate: start || null,
-      endDate: end || null,
-    });
-    setSaving(false);
-    if (ok) close();
+    try {
+      if (method === 'MANUAL') {
+        // Upsert каждого месяца (включая 0 — явный «нет часов» в месяце). Объём
+        // проекта/диапазон тоже сохраняем строкой, чтобы доска знала границы.
+        const slots: PlanSlotInput[] = months.map((m) => ({
+          periodMonth: m.periodMonth,
+          plannedHours: parseEffort(slotHours[m.periodMonth] ?? '') ?? 0,
+          departmentId: slotDept[m.periodMonth] ?? project.departmentId ?? null,
+        }));
+        const slotsOk = await savePlanSlots(project.id, slots);
+        const rowOk = await onSave(project.id, {
+          plannedEffort: manualRecon.sum,
+          startDate: start || null,
+          endDate: end || null,
+        });
+        setSaving(false);
+        if (slotsOk && rowOk) close();
+        return;
+      }
+      const ok = await onSave(project.id, {
+        plannedEffort: effort,
+        startDate: start || null,
+        endDate: end || null,
+      });
+      setSaving(false);
+      if (ok) close();
+    } catch (e: unknown) {
+      setSlotsError(e instanceof Error ? e.message : 'Ошибка сохранения слотов');
+      setSaving(false);
+    }
   };
 
   const total = preview ? round(preview.total) : 0;
@@ -210,12 +303,16 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
                 Равномерно
               </label>
               <label
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: T.textFaint, cursor: 'not-allowed' }}
-                title="Ручной раскид по месяцам — фаза 2 (нужно бэк-поле planMethod)"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: T.text, cursor: 'pointer' }}
+                title="Ручной раскид: объём по месяцам диапазона задаётся вручную"
               >
-                <input type="radio" name={`plan-method-${project.id}`} disabled checked={method === 'MANUAL'} onChange={() => {}} />
+                <input
+                  type="radio"
+                  name={`plan-method-${project.id}`}
+                  checked={method === 'MANUAL'}
+                  onChange={() => setMethod('MANUAL')}
+                />
                 Вручную по месяцам
-                <span style={{ fontSize: 10, color: T.textFaint }}>скоро</span>
               </label>
             </div>
 
@@ -262,14 +359,15 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
               <div style={{ fontSize: 11, color: T.over, marginBottom: 12 }}>⚠ {rangeError}</div>
             )}
 
-            {/* W3B.23: пустой ПО — открытый план (не блок), мягкая подсказка. */}
-            {!rangeError && endHint && (
+            {/* W3B.23: пустой ПО — открытый план (не блок), мягкая подсказка. Только
+                EVEN: ручной режим требует конечный диапазон (своя подсказка ниже). */}
+            {method === 'EVEN' && !rangeError && endHint && (
               <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 12 }}>↗ {endHint}</div>
             )}
 
             {/* WI-48 W3B.21: инлайн-баннер овербукинга. Кнопка остаётся активной —
                 планирование с перегрузом не блокируется (как доска), только предупреждение. */}
-            {overCount > 0 && (
+            {method === 'EVEN' && overCount > 0 && (
               <div
                 style={{
                   fontSize: 11,
@@ -288,8 +386,77 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
               </div>
             )}
 
-            {/* Живое превью */}
-            {preview && preview.rows.length > 0 && (
+            {/* WI-47: ручной помесячный раскид (MANUAL). Редактируемые строки —
+                месяцы диапазона С..ПО, input plannedHours на месяц, живая Σ-сверка.
+                Скролл-фолбэк (длинный диапазон) обеспечен внешним overflow-y тела. */}
+            {method === 'MANUAL' && (
+              <div style={{ borderTop: `1px solid ${T.border}`, paddingTop: 10, marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>
+                  Объём по месяцам:
+                </div>
+
+                {slotsLoading && (
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8 }}>Загрузка слотов…</div>
+                )}
+                {slotsError && (
+                  <div style={{ fontSize: 11, color: T.over, marginBottom: 8 }}>⚠ {slotsError}</div>
+                )}
+                {manualNeedsEnd && (
+                  <div style={{ fontSize: 11, color: T.textMuted, marginBottom: 8, lineHeight: 1.4 }}>
+                    Укажите дату «ПО» — помесячный раскид строится по конечному диапазону.
+                  </div>
+                )}
+
+                {!manualNeedsEnd && months.length > 0 && (
+                  <div>
+                    {months.map((m) => (
+                      <div
+                        key={m.periodMonth}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, fontSize: 11, minWidth: 0 }}
+                      >
+                        <span style={{ flex: 1, minWidth: 0, color: T.textMuted }}>{m.label}</span>
+                        <input
+                          value={slotHours[m.periodMonth] ?? ''}
+                          inputMode="decimal"
+                          placeholder="0"
+                          aria-label={`Плановые часы за ${m.label}`}
+                          onChange={(e) =>
+                            setSlotHours((prev) => ({ ...prev, [m.periodMonth]: e.target.value }))
+                          }
+                          style={{ ...fieldStyle, width: 72, textAlign: 'right', ...tnum }}
+                        />
+                        <span style={{ width: 16, flexShrink: 0, fontSize: 10, color: T.textFaint }}>ч</span>
+                      </div>
+                    ))}
+
+                    {/* Σ-сверка ручного раскида: Σ(слоты) vs объём проекта */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: 11,
+                        color: T.textMuted,
+                        borderTop: `1px solid ${T.border}`,
+                        marginTop: 6,
+                        paddingTop: 6,
+                        ...tnum,
+                      }}
+                    >
+                      <span>
+                        Σ раскид = {round(manualRecon.sum)} ч
+                        {effort != null ? ` · план ${round(effort)} ч` : ' · объём не задан'}
+                      </span>
+                      <span style={{ color: manualRecon.ok ? T.text : T.over }}>
+                        {effort == null ? '·' : manualRecon.ok ? '✓' : '≠'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Живое превью (EVEN) */}
+            {method === 'EVEN' && preview && preview.rows.length > 0 && (
               <div
                 style={{
                   borderTop: `1px solid ${T.border}`,

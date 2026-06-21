@@ -268,3 +268,13 @@ export const BOOKING_TYPE_OPTIONS: SelectOption[] = [
   { value: 'HARD', label: 'Подтверждённая (hard)', position: 1, color: 'green' },
 ];
 export const BOOKING_TYPE_DEFAULT = "'SOFT'";
+
+// WI-47: способ раскида плана проекта. EVEN = равномерно по периоду (раскид
+// считается на лету из plannedEffort+дат, слотов нет — текущее поведение, дефолт).
+// MANUAL = вручную по месяцам (загрузка = Σ помесячных слотов credosTimePlanSlot).
+// Сверка Timetta (правило 8): аналог isAutoPlanning — EVEN≈авто, MANUAL≈ручной метод.
+export const PLAN_METHOD_OPTIONS: SelectOption[] = [
+  { value: 'EVEN', label: 'Равномерно по сроку', position: 0, color: 'blue' },
+  { value: 'MANUAL', label: 'Вручную по месяцам', position: 1, color: 'purple' },
+];
+export const PLAN_METHOD_DEFAULT = "'EVEN'";

@@ -32,6 +32,7 @@ export type CapProject = {
   plannedEffort: number | null; // плановые часы
   startDate: string | null; // ISO
   endDate: string | null; // ISO
+  planMethod?: 'EVEN' | 'MANUAL' | null; // WI-47: способ раскида (пусто = EVEN)
 };
 
 // REQ-0013 13b: доля участия отдела в проекте (join credosTimeProjectDepartment).
@@ -70,6 +71,18 @@ export type DeptPlan = {
   plannedEffort: number | null; // плановые часы
   startDate: string | null; // ISO
   endDate: string | null; // ISO
+};
+
+// WI-47: помесячный слот плана проекта (credosTimePlanSlot). В режиме
+// project.planMethod=MANUAL загрузка проекта = Σ слотов (вместо EVEN-раскида из
+// plannedEffort+дат). periodMonth='YYYY-MM' → внутри месяца раскид по рабочим дням
+// (та же plannedHoursInPeriod, границы месяца). departmentId опц. (детализация
+// проект×отдел×месяц, REQ-0013).
+export type PlanSlot = {
+  projectId: string | null;
+  departmentId: string | null;
+  periodMonth: string | null; // 'YYYY-MM'
+  plannedHours: number | null;
 };
 
 // W3-1: отсутствие сотрудника (отпуск/больничный/...). Период [startDate,

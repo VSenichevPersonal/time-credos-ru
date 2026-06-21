@@ -311,6 +311,61 @@ export const validateRange = (
 export const openEndedHint = (endKey: string): string | null =>
   endKey ? null : 'открытый план — раскид до конца горизонта доски';
 
+// WI-47 «Вручную по месяцам»: чистые ф-ции для ручного помесячного раскида.
+// Контракт Dev2 (`credos-time-plan-slot`): слот = {periodMonth:'YYYY-MM',
+// plannedHours}. UI генерит месяцы диапазона С..ПО и сверяет Σ(слоты) с объёмом.
+
+// Месяцы диапазона [startKey..endKey] (включительно), ключ 'YYYY-MM', метка
+// «мес YY» (как в previewBuckets month-режиме). Пустой/невалидный диапазон → [].
+// ПО раньше С → []. Guard 240 (20 лет) от зацикливания на битых датах.
+export type MonthSlot = { periodMonth: string; label: string };
+
+export const monthsInRange = (startKey: string, endKey: string): MonthSlot[] => {
+  if (!startKey || !endKey || endKey < startKey) return [];
+  const start = new Date(`${startKey}T00:00:00.000Z`);
+  const end = new Date(`${endKey}T00:00:00.000Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+
+  const out: MonthSlot[] = [];
+  let y = start.getUTCFullYear();
+  let m = start.getUTCMonth();
+  const endY = end.getUTCFullYear();
+  const endM = end.getUTCMonth();
+  let guard = 0;
+  while ((y < endY || (y === endY && m <= endM)) && guard < 240) {
+    out.push({
+      periodMonth: `${y}-${String(m + 1).padStart(2, '0')}`,
+      label: `${MONTHS[m]} ${String(y).slice(2)}`,
+    });
+    m++;
+    if (m > 11) { m = 0; y++; }
+    guard++;
+  }
+  return out;
+};
+
+// Σ(plannedHours по месяцам). Игнорит null/нечисло (пустой инпут — 0). Округление
+// до 2 знаков (как parseEffort), чтобы 0.1+0.2 не давало хвост в сверке.
+export const sumSlotHours = (slots: Array<{ plannedHours: number | null }>): number => {
+  let sum = 0;
+  for (const s of slots) {
+    if (s.plannedHours != null && Number.isFinite(s.plannedHours)) sum += s.plannedHours;
+  }
+  return Math.round(sum * 100) / 100;
+};
+
+// Σ-сверка ручного раскида с объёмом проекта. Допуск 1 ч (как EVEN sigmaOk).
+// target null (объём не задан) → не «ок» (нечего сверять). { sum, target, ok }.
+export const reconcileSlots = (
+  slots: Array<{ plannedHours: number | null }>,
+  target: number | null,
+): { sum: number; target: number; ok: boolean } => {
+  const sum = sumSlotHours(slots);
+  const tgt = target != null ? target : 0;
+  const ok = target != null && Math.abs(sum - tgt) <= 1;
+  return { sum, target: tgt, ok };
+};
+
 // W3B.16: утилизация периода = план / СВОБОДНАЯ ёмкость (PreviewRow.capacity).
 // Это доля свободной ёмкости, которую съедает план периода — иной показатель, чем
 // hours/maxHours (масштаб бара). null = нет ёмкости (capacity null или ≤ 0) →
