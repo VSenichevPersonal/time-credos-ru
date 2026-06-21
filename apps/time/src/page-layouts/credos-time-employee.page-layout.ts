@@ -19,6 +19,11 @@ import {
   CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
+import {
+  EMPLOYEE_PROJECTS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
+  EMPLOYEE_PROJECTS_RP_TAB_UNIVERSAL_IDENTIFIER,
+  EMPLOYEE_PROJECTS_RP_WIDGET_UNIVERSAL_IDENTIFIER,
+} from 'src/front-components/employee-projects.front-component';
 
 // Карточка сотрудника (RECORD_PAGE) — вкладка «Отделы» (REQ-0011 follow-up).
 // Зеркало вкладки «Отделы» карточки проекта (REQ-0013 13a): назначения сотрудника
@@ -144,6 +149,29 @@ export default definePageLayout({
           configuration: {
             configurationType: 'RECORD_TABLE',
             viewId: CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
+          },
+        },
+      ],
+    },
+    // #5-часть2. Проекты — где сотрудник списывал время (агрегат /s/project-team
+    // mode=employee-projects). Закрывает follow-up «Проекты, где работал»
+    // (нет relation employee↔project — считается из записей на сервере).
+    {
+      universalIdentifier: EMPLOYEE_PROJECTS_RP_TAB_UNIVERSAL_IDENTIFIER,
+      title: 'Проекты',
+      position: 3,
+      icon: 'IconFolders',
+      layoutMode: PageLayoutTabLayoutMode.CANVAS,
+      widgets: [
+        {
+          universalIdentifier: EMPLOYEE_PROJECTS_RP_WIDGET_UNIVERSAL_IDENTIFIER,
+          title: ' ',
+          type: 'FRONT_COMPONENT',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FRONT_COMPONENT',
+            frontComponentUniversalIdentifier:
+              EMPLOYEE_PROJECTS_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER,
           },
         },
       ],
