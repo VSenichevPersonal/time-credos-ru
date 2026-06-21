@@ -13,6 +13,10 @@
 
 > 🔴 **REQ-0019 РАСШИРЕННЫЕ НАСТРОЙКИ (заказчик 2026-06-22):** singleton credosTimeSettings + 12 глобальных параметров (норма/горизонт/период-согл/пороги/напоминания/revealNames/бронь). Dev2 объект → Dev1 UI секция «Общие параметры». После REQ-0018/REQ-0016. [SETTINGS-PRIORITY]
 
+
+> 🔬 **GAP-АУДИТ v3 (vs Timetta офиц.доки, 2026-06-22):** топ-пробелы → план. `GAP_AUDIT_TIMETTA_KIMAI_3.md`.
+> ❌ #1 billable — ОТКЛОНЁН (заказчик: нет биллируемости). 🔴 #2 Booking-сущность (чел×проект×период soft/hard, инвариант «оценка≠резерв») → REQ-0004. 🟢 #3 **Resource Gap** (Demand−Capacity + цвет ±5/10/15%) — быстрый выигрыш, Dev1 поверх капасити. 🟡 #4 Правила валидации как данные (warn/error) → расширить settings, Dev2. 🔴 #5 Финансовая RBAC (cost≠bill rate, 3 гранулы) — заложить ДО ставок REQ-0002. [GAP3]
+
 Детали задач: `docs/requirements/REQ-*`, `docs/ROADMAP.md`, `data-model/GAP_AUDIT_TIMETTA_KIMAI*.md`.
 
 ---
