@@ -9,6 +9,7 @@ vi.mock('twenty-client-sdk/rest', () => ({
 
 import {
   fetchAbsences,
+  fetchBookings,
   fetchCalendar,
   fetchDeptPlans,
   fetchDepartments,
@@ -317,5 +318,69 @@ describe('patchDeptPlan — REQ-0012', () => {
     mockPatch.mockResolvedValueOnce(undefined);
     await patchDeptPlan('dp1', { endDate: null });
     expect(mockPatch.mock.calls[0][1].endDate).toBeNull();
+  });
+});
+
+// ─── fetchBookings (REQ-0004 Часть C) ─────────────────────────────────────────
+
+const bookingResp = (rows: object[]) => ({ data: { credosTimeBookings: rows } });
+const rawBooking = (over: Record<string, unknown> = {}) => ({
+  id: 'b1',
+  employeeId: 'e1',
+  projectId: 'p1',
+  bookingType: 'HARD',
+  hours: 80,
+  startDate: '2026-06-01',
+  endDate: '2026-06-30',
+  ...over,
+});
+
+describe('fetchBookings', () => {
+  it('маппит поля и возвращает массив', async () => {
+    mockGet.mockResolvedValueOnce(bookingResp([rawBooking()]));
+    const result = await fetchBookings('2026-06-01', '2026-06-30');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      id: 'b1',
+      employeeId: 'e1',
+      projectId: 'p1',
+      bookingType: 'HARD',
+      hours: 80,
+      startDate: '2026-06-01',
+      endDate: '2026-06-30',
+    });
+  });
+
+  it('неизвестный bookingType → SOFT (дефолт)', async () => {
+    mockGet.mockResolvedValueOnce(bookingResp([rawBooking({ bookingType: 'UNKNOWN' })]));
+    const [b] = await fetchBookings('2026-06-01', '2026-06-30');
+    expect(b.bookingType).toBe('SOFT');
+  });
+
+  it('null-поля → null', async () => {
+    mockGet.mockResolvedValueOnce(bookingResp([rawBooking({ employeeId: null, projectId: null, hours: null, startDate: null, endDate: null })]));
+    const [b] = await fetchBookings('2026-06-01', '2026-06-30');
+    expect(b.employeeId).toBeNull();
+    expect(b.hours).toBeNull();
+    expect(b.startDate).toBeNull();
+  });
+
+  it('пустой ответ → []', async () => {
+    mockGet.mockResolvedValueOnce(bookingResp([]));
+    expect(await fetchBookings('2026-06-01', '2026-06-30')).toEqual([]);
+  });
+
+  it('запрос содержит date-range фильтр и limit=400', async () => {
+    mockGet.mockResolvedValueOnce(bookingResp([]));
+    await fetchBookings('2026-06-01', '2026-06-30');
+    expect(mockGet).toHaveBeenCalledWith(
+      '/rest/credosTimeBookings',
+      expect.objectContaining({
+        query: expect.objectContaining({
+          filter: 'endDate[gte]:2026-06-01,startDate[lte]:2026-06-30',
+          limit: '400',
+        }),
+      }),
+    );
   });
 });

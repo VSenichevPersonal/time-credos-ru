@@ -5,6 +5,7 @@ import type { ApiEntry } from 'src/front-components/grid/types';
 import type { GridRowModel } from 'src/front-components/grid/use-grid-model';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { UpsertInput } from 'src/front-components/grid/use-grid-data';
+import type { MutationResult } from 'src/front-components/grid/time-rest';
 import { DAILY_NORM_HOURS } from 'src/front-components/grid/format';
 
 // Действия записи: правка ячейки, bulk-fill по строке, копирование прошлой недели.
@@ -13,9 +14,9 @@ type Args = {
   rowList: GridRowModel[];
   days: WeekDay[];
   entries: ApiEntry[];
-  upsert: (input: UpsertInput) => Promise<void>;
-  upsertMany: (inputs: UpsertInput[]) => Promise<void>;
-  remove: (id: string) => Promise<void>;
+  upsert: (input: UpsertInput) => Promise<MutationResult>;
+  upsertMany: (inputs: UpsertInput[]) => Promise<MutationResult>;
+  remove: (id: string) => Promise<MutationResult>;
 };
 
 const isoDay = (date: string): string => date.slice(0, 10);
@@ -116,18 +117,18 @@ export const useTimesheetActions = ({
   // мягкое сообщение). Сверка (Timetta): согласованный таймшит правится только
   // через отзыв/возврат, прямой правки нет.
   const commitCell = useCallback(
-    (rowKey: string, dayIso: string, hours: number): boolean => {
-      if (isCellLocked(rowList, days, rowKey, dayIso)) return false; // APPROVED → no-op
+    (rowKey: string, dayIso: string, hours: number): Promise<MutationResult> | null => {
+      if (isCellLocked(rowList, days, rowKey, dayIso)) return null; // APPROVED → клиентский no-op
       const { projectId, workTypeId } = splitRowKey(rowKey);
       const row = rowList.find((r) => r.key === rowKey);
       const dayIdx = days.findIndex((d) => d.iso === dayIso);
       const existingId = row?.entryIdByDay[dayIdx] ?? undefined;
+      // CISO-012: возвращаем промис серверной мутации — вызывающий покажет
+      // ERROR/WARNING из /s/time-entry (сервер = источник истины).
       if (hours === 0) {
-        if (existingId) void remove(existingId);
-        return true;
+        return existingId ? remove(existingId) : Promise.resolve({ ok: true });
       }
-      void upsert({ id: existingId, date: dayIso, hours, projectId, workTypeId });
-      return true;
+      return upsert({ id: existingId, date: dayIso, hours, projectId, workTypeId });
     },
     [rowList, days, upsert, remove],
   );
@@ -160,10 +161,10 @@ export const useTimesheetActions = ({
   // гард делает намерение очевидным и закрывает edge-cases. Возвращает true,
   // если хоть одна согласованная ячейка была пропущена (для мягкого сообщения).
   const bulkFill = useCallback(
-    (rowKey: string, hours: number): { skippedLocked: boolean } => {
+    (rowKey: string, hours: number): { skippedLocked: boolean; result: Promise<MutationResult> } => {
       const { projectId, workTypeId } = splitRowKey(rowKey);
       const row = rowList.find((r) => r.key === rowKey);
-      if (!row) return { skippedLocked: false };
+      if (!row) return { skippedLocked: false, result: Promise.resolve({ ok: true }) };
       const inputs: UpsertInput[] = [];
       let skippedLocked = false;
       days.forEach((d, i) => {
@@ -175,8 +176,9 @@ export const useTimesheetActions = ({
         if (row.hoursByDay[i] > 0) return; // не перетираем заполненное
         inputs.push({ id: undefined, date: d.iso, hours, projectId, workTypeId });
       });
-      void upsertMany(inputs);
-      return { skippedLocked };
+      // CISO-012: промис пакетной серверной записи — вызывающий покажет агрегат
+      // ERROR/WARNING из /s/time-entry.
+      return { skippedLocked, result: upsertMany(inputs) };
     },
     [rowList, days, upsertMany],
   );

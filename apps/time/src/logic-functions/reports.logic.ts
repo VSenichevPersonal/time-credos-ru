@@ -5,6 +5,7 @@ import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/unive
 
 import { validDateParam } from './params-validate';
 import { computeDetail, detailToCsv } from './reports-detail';
+import { buildTimesheetGrid, gridToCsv } from './reports-timesheet-grid';
 import {
   computeOlap,
   computeReports,
@@ -281,6 +282,41 @@ const run = async (event: RoutePayload) => {
       };
     }
     return { ok: true, groupBy: 'detail', period: { from, to }, count: rows.length, rows };
+  }
+
+  // REQ-0006 п.4: табель сотрудник×день (форма ближе к Т-13) для кадров/1С:ЗУП.
+  // groupBy=timesheet-grid → сетка строки=сотрудники, колонки=дни периода (месяц),
+  // ячейка=Σ часов за день + Итого. format=csv → CSV (BOM+`;`, как detail). Фильтры
+  // deptId/projectId — как в /s/reports. codes=true → буквенные коды Т-13 (Я/ОТ/Б/…).
+  // CISO-007: ФИО при reveal, иначе КОД сотрудника.
+  if (params.groupBy === 'timesheet-grid') {
+    const grid = buildTimesheetGrid(
+      input,
+      { from, to },
+      { deptId: params.deptId ?? null, projectId: params.projectId ?? null },
+      reveal,
+      { withCodes: params.codes === 'true' },
+    );
+    if (params.format === 'csv') {
+      const csv = gridToCsv(grid, { withBom: true });
+      return {
+        ok: true,
+        format: 'csv',
+        count: grid.rows.length,
+        csv,
+        mimeType: 'text/csv;charset=utf-8',
+        filename: `timesheet-grid_${from.slice(0, 10)}_${to.slice(0, 10)}.csv`,
+      };
+    }
+    return {
+      ok: true,
+      groupBy: 'timesheet-grid',
+      period: grid.period,
+      dates: grid.dates,
+      withCodes: grid.withCodes,
+      count: grid.rows.length,
+      rows: grid.rows,
+    };
   }
 
   // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.

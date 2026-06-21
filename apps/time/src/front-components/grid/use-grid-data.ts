@@ -16,11 +16,15 @@ import {
   fetchWorkTypes,
   resolveEmployeeId,
   upsertEntry,
+  type MutationResult,
 } from 'src/front-components/grid/time-rest';
 import { useSaveStatus } from 'src/front-components/grid/use-save-status';
 
 // Состояние данных таймшита: справочники (грузятся раз) + записи периода.
-// CRUD напрямую по Core REST. Перезагрузка записей после правки.
+// CISO-012: ЗАПИСЬ маршрутизируется через /s/time-entry (см. time-rest.ts) —
+// серверные гарды (lock-approved, валидация, дедуп) срабатывают путь-независимо.
+// Серверный ERROR возвращается вызывающему (показ в тостах) + reload восстанавливает
+// серверное состояние (откат оптимистичного ввода «бесплатно» — оптимистики нет).
 
 export type UpsertInput = {
   id?: string;
@@ -85,49 +89,72 @@ export const useGridData = (from: string, to: string, viewEmployeeId: string | n
     void load();
   }, [load]);
 
+  // Возвращает MutationResult (серверный ok/error/warnings) — вызывающий слой
+  // (weekly-grid) показывает ERROR-тост / WARNING-плашку. reload после операции
+  // синхронизирует UI с сервером: при серверном ERROR запись не создалась/не
+  // изменилась → reload «откатывает» оптимистичный ввод (оптимистики нет).
   const upsert = useCallback(
-    async (input: UpsertInput) => {
+    async (input: UpsertInput): Promise<MutationResult> => {
       if (!targetId) {
         setError('Сотрудник не определён');
-        return;
+        return { ok: false, error: 'employee not resolved' };
       }
       try {
+        let result: MutationResult = { ok: true };
         await track(async () => {
-          await upsertEntry({ ...input, employeeId: targetId });
+          result = await upsertEntry({ ...input, employeeId: targetId });
           await loadEntries(targetId);
         });
+        return result;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+        return { ok: false, error: 'network' };
       }
     },
     [loadEntries, targetId, track],
   );
 
   // Пакетная запись (копирование недели / bulk-fill) — один reload в конце.
+  // Агрегат: ok=false если хоть одна запись отклонена сервером; warnings собираем.
   const upsertMany = useCallback(
-    async (inputs: UpsertInput[]) => {
-      if (!targetId || inputs.length === 0) return;
+    async (inputs: UpsertInput[]): Promise<MutationResult> => {
+      if (!targetId || inputs.length === 0) return { ok: true };
       try {
+        let agg: MutationResult = { ok: true };
         await track(async () => {
-          for (const input of inputs) await upsertEntry({ ...input, employeeId: targetId });
+          const warnings: NonNullable<MutationResult['warnings']> = [];
+          let firstError: MutationResult | null = null;
+          for (const input of inputs) {
+            const r = await upsertEntry({ ...input, employeeId: targetId });
+            if (!r.ok && !firstError) firstError = r;
+            if (r.warnings) warnings.push(...r.warnings);
+          }
           await loadEntries(targetId);
+          agg = firstError
+            ? firstError
+            : { ok: true, ...(warnings.length ? { warnings } : {}) };
         });
+        return agg;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка сохранения');
+        return { ok: false, error: 'network' };
       }
     },
     [loadEntries, targetId, track],
   );
 
   const remove = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<MutationResult> => {
       try {
+        let result: MutationResult = { ok: true };
         await track(async () => {
-          await deleteEntry(id);
+          result = await deleteEntry(id);
           await loadEntries(targetId);
         });
+        return result;
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Ошибка удаления');
+        return { ok: false, error: 'network' };
       }
     },
     [loadEntries, targetId, track],

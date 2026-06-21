@@ -171,7 +171,7 @@ describe('fetchEntries', () => {
   });
 });
 
-// ─── upsertEntry ──────────────────────────────────────────────────────────
+// ─── upsertEntry (CISO-012: роутинг через /s/time-entry) ──────────────────
 
 describe('upsertEntry', () => {
   const base = {
@@ -179,38 +179,85 @@ describe('upsertEntry', () => {
     projectId: 'proj-1', workTypeId: 'wt-1', employeeId: 'emp-1',
   };
 
-  it('без id → POST', async () => {
-    mockPost.mockResolvedValueOnce({});
-    await upsertEntry(base);
-    expect(mockPost).toHaveBeenCalledWith('/rest/credosTimeEntries', expect.objectContaining({
+  it('пишет через /s/time-entry op=upsert (без id → без id в теле)', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    const res = await upsertEntry(base);
+    expect(res.ok).toBe(true);
+    expect(mockPost).toHaveBeenCalledWith('/s/time-entry', expect.objectContaining({
+      op: 'upsert',
       date: '2026-06-15T10:00:00.000Z',
       hours: 8,
     }));
+    // прямой REST не трогаем (роут отработал)
     expect(mockPatch).not.toHaveBeenCalled();
   });
 
-  it('с id → PATCH', async () => {
+  it('с id → /s/ op=upsert с id', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    await upsertEntry({ ...base, id: 'entry-42' });
+    expect(mockPost).toHaveBeenCalledWith('/s/time-entry', expect.objectContaining({
+      op: 'upsert', id: 'entry-42',
+    }));
+  });
+
+  it('серверный ERROR cannot_modify_approved → ok:false проброшен', async () => {
+    mockPost.mockResolvedValueOnce({ ok: false, error: 'cannot_modify_approved' });
+    const res = await upsertEntry({ ...base, id: 'entry-appr' });
+    expect(res).toEqual({ ok: false, error: 'cannot_modify_approved', validation: undefined, warnings: undefined });
+  });
+
+  it('серверный WARNING (переработка) проброшен в warnings', async () => {
+    const warn = { level: 'warning', code: 'overtime_per_day', message: 'много' };
+    mockPost.mockResolvedValueOnce({ ok: true, warnings: [warn] });
+    const res = await upsertEntry(base);
+    expect(res.ok).toBe(true);
+    expect(res.warnings).toEqual([warn]);
+  });
+
+  it('/s/ недоступна → fallback на прямой REST POST, ok:true', async () => {
+    mockPost
+      .mockRejectedValueOnce(new Error('404')) // /s/time-entry упал
+      .mockResolvedValueOnce({});              // fallback POST /rest/
+    const res = await upsertEntry(base);
+    expect(res.ok).toBe(true);
+    expect(mockPost).toHaveBeenLastCalledWith('/rest/credosTimeEntries', expect.objectContaining({
+      date: '2026-06-15T10:00:00.000Z', employeeId: 'emp-1',
+    }));
+  });
+
+  it('fallback с id → прямой REST PATCH', async () => {
+    mockPost.mockRejectedValueOnce(new Error('500')); // /s/ упал
     mockPatch.mockResolvedValueOnce({});
     await upsertEntry({ ...base, id: 'entry-42' });
     expect(mockPatch).toHaveBeenCalledWith('/rest/credosTimeEntries/entry-42', expect.anything());
-    expect(mockPost).not.toHaveBeenCalled();
-  });
-
-  it('description=undefined → null в теле', async () => {
-    mockPost.mockResolvedValueOnce({});
-    await upsertEntry(base);
-    expect(mockPost).toHaveBeenCalledWith('/rest/credosTimeEntries', expect.objectContaining({
-      description: null,
-    }));
   });
 });
 
-// ─── deleteEntry ──────────────────────────────────────────────────────────
+// ─── deleteEntry (CISO-012: роутинг через /s/time-entry) ──────────────────
 
 describe('deleteEntry', () => {
-  it('вызывает DELETE с правильным URL', async () => {
+  it('удаляет через /s/time-entry op=delete', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    const res = await deleteEntry('entry-99');
+    expect(res.ok).toBe(true);
+    expect(mockPost).toHaveBeenCalledWith('/s/time-entry', expect.objectContaining({
+      op: 'delete', id: 'entry-99',
+    }));
+    expect(mockDelete).not.toHaveBeenCalled();
+  });
+
+  it('серверный ERROR cannot_modify_approved → ok:false', async () => {
+    mockPost.mockResolvedValueOnce({ ok: false, error: 'cannot_modify_approved' });
+    const res = await deleteEntry('entry-appr');
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('cannot_modify_approved');
+  });
+
+  it('/s/ недоступна → fallback на прямой REST DELETE', async () => {
+    mockPost.mockRejectedValueOnce(new Error('404'));
     mockDelete.mockResolvedValueOnce({});
-    await deleteEntry('entry-99');
+    const res = await deleteEntry('entry-99');
+    expect(res.ok).toBe(true);
     expect(mockDelete).toHaveBeenCalledWith('/rest/credosTimeEntries/entry-99');
   });
 });

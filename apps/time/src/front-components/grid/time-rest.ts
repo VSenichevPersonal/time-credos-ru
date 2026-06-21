@@ -1,5 +1,6 @@
 import { RestApiClient } from 'twenty-client-sdk/rest';
 
+import type { ValidationFinding } from 'src/constants/validation';
 import type {
   ApiEntry,
   DepartmentRef,
@@ -9,10 +10,21 @@ import type {
   WorkTypeRef,
 } from 'src/front-components/grid/types';
 
-// Прямой доступ к Core REST воркспейса из песочницы front-компонента.
-// Токен приложения (роль с read/update на credosTime*) инжектится в воркер.
-// Серверные /s/-logic-функции на dev-сервере отключены, поэтому CRUD идёт
-// напрямую по /rest/* — права те же (роль приложения).
+// Доступ к данным таймшита из песочницы front-компонента.
+//
+// ЧТЕНИЕ (fetch*/resolve*) — напрямую по Core REST /rest/* (read-only, прав роли
+// приложения достаточно, серверный гард не нужен).
+//
+// ЗАПИСЬ (upsert/delete) — CISO-012: МАРШРУТИЗИРУЕТСЯ через серверную logic-функцию
+// /s/time-entry. Только так путь-независимо срабатывают серверные гарды:
+//   · lock-approved (CISO-011: cannot_modify_approved) — нельзя править/удалять
+//     согласованную запись;
+//   · валидация-лимит (#4: 'hours out of range') — серверная проверка часов/день;
+//   · upsert-дедуп по ключу (employee, project, workType, день) — без дублей.
+// Сервер = источник истины; клиентский validateEntry остаётся как быстрый pre-check.
+// Если /s/ недоступна (404/500 на отдельных стендах) — graceful fallback на прямой
+// REST PATCH/POST/DELETE (как в approval-rest.ts; тогда серверные гарды не работают,
+// но грид не падает — деградация, не отказ).
 
 const client = () => new RestApiClient();
 
@@ -144,12 +156,68 @@ export type UpsertInput = {
   workTypeId: string;
   employeeId: string;
   description?: string;
+  // CISO-012: ref для серверного резолва сотрудника в /s/time-entry. Null →
+  // роут уходит в DEV-fallback (первый активный) — эквивалент прямого пути.
+  workspaceMemberRef?: string | null;
 };
 
-export const upsertEntry = async (input: UpsertInput): Promise<void> => {
+// Результат мутации: серверный гард мог отклонить операцию (ERROR) или вернуть
+// несблокирующие предупреждения (WARNING). ok=false + error → откат UI + тост.
+export type MutationResult = {
+  ok: boolean;
+  // Машинный код серверной ошибки ('cannot_modify_approved' | 'hours out of range' | …).
+  error?: string;
+  // Структурный блокирующий finding из validateEntry (если ERROR по часам).
+  validation?: ValidationFinding;
+  // Несблокирующие предупреждения (переработка) — показать плашкой.
+  warnings?: ValidationFinding[];
+};
+
+// Ответ /s/time-entry (контракт time-entry-api.logic.ts).
+type TimeEntryRouteResp = {
+  ok?: boolean;
+  error?: string;
+  validation?: ValidationFinding;
+  warnings?: ValidationFinding[];
+};
+
+// CISO-012: запись через серверную logic-функцию. true → роут отработал (ok|error
+// от сервера в result). null → /s/ недоступна (сеть/404) — вызывающий делает fallback.
+const sendViaRoute = async (
+  body: Record<string, unknown>,
+): Promise<MutationResult | null> => {
+  try {
+    const resp = await client().post<TimeEntryRouteResp>('/s/time-entry', body);
+    return {
+      ok: resp?.ok === true,
+      error: resp?.error,
+      validation: resp?.validation,
+      warnings: resp?.warnings,
+    };
+  } catch {
+    return null; // роут недоступен — уходим в прямой REST-фоллбэк
+  }
+};
+
+export const upsertEntry = async (input: UpsertInput): Promise<MutationResult> => {
+  // Дата в формате DATE_TIME (фикс. час 10:00 UTC — день стабилен в любом TZ).
+  const date = `${input.date}T10:00:00.000Z`;
+  const route = await sendViaRoute({
+    op: 'upsert',
+    ...(input.id ? { id: input.id } : {}),
+    date,
+    hours: input.hours,
+    projectId: input.projectId,
+    workTypeId: input.workTypeId,
+    description: input.description ?? null,
+    ...(input.workspaceMemberRef ? { workspaceMemberRef: input.workspaceMemberRef } : {}),
+  });
+  if (route) return route;
+
+  // Fallback: /s/ недоступна — прямой REST (без серверных гардов).
   const c = client();
   const data = {
-    date: `${input.date}T10:00:00.000Z`,
+    date,
     hours: input.hours,
     employeeId: input.employeeId,
     projectId: input.projectId,
@@ -158,8 +226,20 @@ export const upsertEntry = async (input: UpsertInput): Promise<void> => {
   };
   if (input.id) await c.patch(`/rest/credosTimeEntries/${input.id}`, data);
   else await c.post('/rest/credosTimeEntries', data);
+  return { ok: true };
 };
 
-export const deleteEntry = async (id: string): Promise<void> => {
+export const deleteEntry = async (
+  id: string,
+  workspaceMemberRef?: string | null,
+): Promise<MutationResult> => {
+  const route = await sendViaRoute({
+    op: 'delete',
+    id,
+    ...(workspaceMemberRef ? { workspaceMemberRef } : {}),
+  });
+  if (route) return route;
+  // Fallback: /s/ недоступна — прямой REST DELETE (без lock-approved гарда).
   await client().delete(`/rest/credosTimeEntries/${id}`);
+  return { ok: true };
 };

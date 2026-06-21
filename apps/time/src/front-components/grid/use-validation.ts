@@ -5,6 +5,7 @@ import {
   validateEntry,
   type ValidationFinding,
 } from 'src/constants/validation';
+import type { MutationResult } from 'src/front-components/grid/time-rest';
 import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
 
 // Показ результатов валидации записи при вводе (REQ-0019-UI).
@@ -88,5 +89,36 @@ export const useValidation = () => {
     });
   }, [push]);
 
-  return { notices, checkAndNotify, notifyLocked, dismiss };
+  // CISO-012: показать результат СЕРВЕРНОЙ мутации (/s/time-entry — источник истины).
+  // ERROR (cannot_modify_approved / hours out of range / прочее) → красная плашка
+  // (держится, пользователь исправляет); WARNING (переработка) → янтарь, авто-гаснет.
+  // Возвращает true, если был блокирующий серверный ERROR (вызывающий уже сделал
+  // reload — оптимистичный ввод откатился к серверному состоянию).
+  const showServerResult = useCallback(
+    (result: MutationResult): { blocked: boolean } => {
+      // Несблокирующие предупреждения сервера — показываем всегда (даже при ok).
+      for (const w of result.warnings ?? []) push(w);
+      if (result.ok) return { blocked: false };
+
+      // Блокирующий ERROR. Готовый структурный finding (часы) — как есть;
+      // иначе мапим машинный код в русский текст.
+      if (result.validation) {
+        push(result.validation);
+      } else {
+        const message =
+          result.error === 'cannot_modify_approved'
+            ? 'Согласовано — правка запрещена. Нужен отзыв согласования.'
+            : result.error === 'hours out of range'
+              ? 'Часы за день вне допустимого диапазона'
+              : result.error === 'employee not resolved'
+                ? 'Сотрудник не сопоставлен — обратитесь к администратору'
+                : 'Сервер отклонил операцию. Изменение не сохранено.';
+        push({ level: 'error', code: 'max_hours_per_day', message });
+      }
+      return { blocked: true };
+    },
+    [push],
+  );
+
+  return { notices, checkAndNotify, notifyLocked, showServerResult, dismiss };
 };

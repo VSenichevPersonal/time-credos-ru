@@ -76,16 +76,25 @@ export const WeeklyGrid = () => {
   const validation = useValidation();
   const overtimeThreshold = useGlobalSettings()?.overtimeWarnHours;
 
-  // Обёртки над действиями: проверяем часы → блокируем при ERROR, иначе пишем.
-  // W6-2/CISO-012: согласованную (APPROVED) ячейку actions-слой не пишет (no-op);
-  // здесь показываем мягкое уведомление «правка запрещена».
+  // Обёртки над действиями: клиентский validateEntry — быстрый pre-check (избегаем
+  // лишних запросов при явном ERROR). Затем пишем через /s/time-entry (CISO-012) и
+  // показываем СЕРВЕРНЫЙ ответ (источник истины): ERROR (cannot_modify_approved /
+  // hours out of range) → красная плашка + reload откатил ввод; WARNING → янтарь.
+  // W6-2: клиентский lock-предикат остаётся как мгновенный UX-no-op (без запроса).
   const commitCell = (rowKey: string, dayIso: string, hours: number) => {
-    if (validation.checkAndNotify(hours).blocked) return; // ERROR → не сохраняем
-    if (!actions.commitCell(rowKey, dayIso, hours)) validation.notifyLocked();
+    if (validation.checkAndNotify(hours).blocked) return; // клиент-ERROR → не шлём запрос
+    const result = actions.commitCell(rowKey, dayIso, hours);
+    if (result === null) {
+      validation.notifyLocked(); // клиентский lock (APPROVED) — мгновенно, без запроса
+      return;
+    }
+    void result.then((r) => validation.showServerResult(r));
   };
   const bulkFill = (rowKey: string, hours: number) => {
     if (validation.checkAndNotify(hours).blocked) return;
-    if (actions.bulkFill(rowKey, hours).skippedLocked) validation.notifyLocked();
+    const { skippedLocked, result } = actions.bulkFill(rowKey, hours);
+    if (skippedLocked) validation.notifyLocked();
+    void result.then((r) => validation.showServerResult(r));
   };
 
   // Согласование периода (отключаемое): бейдж + действия в подвале.
@@ -172,7 +181,8 @@ export const WeeklyGrid = () => {
             ? () => {
                 const { rowKeys, inputs } = actions.copyPreviousWeekWithHours();
                 setExtraRowKeys((prev) => [...new Set([...prev, ...rowKeys])]);
-                void data.upsertMany(inputs);
+                // CISO-012: пакет через /s/time-entry — показать серверный агрегат.
+                void data.upsertMany(inputs).then((r) => validation.showServerResult(r));
               }
             : undefined
         }
@@ -180,7 +190,8 @@ export const WeeklyGrid = () => {
           mode === 'week' && rowList.length > 0
             ? () => {
                 const inputs = actions.fillStandardWeek();
-                if (inputs.length > 0) void data.upsertMany(inputs);
+                if (inputs.length > 0)
+                  void data.upsertMany(inputs).then((r) => validation.showServerResult(r));
               }
             : undefined
         }
