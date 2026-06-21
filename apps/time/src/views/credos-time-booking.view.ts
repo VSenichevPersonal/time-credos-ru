@@ -1,4 +1,8 @@
-import { defineView, ViewKey } from 'twenty-sdk/define';
+import {
+  defineView,
+  generateDefaultFieldUniversalIdentifier,
+  ViewKey,
+} from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_BOOKING_EMPLOYEE_FIELD_ID,
@@ -11,8 +15,21 @@ import {
   CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
+// BOOKING_ANALYSIS волна-1 / поля #5 (P1): аудит «кто/когда забронировал».
+// Не заводим свои поля — у объекта есть НАТИВНЫЕ createdBy/createdAt (Twenty даёт
+// из коробки). Их universalIdentifier детерминированно выводится из UID объекта +
+// имени поля (UUID v5, см. SDK generateDefaultFieldUniversalIdentifier) — это
+// стабильный ID, по которому нативное поле адресуется в view БЕЗ объявления в
+// objects/. additive: добавляем только колонки во view, схему не трогаем.
+const nativeFieldId = (fieldName: string): string =>
+  generateDefaultFieldUniversalIdentifier({
+    objectUniversalIdentifier: CREDOS_TIME_BOOKING_OBJECT_UNIVERSAL_IDENTIFIER,
+    fieldName,
+  });
+
 // REQ-0004 Часть C: INDEX-view броней ресурсов (реестр). Колонки: сотрудник,
-// проект, тип (soft/hard), часы, период. Источник для доски Demand (Dev1).
+// проект, тип (soft/hard), часы, период + аудит (создал/создано).
+// Источник для доски Demand (Dev1).
 export default defineView({
   universalIdentifier: CREDOS_TIME_BOOKING_VIEW_UNIVERSAL_IDENTIFIER,
   name: 'Брони ресурсов',
@@ -62,6 +79,21 @@ export default defineView({
       position: 5,
       isVisible: true,
       size: 150,
+    },
+    // Аудит (нативные поля Twenty): кто забронировал / когда создана бронь.
+    {
+      universalIdentifier: 'f1c6d7e2-5b08-4ad4-9e96-7d3a0c4f5162',
+      fieldMetadataUniversalIdentifier: nativeFieldId('createdBy'),
+      position: 6,
+      isVisible: true,
+      size: 180,
+    },
+    {
+      universalIdentifier: 'a2d7e8f3-6c19-4be5-8fa7-8e4b1d506273',
+      fieldMetadataUniversalIdentifier: nativeFieldId('createdAt'),
+      position: 7,
+      isVisible: true,
+      size: 170,
     },
   ],
 });

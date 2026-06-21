@@ -15,6 +15,7 @@ import { ErrorState } from 'src/front-components/shared/error-state';
 import { useDrill, type DrillLevel } from 'src/front-components/shared/use-drill';
 import { TrendView, type DeptOption } from 'src/front-components/reports/trend-view';
 import { MissingView } from 'src/front-components/reports/missing-view';
+import { ProjectsView } from 'src/front-components/reports/projects-view';
 import { useOlap } from 'src/front-components/reports/use-olap';
 import { DrillView } from 'src/front-components/reports/drill-view';
 import { dimLabel, nextAxis, valueLabel } from 'src/front-components/reports/drill-axis';
@@ -30,9 +31,10 @@ const ALL_DIMS: OlapDim[] = ['dept', 'project', 'employee', 'category', 'workTyp
 
 const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.value, label: o.label }));
 
-// Верхний режим дашборда: сводка (срезы/период), тренд (помесячная динамика) или
-// незаполненные (статус заполнения таймшита за текущую неделю — руководителю).
-type View = 'summary' | 'trend' | 'missing';
+// Верхний режим дашборда: сводка (срезы/период), тренд (помесячная динамика),
+// проекты (план/факт/остаток по проектам) или незаполненные (статус заполнения
+// таймшита за текущую неделю — руководителю).
+type View = 'summary' | 'trend' | 'projects' | 'missing';
 
 // Дашборд «Отчёты»: утилизация + загрузка/недогруз по периоду и срезу
 // (отдел/проект/человек). Данные — /s/reports. Светлая тема, тинт-нейтрали.
@@ -247,6 +249,7 @@ export const ReportsDashboard = () => {
           segments={[
             { value: 'summary', label: 'Сводка' },
             { value: 'trend', label: 'Тренд' },
+            { value: 'projects', label: 'Проекты' },
             { value: 'missing', label: 'Незаполненные' },
           ]}
           onChange={(v: View) => setView(v)}
@@ -291,6 +294,24 @@ export const ReportsDashboard = () => {
             </span>
           </>
         )}
+        {view === 'projects' && (
+          <>
+            <PeriodNav label={period.label} isCurrent={isCurrent} onPrev={onPeriodChange(prev)} onNext={onPeriodChange(next)} />
+            <Segmented
+              ariaLabel="Гранулярность периода"
+              value={gran}
+              segments={[
+                { value: 'month', label: 'Месяц' },
+                { value: 'quarter', label: 'Квартал' },
+                { value: 'year', label: 'Год' },
+              ]}
+              onChange={(g: PeriodGran) => {
+                reset();
+                setGran(g);
+              }}
+            />
+          </>
+        )}
       </div>
 
       {view === 'missing' ? (
@@ -299,6 +320,10 @@ export const ReportsDashboard = () => {
         </ErrorBoundary>
       ) : view === 'trend' ? (
         <TrendView deptOptions={deptOptions} />
+      ) : view === 'projects' ? (
+        <ErrorBoundary title="Не удалось показать отчёт по проектам">
+          <ProjectsView from={period.from} to={period.to} />
+        </ErrorBoundary>
       ) : error ? (
         <ErrorState title="Не удалось загрузить отчёт" detail={error} onRetry={reload} />
       ) : loading || !data ? (

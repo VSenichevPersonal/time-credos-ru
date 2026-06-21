@@ -45,3 +45,38 @@ export type ReportsResponse = {
   byEmployee: EmployeeRow[];
   error?: string;
 };
+
+// --- Отчёт «Проекты — план/факт/остаток» (groupBy=projects-plan-fact) ---
+// Контракт бэка (computeProjectsPlanFact): часы, без денег [[no-billable-concept]].
+// Бэк сортирует rows: перерасход → факт убыв. → имя.
+
+// Строка отчёта по проекту: план/факт/остаток (часы) + флаг перерасхода.
+export type ProjectPlanFactRow = {
+  projectId: string;
+  name: string; // имя проекта (fallback code/id) — НЕ ПДн
+  code: string | null;
+  status: string | null; // UPPER_CASE SELECT (PLANNED/ACTIVE/ON_HOLD/DONE)
+  startDate?: string | null;
+  endDate?: string | null;
+  planned: number | null; // плановые часы, null если не задан
+  fact: number; // факт = Σ часов записей проекта за период
+  remaining: number | null; // план − факт; null если плана нет
+  overrun: boolean; // факт > план → перерасход
+  pct: number | null; // факт / план (0..1+); null если плана нет/0
+};
+
+export type ProjectsPlanFactTotals = {
+  planned: number;
+  fact: number;
+  remaining: number;
+  overrunCount: number; // сколько проектов в перерасходе
+};
+
+export type ProjectsPlanFactResponse = {
+  ok: boolean;
+  period: { from: string | null; to: string | null };
+  totals: ProjectsPlanFactTotals;
+  count: number;
+  rows: ProjectPlanFactRow[];
+  error?: string;
+};
