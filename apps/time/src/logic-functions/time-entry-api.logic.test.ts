@@ -215,3 +215,87 @@ describe('reports data disclosure (CISO-007)', () => {
 describe('absence PII (CISO-008)', () => {
   it.todo('absence.note: help/placeholder предупреждает не вводить диагноз/мед. сведения');
 });
+
+// SCOUT-B: защита factHours от дублей — upsert-семантика по ключу
+// (employeeId, projectId, workTypeId, date-день). Зеркало уникального индекса
+// credos-time-entry-unique. Дубль не создаётся; тот же ключ → update, не create.
+describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
+  const EMP = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const EXISTING = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const empRes = { data: { credosTimeEmployees: [{ id: EMP, name: 'Test' }] } };
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('upsert без id, ключ НЕ найден → создаётся новая запись (POST)', async () => {
+    const mockFn = mockFetch([
+      empRes, // resolveEmployeeId
+      emptyEntries, // findExistingEntryIdByKey → пусто
+      { data: { createCredosTimeEntry: { id: 'new-1' } } }, // POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-06-10',
+    }));
+    expect(result).toMatchObject({ ok: true });
+    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST');
+    const patches = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    expect(posts).toHaveLength(1); // создана
+    expect(patches).toHaveLength(0); // не апдейт
+  });
+
+  it('upsert без id, ключ НАЙДЕН (DRAFT) → обновляется существующая (PATCH, без POST = без дубля)', async () => {
+    const mockFn = mockFetch([
+      empRes, // resolveEmployeeId
+      { data: { credosTimeEntries: [{ id: EXISTING }] } }, // findExistingEntryIdByKey → найдено
+      { data: { credosTimeEntries: [{ id: EXISTING, status: 'DRAFT', projectId: null }] } }, // status-read
+      { data: { updateCredosTimeEntry: { id: EXISTING } } }, // PATCH
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '4', date: '2026-06-10',
+    }));
+    expect(result).toMatchObject({ ok: true });
+    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST');
+    const patches = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'PATCH');
+    expect(posts).toHaveLength(0); // дубль НЕ создан
+    expect(patches).toHaveLength(1); // обновлена существующая
+    // PATCH идёт по найденному id
+    expect(patches.some((c) => String(c[0]).includes(EXISTING))).toBe(true);
+  });
+
+  it('upsert без id, ключ найден и запись APPROVED → cannot_modify_approved (без мутаций)', async () => {
+    const mockFn = mockFetch([
+      empRes,
+      { data: { credosTimeEntries: [{ id: EXISTING }] } }, // findExistingEntryIdByKey
+      { data: { credosTimeEntries: [{ id: EXISTING, status: 'APPROVED', projectId: null }] } }, // status-read
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-06-10',
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'cannot_modify_approved' });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('findExistingEntryIdByKey: projectId/workTypeId null → filter использует [is]:NULL (не [eq])', async () => {
+    const mockFn = mockFetch([
+      empRes,
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'new-2' } } },
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10' }));
+    // 2-й fetch — поиск по ключу; в filter должны быть projectId[is]:NULL и workTypeId[is]:NULL
+    const keyCall = String(mockFn.mock.calls[1]?.[0] ?? '');
+    expect(decodeURIComponent(keyCall)).toContain('projectId[is]:NULL');
+    expect(decodeURIComponent(keyCall)).toContain('workTypeId[is]:NULL');
+  });
+});

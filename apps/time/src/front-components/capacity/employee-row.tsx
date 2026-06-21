@@ -1,4 +1,4 @@
-import { T, loadTone, formatCell } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatCell, formatPct, avgRatio, SIGMA_W } from 'src/front-components/capacity/cap-tokens';
 import { departmentLabel } from 'src/constants/labels';
 import type {
   CellMetric,
@@ -68,7 +68,7 @@ export const EmployeeRow = ({
       return (
         <div
           key={p.key}
-          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч · свободно ${Math.round(cell.free)} ч`}
+          title={`Загрузка ${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${cell.ratio !== null ? ` (${Math.round(cell.ratio * 100)}%)` : ''} · свободно ${Math.round(cell.free)} ч`}
           style={{
             flex: 1,
             minWidth: 56,
@@ -89,5 +89,30 @@ export const EmployeeRow = ({
         </div>
       );
     })}
+    {(() => {
+      const avg = avgRatio(cells);
+      const tone = loadTone(avg);
+      return (
+        <div
+          title={`Средняя загрузка за горизонт: ${formatPct(avg) || '—'}`}
+          style={{
+            width: SIGMA_W,
+            minWidth: SIGMA_W,
+            height: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderLeft: `1px solid ${T.borderStrong}`,
+            background: tone.bg,
+            color: tone.fg,
+            fontSize: 12,
+            fontWeight: 700,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {formatPct(avg)}
+        </div>
+      );
+    })()}
   </div>
 );

@@ -114,6 +114,40 @@ const resolveEmployeeId = async (
 // recalcProjectFactHours вынесен в ./project-fact-rollup (SSOT) и переиспользуется
 // database-event триггерами — единая формула и единый сбор записей по курсору.
 
+// SCOUT-B: ключ уникальности записи трудозатрат — (employeeId, projectId,
+// workTypeId, date-день). Зеркалит уникальный индекс credos-time-entry-unique.
+// БД-индекс ловит дубли на всех путях, но: (1) NULL != NULL → строки с NULL в
+// projectId/workTypeId индексом не ловятся; (2) приложенческая upsert-семантика
+// (тот же ключ → update, а не 500 от констрейнта). Этот гард закрывает оба.
+// date нормализуем по календарному дню (диапазон [день 00:00, день 23:59:59]).
+const dayBounds = (iso: string): { from: string; to: string } => {
+  const day = iso.slice(0, 10);
+  return { from: `${day}T00:00:00.000Z`, to: `${day}T23:59:59.999Z` };
+};
+
+const findExistingEntryIdByKey = async (key: {
+  employeeId: string;
+  projectId: string | null;
+  workTypeId: string | null;
+  date: string;
+}): Promise<string | null> => {
+  const { from, to } = dayBounds(key.date);
+  // date — DATE_TIME: сравниваем по диапазону дня. project/workType nullable →
+  // filter `[is]:NULL`, иначе `[eq]:` (точное совпадение по UUID).
+  const parts = [
+    `employeeId[eq]:${key.employeeId}`,
+    `date[gte]:${from}`,
+    `date[lte]:${to}`,
+    key.projectId ? `projectId[eq]:${key.projectId}` : 'projectId[is]:NULL',
+    key.workTypeId ? `workTypeId[eq]:${key.workTypeId}` : 'workTypeId[is]:NULL',
+  ];
+  const res = await api.get<{ data: { credosTimeEntries: Array<{ id: string }> } }>(
+    '/rest/credosTimeEntries',
+    { filter: parts.join(','), limit: '1' },
+  );
+  return res.data?.credosTimeEntries?.[0]?.id ?? null;
+};
+
 const run = async (event: RoutePayload) => {
   const params = readParams(event);
   // Один POST-маршрут /s/time-entry; операция выбирается полем `op`.
@@ -174,18 +208,46 @@ const run = async (event: RoutePayload) => {
     if (!employeeId) return { ok: false, error: 'employee not resolved' };
 
     const newProjectId = params.projectId && isUuid(params.projectId) ? params.projectId : null;
+    const newWorkTypeId = params.workTypeId && isUuid(params.workTypeId) ? params.workTypeId : null;
     const data: Record<string, unknown> = {
       date: params.date,
       hours,
       description: params.description ?? null,
       employeeId,
       projectId: newProjectId,
-      workTypeId: params.workTypeId || null,
+      workTypeId: newWorkTypeId,
     };
 
-    if (params.id) {
+    // SCOUT-B upsert-семантика: если id не передан, ищем существующую запись по
+    // ключу (employee, project, workType, день) → обновляем её вместо создания
+    // (не плодим дубли). Закрывает NULL-щель уникального индекса и даёт чистый
+    // upsert для CSV-импорта/повторного ввода вместо 500 от БД-констрейнта.
+    let targetId = params.id ?? null;
+    if (!targetId && params.date) {
+      targetId = await findExistingEntryIdByKey({
+        employeeId,
+        projectId: newProjectId,
+        workTypeId: newWorkTypeId,
+        date: params.date,
+      });
+      // Найденную по ключу запись тоже защищаем (CISO-011) и собираем её проект
+      // для пересчёта (смены проекта тут быть не может — ключ совпадает).
+      if (targetId) {
+        const exRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
+          '/rest/credosTimeEntries',
+          { filter: `id[eq]:${targetId}`, limit: '1' },
+        );
+        const ex = exRes.data?.credosTimeEntries?.[0];
+        if (ex?.status === ENTRY_STATUS.APPROVED) {
+          return { ok: false, error: 'cannot_modify_approved' };
+        }
+        prevProjectId = ex?.projectId ?? null;
+      }
+    }
+
+    if (targetId) {
       const res = await api.patch<{ data: { updateCredosTimeEntry: TimeEntry } }>(
-        `/rest/credosTimeEntries/${params.id}`,
+        `/rest/credosTimeEntries/${targetId}`,
         data,
       );
       const projectIdsToRecalc = new Set<string>(

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { T, FONT } from 'src/front-components/capacity/cap-tokens';
 import { Center } from 'src/front-components/grid/center';
 import { BoardToolbar } from 'src/front-components/capacity/board-toolbar';
+import { BoardLegend } from 'src/front-components/capacity/board-legend';
 import { PeriodHeader } from 'src/front-components/capacity/period-header';
 import { SummaryRow } from 'src/front-components/capacity/summary-row';
 import { DeptRows, EmployeeRows } from 'src/front-components/capacity/board-rows';
@@ -96,6 +97,8 @@ export const CapacityBoard = () => {
         onGranularity={setGranularity}
         onTogglePlanning={() => setPlanning((v) => !v)}
       />
+
+      <BoardLegend />
 
       {planning && saveError && (
         <div

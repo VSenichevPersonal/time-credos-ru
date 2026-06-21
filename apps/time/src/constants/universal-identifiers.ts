@@ -118,6 +118,12 @@ export const CREDOS_TIME_ENTRY_APPROVED_AT_FIELD_ID = '1cb81c6a-41bd-4f69-8eca-e
 // rejectComment — причина отклонения (заполняет /s/approval op=reject; сотрудник
 // видит что исправить). Очищается при approve/повторном submit. UX-gap (Timetta).
 export const CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID = 'c9d4029f-f588-4bfe-86ca-2252870e8272';
+// Уникальный индекс записи трудозатрат (SCOUT-B): защита factHours от дублей.
+// UNIQUE(employeeId, projectId, workTypeId, date). БД-уровень — ловит дубли на
+// ВСЕХ путях (REST/грид/CSV), кроме строк с NULL в ключе (PG: NULL != NULL) —
+// остаток закрывает upsert-гард в /s/time-entry.
+export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_UNIVERSAL_IDENTIFIER =
+  '5f51e5d2-4994-43c1-a4ce-d86a699d0024';
 // WorkType
 export const CREDOS_TIME_WORK_TYPE_GROUP_FIELD_ID = '78e61c8f-d18c-48c3-9897-5cf3316aebe9';
 // Employee

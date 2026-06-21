@@ -25,6 +25,15 @@ export const loadTone = (ratio: number | null): LoadTone => {
 export const formatPct = (ratio: number | null): string =>
   ratio === null ? '' : `${Math.round(ratio * 100)}%`;
 
+// DP-0006 §3: средняя загрузка за горизонт (по периодам с ёмкостью) — одна цифра
+// на строку вместо чтения всех колонок. null = нет ёмкости ни в одном периоде.
+export const SIGMA_W = 72; // ширина колонки «Σ горизонт» (фикс, не flex)
+export const avgRatio = (cells: LoadCell[]): number | null => {
+  const valid = cells.filter((c) => c.capacity > 0);
+  if (valid.length === 0) return null;
+  return valid.reduce((s, c) => s + (c.ratio ?? 0), 0) / valid.length;
+};
+
 // Значение ячейки по выбранной метрике. Свободно — со знаком (+можно взять / −перегруз).
 export const formatCell = (metric: CellMetric, cell: LoadCell): string => {
   if (cell.capacity <= 0) return '';

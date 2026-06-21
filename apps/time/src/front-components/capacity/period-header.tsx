@@ -1,5 +1,25 @@
-import { T } from 'src/front-components/capacity/cap-tokens';
+import { T, SIGMA_W } from 'src/front-components/capacity/cap-tokens';
 import type { Period } from 'src/front-components/capacity/types';
+
+// Ячейка фиксированной ширины Σ-горизонта (выравнивание со строками).
+const sigmaCell = (height: number, content: React.ReactNode, faint = false) => (
+  <div
+    style={{
+      width: SIGMA_W,
+      minWidth: SIGMA_W,
+      height,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderLeft: `1px solid ${T.borderStrong}`,
+      fontSize: 11,
+      fontWeight: 600,
+      color: faint ? T.textFaint : T.textMuted,
+    }}
+  >
+    {content}
+  </div>
+);
 
 // Шапка: для недель — 2 строки (месяц-бэнд → день), для месяцев — одна строка.
 // Колонка 0 = текущий период (горизонт начинается «сегодня») — тонкий тик «сейчас».
@@ -72,6 +92,7 @@ export const PeriodHeader = ({ periods, nameWidth, granularity }: Props) => (
             {b.label}
           </div>
         ))}
+        {sigmaCell(22, '', true)}
       </div>
     )}
 
@@ -99,6 +120,7 @@ export const PeriodHeader = ({ periods, nameWidth, granularity }: Props) => (
           {granularity === 'week' ? p.from.getUTCDate() : p.label}
         </div>
       ))}
+      {sigmaCell(30, 'Σ гор.')}
     </div>
   </div>
 );
