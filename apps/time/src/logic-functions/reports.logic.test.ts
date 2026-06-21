@@ -22,7 +22,8 @@ const emptyPage = (plural: string) => ({
   pageInfo: { hasNextPage: false, endCursor: null },
 });
 
-// 7 параллельных restGetAll в run(): entries, projects, employees, departments, calendar, absences, workTypes
+// Параллельные restGetAll в run(): entries, projects, employees, departments,
+// calendar, absences, workTypes, employeeDepartments (REQ-0011), settings (REQ-0019).
 const ALL_PLURALS = [
   'credosTimeEntries',
   'credosTimeProjects',
@@ -32,6 +33,7 @@ const ALL_PLURALS = [
   'credosTimeAbsences',
   'credosTimeWorkTypes',
   'credosTimeEmployeeDepartments', // REQ-0011 FTE-назначения
+  'credosTimeSettings', // REQ-0019 singleton (revealEmployeeNames)
 ];
 
 const mockFetch = (responses: unknown[]) => {
@@ -186,11 +188,11 @@ describe('reports.logic — restGetAll пагинация', () => {
     vi.stubGlobal('fetch', fetchMock);
     const result = await handler(event({ from: '2026-06-01', to: '2026-06-30' })) as Record<string, unknown>;
     expect(result).toMatchObject({ ok: true });
-    // 1 запрос на entries (1 страница) + 7 на остальные = 8 fetch (REQ-0011 +empDept)
-    expect(fetchMock).toHaveBeenCalledTimes(8);
+    // 1 запрос на entries (1 страница) + 8 на остальные = 9 fetch (REQ-0011 +empDept, REQ-0019 +settings)
+    expect(fetchMock).toHaveBeenCalledTimes(9);
   });
 
-  it('две страницы entries → fetch вызывается 8 раз (2 для entries + 6 остальных)', async () => {
+  it('две страницы entries → fetch вызывается 10 раз (2 для entries + 8 остальных)', async () => {
     const page1 = {
       data: { credosTimeEntries: [{ id: 'e1', date: '2026-06-01', hours: 8, projectId: null, employeeId: null, workTypeId: null, tags: [] }] },
       pageInfo: { hasNextPage: true, endCursor: 'cursor-abc' },
@@ -204,8 +206,8 @@ describe('reports.logic — restGetAll пагинация', () => {
     vi.stubGlobal('fetch', fetchMock);
     const result = await handler(event({ from: '2026-06-01', to: '2026-06-30' })) as Record<string, unknown>;
     expect(result).toMatchObject({ ok: true });
-    // 2 страницы entries + 7 остальных = 9 (REQ-0011 +empDept)
-    expect(fetchMock).toHaveBeenCalledTimes(9);
+    // 2 страницы entries + 8 остальных = 10 (REQ-0011 +empDept, REQ-0019 +settings)
+    expect(fetchMock).toHaveBeenCalledTimes(10);
   });
 
   it('cursor передаётся на 2-й запрос (starting_after)', async () => {
@@ -220,7 +222,7 @@ describe('reports.logic — restGetAll пагинация', () => {
     vi.stubGlobal('fetch', fetchMock);
     await handler(event());
     // recs пустые → цикл прерван, starting_after не используется
-    expect(fetchMock).toHaveBeenCalledTimes(8); // REQ-0011 +empDept
+    expect(fetchMock).toHaveBeenCalledTimes(9); // REQ-0011 +empDept, REQ-0019 +settings
     void page2; // не используется — пагинация не продолжилась
   });
 });

@@ -154,20 +154,35 @@ const readOlap = (
 // может подставить чужой валидный UUID руководителя и пройти isManager-guard); к тому
 // же ref заполнен лишь у 1/43 → подход и небезопасен, и нерабочий.
 //
-// БЕЗОПАСНЫЙ ДЕФОЛТ: НЕ раскрывать ФИО ни в одном срезе (REVEAL=false). Ключи
+// БЕЗОПАСНЫЙ ДЕФОЛТ: НЕ раскрывать ФИО ни в одном срезе (reveal=false). Ключи
 // (employeeId) сохраняем — «Мои часы» фильтрует свою строку по key и name не
 // использует (my-hours.tsx). TODO(CISO-005): когда появится доверенный
 // server-identity (userWorkspaceId→workspaceMember), резолвить актора и отдавать ФИО
 // руководителю со scope по его подчинённым (RBAC_MODEL: менеджер видит свою команду).
-const REVEAL_EMPLOYEE_NAMES = false;
+//
+// REQ-0019: флаг больше не хардкод-константа — читается из singleton
+// credosTimeSettings.revealEmployeeNames (админ-тоггл, CISO-007). Fallback false
+// (безопасный дефолт) при отсутствии записи/поля/ошибке чтения.
+type RawSettings = { revealEmployeeNames?: boolean | null };
+const readRevealEmployeeNames = async (): Promise<boolean> => {
+  try {
+    const settings = await restGetAll<RawSettings>('credosTimeSettings', {});
+    return settings[0]?.revealEmployeeNames === true; // singleton; fallback false
+  } catch {
+    return false; // безопасный дефолт при ошибке чтения настроек
+  }
+};
 
 // byEmployee: затираем ФИО (name) до пустой строки, ключ (employeeId) сохраняем.
-const redactByEmployee = <T extends { name: string }>(rows: T[]): T[] =>
-  REVEAL_EMPLOYEE_NAMES ? rows : rows.map((r) => ({ ...r, name: '' }));
+const redactByEmployee = <T extends { name: string }>(rows: T[], reveal: boolean): T[] =>
+  reveal ? rows : rows.map((r) => ({ ...r, name: '' }));
 
 // OLAP: ось/фильтр employee несёт ФИО в name/label — затираем (только dim employee).
-const redactOlap = (result: ReturnType<typeof computeOlap>): ReturnType<typeof computeOlap> => {
-  if (REVEAL_EMPLOYEE_NAMES) return result;
+const redactOlap = (
+  result: ReturnType<typeof computeOlap>,
+  reveal: boolean,
+): ReturnType<typeof computeOlap> => {
+  if (reveal) return result;
   return {
     ...result,
     rows: result.groupBy === 'employee' ? result.rows.map((r) => ({ ...r, name: '' })) : result.rows,
@@ -193,6 +208,7 @@ const run = async (event: RoutePayload) => {
     absences,
     workTypes,
     assignments,
+    reveal,
   ] = await Promise.all([
     restGetAll<RawEntry>('credosTimeEntries', { filter: `date[gte]:${from},date[lte]:${to}` }),
     restGetAll<RawProject>('credosTimeProjects', {}),
@@ -211,6 +227,8 @@ const run = async (event: RoutePayload) => {
     // REQ-0011: FTE-назначения сотрудников на отделы. Численность отдела для нормы =
     // Σ FTE активных в периоде назначений (fallback по сотрудникам без записей = 100%).
     restGetAll<RawEmpDeptAssignment>('credosTimeEmployeeDepartments', {}),
+    // REQ-0019: показ ФИО — из настроек (singleton), а не хардкод-флага.
+    readRevealEmployeeNames(),
   ]);
 
   const input = {
@@ -235,9 +253,9 @@ const run = async (event: RoutePayload) => {
   // filter) → инъекции нет. format=csv → CSV-строка в ответе (content-type не
   // поддержан песочницей; фронт делает Blob-download).
   if (params.groupBy === 'detail') {
-    // CISO-007: ФИО (employeeName) затираем (revealNames=false) — server-actor
-    // недостижим, доверенной роли нет. Остальные поля (дата/проект/часы/статус)
-    // не ПДн. Фильтры deptId/projectId/employeeId работают для drill-down.
+    // CISO-007: ФИО (employeeName) затираем по настройке revealEmployeeNames
+    // (REQ-0019; дефолт false). Остальные поля (дата/проект/часы/статус) не ПДн.
+    // Фильтры deptId/projectId/employeeId работают для drill-down.
     const rows = computeDetail(
       input,
       {
@@ -245,7 +263,7 @@ const run = async (event: RoutePayload) => {
         projectId: params.projectId ?? null,
         employeeId: params.employeeId ?? null,
       },
-      REVEAL_EMPLOYEE_NAMES,
+      reveal,
     );
     if (params.format === 'csv') {
       return { ok: true, format: 'csv', count: rows.length, csv: detailToCsv(rows) };
@@ -256,13 +274,13 @@ const run = async (event: RoutePayload) => {
   // W4-1: параметрический OLAP при наличии groupBy; иначе — старый 3-срезовый ответ.
   // CISO-007: затираем ФИО в OLAP employee-срезе/фильтре.
   if (olap) {
-    return redactOlap(computeOlap(input, { from, to }, olap));
+    return redactOlap(computeOlap(input, { from, to }, olap), reveal);
   }
   // CISO-007: затираем ФИО в byEmployee (раскрывал имена всех сотрудников).
   const result = computeReports(input, { from, to });
   return {
     ...result,
-    byEmployee: redactByEmployee(result.byEmployee),
+    byEmployee: redactByEmployee(result.byEmployee, reveal),
     groupBy: params.groupBy ?? null,
   };
 };

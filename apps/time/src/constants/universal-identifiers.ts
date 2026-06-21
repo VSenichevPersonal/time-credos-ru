@@ -469,6 +469,20 @@ export const CREDOS_TIME_PROJECT_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER =
 export const CREDOS_TIME_PROJECT_DEPARTMENT_NAV_UNIVERSAL_IDENTIFIER =
   'cac47fc6-5365-4603-8ef9-198a5e2d6034';
 
+// --- REQ-0018: структура отделов (руководитель + иерархия) ---
+// head — руководитель отдела (→ Employee, MANY_TO_ONE). Объективный источник
+// «кто руковод» (питает isManager/approval-маршрутизацию/RBAC-скоуп). parentDepartment
+// — вышестоящий отдел (self-relation, опц. иерархия для скоупинга). Обратные стороны:
+// Employee.headedDepartments / Department.childDepartments.
+export const CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID =
+  '76aac183-f70e-4ec4-8bd3-0598c879f009';
+export const CREDOS_TIME_EMPLOYEE_HEADED_DEPARTMENTS_FIELD_ID =
+  'eb23c9d8-c0a2-4b9c-84d8-fe93c72c501e';
+export const CREDOS_TIME_DEPARTMENT_PARENT_FIELD_ID =
+  '0cb266f3-b7b2-411b-a1f3-8d8bbf8eafec';
+export const CREDOS_TIME_DEPARTMENT_CHILDREN_FIELD_ID =
+  '62ae19d5-ba13-4c7f-a71e-856e218e088c';
+
 // Вкладка «Отделы» карточки проекта (доли отделов текущего проекта).
 // nav-menu-item «Доли отделов» убран из сайдбара — атрибут перенесён в карточку.
 // Tab + FIELDS-виджет на Project card-view, где виден relation-field departmentShares
@@ -539,3 +553,95 @@ export const CREDOS_TIME_EMPLOYEE_CARD_VF_2 =
 // миграции добавляются В ЭТОТ ЖЕ handler, не отдельным файлом.
 export const BACKFILL_PROJECT_DEPARTMENTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   '81b054aa-ce6a-4059-aab2-cb0401030b8d';
+
+// --- REQ-0019: глобальный singleton настроек модуля (credosTimeSettings) ---
+// Объект + 12 полей + index-view (для существования; правка в UI настроек, Dev1)
+// + nav-menu-item. Сид 1 записи дефолтов — в общем post-install handler (миграция 3).
+export const CREDOS_TIME_SETTINGS_OBJECT_UNIVERSAL_IDENTIFIER =
+  'da1db590-d718-4b6f-867a-f159c4d0dbec';
+export const CREDOS_TIME_SETTINGS_NORM_HOURS_PER_DAY_FIELD_ID =
+  'a39007e8-b9f9-4d4a-9e17-117dabeabd7d';
+export const CREDOS_TIME_SETTINGS_WEEK_STARTS_ON_FIELD_ID =
+  '5256a3fa-c819-4119-8158-46411675794b';
+export const CREDOS_TIME_SETTINGS_PLANNING_HORIZON_WEEKS_FIELD_ID =
+  '14ee283f-6296-4cc7-a6dd-7c08ff906b7c';
+export const CREDOS_TIME_SETTINGS_DEFAULT_CAPACITY_FACTOR_FIELD_ID =
+  'da596473-7439-49dc-9778-b98d904bfe97';
+export const CREDOS_TIME_SETTINGS_DEFAULT_APPROVAL_REQUIRED_FIELD_ID =
+  '953fc81c-dd0e-4f50-b010-e8f8e539df2e';
+export const CREDOS_TIME_SETTINGS_APPROVAL_PERIOD_FIELD_ID =
+  'f922c24b-3e37-4df6-afb8-e7df4773a0ab';
+export const CREDOS_TIME_SETTINGS_OVERTIME_WARN_HOURS_FIELD_ID =
+  'e1b635f2-c92a-4d16-82d5-feaf5364e4b5';
+export const CREDOS_TIME_SETTINGS_FILL_TEMPLATE_HOURS_FIELD_ID =
+  '4bd1574f-8e5e-461b-8722-44ebd05b4e61';
+export const CREDOS_TIME_SETTINGS_REMINDER_ENABLED_FIELD_ID =
+  '0de72740-43d1-4b31-906f-20e9824b4ae3';
+export const CREDOS_TIME_SETTINGS_REMINDER_DAY_OF_WEEK_FIELD_ID =
+  '16a02ee8-4478-484f-a3b4-1dd4e12587b6';
+export const CREDOS_TIME_SETTINGS_REVEAL_EMPLOYEE_NAMES_FIELD_ID =
+  '48f00ca8-bb8a-462c-922a-25dc729fb453';
+export const CREDOS_TIME_SETTINGS_TENTATIVE_BOOKING_ENABLED_FIELD_ID =
+  'e031ab36-23e0-42d4-92fd-4ef9fd0e0633';
+export const CREDOS_TIME_SETTINGS_VIEW_UNIVERSAL_IDENTIFIER =
+  'bc8bc1a0-e966-4eb9-94ac-ee1eec20fa19';
+export const CREDOS_TIME_SETTINGS_OBJ_NAV_UNIVERSAL_IDENTIFIER =
+  '061d5b66-df80-4eab-b484-5e020d6959eb';
+
+// --- REQ-0016: связанность карточек (кросс-таблицы во вкладках) ---
+// Переиспользуем нативный паттерн relation-FIELDS card-view (как «Отделы» в
+// карточке проекта/сотрудника): FIELDS-виджет на card-view, где виден relation-
+// field (ONE_TO_MANY) → ядро рендерит дочерние записи ТЕКУЩЕЙ сущности инлайн-
+// таблицей, отфильтрованной по родителю, кликабельной в карточку дочерней
+// записи (нативно). RECORD_TABLE-реестр (INDEX-view join-объекта) — полный
+// список всех связей.
+
+// Карточка отдела (RECORD_PAGE) — новый layout. Вкладки:
+//  • «Сотрудники» — FTE-назначения отдела (relation employeeAssignments,
+//    зеркало вкладки «Сотрудники» нет → берём join credosTimeEmployeeDepartment).
+//  • «Проекты» — доли отдела в проектах (relation projectShares, join
+//    credosTimeProjectDepartment).
+// labelIdentifier отдела — авто-поле name (TEXT-поля нет); в card-view position 0
+// показываем code (SELECT), как в index-view отдела.
+export const CREDOS_TIME_DEPARTMENT_RECORD_PAGE_UNIVERSAL_IDENTIFIER =
+  '85c05a27-58b9-4d40-9099-57fdbf040e09';
+export const CREDOS_TIME_DEPARTMENT_RP_TAB_EMPLOYEES_UNIVERSAL_IDENTIFIER =
+  '862313d2-c468-4c95-95eb-fda48047c8ce';
+export const CREDOS_TIME_DEPARTMENT_RP_TAB_PROJECTS_UNIVERSAL_IDENTIFIER =
+  '26ca6561-2e94-4007-8612-ba68dbda2cda';
+export const CREDOS_TIME_DEPARTMENT_RP_W_EMPLOYEES_UNIVERSAL_IDENTIFIER =
+  '8a12b336-f526-492f-b7d3-dc63555323ef';
+export const CREDOS_TIME_DEPARTMENT_RP_W_EMPLOYEES_REGISTRY_UNIVERSAL_IDENTIFIER =
+  'd3b6032c-c615-4744-aabd-c60adf3350c8';
+export const CREDOS_TIME_DEPARTMENT_RP_W_PROJECTS_UNIVERSAL_IDENTIFIER =
+  '7be1710c-d802-4df6-a630-7afbc6036cdb';
+export const CREDOS_TIME_DEPARTMENT_RP_W_PROJECTS_REGISTRY_UNIVERSAL_IDENTIFIER =
+  '584d4bca-0c3d-4cd1-be83-290ce525af28';
+// Card-views «Отдел — сотрудники» / «Отдел — проекты» + их view-fields.
+export const CREDOS_TIME_DEPARTMENT_CARD_EMPLOYEES_VIEW_UNIVERSAL_IDENTIFIER =
+  '96d93edf-47c9-4f9b-9c86-2bfec78adeb7';
+export const CREDOS_TIME_DEPARTMENT_CARD_PROJECTS_VIEW_UNIVERSAL_IDENTIFIER =
+  'b83a9e57-68bd-4900-b3d5-29955aeaeca5';
+export const CREDOS_TIME_DEPARTMENT_CARD_VF_1 =
+  'f2c5a05a-03af-451f-8de1-ae1babba52ea';
+export const CREDOS_TIME_DEPARTMENT_CARD_VF_2 =
+  '588bbaf1-9443-48e2-a009-33d893f8d1d8';
+export const CREDOS_TIME_DEPARTMENT_CARD_VF_3 =
+  '080d5470-6d57-4707-99e5-c5f8d046477f';
+export const CREDOS_TIME_DEPARTMENT_CARD_VF_4 =
+  'e3ceb357-faff-41db-a58c-e303a33ec126';
+
+// Карточка сотрудника — вкладка «Трудозатраты» (relation timeEntries,
+// ONE_TO_MANY). Записи сотрудника инлайн-таблицей, кликабельно в карточку записи
+// (а из неё — в проект/этап). «Проекты, где работал» = агрегат записей по проекту
+// → follow-up Dev2 (нет прямого relation employee↔project).
+export const CREDOS_TIME_EMPLOYEE_RP_TAB_TIME_ENTRIES_UNIVERSAL_IDENTIFIER =
+  'eebdb01d-d3c7-45e0-980a-a4804fd304c4';
+export const CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER =
+  '0edf5fd7-7fba-4b4c-b398-f8380602b728';
+export const CREDOS_TIME_EMPLOYEE_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER =
+  '3835bfd7-cffb-4d9c-ab8b-414aee41dd9c';
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_3 =
+  'f0a4d1ce-f2fe-462c-ad1a-e200dd02d8d0';
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_4 =
+  'de2bdc80-0359-4ce0-88cd-fef67784a3a6';

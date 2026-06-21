@@ -90,6 +90,10 @@ describe('backfill-project-departments — базовые кейсы', () => {
     const mockFn = mockFetch([
       page('credosTimeProjects', [proj('p1', 'd1', 80)]),
       page('credosTimeProjectDepartments', [share('p1', 'd1')]),
+      page('credosTimeEntries', []), // backfillProjectFactHours GET
+      {}, // backfillProjectFactHours PATCH p1 (rollup)
+      // REQ-0019 seedSettings: singleton уже есть → POST не нужен (идемпотентно)
+      page('credosTimeSettings', [{ id: 's1' }]),
     ]);
     vi.stubGlobal('fetch', mockFn);
     const r = await handler(PAYLOAD);
@@ -98,6 +102,47 @@ describe('backfill-project-departments — базовые кейсы', () => {
       (c: unknown[]) => typeof c[1] === 'object' && (c[1] as RequestInit).method === 'POST',
     );
     expect(posts).toHaveLength(0);
+  });
+
+  it('REQ-0019 сид: настроек нет → POST credosTimeSettings, settingsSeeded:true', async () => {
+    const mockFn = mockFetch([
+      page('credosTimeProjects', []),
+      page('credosTimeProjectDepartments', []),
+      page('credosTimeEntries', []), // backfillProjectFactHours
+      page('credosTimeSettings', []), // settings пусты → создать
+      {}, // POST credosTimeSettings response
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const r = (await handler(PAYLOAD)) as BackfillResult & { settingsSeeded: boolean };
+    expect(r.settingsSeeded).toBe(true);
+    const settingsPosts = mockFn.mock.calls.filter(
+      (c: unknown[]) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('credosTimeSettings') &&
+        typeof c[1] === 'object' &&
+        (c[1] as RequestInit).method === 'POST',
+    );
+    expect(settingsPosts).toHaveLength(1);
+  });
+
+  it('REQ-0019 сид: singleton есть → settingsSeeded:false, POST не вызван', async () => {
+    const mockFn = mockFetch([
+      page('credosTimeProjects', []),
+      page('credosTimeProjectDepartments', []),
+      page('credosTimeEntries', []),
+      page('credosTimeSettings', [{ id: 's1' }]), // singleton уже есть
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const r = (await handler(PAYLOAD)) as BackfillResult & { settingsSeeded: boolean };
+    expect(r.settingsSeeded).toBe(false);
+    const settingsPosts = mockFn.mock.calls.filter(
+      (c: unknown[]) =>
+        typeof c[0] === 'string' &&
+        c[0].includes('credosTimeSettings') &&
+        typeof c[1] === 'object' &&
+        (c[1] as RequestInit).method === 'POST',
+    );
+    expect(settingsPosts).toHaveLength(0);
   });
 
   it('POST ошибка на одном проекте → errors:1, остальные продолжаются', async () => {

@@ -118,9 +118,53 @@ const backfillProjectFactHours = async (
   return { updated, errors };
 };
 
+type RawSettings = { id: string };
+
+// REQ-0019 — сид глобального singleton credosTimeSettings. Создаёт ровно 1 запись
+// с дефолтами, если её ещё нет. Идемпотентно: при наличии любой записи — НЕ плодит
+// (повторный install/upgrade безопасен). SELECT-значения — bare UPPER_CASE (формат
+// хранения REST; не путать с defaultValue объекта "'VALUE'"). Значения дефолтов =
+// REQ-0019 spec; должны совпадать с object defaultValue (SSOT — спека).
+const seedSettings = async (): Promise<{ created: boolean; skipped: boolean; error: boolean }> => {
+  const existing = await restGetAll<RawSettings>('credosTimeSettings', {});
+  if (existing.length > 0) {
+    return { created: false, skipped: true, error: false }; // singleton уже есть
+  }
+  try {
+    await restPost('/rest/credosTimeSettings', {
+      normHoursPerDay: 8,
+      weekStartsOn: 'MONDAY',
+      planningHorizonWeeks: 16,
+      defaultCapacityFactor: 0.8,
+      defaultApprovalRequired: false,
+      approvalPeriod: 'WEEK',
+      overtimeWarnHours: 12,
+      fillTemplateHours: 8,
+      reminderEnabled: false,
+      reminderDayOfWeek: 'FRIDAY',
+      revealEmployeeNames: false,
+      tentativeBookingEnabled: true,
+    });
+    // eslint-disable-next-line no-console
+    console.warn('[seed-settings] создан singleton credosTimeSettings с дефолтами');
+    return { created: true, skipped: false, error: false };
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[seed-settings] ошибка создания singleton: %s', e instanceof Error ? e.message : String(e));
+    return { created: false, skipped: false, error: true };
+  }
+};
+
 const handler = async (
   _payload: InstallPayload,
-): Promise<{ ok: boolean; created: number; skipped: number; errors: number; factHoursUpdated: number }> => {
+): Promise<{
+  ok: boolean;
+  created: number;
+  skipped: number;
+  errors: number;
+  factHoursUpdated: number;
+  settingsSeeded: boolean;
+}> => {
   // Проекты (со старым departmentId) + уже существующие доли (для идемпотентности).
   const [projects, existingShares] = await Promise.all([
     restGetAll<RawProject>('credosTimeProjects', {}),
@@ -171,12 +215,16 @@ const handler = async (
   // Миграция 2: бэкфилл factHours/budgetRemaining (баг «пустые Факт/Остаток»).
   const fact = await backfillProjectFactHours(projects);
 
+  // Миграция 3: REQ-0019 — сид singleton credosTimeSettings (1 запись дефолтов).
+  const settings = await seedSettings();
+
   return {
-    ok: errors === 0 && fact.errors === 0,
+    ok: errors === 0 && fact.errors === 0 && !settings.error,
     created,
     skipped,
-    errors: errors + fact.errors,
+    errors: errors + fact.errors + (settings.error ? 1 : 0),
     factHoursUpdated: fact.updated,
+    settingsSeeded: settings.created,
   };
 };
 
@@ -184,7 +232,7 @@ export default definePostInstallLogicFunction({
   universalIdentifier: BACKFILL_PROJECT_DEPARTMENTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER,
   name: 'backfill-project-departments',
   description:
-    'Бэкфилл: (1) REQ-0013 13a project.departmentId → доля credosTimeProjectDepartment (100%); (2) factHours/budgetRemaining проектов = Σ часов записей. Идемпотентно.',
+    'Бэкфилл: (1) REQ-0013 13a project.departmentId → доля credosTimeProjectDepartment (100%); (2) factHours/budgetRemaining проектов = Σ часов записей; (3) REQ-0019 сид singleton credosTimeSettings (1 запись дефолтов). Идемпотентно.',
   timeoutSeconds: 60,
   // Существующий инстанс Credos уже установлен — без этого флага бэкфилл не
   // выполнится на апгрейде и старые проекты никогда не получат доли.

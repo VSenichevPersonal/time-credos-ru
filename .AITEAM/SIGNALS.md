@@ -2941,6 +2941,71 @@ Dev2 дал поля `credosTimeProject.factHours` (rollup Σ часов) + `bud
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [report] REQ-0019 расширенные настройки (singleton credosTimeSettings) ГОТОВО
+
+Плоский singleton по спеке (сверка Timetta system-settings; не плодим объект на параметр).
+
+**Объект `credosTimeSettings`** (`objects/credos-time-settings.object.ts`) + 12 полей, рус. labels, SELECT UPPER_SNAKE:
+- NUMBER: normHoursPerDay(8), planningHorizonWeeks(16,INT), defaultCapacityFactor(0.8), overtimeWarnHours(12), fillTemplateHours(8)
+- SELECT: weekStartsOn(MONDAY), approvalPeriod(WEEK), reminderDayOfWeek(FRIDAY) — наборы в `select-options.ts`
+- BOOLEAN: defaultApprovalRequired(false), reminderEnabled(false), revealEmployeeNames(false), tentativeBookingEnabled(true)
+- nameSingular≠namePlural (ядро запрещает совпадение): singular=`credosTimeSetting`, plural=`credosTimeSettings` (REST-плюрал — его читают потребители).
+- index-view (`views/credos-time-settings.view.ts`, 7 колонок) + nav-item (`navigation-menu-items/credos-time-settings.navigation-menu-item.ts`, pos 9) — для существования; управление в UI настроек (Dev1).
+- UUID в `constants/universal-identifiers.ts` (1 объект + 12 полей + view + nav), без дублей.
+
+**Сид** — миграция 3 в общем post-install (`backfill-project-departments.post-install.ts`, SDK берёт единственную E[0]). `seedSettings()`: создаёт 1 запись дефолтов, если записей нет; идемпотентно (есть → skip). Return +`settingsSeeded`.
+
+**revealEmployeeNames подключён:** в `reports.logic.ts` хардкод-конст `REVEAL_EMPLOYEE_NAMES=false` заменён на `readRevealEmployeeNames()` (чтение singleton, fallback false при ошибке/отсутствии). Прокинут в detail/byEmployee/OLAP-редакторы. CISO-007 дефолт сохранён.
+
+**Follow-up Dev1:** секция «Общие параметры» в UI «Настройки Time Credos» над «Отделы» (правка singleton: GET/PATCH `credosTimeSettings`, группировка ввод/планирование/согласование/напоминания/безопасность). Тоггл revealEmployeeNames — админ-доступ (RBAC-волна).
+
+**Follow-up Dev2 (опц., объёмно):** подключить остальные параметры-потребители (normHoursPerDay→fallback нормы ADR-0007; planningHorizonWeeks→доска; defaultCapacityFactor/defaultApprovalRequired→дефолты новых отделов; overtimeWarnHours/fillTemplateHours→ввод; reminder*; weekStartsOn; approvalPeriod). Сейчас читается только revealEmployeeNames.
+
+**Валидация:** lint 0; test:unit 0 failed (1554 passed, обновлены счётчики fetch в reports.logic.test +1, добавлены 2 теста сида в backfill.test); `dev --once --dry-run` чисто — объект+поля+view+nav+post-install создаются, без дублей UUID, apply-готово. НЕ коммичено.
+
+---
+
+### 2026-06-22 — [report] REQ-0018 структура отделов (head + parentDepartment) ГОТОВО
+
+MVP по спеке (границы: head + опц. иерархия, не переусложнять):
+- `credosTimeDepartment.head` → Employee (MANY_TO_ONE nullable, SET_NULL) + обратная `employee.headedDepartments` (ONE_TO_MANY). Объективный источник «кто руковод».
+- `credosTimeDepartment.parentDepartment` → self (MANY_TO_ONE nullable) + обратная `childDepartments`. Иерархия для скоупинга.
+- view-колонки: «Руководитель» + «Вышестоящий отдел».
+- +4 UUID в SSOT.
+
+**Dry-run:** `twenty dev:build` ✓ (self-relation parentDepartment↔childDepartments + head-граф валидны), `oxlint` 0/0, `tsc` 0 реальных, манифест: head/parentDepartment/childDepartments/headedDepartments на местах, иконки в SDK.
+
+**Файлы (Dev2-зона, изолировано):** `constants/universal-identifiers.ts`, `objects/credos-time-department.object.ts`, `objects/credos-time-employee.object.ts`, `views/credos-time-department.view.ts`. Не закоммичено — ждёт arch-gate.
+
+**Пропустил (опц. по спеке):** backfill heads (неизвестны → проставить вручную/из данных позже), синхр `employee.isManager`=(head≥1 отдела) — отдельным заходом (затрагивает SSOT isManager, согласовать).
+
+**Хендофф @Dev1 (UI):** карточка отдела — поле «Руководитель» (выбор сотрудника) + «Вышестоящий отдел»; карточка сотрудника — «Руководит отделами» (обратная).
+
+**Связи (для arch):** питает A2/isManager (department.head = объективный руковод), REQ-0007 (approval-маршрутизация на head отдела), CISO-005/007 (RBAC-скоуп head→своя команда — после server-identity).
+
+**Коллизия-note:** параллельно SCOUT-B-поток правил тот же `universal-identifiers.ts` (unique-index UUID, стр.121-135) — разные секции, мои REQ-0018 UUID целы, конфликта нет. Проверял git status перед правками (конс-режим).
+
+— Dev 2
+
+
+### 2026-06-22 — [taking] REQ-0018 структура отделов (head + parentDepartment) — Dev2
+
+Явное arch-назначение (стр.90 «→ Dev2: после SCOUT-B взять REQ-0018»). SCOUT-B занят параллельным потоком (entry-объект) — REQ-0018 на **department-объекте** (другой файл, нет конфликта). Объекты чисты (проверил git status).
+
+**MVP (границы REQ-0018, не переусложнять):**
+- `credosTimeDepartment.head` → credosTimeEmployee (MANY_TO_ONE nullable) + обратная `employee.headedDepartments`
+- `credosTimeDepartment.parentDepartment` → self (MANY_TO_ONE nullable) + обратная `childDepartments`
+- view-поля (department): руководитель + вышестоящий отдел
+- +4 UUID в SSOT
+- **Пропускаю** (опц. по спеке): backfill heads (неизвестны→вручную), isManager-синхр (отдельно)
+
+**Файлы:** `constants/universal-identifiers.ts`, `objects/credos-time-department.object.ts`, `objects/credos-time-employee.object.ts` (или fields/), `views/credos-time-department.view.ts`. Всё Dev2-зона, изолировано.
+
+Конс-режим: явное назначение + изолированный объект + проверка git status перед каждой правкой.
+
+— Dev 2
+
+
 ### 2026-06-22 — [report] CISO-007 reports-detail — УСТУПАЮ параллельному потоку (их REVEAL=false лучше)
 
 Взял блокер CISO-007 (employeeName role-guard), но параллельный поток/arch уже выкатил **комплексный фикс REVEAL=false** в reports.logic.ts — лучше моего:
@@ -5368,7 +5433,17 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
-### 2026-06-21 07:30 — [deployed] Накатал закоммиченный A1 self-employee (был не на сервере) + заметки по 7a78a02
+### 2026-06-21 07:50 — [user-direct] Тест-админ admin@credos.ru СОЗДАН (браузер освободился, T3 разблокирован)
+
+Заказчик просил тест-аккаунт. Браузер chrome-devtools освободился → создал через UI invite+signup:
+- **admin@credos.ru / пароль admin@credos.ru** (15 симв, dev-only). Профиль «Admin Test».
+- Путь: Settings → Members → публичная invite-ссылка → signup (изолированный контекст, owner-сессию не трогал) → профиль.
+- **Подтверждено REST:** workspaceMembers = 2 (Василий Сеничев vs@credos.ru + Admin Test admin@credos.ru) ✅. Аккаунт login-способен.
+- Креды записаны в `.env` (gitignored): `TWENTY_TEST_ADMIN_EMAIL/PASSWORD`.
+
+**Остаток:** роль = **дефолтная workspace** (не полный Admin). Браузер снова перехвачен параллельным агентом при попытке назначить Admin-роль (Settings→Roles). Догоню элевацию до Admin когда браузер освободится, либо owner сам (Settings → Members → роль). Для теста логина/UX аккаунт уже годен.
+
+⚠️ Security (dev-only): пароль=логин — слабый, только dev/test без реальных ПДн. На прод не переносить. — DevOps
 
 Коммит `7a78a02` (владелец напрямую) содержал **завершённый app-код** (A1 `shared/use-self-employee.ts` = useUserId identity + capacity-rest/use-capacity/weekly-grid), но он **не был на сервере** (committed-дрейф, tree чисто). Накатал (моя core-задача «завершённое деплоится»): 2 updated frontComponent, parity ✅ «No metadata changes», health 🟢.
 → **arch:** A1 (useUserId) теперь на dev — разблокирует approval-identity (CISO-005/002), можешь двигать REQ-0014.
@@ -8256,3 +8331,33 @@ FALLBACK (календарь недоступен/ещё не загружен):
 ДЕДУП УЖЕ ПРИМЕНЁН LIVE (требование задания «запусти live») — данные готовы к apply индекса (без дублей создание UNIQUE не упадёт). Схему/код НЕ деплоил, НЕ коммитил. Зона Dev2: objects/ logic-functions/ scripts/ + новый indexes/ + constants.
 
 — Dev 2
+
+## Dev 1 → arch
+[report] REQ-0016 — связанность карточек (кросс-таблицы во вкладках, кликабельно).
+
+ПОДХОД: переиспользован нативный паттерн relation-FIELDS card-view (как «Отделы» в карточке проекта/сотрудника, REQ-0013/REQ-0011) — без новых объектов, только новые view-вкладки + page-layout. Клик по строке → карточка связанной сущности (нативный механизм Twenty), кликабельность из коробки.
+
+СДЕЛАНО:
+1. **Карточка отдела** (НОВЫЙ page-layout `credos-time-department.page-layout.ts` — раньше не было). 2 вкладки:
+   - «Сотрудники» — relation `employeeAssignments` (ONE_TO_MANY → credosTimeEmployeeDepartment): FTE-назначения отдела (сотрудник + % FTE + даты), FIELDS-виджет (инлайн, нативная правка) + RECORD_TABLE-реестр (INDEX-view join-объекта, переиспользован существующий).
+   - «Проекты» — relation `projectShares` (ONE_TO_MANY → credosTimeProjectDepartment): доли отдела в проектах (проект + плановая доля в часах), FIELDS + RECORD_TABLE.
+   - 2 новые card-view: `credos-time-department-card-employees.view.ts`, `credos-time-department-card-projects.view.ts`. position 0 = code (у отдела нет TEXT labelIdentifier, как в index-view).
+2. **Карточка сотрудника** — добавлена вкладка «Трудозатраты» (relation `timeEntries`, ONE_TO_MANY → credosTimeEntry): записи сотрудника инлайн, кликабельно в карточку записи → проект/этап. Новый card-view `credos-time-employee-card-time-entries.view.ts`.
+3. Константы: REQ-0016 блок в `universal-identifiers.ts` (+21 UUID v4, проверены на коллизии — 0 дублей в src/).
+
+FOLLOW-UP Dev2 (нет прямого relation для кросс-таблицы → нужен агрегат):
+- **Карточка проекта «Команда»** (сотрудники проекта по записям) — уже заглушка FRONT_COMPONENT в layout проекта; relation проект↔сотрудник напрямую нет (только timeEntries→employee). Нужен агрегат «сотрудник + часы» через /s/reports или REST. НЕ трогал (зона Dev2).
+- **Сотрудник «Проекты, где работал»** — агрегат записей по проекту (нет relation employee↔project). Пока показаны «Трудозатраты» (записи, кликабельны в проект). Если нужна именно агрегат-таблица проектов с суммой часов — front-component Dev2.
+- **Отдел «Загрузка/ёмкость» + «Записи отдела»** (матрица REQ-0016) — агрегаты по периодам, front-component /s/reports (нет прямого relation для инлайн-кросс-таблицы).
+
+ВАЛИДАЦИЯ:
+- yarn lint — **0 warnings, 0 errors**.
+- yarn test:unit — мои зоны (views/page-layouts/constants) чисто. ⚠️ **4 failed в logic-functions/ (зона Dev2): `reports.logic.test.ts` (3) + `backfill-project-departments.test.ts` (1)** — это in-flight работа Dev2 в рабочем дереве (reports.logic.ts/post-install в uncommitted diff, не мои). Ни один фейл не ссылается на REQ-0016. К моим изменениям отношения не имеют.
+- yarn twenty dev --once --dry-run — build/manifest/typecheck **OK**. Мои REQ-0016 сущности — **0 ошибок** (проверил все 21 UUID — нет в логе ошибок; 0 pageLayout/view/viewField ошибок по моим файлам); relation-targets (employeeAssignments/projectShares/timeEntries) существуют, apply-готово. ⚠️ **38 ошибок dry-run — ВСЕ из credosTimeSettings (REQ-0019, чужая in-flight работа в дереве)**: корень — `INVALID_OBJECT_INPUT: singular и plural имена объекта credosTimeSettings совпадают` → каскад 25 полей + view + viewFields + 4 relation-target NOT_FOUND. Чинить — Dev2/автор REQ-0019. НЕ dev --once.
+
+НЕ коммитил, НЕ деплоил. Зона: page-layouts/ views/ constants/.
+
+— Dev 1
+
+**[QA → Dev 2] [bug] credosTimeSettings: nameSingular === namePlural** — оба `credosTimeSettings`. SDK требует разные. Fix: `nameSingular: 'credosTimeSetting'`. Каскад 38 ошибок dry-run у Dev 1 — из этого объекта.
+— QA

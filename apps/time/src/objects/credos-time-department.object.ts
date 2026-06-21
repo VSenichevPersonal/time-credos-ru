@@ -2,15 +2,19 @@ import {
   defineObject,
   FieldType,
   NumberDataType,
+  OnDeleteAction,
   RelationType,
 } from 'twenty-sdk/define';
 
 import { DEPARTMENT_CODE_OPTIONS } from 'src/constants/select-options';
 import {
+  CREDOS_TIME_DEPARTMENT_CHILDREN_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_DEPT_PLANS_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_EMPLOYEE_ASSIGNMENTS_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_PARENT_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_PROJECT_SHARES_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_PROJECTS_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_WORK_TYPES_FIELD_ID,
@@ -19,6 +23,7 @@ import {
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_DEPARTMENT_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_HEADED_DEPARTMENTS_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_DEPARTMENT_DEPARTMENT_FIELD_ID,
   CREDOS_TIME_PROJECT_DEPARTMENT_FIELD_ID,
@@ -151,6 +156,57 @@ export default defineObject({
         CREDOS_TIME_EMPLOYEE_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
         CREDOS_TIME_EMPLOYEE_DEPARTMENT_DEPARTMENT_FIELD_ID,
+      universalSettings: { relationType: RelationType.ONE_TO_MANY },
+    },
+    // REQ-0018: руководитель отдела (→ Employee, MANY_TO_ONE nullable). Объективный
+    // источник «кто руковод» (питает isManager/approval-маршрутизацию/RBAC-скоуп).
+    {
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID,
+      name: 'head',
+      type: FieldType.RELATION,
+      label: 'Руководитель',
+      icon: 'IconUserStar',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_EMPLOYEE_HEADED_DEPARTMENTS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'headId',
+      },
+    },
+    // REQ-0018: вышестоящий отдел (self-relation, опц. иерархия для скоупинга
+    // «руковод видит свой + дочерние отделы»). Один родитель на отдел.
+    {
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_PARENT_FIELD_ID,
+      name: 'parentDepartment',
+      type: FieldType.RELATION,
+      label: 'Вышестоящий отдел',
+      icon: 'IconHierarchy',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPARTMENT_CHILDREN_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'parentDepartmentId',
+      },
+    },
+    // REQ-0018: обратная сторона parentDepartment — дочерние отделы (ONE_TO_MANY self).
+    {
+      universalIdentifier: CREDOS_TIME_DEPARTMENT_CHILDREN_FIELD_ID,
+      name: 'childDepartments',
+      type: FieldType.RELATION,
+      label: 'Дочерние отделы',
+      icon: 'IconSitemap',
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPARTMENT_PARENT_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

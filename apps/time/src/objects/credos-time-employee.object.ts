@@ -9,12 +9,14 @@ import {
   CREDOS_TIME_ABSENCE_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ABSENCE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_EMPLOYEES_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_ABSENCES_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_ASSIGNMENTS_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_HEADED_DEPARTMENTS_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_IS_MANAGER_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
@@ -157,6 +159,20 @@ export default defineObject({
         CREDOS_TIME_EMPLOYEE_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
         CREDOS_TIME_EMPLOYEE_DEPARTMENT_EMPLOYEE_FIELD_ID,
+      universalSettings: { relationType: RelationType.ONE_TO_MANY },
+    },
+    // REQ-0018: обратная сторона Department.head (ONE_TO_MANY) — отделы, которыми
+    // руководит сотрудник. Непустой список → сотрудник «руководитель» (источник isManager).
+    {
+      universalIdentifier: CREDOS_TIME_EMPLOYEE_HEADED_DEPARTMENTS_FIELD_ID,
+      name: 'headedDepartments',
+      type: FieldType.RELATION,
+      label: 'Руководит отделами',
+      icon: 'IconBuilding',
+      relationTargetObjectMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID,
       universalSettings: { relationType: RelationType.ONE_TO_MANY },
     },
   ],

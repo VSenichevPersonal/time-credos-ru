@@ -3,8 +3,10 @@ import { defineView, ViewKey } from 'twenty-sdk/define';
 import {
   CREDOS_TIME_DEPARTMENT_APPROVAL_REQUIRED_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_CODE_FIELD_ID,
+  CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_HEADCOUNT_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_PARENT_FIELD_ID,
   CREDOS_TIME_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
@@ -38,6 +40,21 @@ export default defineView({
       position: 2,
       isVisible: true,
       size: 140,
+    },
+    // REQ-0018: руководитель + вышестоящий отдел.
+    {
+      universalIdentifier: '448334ab-2780-4a20-8da1-2d81b3093527',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_DEPARTMENT_HEAD_FIELD_ID,
+      position: 3,
+      isVisible: true,
+      size: 220,
+    },
+    {
+      universalIdentifier: '732d8d96-a011-4255-99ab-06a884e0f98a',
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_DEPARTMENT_PARENT_FIELD_ID,
+      position: 4,
+      isVisible: true,
+      size: 200,
     },
   ],
 });

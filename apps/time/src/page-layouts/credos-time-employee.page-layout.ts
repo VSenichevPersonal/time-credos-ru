@@ -2,12 +2,15 @@ import { definePageLayout, PageLayoutTabLayoutMode } from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_EMPLOYEE_CARD_DEPARTMENTS_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RECORD_PAGE_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RP_TAB_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_RP_TAB_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RP_W_DEPARTMENTS_REGISTRY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_RP_W_DEPARTMENTS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
 // Карточка сотрудника (RECORD_PAGE) — вкладка «Отделы» (REQ-0011 follow-up).
@@ -58,6 +61,32 @@ export default definePageLayout({
           configuration: {
             configurationType: 'RECORD_TABLE',
             viewId: CREDOS_TIME_EMPLOYEE_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
+          },
+        },
+      ],
+    },
+    // REQ-0016. Трудозатраты — записи сотрудника (обратная связь timeEntries).
+    // Кликабельно в карточку записи → проект/этап. «Проекты, где работал» =
+    // агрегат записей по проекту → follow-up Dev2 (нет relation employee↔project).
+    {
+      universalIdentifier:
+        CREDOS_TIME_EMPLOYEE_RP_TAB_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
+      title: 'Трудозатраты',
+      position: 1,
+      icon: 'IconClock',
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier:
+            CREDOS_TIME_EMPLOYEE_RP_W_TIME_ENTRIES_UNIVERSAL_IDENTIFIER,
+          title: 'Записи трудозатрат',
+          type: 'FIELDS',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_EMPLOYEE_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: false,
           },
         },
       ],

@@ -229,3 +229,33 @@ export const PROJECT_STATUS_OPTIONS: SelectOption[] = [
   { value: 'ON_HOLD', label: 'Приостановлен', position: 2, color: 'orange' },
   { value: 'DONE', label: 'Завершён', position: 3, color: 'blue' },
 ];
+
+// --- REQ-0019: SELECT-наборы глобальных настроек (credosTimeSettings) ---
+// Значения UPPER_SNAKE (требование SDK), ярлыки русские. Дефолты — отдельные
+// консты в формате "'VALUE'" (SDK requires quoted UPPER_CASE для defaultValue).
+
+// Старт недели сетки планирования/таймшита.
+export const WEEK_STARTS_ON_OPTIONS: SelectOption[] = [
+  { value: 'MONDAY', label: 'Понедельник', position: 0, color: 'blue' },
+  { value: 'SUNDAY', label: 'Воскресенье', position: 1, color: 'orange' },
+];
+export const WEEK_STARTS_ON_DEFAULT = "'MONDAY'";
+
+// Гранулярность согласования (REQ-0007).
+export const APPROVAL_PERIOD_OPTIONS: SelectOption[] = [
+  { value: 'WEEK', label: 'Неделя', position: 0, color: 'green' },
+  { value: 'MONTH', label: 'Месяц', position: 1, color: 'blue' },
+];
+export const APPROVAL_PERIOD_DEFAULT = "'WEEK'";
+
+// День недели напоминания заполнить таймшит.
+export const DAY_OF_WEEK_OPTIONS: SelectOption[] = [
+  { value: 'MONDAY', label: 'Понедельник', position: 0, color: 'gray' },
+  { value: 'TUESDAY', label: 'Вторник', position: 1, color: 'gray' },
+  { value: 'WEDNESDAY', label: 'Среда', position: 2, color: 'gray' },
+  { value: 'THURSDAY', label: 'Четверг', position: 3, color: 'gray' },
+  { value: 'FRIDAY', label: 'Пятница', position: 4, color: 'green' },
+  { value: 'SATURDAY', label: 'Суббота', position: 5, color: 'orange' },
+  { value: 'SUNDAY', label: 'Воскресенье', position: 6, color: 'orange' },
+];
+export const DAY_OF_WEEK_DEFAULT = "'FRIDAY'";
