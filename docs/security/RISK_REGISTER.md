@@ -29,4 +29,12 @@ Owner: CISO. Severity: P0 (freeze) · P1 (high) · P2 (medium) · P3 (low). Ст
 **Суть:** грид ввода пишет напрямую Core REST (`grid/time-rest.ts`), НЕ через `/s/time-entry`. Серверные гарды в `time-entry-api.logic.ts` (lock-approved T3/CISO-011, валидация ERROR #4, upsert-дедуп) на этом пути НЕ срабатывают.
 **Что спасает:** factHours — database-event триггеры (любой путь). Дедуп — UNIQUE-индекс на уровне БД (любой путь). 
 **Что обходится:** lock-approved (можно править согласованную через грид), валидация-лимит (только клиентская проверка validateEntry). Клиент-сайд гарды = UX, не enforcement.
-**План (RBAC-волна, после CISO-005):** либо роутить запись через `/s/time-entry`, либо fieldPermissions/RLS на уровне БД (approved=read-only для не-руководителя), либо database-event guard на entry-update (отвергать правку APPROVED). Последнее — самое надёжное, путь-независимое.
+**Возможности SDK для серверного enforcement (оценка Dev2, 2026-06-22):**
+- **database-event триггер НЕ может ВЕТО.** Twenty SDK даёт триггеры только `created`/`updated`/`destroyed` — **реактивные (after-mutation)**. before-update / pre-hook / синхронной валидации с возможностью отклонить операцию НЕТ. `throw` в хендлере НЕ откатывает мутацию — она уже состоялась (потому `wrapEvent` в `project-fact-rollup-events.ts` и глотает ошибки: throw бесполезен как вето). Источник: docs.twenty.com `logic/logic-functions.md` (типы триггеров: httpRoute / cron / databaseEvent / serverWebhook — все, кроме httpRoute, реактивные) + текущий код триггеров. → **Путь-независимый database-event guard на entry-update нереализуем этим SDK.**
+- **Компенсирующий after-контроль (revert-к-снапшоту) рассмотрен и ОТВЕРГНУТ** как осмысленный сейчас: payload `update` содержит `before`, технически можно откатить PATCH-ом. НО — окно гонки (между мутацией и revert «грязные» данные видны выгрузке 1С), хрупкий revert для `destroyed` (восстановление удалённой записи с relations), риск ложных срабатываний на легитимной смене статуса approval-флоу, и дублирование будущей RLS-логики. Не делаем — переусложнение без надёжности.
+
+**План (RBAC-волна, после CISO-005) — два реальных пути:**
+1. **(Dev1)** роутить грид-записи (`grid/time-rest.ts`) через `/s/time-entry` — тогда работает уже существующий гард `cannot_modify_approved` в `time-entry-api.logic.ts`. Самый дешёвый путь, закрывает практику.
+2. **fieldPermissions / RLS** на уровне Twenty (approved = read-only для не-руководителя) — единственный по-настоящему путь-независимый enforcement; требует CISO-005 (server-side actor).
+
+database-event guard из плана ВЫЧЕРКНУТ — SDK не поддерживает вето (см. оценку выше).
