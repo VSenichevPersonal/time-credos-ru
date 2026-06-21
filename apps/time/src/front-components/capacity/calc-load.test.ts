@@ -9,6 +9,7 @@ import {
   buildPeriods,
   buildSharesByProject,
   bookingHoursInPeriod,
+  deptBookingHours,
   deptCapacity,
   deptLoadCells,
   deptPlanHoursInPeriod,
@@ -19,6 +20,7 @@ import {
   fteHeadcountByDept,
   isAssignmentActive,
   plannedHoursInPeriod,
+  projectDeptHoursInPeriod,
   projectDeptShareLoads,
   projectHoursInPeriod,
   projectShareHoursInPeriod,
@@ -1164,5 +1166,131 @@ describe('обёртки раскида принимают PlanSpread (WI-05)', 
     const { planned, unplanned } = deptProjectLoads(dept(), [proj({ endDate: null })], periods, undefined, spread);
     expect(planned).toHaveLength(0);
     expect(unplanned.map((p) => p.id)).toEqual(['p1']);
+  });
+});
+
+describe('buildSharesByProject', () => {
+  const share = (projectId: string | null, departmentId: string, h: number): ProjectDeptShare => ({
+    projectId,
+    departmentId,
+    plannedEffortShare: h,
+  });
+
+  it('пустой вход → пустая Map', () => {
+    expect(buildSharesByProject([])).toEqual(new Map());
+  });
+
+  it('группирует доли по projectId', () => {
+    const result = buildSharesByProject([
+      share('p1', 'd1', 40),
+      share('p1', 'd2', 60),
+      share('p2', 'd1', 80),
+    ]);
+    expect(result.get('p1')).toHaveLength(2);
+    expect(result.get('p2')).toHaveLength(1);
+  });
+
+  it('запись без projectId (null) игнорируется', () => {
+    const result = buildSharesByProject([share(null, 'd1', 100)]);
+    expect(result.size).toBe(0);
+  });
+
+  it('порядок долей сохраняется', () => {
+    const result = buildSharesByProject([
+      share('p1', 'd1', 40),
+      share('p1', 'd2', 60),
+    ]);
+    expect(result.get('p1')!.map((s) => s.departmentId)).toEqual(['d1', 'd2']);
+  });
+});
+
+describe('projectDeptHoursInPeriod', () => {
+  const p = mkPeriod('2026-06-01', '2026-06-30');
+  const proj60: CapProject = {
+    id: 'p1',
+    code: 'P1',
+    name: 'Проект',
+    departmentId: 'd1',
+    plannedEffort: 60,
+    startDate: '2026-06-01',
+    endDate: '2026-06-30',
+  };
+
+  it('нет sharesByProject → fallback: родной отдел получает весь plannedEffort', () => {
+    expect(projectDeptHoursInPeriod(proj60, 'd1', p)).toBeCloseTo(60);
+  });
+
+  it('нет sharesByProject, чужой отдел → 0', () => {
+    expect(projectDeptHoursInPeriod(proj60, 'd2', p)).toBe(0);
+  });
+
+  it('sharesByProject есть → Σ долей только этого отдела', () => {
+    const shares: ProjectDeptShare[] = [
+      { projectId: 'p1', departmentId: 'd1', plannedEffortShare: 20 },
+      { projectId: 'p1', departmentId: 'd2', plannedEffortShare: 40 },
+    ];
+    const sbp = buildSharesByProject(shares);
+    expect(projectDeptHoursInPeriod(proj60, 'd1', p, sbp)).toBeCloseTo(20);
+    expect(projectDeptHoursInPeriod(proj60, 'd2', p, sbp)).toBeCloseTo(40);
+  });
+
+  it('у проекта нет долей в sharesByProject → fallback на родной отдел', () => {
+    const sbp = buildSharesByProject([]); // p1 не в Map
+    expect(projectDeptHoursInPeriod(proj60, 'd1', p, sbp)).toBeCloseTo(60);
+  });
+});
+
+describe('deptBookingHours', () => {
+  const emp1: EmployeeRef = { id: 'e1', name: 'Иванов', departmentId: 'd1' };
+  const emp2: EmployeeRef = { id: 'e2', name: 'Петров', departmentId: 'd1' };
+  const emp3: EmployeeRef = { id: 'e3', name: 'Сидоров', departmentId: 'd2' };
+  const p = mkPeriod('2026-06-01', '2026-06-30');
+
+  it('нет ctx (undefined) → hard=0, soft=0', () => {
+    expect(deptBookingHours(dept(), undefined, p)).toEqual({ hard: 0, soft: 0 });
+  });
+
+  it('HARD-бронь сотрудника отдела → hard > 0', () => {
+    const ctx = buildBookingCtx(
+      [mkBooking({ employeeId: 'e1', bookingType: 'HARD', hours: 80 })],
+      [emp1],
+      true,
+    );
+    const result = deptBookingHours(dept(), ctx, p);
+    expect(result.hard).toBeCloseTo(80);
+    expect(result.soft).toBe(0);
+  });
+
+  it('SOFT-бронь → soft > 0, hard = 0', () => {
+    const ctx = buildBookingCtx(
+      [mkBooking({ employeeId: 'e1', bookingType: 'SOFT', hours: 40 })],
+      [emp1],
+      true,
+    );
+    const result = deptBookingHours(dept(), ctx, p);
+    expect(result.soft).toBeCloseTo(40);
+    expect(result.hard).toBe(0);
+  });
+
+  it('суммирует брони нескольких сотрудников отдела', () => {
+    const ctx = buildBookingCtx(
+      [
+        mkBooking({ employeeId: 'e1', bookingType: 'HARD', hours: 40 }),
+        mkBooking({ employeeId: 'e2', bookingType: 'HARD', hours: 40 }),
+      ],
+      [emp1, emp2],
+      true,
+    );
+    const result = deptBookingHours(dept(), ctx, p);
+    expect(result.hard).toBeCloseTo(80);
+  });
+
+  it('сотрудник из другого отдела (d2) не учитывается в d1', () => {
+    const ctx = buildBookingCtx(
+      [mkBooking({ employeeId: 'e3', bookingType: 'HARD', hours: 80 })],
+      [emp3],
+      true,
+    );
+    expect(deptBookingHours(dept(), ctx, p)).toEqual({ hard: 0, soft: 0 });
   });
 });

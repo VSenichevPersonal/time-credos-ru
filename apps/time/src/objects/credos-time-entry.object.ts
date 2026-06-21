@@ -124,6 +124,11 @@ export default defineObject({
       defaultValue: null,
     },
     // TimeEntry.employee -> Employee.timeEntries (MANY_TO_ONE).
+    // onDelete: RESTRICT (CISO-011) — нельзя удалить сотрудника с записями
+    // (вкл. APPROVED). БД-уровень защиты согласованных часов табеля/1С.
+    // Форсирует архивирование сотрудника вместо delete (как в Timetta:
+    // ресурс с проводками нельзя удалить, только архив). Было CASCADE —
+    // сносило ВСЕ записи в обход guard /s/time-entry. Волна-5C, риск целостности.
     {
       universalIdentifier: CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
       name: 'employee',
@@ -136,11 +141,16 @@ export default defineObject({
         CREDOS_TIME_EMPLOYEE_TIME_ENTRIES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
-        onDelete: OnDeleteAction.CASCADE,
+        onDelete: OnDeleteAction.RESTRICT,
         joinColumnName: 'employeeId',
       },
     },
     // TimeEntry.project -> Project.timeEntries (MANY_TO_ONE).
+    // onDelete: RESTRICT (CISO-011) — нельзя удалить проект с записями
+    // (вкл. APPROVED). БД-уровень защиты согласованных часов табеля/1С.
+    // Форсирует архивирование проекта вместо delete (как в Timetta:
+    // проект с проводками нельзя удалить, только архив). Было CASCADE —
+    // сносило ВСЕ записи в обход guard /s/time-entry. Волна-5C, риск целостности.
     {
       universalIdentifier: CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
       name: 'project',
@@ -153,7 +163,7 @@ export default defineObject({
         CREDOS_TIME_PROJECT_TIME_ENTRIES_FIELD_ID,
       universalSettings: {
         relationType: RelationType.MANY_TO_ONE,
-        onDelete: OnDeleteAction.CASCADE,
+        onDelete: OnDeleteAction.RESTRICT,
         joinColumnName: 'projectId',
       },
     },

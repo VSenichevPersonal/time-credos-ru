@@ -36,7 +36,7 @@ const LoadSwatch = ({ ratio, label }: { ratio: number; label: string }) => (
 const GapLegend = () => (
   <>
     <span style={{ fontSize: 11, fontWeight: 600, color: T.textFaint }}>
-      Gap = спрос − ёмкость:
+      Баланс = спрос − ёмкость:
     </span>
     <Swatch bg={gapTone(-0.2).bg} label="профицит (свободно)" icon="▼" />
     <Swatch bg={gapTone(0).bg} label="баланс ±5%" icon="●" />

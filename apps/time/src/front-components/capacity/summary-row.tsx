@@ -47,7 +47,7 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
       return (
         <div
           key={p.key}
-          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${isGap ? ` · gap ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ' · ⚠ овербукинг' : ''}`}
+          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${isGap ? ` · баланс ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ' · ⚠ овербукинг' : ''}`}
           style={{
             flex: 1,
             minWidth: colWidth(metric),

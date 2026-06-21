@@ -77,9 +77,12 @@ export const HourCell = ({
   }, [value, editing]);
 
   // E1.5: при входе по клику — выделить весь текст (Excel: клик в ячейку = заменить).
+  // Remote DOM: у input в песочнице может НЕ быть метода select() → гард по typeof,
+  // иначе TypeError роняет виджет (краш при клике по ячейке).
   useEffect(() => {
     if (editing && selectOnFocus.current) {
-      inputRef.current?.select();
+      const el = inputRef.current as { select?: () => void } | null;
+      if (el && typeof el.select === 'function') el.select();
       selectOnFocus.current = false;
     }
   }, [editing]);

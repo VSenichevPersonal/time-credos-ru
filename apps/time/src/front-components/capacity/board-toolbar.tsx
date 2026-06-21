@@ -9,10 +9,10 @@ import type { CapAxis, CellMetric } from 'src/front-components/capacity/types';
 // руководителю) и индикатор автосохранения. Логика расчётов — в родителе.
 
 const HINT: Record<CellMetric, string> = {
-  free: 'Свободно ч = ёмкость − план (по производственному календарю РФ)',
-  pct: 'Загрузка % = план / ёмкость',
-  plan: 'План ч = плановые часы проектов отдела в периоде',
-  gap: 'Gap = спрос − ёмкость (▲ дефицит / ▼ профицит). Цвет по нормам ±5/15%',
+  free: 'Свободно, ч = ёмкость − план (по производственному календарю РФ)',
+  pct: 'Загрузка, % = план / ёмкость',
+  plan: 'План, ч = плановые часы проектов отдела в периоде',
+  gap: 'Баланс = спрос − ёмкость (Gap). ▲ дефицит / ▼ профицит. ±5% баланс, >15% дефицит/профицит',
 };
 
 type Props = {
@@ -68,10 +68,10 @@ export const BoardToolbar = ({
       ariaLabel="Метрика ячейки"
       value={metric}
       segments={[
-        { value: 'free', label: 'Свободно ч' },
-        { value: 'pct', label: 'Загрузка %' },
-        { value: 'plan', label: 'План ч' },
-        { value: 'gap', label: 'Gap' },
+        { value: 'free', label: 'Свободно, ч' },
+        { value: 'pct', label: 'Загрузка, %' },
+        { value: 'plan', label: 'План, ч' },
+        { value: 'gap', label: 'Баланс, ч' },
       ]}
       onChange={onMetric}
     />
