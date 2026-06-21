@@ -9,12 +9,12 @@ import {
   CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
-// Пункт «Таймшиты» (таймшит-сетка, бывш. «Записи») внутри папки «Таймшиты».
+// Пункт «Записи» внутри папки «Трудозатраты».
 export default defineNavigationMenuItem({
   universalIdentifier: CREDOS_TIME_ENTRY_NAV_UNIVERSAL_IDENTIFIER,
-  name: 'Таймшиты',
+  name: 'Записи',
   icon: 'IconClock',
-  position: 0,
+  position: 1,
   type: NavigationMenuItemType.VIEW,
   viewUniversalIdentifier: CREDOS_TIME_ENTRY_VIEW_UNIVERSAL_IDENTIFIER,
   folderUniversalIdentifier: CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,

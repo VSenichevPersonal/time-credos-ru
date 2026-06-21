@@ -9,7 +9,7 @@ import {
   CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
 
-// Пункт «Согласование» внутри папки «Таймшиты» (для руководителя —
+// Пункт «Согласование» внутри папки «Трудозатраты» (для руководителя —
 // список записей, ожидающих согласования).
 export default defineNavigationMenuItem({
   universalIdentifier: CREDOS_TIME_APPROVAL_NAV_UNIVERSAL_IDENTIFIER,
