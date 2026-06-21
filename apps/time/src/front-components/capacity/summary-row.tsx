@@ -1,4 +1,4 @@
-import { T, loadTone, formatCell, formatPct, avgRatio, SIGMA_W } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatCell, formatPct, avgRatio, SIGMA_W, gapTone, gapPct, gapIcon } from 'src/front-components/capacity/cap-tokens';
 import type { CellMetric, LoadCell, Period } from 'src/front-components/capacity/types';
 
 // Сводная строка «Все отделы»: суммарная загрузка компании по периодам.
@@ -35,11 +35,14 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
     </div>
     {periods.map((p, i) => {
       const cell = cells[i];
-      const tone = loadTone(cell.ratio);
+      const isGap = metric === 'gap';
+      const gp = isGap ? gapPct(cell) : null;
+      const tone = isGap ? gapTone(gp) : loadTone(cell.ratio);
+      const icon = isGap ? gapIcon(gp) : '';
       return (
         <div
           key={p.key}
-          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч`}
+          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${isGap ? ` · gap ${Math.round(cell.load - cell.capacity)} ч` : ''}`}
           style={{
             flex: 1,
             minWidth: 56,
@@ -47,6 +50,7 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            gap: 3,
             borderRight: `1px solid ${T.border}`,
             background: tone.bg,
             color: tone.fg,
@@ -56,6 +60,7 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
             boxShadow: i === 0 ? `inset 2px 0 0 ${T.accentRing}` : undefined,
           }}
         >
+          {icon && <span aria-hidden style={{ fontSize: 9 }}>{icon}</span>}
           {formatCell(metric, cell)}
         </div>
       );

@@ -4,6 +4,11 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 import { TIME_ENTRY_API_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import { ENTRY_STATUS } from 'src/constants/approval';
+import {
+  VALIDATION_DEFAULTS,
+  type ValidationThresholds,
+  validateEntry,
+} from 'src/constants/validation';
 import { isIsoDate, isUuid } from './params-validate';
 // SSOT-пересчёт rollup-поля проекта (factHours/budgetRemaining). Один источник
 // формулы и поведения — общий с database-event триггерами (project-fact-rollup.logic.ts).
@@ -26,9 +31,6 @@ type TimeEntry = {
 };
 
 type RefItem = { id: string; name: string; code?: string };
-
-const HOURS_MIN = 0;
-const HOURS_MAX = 24;
 
 // Тонкий REST-клиент к Core API воркспейса (на нативном fetch серверного рантайма).
 const apiBase = () => (process.env.TWENTY_API_URL ?? '').replace(/\/$/, '');
@@ -63,6 +65,43 @@ const api = {
   post: <T>(p: string, b: unknown) => restSend<T>('POST', p, b),
   patch: <T>(p: string, b: unknown) => restSend<T>('PATCH', p, b),
   delete: (p: string) => restSend('DELETE', p),
+};
+
+// gap-аудит v3 #4: пороги валидации — ДАННЫЕ из singleton credosTimeSettings,
+// не хардкод. Лимит часов/день (maxHoursPerDay) → ERROR; порог переработки
+// (overtimeWarnHours) → WARNING. warnOnScheduleDeviation=false выключает
+// предупреждения о переработке (лимит-ERROR остаётся всегда). Любая ошибка
+// чтения настроек → безопасные дефолты (VALIDATION_DEFAULTS, лимит 24).
+type RawSettingsValidation = {
+  maxHoursPerDay?: number | null;
+  overtimeWarnHours?: number | null;
+  warnOnScheduleDeviation?: boolean | null;
+};
+const readValidationThresholds = async (): Promise<ValidationThresholds> => {
+  try {
+    const res = await api.get<{
+      data: { credosTimeSettings: RawSettingsValidation[] };
+    }>('/rest/credosTimeSettings', { limit: '1' });
+    const s = res.data?.credosTimeSettings?.[0];
+    const maxHoursPerDay =
+      typeof s?.maxHoursPerDay === 'number' && s.maxHoursPerDay > 0
+        ? s.maxHoursPerDay
+        : VALIDATION_DEFAULTS.maxHoursPerDay;
+    // warnOnScheduleDeviation=false → выключаем WARNING переработки (порог 0).
+    const warnEnabled = s?.warnOnScheduleDeviation !== false;
+    const overtimeWarnHours = !warnEnabled
+      ? 0
+      : typeof s?.overtimeWarnHours === 'number' && s.overtimeWarnHours > 0
+        ? s.overtimeWarnHours
+        : VALIDATION_DEFAULTS.overtimeWarnHours;
+    return {
+      maxHoursPerDay,
+      overtimeWarnHours,
+      minHoursPerWeek: VALIDATION_DEFAULTS.minHoursPerWeek,
+    };
+  } catch {
+    return { ...VALIDATION_DEFAULTS };
+  }
 };
 
 // Чтение query/body независимо от метода (RoutePayload AWS-формат).
@@ -203,8 +242,19 @@ const run = async (event: RoutePayload) => {
     }
 
     const hours = Number(params.hours);
-    if (Number.isNaN(hours) || hours < HOURS_MIN || hours > HOURS_MAX)
-      return { ok: false, error: 'hours out of range' };
+    // gap-аудит v3 #4: валидация как данные + уровни. Пороги из settings.
+    // ERROR (лимит часов/день) блокирует операцию; WARNING (переработка) —
+    // не блок, флаг в ответе. validateEntry — чистая (constants/validation).
+    const thresholds = await readValidationThresholds();
+    const findings = validateEntry({ hours }, thresholds);
+    const blocking = findings.find((f) => f.level === 'error');
+    if (blocking) {
+      // back-compat: code/error остаётся 'hours out of range' для старых клиентов,
+      // плюс структурный validation-блок {level, code, message}.
+      return { ok: false, error: 'hours out of range', validation: blocking };
+    }
+    // Несблокирующие предупреждения (переработка) — отдаём списком в ответе.
+    const warnings = findings.filter((f) => f.level === 'warning');
     if (!employeeId) return { ok: false, error: 'employee not resolved' };
 
     const newProjectId = params.projectId && isUuid(params.projectId) ? params.projectId : null;
@@ -254,14 +304,22 @@ const run = async (event: RoutePayload) => {
         [prevProjectId, newProjectId].filter((id): id is string => !!id && isUuid(id)),
       );
       for (const pid of projectIdsToRecalc) await recalcProjectFactHours(pid);
-      return { ok: true, entry: res.data?.updateCredosTimeEntry };
+      return {
+        ok: true,
+        entry: res.data?.updateCredosTimeEntry,
+        ...(warnings.length ? { warnings } : {}),
+      };
     }
     const res = await api.post<{ data: { createCredosTimeEntry: TimeEntry } }>(
       '/rest/credosTimeEntries',
       data,
     );
     if (newProjectId) await recalcProjectFactHours(newProjectId);
-    return { ok: true, entry: res.data?.createCredosTimeEntry };
+    return {
+      ok: true,
+      entry: res.data?.createCredosTimeEntry,
+      ...(warnings.length ? { warnings } : {}),
+    };
   }
 
   // GET (по умолчанию) — список записей за неделю + справочники для сетки.

@@ -1,7 +1,8 @@
 // Типы доски планирования загрузки (capacity).
 
 // Метрика ячейки. Дефолт — «свободно ч» (то, что продажи могут ещё обещать).
-export type CellMetric = 'pct' | 'free' | 'plan';
+// 'gap' — Resource Gap (Timetta): Demand−Capacity со знаком (дефицит/профицит).
+export type CellMetric = 'pct' | 'free' | 'plan' | 'gap';
 
 // Ось группировки доски планирования.
 export type CapAxis = 'dept' | 'employee';

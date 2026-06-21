@@ -12,6 +12,7 @@ const HINT: Record<CellMetric, string> = {
   free: 'Свободно ч = ёмкость − план (по производственному календарю РФ)',
   pct: 'Загрузка % = план / ёмкость',
   plan: 'План ч = плановые часы проектов отдела в периоде',
+  gap: 'Gap = спрос − ёмкость (▲ дефицит / ▼ профицит). Цвет по нормам ±5/15%',
 };
 
 type Props = {
@@ -70,6 +71,7 @@ export const BoardToolbar = ({
         { value: 'free', label: 'Свободно ч' },
         { value: 'pct', label: 'Загрузка %' },
         { value: 'plan', label: 'План ч' },
+        { value: 'gap', label: 'Gap' },
       ]}
       onChange={onMetric}
     />

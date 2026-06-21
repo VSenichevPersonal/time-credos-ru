@@ -13,6 +13,8 @@ import {
   CREDOS_TIME_SETTINGS_DEFAULT_APPROVAL_REQUIRED_FIELD_ID,
   CREDOS_TIME_SETTINGS_DEFAULT_CAPACITY_FACTOR_FIELD_ID,
   CREDOS_TIME_SETTINGS_FILL_TEMPLATE_HOURS_FIELD_ID,
+  CREDOS_TIME_SETTINGS_MAX_HOURS_PER_DAY_FIELD_ID,
+  CREDOS_TIME_SETTINGS_MIN_HOURS_PER_WEEK_FIELD_ID,
   CREDOS_TIME_SETTINGS_NORM_HOURS_PER_DAY_FIELD_ID,
   CREDOS_TIME_SETTINGS_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_SETTINGS_OVERTIME_WARN_HOURS_FIELD_ID,
@@ -21,6 +23,7 @@ import {
   CREDOS_TIME_SETTINGS_REMINDER_ENABLED_FIELD_ID,
   CREDOS_TIME_SETTINGS_REVEAL_EMPLOYEE_NAMES_FIELD_ID,
   CREDOS_TIME_SETTINGS_TENTATIVE_BOOKING_ENABLED_FIELD_ID,
+  CREDOS_TIME_SETTINGS_WARN_ON_SCHEDULE_DEVIATION_FIELD_ID,
   CREDOS_TIME_SETTINGS_WEEK_STARTS_ON_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
@@ -77,6 +80,42 @@ export default defineObject({
       icon: 'IconAlertTriangle',
       defaultValue: 12,
       universalSettings: { dataType: NumberDataType.FLOAT, decimals: 1 },
+    },
+    // --- Правила валидации таймшита (gap-аудит v3 #4, сверка Timetta
+    // timesheet-validation-rules). Соглашение уровней: лимит часов/день =
+    // ERROR (блок ввода), переработка/недобор недели = WARNING (флаг, не блок).
+    // Пороги — данные здесь, логика — в constants/validation.ts (SSOT). ---
+    {
+      universalIdentifier: CREDOS_TIME_SETTINGS_MAX_HOURS_PER_DAY_FIELD_ID,
+      name: 'maxHoursPerDay',
+      type: FieldType.NUMBER,
+      // Жёсткий лимит часов за день. Превышение → ERROR (операция блокируется).
+      label: 'Лимит часов в день (ошибка при превышении)',
+      icon: 'IconClockX',
+      defaultValue: 24,
+      universalSettings: { dataType: NumberDataType.FLOAT, decimals: 1 },
+    },
+    {
+      universalIdentifier: CREDOS_TIME_SETTINGS_MIN_HOURS_PER_WEEK_FIELD_ID,
+      name: 'minHoursPerWeek',
+      type: FieldType.NUMBER,
+      // Порог недобора недельной нормы. weekHours < порога → WARNING (не блок).
+      // 0 = правило выключено (по умолчанию недобор недели не флагуем).
+      label: 'Мин. часов в неделю (предупреждение о недоборе, 0 = выкл.)',
+      icon: 'IconClockMinus',
+      defaultValue: 0,
+      universalSettings: { dataType: NumberDataType.FLOAT, decimals: 1 },
+    },
+    {
+      universalIdentifier:
+        CREDOS_TIME_SETTINGS_WARN_ON_SCHEDULE_DEVIATION_FIELD_ID,
+      name: 'warnOnScheduleDeviation',
+      type: FieldType.BOOLEAN,
+      // Включает предупреждения об отклонении от расписания (переработка/недобор).
+      // Лимит часов/день (ERROR) флагом не управляется — всегда активен.
+      label: 'Предупреждать об отклонении от расписания',
+      icon: 'IconCalendarStats',
+      defaultValue: true,
     },
     // --- Планирование ---
     {

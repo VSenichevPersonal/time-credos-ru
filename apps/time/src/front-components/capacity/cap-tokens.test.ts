@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadTone, formatPct, formatCell } from './cap-tokens';
+import { loadTone, formatPct, formatCell, gapHours, gapPct, gapTone, gapIcon, formatGap } from './cap-tokens';
 import type { LoadCell } from './types';
 
 const cell = (capacity: number, load: number): LoadCell => ({
@@ -83,5 +83,69 @@ describe('formatCell', () => {
     expect(formatCell('free', cell(160, 80))).toBe('+80');  // свободно
     expect(formatCell('free', cell(160, 200))).toBe('-40'); // перегруз
     expect(formatCell('free', cell(160, 160))).toBe('0');   // точно ноль
+  });
+
+  it('метрика gap → Demand−Capacity со знаком и %', () => {
+    expect(formatCell('gap', cell(160, 200))).toBe('+40ч 25%'); // дефицит
+    expect(formatCell('gap', cell(160, 80))).toBe('-80ч 50%');  // профицит
+    expect(formatCell('gap', cell(160, 160))).toBe('0ч 0%');    // баланс
+    expect(formatCell('gap', cell(0, 0))).toBe('');             // нет ёмкости
+  });
+});
+
+// ─── Resource Gap ───────────────────────────────────────────────────────────
+
+describe('gapHours / gapPct', () => {
+  it('gap = Demand − Capacity (дефицит положителен)', () => {
+    expect(gapHours(cell(160, 200))).toBe(40);   // перегруз
+    expect(gapHours(cell(160, 80))).toBe(-80);   // профицит
+    expect(gapHours(cell(160, 160))).toBe(0);
+  });
+
+  it('gapPct = ratio − 1 (null без ёмкости)', () => {
+    expect(gapPct(cell(160, 200))).toBeCloseTo(0.25);
+    expect(gapPct(cell(160, 80))).toBeCloseTo(-0.5);
+    expect(gapPct(cell(0, 0))).toBeNull();
+  });
+});
+
+describe('gapTone (шкала ±5/15%)', () => {
+  const alphaOf = (bg: string): number => parseFloat(bg.match(/[\d.]+\)$/)![0]);
+
+  it('null → нейтральный (нет ёмкости)', () => {
+    expect(gapTone(null).fg).toBe('#9a9ea8'); // T.textFaint
+  });
+
+  it('|gap| ≤ 5% → баланс (прозрачно)', () => {
+    expect(gapTone(0).bg).toBe('transparent');
+    expect(gapTone(0.04).bg).toBe('transparent');
+    expect(gapTone(-0.04).bg).toBe('transparent');
+  });
+
+  it('дефицит 5..15% → янтарь, >15% → терракот', () => {
+    expect(gapTone(0.1).bg).toBe('#fef3c7');  // T.warnTint
+    expect(gapTone(0.2).bg).toBe('#fbe4dd');  // терракот
+  });
+
+  it('профицит → синий, сильнее при >15%', () => {
+    expect(gapTone(-0.1).bg).toMatch(/^rgba\(59, 111, 224,/);
+    expect(alphaOf(gapTone(-0.2).bg)).toBeGreaterThan(alphaOf(gapTone(-0.1).bg));
+  });
+});
+
+describe('gapIcon (не цвет — для доступности)', () => {
+  it('баланс ●, дефицит ▲, профицит ▼', () => {
+    expect(gapIcon(0)).toBe('●');
+    expect(gapIcon(0.2)).toBe('▲');
+    expect(gapIcon(-0.2)).toBe('▼');
+    expect(gapIcon(null)).toBe('');
+  });
+});
+
+describe('formatGap', () => {
+  it('дефицит со знаком +, профицит с −', () => {
+    expect(formatGap(cell(160, 200))).toBe('+40ч 25%');
+    expect(formatGap(cell(160, 80))).toBe('-80ч 50%');
+    expect(formatGap(cell(0, 0))).toBe('');
   });
 });

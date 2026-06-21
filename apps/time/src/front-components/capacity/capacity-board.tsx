@@ -98,7 +98,7 @@ export const CapacityBoard = () => {
         onTogglePlanning={() => setPlanning((v) => !v)}
       />
 
-      <BoardLegend />
+      <BoardLegend metric={metric} />
 
       {planning && saveError && (
         <div

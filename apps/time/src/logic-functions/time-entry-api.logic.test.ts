@@ -42,6 +42,12 @@ const emptyEmployees = { data: { credosTimeEmployees: [] } };
 const emptyEntries = { data: { credosTimeEntries: [] } };
 const emptyProjects = { data: { credosTimeProjects: [] } };
 const emptyWorkTypes = { data: { credosTimeWorkTypes: [] } };
+// gap-аудит v3 #4: upsert читает пороги валидации из singleton credosTimeSettings
+// (после возможного pre-read записи, перед поиском по ключу). Этот мок-ответ
+// занимает свою позицию в последовательности fetch. Пусто → дефолты (лимит 24).
+const settingsRes = (over: Record<string, unknown> = {}) => ({
+  data: { credosTimeSettings: [{ maxHoursPerDay: 24, overtimeWarnHours: 12, warnOnScheduleDeviation: true, ...over }] },
+});
 
 describe('time-entry-api: ownership / anti-impersonation (CISO-005)', () => {
   it.todo('identity сотрудника берётся из event.userWorkspaceId, НЕ из params.workspaceMemberRef');
@@ -233,6 +239,7 @@ describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
   it('upsert без id, ключ НЕ найден → создаётся новая запись (POST)', async () => {
     const mockFn = mockFetch([
       empRes, // resolveEmployeeId
+      settingsRes(), // readValidationThresholds
       emptyEntries, // findExistingEntryIdByKey → пусто
       { data: { createCredosTimeEntry: { id: 'new-1' } } }, // POST
     ]);
@@ -250,6 +257,7 @@ describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
   it('upsert без id, ключ НАЙДЕН (DRAFT) → обновляется существующая (PATCH, без POST = без дубля)', async () => {
     const mockFn = mockFetch([
       empRes, // resolveEmployeeId
+      settingsRes(), // readValidationThresholds
       { data: { credosTimeEntries: [{ id: EXISTING }] } }, // findExistingEntryIdByKey → найдено
       { data: { credosTimeEntries: [{ id: EXISTING, status: 'DRAFT', projectId: null }] } }, // status-read
       { data: { updateCredosTimeEntry: { id: EXISTING } } }, // PATCH
@@ -270,6 +278,7 @@ describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
   it('upsert без id, ключ найден и запись APPROVED → cannot_modify_approved (без мутаций)', async () => {
     const mockFn = mockFetch([
       empRes,
+      settingsRes(), // readValidationThresholds
       { data: { credosTimeEntries: [{ id: EXISTING }] } }, // findExistingEntryIdByKey
       { data: { credosTimeEntries: [{ id: EXISTING, status: 'APPROVED', projectId: null }] } }, // status-read
     ]);
@@ -288,14 +297,97 @@ describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
   it('findExistingEntryIdByKey: projectId/workTypeId null → filter использует [is]:NULL (не [eq])', async () => {
     const mockFn = mockFetch([
       empRes,
+      settingsRes(), // readValidationThresholds
       emptyEntries, // findExistingEntryIdByKey
       { data: { createCredosTimeEntry: { id: 'new-2' } } },
     ]);
     vi.stubGlobal('fetch', mockFn);
     await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10' }));
-    // 2-й fetch — поиск по ключу; в filter должны быть projectId[is]:NULL и workTypeId[is]:NULL
-    const keyCall = String(mockFn.mock.calls[1]?.[0] ?? '');
+    // 3-й fetch (calls[2]) — поиск по ключу; filter с projectId[is]:NULL и workTypeId[is]:NULL
+    const keyCall = String(mockFn.mock.calls[2]?.[0] ?? '');
     expect(decodeURIComponent(keyCall)).toContain('projectId[is]:NULL');
     expect(decodeURIComponent(keyCall)).toContain('workTypeId[is]:NULL');
+  });
+});
+
+// gap-аудит v3 #4: правила валидации как данные + уровни Ошибка/Предупреждение.
+// Пороги читаются из credosTimeSettings; лимит часов/день = ERROR (блок),
+// переработка = WARNING (флаг в ответе, не блок). Сверка: Timetta
+// timesheet-validation-rules (Ошибка обязывает устранить, Предупреждение
+// позволяет отправить).
+describe('валидация: уровни Ошибка/Предупреждение (gap-аудит v3 #4)', () => {
+  const EMP = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const empRes = { data: { credosTimeEmployees: [{ id: EMP, name: 'Test' }] } };
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('часы > лимита (maxHoursPerDay=24) → ERROR, операция блокируется (нет POST/PATCH)', async () => {
+    const mockFn = mockFetch([empRes, settingsRes()]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', hours: '25', date: '2026-06-10' }));
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'hours out of range',
+      validation: { level: 'error', code: 'max_hours_per_day' },
+    });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('пользовательский лимит из настроек (maxHoursPerDay=10): 11 ч → ERROR', async () => {
+    const mockFn = mockFetch([empRes, settingsRes({ maxHoursPerDay: 10 })]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', hours: '11', date: '2026-06-10' }));
+    expect(result).toMatchObject({ ok: false, validation: { level: 'error' } });
+  });
+
+  it('переработка (14 ч > overtimeWarnHours=12, < лимита) → WARNING, запись создаётся', async () => {
+    const mockFn = mockFetch([
+      empRes,
+      settingsRes(),
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'new-ot' } } }, // POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', hours: '14', date: '2026-06-10' }));
+    expect(result).toMatchObject({
+      ok: true,
+      warnings: [{ level: 'warning', code: 'overtime_per_day' }],
+    });
+    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST');
+    expect(posts).toHaveLength(1); // WARNING не блокирует — запись создана
+  });
+
+  it('warnOnScheduleDeviation=false → переработка не флагуется (нет warnings)', async () => {
+    const mockFn = mockFetch([
+      empRes,
+      settingsRes({ warnOnScheduleDeviation: false }),
+      emptyEntries,
+      { data: { createCredosTimeEntry: { id: 'new-now' } } },
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', hours: '14', date: '2026-06-10' }));
+    expect(result).toMatchObject({ ok: true });
+    expect(result).not.toHaveProperty('warnings');
+  });
+
+  it('настроек нет (fetch settings пуст) → дефолтный лимит 24, 8 ч проходит без warnings', async () => {
+    const mockFn = mockFetch([
+      empRes,
+      { data: { credosTimeSettings: [] } }, // settings пусты → дефолты
+      emptyEntries,
+      { data: { createCredosTimeEntry: { id: 'new-def' } } },
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10' }));
+    expect(result).toMatchObject({ ok: true });
+    expect(result).not.toHaveProperty('warnings');
   });
 });
