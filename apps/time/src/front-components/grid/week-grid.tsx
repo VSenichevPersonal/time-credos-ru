@@ -121,10 +121,8 @@ export const WeekGrid = ({
               rowTotal={row.rowTotal}
               alt={i % 2 === 1}
               nav={nav}
-              normFor={normFor}
               onCellCommit={(dayIso, hours) => onCellCommit(row.key, dayIso, hours)}
               onCommitDescription={(dayIso, text) => onCommitDescription(row.key, dayIso, text)}
-              onFill={(v) => onBulkFill(row.key, v)}
               onDuplicate={() => duplicateRow(row.projectId)}
               onFillWeekdays={() => onFillWeekdays(row.key)}
               onClearRow={() => onClearRow(row.key)}

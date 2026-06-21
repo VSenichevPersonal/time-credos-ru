@@ -1,11 +1,11 @@
 import { HourCell } from 'src/front-components/grid/hour-cell';
 import { RowMenu } from 'src/front-components/grid/row-menu';
+import type { CommentDay } from 'src/front-components/grid/row-menu';
 import { TagChips } from 'src/front-components/grid/tag-chips';
 import { T } from 'src/front-components/grid/tokens';
 import { GRID_TEMPLATE, GRID_TEMPLATE_SINGLE } from 'src/front-components/grid/week-header';
 import { fmtTotal } from 'src/front-components/grid/format';
 import { categoryMeta } from 'src/front-components/shared/category-meta';
-import type { NormForDay } from 'src/front-components/grid/use-daily-norm';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { Nav } from 'src/front-components/grid/use-keyboard';
 
@@ -30,9 +30,7 @@ type Props = {
   rowTotal: number;
   alt: boolean;
   nav: Nav;
-  normFor?: NormForDay; // норма дня для чипа быстрого ввода в пустой ячейке
   onCellCommit: (dayIso: string, hours: number) => void;
-  onFill?: (value: number) => void; // U5: заполнить будни строки значением ячейки
   onDuplicate?: () => void; // W3-1: дублировать строку (тот же проект, новый вид работ)
   onFillWeekdays?: () => void; // меню строки: 8 ч во все пустые будни
   onClearRow?: () => void; // меню строки: обнулить все часы строки
@@ -55,9 +53,7 @@ export const GridRow = ({
   rowTotal,
   alt,
   nav,
-  normFor,
   onCellCommit,
-  onFill,
   onDuplicate,
   onFillWeekdays,
   onClearRow,
@@ -67,6 +63,15 @@ export const GridRow = ({
 }: Props) => {
   const rowLocked = (lockedByDay ?? []).length > 0 && (lockedByDay ?? []).every(Boolean);
   const hasHours = hoursByDay.some((h) => h > 0);
+  // WI-01: дни строки с часами — цели для «Комментарий к записи…» в меню ⋯
+  // (раньше ✎-кнопка жила в ячейке и была недостижима мышью).
+  const commentDays: CommentDay[] = days.map((day, i) => ({
+    dayIso: day.iso,
+    label: `${day.dayLabel} ${day.dateLabel}`,
+    hours: hoursByDay[i] ?? 0,
+    description: descByDay?.[i] ?? null,
+    locked: lockedByDay?.[i],
+  }));
   const menu = onDuplicate && (
     <RowMenu
       rowLocked={rowLocked}
@@ -75,6 +80,10 @@ export const GridRow = ({
       onFillWeekdays={() => onFillWeekdays?.()}
       onClearRow={() => onClearRow?.()}
       onDeleteRow={() => onDeleteRow?.()}
+      commentDays={commentDays}
+      onCommitComment={
+        onCommitDescription ? (dayIso, text) => onCommitDescription(dayIso, text) : undefined
+      }
     />
   );
   return (
@@ -191,14 +200,9 @@ export const GridRow = ({
         overtimeThreshold={overtimeThreshold}
         active={nav.isActive(rowIndex, i)}
         seed={nav.isActive(rowIndex, i) ? nav.editSeed : null}
-        norm={normFor ? normFor(day.iso, day.isWeekend) : undefined}
         description={descByDay?.[i] ?? null}
         onActivate={() => nav.setActive({ row: rowIndex, col: i })}
         onCommit={(h) => onCellCommit(day.iso, h)}
-        onCommitDescription={
-          onCommitDescription ? (text) => onCommitDescription(day.iso, text) : undefined
-        }
-        onFill={onFill ? () => onFill(hoursByDay[i]) : undefined}
         onKey={(e) => nav.handleKey(e)}
         onSeedConsumed={nav.consumeSeed}
       />

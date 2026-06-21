@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { T, cellFill } from 'src/front-components/grid/tokens';
-import { CellComment } from 'src/front-components/grid/cell-comment';
 import { fmtHours, isOvertime, parseHours } from 'src/front-components/grid/format';
 
-// Ячейка часов: tabular-nums, правое выравнивание. Активная (по клавиатуре)
-// подсвечена кольцом. Печать цифры → сразу ввод (seed). Enter/Tab подтверждают
-// и навигация уводит фокус (управляет родитель через onKey).
+// Ячейка часов: ЧИСТЫЙ ВВОД (WI-01, решение C1). Клик / печать цифры → сразу
+// inline-редактирование. Никаких плавающих кнопок в ячейке (чип-нормы / ⇥-fill /
+// ✎-коммент убраны — мышью были недостижимы, корень UX-бага «контролы появляются
+// при наведении, но не нажимаются»). Все действия строки → меню строки ⋯ (row-menu).
+//
+// Ячейка несёт только статус (read-only, не интерактив): число, замок (locked),
+// цвет-переработка, точка-индикатор комментария. tabular-nums, правое выравнивание.
+// Активная (по клавиатуре) подсвечена кольцом. Enter/Tab подтверждают и навигация
+// уводит фокус (управляет родитель через onKey).
 
 type Props = {
   value: number; // 0 = пусто
@@ -16,14 +21,11 @@ type Props = {
   locked?: boolean; // W6-2: согласованная запись — только чтение
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек (fallback 12)
   seed: string | null; // символ, с которого начали печатать
-  norm?: number; // норма дня (чип быстрого ввода в пустой активной ячейке)
-  description?: string | null; // комментарий записи (Неделя: поповер на ячейке)
+  description?: string | null; // комментарий записи — read-only индикатор (правка в меню ⋯)
   onActivate: () => void;
   onCommit: (hours: number) => void;
-  onCommitDescription?: (text: string) => void; // U11: комментарий к ячейке (Неделя)
   onKey: (e: { key: string; shiftKey: boolean }) => void; // навигация (родитель)
   onSeedConsumed: () => void;
-  onFill?: () => void; // U5: заполнить будни строки значением этой ячейки
 };
 
 export const HourCell = ({
@@ -34,14 +36,11 @@ export const HourCell = ({
   locked,
   overtimeThreshold,
   seed,
-  norm,
   description,
   onActivate,
   onCommit,
-  onCommitDescription,
   onKey,
   onSeedConsumed,
-  onFill,
 }: Props) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -137,7 +136,7 @@ export const HourCell = ({
           ? 'Согласовано — правка запрещена'
           : over
             ? 'Переработка: часов больше порога'
-            : undefined
+            : description || undefined
       }
       onClick={() => {
         onActivate();
@@ -161,54 +160,14 @@ export const HourCell = ({
       {/* W6-2: замок — статус read-only не только цветом (a11y). Слева, тихо. */}
       {locked && <LockGlyph />}
 
-      {/* Чип нормы дня в активной ПУСТОЙ ячейке — «кнопка в месте ввода»: один
-          клик ставит норму (8 ч из useDailyNorm), быстрее печати. */}
-      {active && !locked && value === 0 && onFill && norm !== undefined && norm > 0 ? (
-        <button
-          type="button"
-          title={`Поставить норму дня: ${fmtHours(norm)} ч`}
-          aria-label={`Поставить норму ${fmtHours(norm)} часов`}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onCommit(norm);
-          }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            height: 18,
-            padding: '0 6px',
-            fontSize: 11.5,
-            fontWeight: 600,
-            fontVariantNumeric: 'tabular-nums',
-            border: `1px solid ${T.accentRing}`,
-            borderRadius: 5,
-            background: T.accentSoft,
-            color: T.accent,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            lineHeight: 1,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = T.accent;
-            e.currentTarget.style.color = T.onAccent;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = T.accentSoft;
-            e.currentTarget.style.color = T.accent;
-          }}
-        >
-          {fmtHours(norm)}
-        </button>
-      ) : (
-        value > 0 ? fmtHours(value) : '·'
-      )}
+      {value > 0 ? fmtHours(value) : '·'}
 
-      {/* Индикатор комментария: тихая точка-маркер, если описание есть (Неделя). */}
+      {/* Индикатор комментария: тихая точка-маркер (read-only), если описание есть.
+          Правка комментария — в меню строки ⋯ → «Комментарий к записи…» (WI-01:
+          интерактивная ✎-кнопка убрана из ячейки, мышью была недостижима). */}
       {value > 0 && description && (
         <span
           aria-hidden
-          title={description}
           style={{
             position: 'absolute',
             top: 3,
@@ -220,53 +179,6 @@ export const HourCell = ({
             opacity: 0.7,
           }}
         />
-      )}
-
-      {/* U5: заполнить будни строки значением — глиф ⇥ + хит-зона ≥16px (P2). */}
-      {active && !locked && value > 0 && onFill && (
-        <button
-          type="button"
-          title="Заполнить будни строки этим значением"
-          aria-label="Заполнить будни значением"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onFill();
-          }}
-          style={{
-            position: 'absolute',
-            right: 0,
-            bottom: 0,
-            width: 18,
-            height: 18,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 0,
-            border: 'none',
-            borderRadius: 4,
-            background: 'transparent',
-            color: T.accent,
-            cursor: 'pointer',
-            fontSize: 12,
-            lineHeight: 0,
-            fontFamily: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = T.accentSoft;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}
-        >
-          ⇥
-        </button>
-      )}
-
-      {/* U11: комментарий к ячейке в режиме Неделя (триггер ✎ + поповер). Раньше
-          был только в режиме День — устраняем разрыв. */}
-      {active && !locked && value > 0 && onCommitDescription && (
-        <CellComment description={description ?? null} onCommit={onCommitDescription} />
       )}
     </div>
   );
