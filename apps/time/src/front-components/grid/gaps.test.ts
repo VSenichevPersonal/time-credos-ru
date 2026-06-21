@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { calcWeekGaps, gapsSummary } from './gaps';
+import { calcWeekGaps, gapsSummary, weekUnderfillNotice } from './gaps';
 import type { WeekDay } from './use-week';
 
 // Пн–Вс: будни 0..4, выходные 5..6
@@ -109,6 +109,53 @@ describe('calcWeekGaps + норма из произв. календаря (T2 SS
     const g = calcWeekGaps(WEEK, [0, 0, 0, 0, 0, 0, 0]);
     expect(g.emptyCount).toBe(5);
     expect(g.missingHours).toBe(40);
+  });
+});
+
+describe('normHours/factHours (UC-VAL-03: Σ нормы и Σ факта недели)', () => {
+  it('полная неделя: норма 40, факт 40', () => {
+    const g = calcWeekGaps(WEEK, [8, 8, 8, 8, 8, 0, 0]);
+    expect(g.normHours).toBe(40);
+    expect(g.factHours).toBe(40);
+  });
+
+  it('часы выходного НЕ входят в факт недели (нерабочий день)', () => {
+    const g = calcWeekGaps(WEEK, [8, 8, 8, 8, 8, 5, 5]);
+    expect(g.normHours).toBe(40);
+    expect(g.factHours).toBe(40); // 5+5 в Сб/Вс не учитываются
+  });
+
+  it('недобор: факт 36 из нормы 40', () => {
+    const g = calcWeekGaps(WEEK, [8, 4, 8, 8, 8, 0, 0]);
+    expect(g.normHours).toBe(40);
+    expect(g.factHours).toBe(36);
+  });
+});
+
+describe('weekUnderfillNotice (UC-VAL-03: подтверждение при submit)', () => {
+  it('факт = норма → нет недобора → пустая строка (поповер не нужен)', () => {
+    const g = calcWeekGaps(WEEK, [8, 8, 8, 8, 8, 0, 0]);
+    expect(weekUnderfillNotice(g)).toBe('');
+  });
+
+  it('факт > норма (переработка) → не недобор → пустая строка', () => {
+    const g = calcWeekGaps(WEEK, [10, 8, 8, 8, 8, 0, 0]);
+    expect(weekUnderfillNotice(g)).toBe('');
+  });
+
+  it('факт < норма → текст «N из M ч. Всё равно отправить?»', () => {
+    const g = calcWeekGaps(WEEK, [8, 4, 8, 8, 8, 0, 0]);
+    const notice = weekUnderfillNotice(g);
+    expect(notice).toContain('Неделя недозаполнена');
+    expect(notice).toContain('36 из 40 ч');
+    expect(notice).toContain('Всё равно отправить?');
+  });
+
+  it('норма недели 0 (вся неделя праздники/выходные) → нет недобора', () => {
+    const allHoliday = (_iso: string, _isWeekend: boolean): number => 0;
+    const g = calcWeekGaps(WEEK, [0, 0, 0, 0, 0, 0, 0], allHoliday);
+    expect(g.normHours).toBe(0);
+    expect(weekUnderfillNotice(g)).toBe('');
   });
 });
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { T } from 'src/front-components/grid/tokens';
 import { ENTRY_STATUS_LABELS } from 'src/constants/labels';
 import type { PeriodStatus } from 'src/front-components/grid/use-approval';
-import { gapsSummary, type WeekGaps } from 'src/front-components/grid/gaps';
+import { gapsSummary, weekUnderfillNotice, type WeekGaps } from 'src/front-components/grid/gaps';
 
 // Инлайн-полоса согласования периода (в подвале сетки). Без модалок: бейдж
 // статуса + кнопки. Цвета из токенов: нейтральный/янтарный/зелёный/терракот.
@@ -113,23 +113,12 @@ export const ApprovalBar = ({
 
       {/* Сотрудник: отправить черновики на согласование (инлайн). */}
       {!isManager && canSubmit && (
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={busy}
-          style={{
-            ...btnBase,
-            marginLeft: 'auto',
-            border: 'none',
-            color: T.onAccent,
-            background: busy ? T.accentRing : T.accent,
-            opacity: busy ? 0.7 : 1,
-          }}
-          onMouseEnter={(e) => !busy && (e.currentTarget.style.background = T.accentHover)}
-          onMouseLeave={(e) => !busy && (e.currentTarget.style.background = T.accent)}
-        >
-          Отправить на согласование ({draftCount})
-        </button>
+        <SubmitButton
+          draftCount={draftCount}
+          busy={busy}
+          weekGaps={weekGaps}
+          onSubmit={onSubmit}
+        />
       )}
 
       {/* Руководитель: согласовать/отклонить ожидающие. */}
@@ -159,6 +148,127 @@ export const ApprovalBar = ({
         </div>
       )}
       </div>
+    </div>
+  );
+};
+
+// UC-VAL-03: при отправке на согласование предупреждаем о НЕДОЗАПОЛНЕННОЙ неделе
+// (факт < норма). Если недобора нет — submit сразу. Если есть — inline-поповер
+// мягкого подтверждения «Неделя недозаполнена: N из M ч. Всё равно отправить?»
+// (паттерн RejectButton, useState, Remote DOM-safe — без window.confirm).
+// WARNING, не блок: недозаполнение легитимно (отпуск/неполная ставка) — отправка
+// разрешена после осознанного подтверждения. Пассивный GapsNotice выше остаётся
+// (подсказка ДО клика); поповер — точка осознанного решения В МОМЕНТ submit.
+const SubmitButton = ({
+  draftCount,
+  busy,
+  weekGaps,
+  onSubmit,
+}: {
+  draftCount: number;
+  busy: boolean;
+  weekGaps?: WeekGaps;
+  onSubmit: () => void;
+}) => {
+  const [confirming, setConfirming] = useState(false);
+  const notice = weekGaps ? weekUnderfillNotice(weekGaps) : '';
+
+  // Клик: без недобора → submit сразу; с недобором → открыть подтверждение.
+  const handleClick = () => {
+    if (busy) return;
+    if (notice) setConfirming(true);
+    else onSubmit();
+  };
+
+  const confirm = () => {
+    setConfirming(false);
+    onSubmit();
+  };
+
+  const cancel = () => setConfirming(false);
+
+  return (
+    <div style={{ position: 'relative', marginLeft: 'auto' }}>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={busy}
+        style={{
+          ...btnBase,
+          border: 'none',
+          color: T.onAccent,
+          background: busy ? T.accentRing : T.accent,
+          opacity: busy ? 0.7 : 1,
+        }}
+        onMouseEnter={(e) => !busy && (e.currentTarget.style.background = T.accentHover)}
+        onMouseLeave={(e) => !busy && (e.currentTarget.style.background = T.accent)}
+      >
+        Отправить на согласование ({draftCount})
+      </button>
+      {confirming && (
+        <>
+          <div
+            onClick={cancel}
+            style={{ position: 'fixed', inset: 0, zIndex: 20 }}
+          />
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute',
+              bottom: 34,
+              right: 0,
+              zIndex: 21,
+              width: 300,
+              background: T.surface,
+              border: `1px solid ${T.borderStrong}`,
+              borderRadius: 9,
+              boxShadow: '0 8px 24px rgba(29,31,38,0.16)',
+              padding: 12,
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 7,
+                fontSize: 12.5,
+                lineHeight: 1.45,
+                color: T.text,
+                marginBottom: 10,
+              }}
+            >
+              <span aria-hidden style={{ color: T.warn, fontWeight: 700 }}>!</span>
+              <span>{notice}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={cancel}
+                style={{
+                  ...btnBase,
+                  border: `1px solid ${T.border}`,
+                  background: T.surface,
+                  color: T.textMuted,
+                }}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={confirm}
+                style={{
+                  ...btnBase,
+                  border: 'none',
+                  background: T.accent,
+                  color: T.onAccent,
+                }}
+              >
+                Всё равно отправить
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
