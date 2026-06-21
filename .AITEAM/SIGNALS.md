@@ -22,9 +22,32 @@
 
 — Dev 1
 
-### 2026-06-21 — [taking] wi47-panel-manual
+### 2026-06-21 — [report] wi47-panel-manual — режим «Вручную по месяцам» ГОТОВ
 
-Беру WI-47 (приоритет заказчика): режим «Вручную по месяцам» в панели «План проекта». Снимаю disabled с радио, добавляю редактируемые помесячные строки (диапазон С..ПО), живую Σ-сверку, префилл из GET /s/plan-slots, сохранение upsert. EVEN не ломаю. Зона capacity/project-plan-panel.tsx + plan-preview.ts (чистые ф-ции генерации месяцев/Σ) + новый plan-slots-rest.ts (клиент к контракту Dev2). dry-run, без коммита.
+**Радио MANUAL включено** (снят disabled/«скоро»). Переключает панель из EVEN-превью в редактируемый помесячный раскид. EVEN — дефолт, не сломан (gated `method === 'EVEN'`).
+
+**UI ручного режима:**
+- Строки по месяцам диапазона С..ПО (`monthsInRange`): метка «мес YY» + input plannedHours (decimal, стиль hour-cell, tabular-nums, право).
+- Живая Σ-сверка `Σ раскид = X ч · план Y ч` + индикатор ✓ / ≠ / · (как EVEN sigmaOk, допуск 1 ч, `reconcileSlots`). Объём не задан → «·».
+- Префилл: GET `/s/plan-slots?projectId=` при открытии в MANUAL (useEffect, alive-guard), индикатор «Загрузка слотов…» + ошибка.
+- MANUAL требует конечный ПО (раскид по конечному диапазону) → пустой ПО блокирует Save + подсказка. EVEN open-ended/overbooking-баннер скрыты в MANUAL.
+- Скролл длинных диапазонов — внешний overflow-y тела панели (без вложенного скролла, WI-48-фикс цел).
+
+**Сохранение:** `savePlanSlots` = upsert каждого месяца POST `/s/plan-slots` (0 тоже пишем — явный «нет часов»), + onSave строки (plannedEffort = Σ слотов, start/end). Ошибка слота → setSlotsError, panel не закрывается.
+
+**Чистые ф-ции (+тесты, 17 шт):** `plan-preview.ts` → `monthsInRange(start,end)` (YYYY-MM, padStart, переход через год, пустой/ПО<С → []), `sumSlotHours`, `reconcileSlots(slots,target)` (допуск 1ч, target null → не-ок). Все зелёные.
+
+**От контракта Dev2 жду / уточнения:**
+- Имена слота: `periodMonth` 'YYYY-MM', `plannedHours`, опц `departmentId` — закодировал в `plan-slots-rest.ts` (тип `PlanSlotInput`, чтобы не конфликтовать с твоим `PlanSlot` в types.ts).
+- Routes: GET `/s/plan-slots?projectId=` → `{ok, slots:[{periodMonth, plannedHours, departmentId?}]}`; POST `/s/plan-slots {projectId, periodMonth, plannedHours, departmentId?}` → `{ok}`. Если route иначе — скажи, поправлю один файл. Батч-upsert приветствуется (сейчас по месяцу).
+
+**⚠ dry-run БЛОКЕР (НЕ мой):** `viewField INVALID_VIEW_DATA` — labelIdentifier view field не в нижней позиции в `views/credos-time-plan-slot.view.ts` (universalIdentifier 1d13f512…). Твой объект/вью. Typecheck чист, метаданные падают на этом. @Dev2: подвинь labelIdentifier-поле в низ viewFields. Также 1 lint-warning `calc-load.ts:284` (unused `mm` в monthRange) — твой.
+
+**⚠ @arch: новый untracked файл `capacity/plan-slots-rest.ts`** — учесть в анти-`git clean`-протоколе (см. bug#5 выше), иначе при reset снесёт.
+
+**Валидация:** `yarn lint` мои 0/0 (1 warning calc-load.ts Dev2); `yarn test:unit` 74 файла, 2111 passed, 0 failed; dry-run typecheck ok, метаданные падают на Dev2-вью. НЕ коммитил.
+
+**Файлы:** `capacity/project-plan-panel.tsx`, `capacity/plan-preview.ts`(+test), `capacity/plan-slots-rest.ts` (новый).
 
 — Dev 1
 
@@ -563,6 +586,42 @@ oxlint 0/0, tsc мои чисто, DOM-free. dry-run, НЕ коммитил.
 — Dev 1
 
 ## Dev 2 → arch
+
+### 2026-06-22 — [report] wi47-slot-object — слот-объект помесячного плана ГОТОВ
+
+ВЫВОД: «Планирование вручную по месяцам» (WI-47, приоритет заказчика) построено. Новый слот-объект `credosTimePlanSlot` + режим `planMethod` на проекте + MANUAL-раскид в calc-load + REST `/s/plan-slots`. EVEN-дефолт НЕ сломан. dry-run чист (нет INVALID_FIELD_INPUT/reserved/sync-fail).
+
+**Контракт согласован с PLANNING_RECORDS_CONSISTENCY §5 (уровень 1: слот-объект, агрегат остаётся для EVEN).**
+
+**ИТОГ ИМЁН ПОЛЕЙ (`credosTimePlanSlot`):**
+- `periodMonth` TEXT 'YYYY-MM' (помесячный ключ; НЕ `month`, чтобы не путать с числом; это labelIdentifier → ПОЗИЦИЯ 0 в index-view, иначе INVALID_VIEW_DATA — словил на dry-run и поправил).
+- `plannedHours` NUMBER FLOAT(2) — часы на месяц.
+- `project` RELATION→credosTimeProject (MANY_TO_ONE, **onDelete CASCADE**), обратная `project.planSlots` ONE_TO_MANY.
+- `department` RELATION→credosTimeDepartment (MANY_TO_ONE, nullable, **SET_NULL**), обратная `department.planSlots`.
++ на проекте: `planMethod` SELECT(EVEN|MANUAL), nullable, default EVEN (пусто=EVEN, миграция). Слаг `planMethod` НЕ резерв (проверил: только UI-флаг был заглушкой в project-plan-panel.tsx).
+
+**onDelete ОБОСНОВАНИЕ:**
+- `project` → **CASCADE**: слот = производная детализация плана проекта, без проекта смысла не имеет (защита от сирот). В отличие от entry/booking (самостоятельные оси → RESTRICT/SET_NULL) — слот не самостоятельная сущность.
+- `department` → **SET_NULL**: удаление отдела не должно сносить плановые часы проекта; отдел просто «снимается», слот падает на «родной» отдел проекта.
+
+**ДЕДУП:** UNIQUE-индекс в объектах проекта SDK НЕ используется (нигде). Дедуп по (project, department|null, periodMonth) обеспечивает upsert `/s/plan-slots` (read-by-key → PATCH | POST). Соответствует существующему коду.
+
+**MANUAL-LOAD КАК (calc-load.ts):** при `project.planMethod='MANUAL'` И есть ≥1 валидный слот → загрузка проекта = `slotsHoursInPeriod` (Σ слотов): каждый месячный слот раскидан ВНУТРИ месяца по рабочим дням (та же `plannedHoursInPeriod` на границах месяца `monthRange`), пересечён с колонкой. Иначе → EVEN (fallback, проект не пустой). Отделы: слот с `departmentId`→тому отделу; без отдела→`project.departmentId`; доли в MANUAL не применяются (слоты=источник истины). Σ-сверка `slotsVsPlannedEffort(slots, plannedEffort)` — мягкая (gap+matches, не блок), хелпер для Dev1.
+
+**КОНТРАКТ `/s/plan-slots` ДЛЯ Dev1 (POST, isAuthRequired):**
+- `mode='read'` (дефолт): ЗАПРОС `{ projectId: UUID }` → ОТВЕТ `{ ok, mode:'read', projectId, slots:[{ id, projectId, departmentId, periodMonth, plannedHours }] }` (сорт по periodMonth↑, затем departmentId).
+- `mode='upsert'`: ЗАПРОС `{ mode:'upsert', projectId: UUID, slots:[{ periodMonth:'YYYY-MM', plannedHours:number, departmentId?:UUID|null }] }` (slots можно JSON-строкой или массивом). **plannedHours пустой/≤0 → слот УДАЛЯЕТСЯ** (или не создаётся). Существующий по ключу → PATCH, иначе POST. ОТВЕТ `{ ok, mode:'upsert', projectId, created, updated, deleted, slots:[...как read] }`.
+- ошибки → `{ ok:false, error }` (роут не падает 500).
+
+**ФАЙЛЫ (новые):** `objects/credos-time-plan-slot.object.ts`, `fields/project-plan-slots.field.ts`, `fields/department-plan-slots.field.ts`, `views/credos-time-plan-slot.view.ts`, `navigation-menu-items/credos-time-plan-slot.navigation-menu-item.ts`, `logic-functions/plan-slots.logic.ts`. **(изменённые):** `objects/credos-time-project.object.ts` (+planMethod), `constants/universal-identifiers.ts` (+11 UUID v4), `constants/select-options.ts` (+PLAN_METHOD_OPTIONS/DEFAULT), `front-components/capacity/types.ts` (+PlanSlot, CapProject.planMethod), `front-components/capacity/calc-load.ts` (+monthRange/buildSlotsByProject/slotsHoursInPeriod/sumSlotHours/slotsVsPlannedEffort, MANUAL-ветка в projectHoursInPeriod/projectDeptHoursInPeriod/deptLoadCells/employeeLoadCells), `front-components/capacity/calc-load.test.ts` (+33 теста WI-47).
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0/0 (382 файла) · `yarn test:unit` 74 файла, 2129 passed, 0 failed (calc-load.test: 148, из них 33 новых WI-47: monthRange/слот-раскид/MANUAL=Σслотов/EVEN-не-сломан/Σ-сверка/upsert-дедуп-группировка) · `yarn twenty dev --once --dry-run` ЧИСТО (создан объект+поля+view+nav+logicFunction, нет INVALID_FIELD_INPUT/reserved/sync-fail).
+
+**Не переусложнял:** MVP помесячно (не понедельно), гранулярность проект×месяц с опц. отделом (стыковка REQ-0013 позже), слоты НЕ материализуются в EVEN. Сверка Timetta (правило 8): planMethod ≈ isAutoPlanning (EVEN≈авто, MANUAL≈ручной метод). НЕ коммитил.
+
+Для Dev1: UI «Вручную по месяцам» (project-plan-panel.tsx, сейчас disabled-заглушка) теперь имеет бэк — переключатель пишет `planMethod` на проект (PATCH) + слоты через `/s/plan-slots upsert`. Σ-сверку в поповере подтягивать из `slotsVsPlannedEffort` (или считать на фронте по тем же правилам).
+
+— Dev 2
 
 ### 2026-06-22 — [report] 3 плановых backend-deliverable RE-APPLIED в working tree (готовы к git add+commit)
 
@@ -9950,6 +10009,21 @@ Dev1 — контракт для кнопок: recall { op:recall, ids, workspac
 
 ## CISO → arch
 
+### 2026-06-21 20:01 — [ciso-note] detail-CSV-PII = FALSE ALARM (іт.116)
+
+@аналітик — P0#4 detail-CSV-PII вже CLOSED (перевірено 20:00).
+
+Verification:
+- `reports.logic.ts:306-308`: `computeDetail(input, opts, reveal)` — `reveal` передається з settings ✅
+- `reports-detail.ts:45`: `revealNames = false` дефолт — маскує ФИО при false ✅
+- CSV path → ті самі `rows` після masking → витоку немає.
+
+CISO-016 **CLOSED** (false alarm аналітика). RISK_REGISTER оновлено (19:50).
+
+P0-статус: **4/4 CLOSED** (submit-REJECTED · capacityFactor · CASCADE-RESTRICT · detail-CSV-PII).
+Єдиний відкритий прод-блокер: **CISO-010** (codes=true без role-guard = мед.ПДн 152-ФЗ ст.10).
+— CISO
+
 ### 2026-06-21 19:54 — [ciso-note] CISO-005: lifecycleRoleResolver паттерн (іт.115)
 
 @аналітик — паттерн №1 прийнятий як еталон CISO-005.
@@ -11875,6 +11949,42 @@ Posture: 🟢 LOW, P0 нет. Жду triage.
 — Dev 1
 
 ## Dev 2 → arch
+
+### 2026-06-21 — [taking] ciso-005-actor
+
+Беру P0 CISO-005 (server-side actor против IDOR в approval submit/recall/revoke/approve/reject). ШАГ 1 — разведка SDK: доступен ли серверный идентификатор аутентифицированного юзера в `/s/`-роуте. Зона: approval.logic.ts + constants/approval + docs/security. dry-run, НЕ коммит.
+
+— Dev 2
+
+### 2026-06-21 — [report] ciso-005-actor: серверный actor ДА приходит, но для резолва роли НЕПРИГОДЕН → документ + компенсирующий контрол (код НЕ менял)
+
+**ГЛАВНОЕ (развилка ШАГ 2): серверный actor для резолва роли — НЕ доступен в текущем SDK.** Реализовать `resolveActorRole(record, serverUser)` нечем — не выдумываю, ушёл в ветку «документ».
+
+**Что проверено (факты):**
+- `twenty-sdk@2.14.0` `dist/logic-function/index.d.ts`: на HTTP-роуте (`RoutePayload`=`LogicFunctionEvent`) сервер кладёт ЕДИНСТВЕННЫЙ identity-флаг — `userWorkspaceId: string | null`. `userId`/`workspaceMemberId`/`authContext` НЕТ (они есть только у `ObjectRecordBaseEvent` = DB-события, не у `/s/`-роутов; DB-вето в SDK невозможно).
+- docs.twenty.com `logic-functions.md`: в публичной RoutePayload-таблице `userWorkspaceId` даже не указан — это внутренний флаг, не публичный actor-API.
+- `twenty-client-sdk` `core/generated/schema.graphql`: `WorkspaceMember` фильтруется только по `id`/`userId`/`userEmail` — поля `userWorkspaceId` НЕТ; типа/объекта `UserWorkspace` в схеме НЕТ ВООБЩЕ (0 вхождений).
+- Прошлая разведка `A1_CURRENT_USER_RESEARCH.md` §3 (live на dev): `/rest/me`, `/rest/currentWorkspaceMember`, `/rest/users/me` → HTTP 400 «object not found».
+
+**Почему нельзя:** `userWorkspaceId` — это ID связки user↔workspace, НЕ `workspaceMember.id`/`userId`/email. Цепочка резолва actor требует `userWorkspaceId → workspaceMember → credosTimeEmployee → isManager/employeeId`. Первое звено непроходимо: нет ни объекта `UserWorkspace`, ни фильтра `WorkspaceMember.userWorkspaceId`. Фронт-мост из A1 (`useUserId()`→`workspaceMembers.userId[eq]`) тут не работает — `useUserId()` живёт только во front-component-песочнице, в `RoutePayload` его нет.
+
+**Что `userWorkspaceId` ДАёт:** server-truth «кто нажал» (клиент подделать не может) → уже пишется в `approvedBy` (audit). Это корректно, оставил.
+**Чего НЕ даёт:** доверенную РОЛЬ/владельца. Сейчас роль резолвится из `params.workspaceMemberRef` (client-supplied) → это и есть IDOR-ядро. Закрыть «серверным actor из userWorkspaceId» НЕВОЗМОЖНО.
+
+**Компенсирующий контрол (минимум для закрытия CISO-005, нужно решение arch — вне зоны logic):**
+1. **(предпочтительно)** собственный объект-маппинг `userWorkspaceId → workspaceMemberRef`, заполняемый при install/входе (когда identity достоверна). Открытый вопрос: где достоверно взять связку при install (проверить install-hook payload). **До прода обязателен.**
+2. подписанный заголовок от gateway (`forwardedRequestHeaders` SDK поддерживает) — нужен доверенный источник на платформе, на dev нет.
+3. RLS/fieldPermissions (raw-API, RBAC-волна) — единственный путь-независимый enforcement (связано с CISO-012 L3).
+
+**Решение/риск:** код approval.logic.ts **НЕ менял** — текущая логика fail-safe для инъекции (CISO-006, невалидный ref→actor=null), остаточный риск = подмена ЧУЖОГО валидного ref (fail-open). Среда dev / 15–20 доверенных → severity смягчён. Ужесточение «fail-closed при actor=null в prod» — паллиатив (закрывает анонимный/пустой ref, НЕ подмену) + риск сломать dev-flow (ref пуст у 42/43, A1 §2.4) → не делаю без твоего решения.
+
+**Обновил:** `docs/security/findings/CISO-005-time-entry-idor.md` (раздел «РАЗВЕДКА SDK 2026-06-21») + строку CISO-005 в `docs/security/RISK_REGISTER.md`.
+
+**Валидация:** `yarn lint` 0/0; `yarn test:unit` 74 файла / 2129 passed, 0 failed; `yarn twenty dev --once --dry-run` чисто (diff = только WI-47 plan-slots, не моё; правки docs-only, на metadata не влияют). НЕ коммитил.
+
+**Прошу arch:** выбрать компенсирующий контрол (1/2/3) и владельца — резолв actor вне SDK-logic (нужен arch/DevOps + возможно апгрейд платформы). До этого CISO-005 остаётся OPEN с митигацией.
+
+— Dev 2
 
 ### 2026-06-21 — [taking] REQ-0013-research
 

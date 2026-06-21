@@ -45,3 +45,46 @@
 2. upsert игнорирует client `workspaceMemberRef`, привязывает к серверной личности actor.
 3. list возвращает только записи actor (+ его отдел для руководителя).
 4. Нет DEV-fallback на первого активного в прод-режиме.
+
+---
+
+## РАЗВЕДКА SDK 2026-06-21 (Dev 2, итер. ciso-005-actor): серверный actor — ВЕРДИКТ
+
+**Вопрос ШАГ 1:** доступен ли в logic-function (`/s/`-роут) серверный идентификатор аутентифицированного пользователя, НЕ переданный клиентом, и можно ли по нему резолвить роль/владельца?
+
+**Ответ: identity ПРИХОДИТ серверно (`event.userWorkspaceId`), но НЕПРИГОДНА для резолва actor — нет моста к workspaceMember/employee. Реализовать `resolveActorRole` по этому идентификатору НЕЛЬЗЯ.**
+
+### Что проверено (источники)
+
+| Источник | Факт |
+|---|---|
+| `twenty-sdk@2.14.0` `dist/logic-function/index.d.ts` (тип `LogicFunctionEvent` = `RoutePayload`) | На HTTP-роуте сервер кладёт ровно ОДИН identity-флаг: `userWorkspaceId: string \| null`. Полей `userId` / `workspaceMemberId` / `authContext` НЕТ. |
+| Тот же файл, `ObjectRecordBaseEvent` (стр. 184–186) | `userId` / `workspaceMemberId` есть **только у DB-событий** (create/update/...), НЕ у `/s/`-роутов. DB-event-вето в SDK невозможно (реактивные триггеры) → этот путь для approval неприменим. |
+| docs.twenty.com `logic-functions.md` (RoutePayload-таблица) | В публичной таблице `userWorkspaceId` даже не указан среди полей роута — т.е. это не задокументированный «actor-API», а внутренний флаг (тип в SDK его декларирует). На него нельзя строить публичный контракт безопасности. |
+| `twenty-client-sdk` `core/generated/schema.graphql` | Тип `WorkspaceMember` фильтруется (`WorkspaceMemberFilterInput`) только по `id` / `userId` / `userEmail`. Поля `userWorkspaceId` НЕТ. Типа/объекта `UserWorkspace` в Core-схеме НЕТ вообще (0 вхождений `userWorkspace`). |
+| `docs/data-model/A1_CURRENT_USER_RESEARCH.md` §3 (прошлая разведка, live-проверено на dev) | `/rest/me`, `/rest/currentWorkspaceMember`, `/rest/users/me` → **HTTP 400 «object not found»**. Прямого REST-маппинга `userWorkspaceId → workspaceMember` нет. |
+
+### Почему мост не строится
+
+`event.userWorkspaceId` — это ID сущности **userWorkspace** (связка user↔workspace), а НЕ `workspaceMember.id`, НЕ `userId` и НЕ email. Резолв actor требует цепочки `→ workspaceMember → credosTimeEmployee (workspaceMemberRef/email) → isManager/employeeId`. Первое же звено `userWorkspaceId → workspaceMember` нечем пройти: в Core REST/GraphQL нет ни объекта `UserWorkspace`, ни фильтра `WorkspaceMember.userWorkspaceId`. Фронтовый мост из A1 (`useUserId()` → `workspaceMembers.userId[eq]`) здесь НЕ работает: `useUserId()` доступен только в front-component-песочнице и даёт `userId`, которого в `RoutePayload` нет.
+
+### Что это значит для actor
+
+- `userWorkspaceId` — **server-truth для аудита** «кто нажал» (клиент подделать не может). Уже используется как `actorId` → `approvedBy` (`approval.logic.ts:286`). Это корректно и оставляем.
+- **Роль/владелец** (isManager, ownership для recall/revoke/SoD) сейчас резолвится из `params.workspaceMemberRef` — **client-supplied, недоверенный**. Это и есть IDOR-ядро CISO-005. Закрыть его «серверным actor из `userWorkspaceId`» в текущем SDK **невозможно** — выдумывать маппинг запрещено (KISS / не переусложнять).
+
+### Компенсирующие контролы (минимум, по приоритету)
+
+Полноценный server-side actor требует одного из (вне зоны Dev 2 logic — нужен arch/DevOps + версия платформы):
+
+1. **(предпочтительно) Доверенная таблица-маппинг `userWorkspaceId → workspaceMemberRef`.** Собственный объект `credosTimeUserMap`, заполняется при install/первом входе (когда identity достоверна). Тогда `/s/`-функция: `event.userWorkspaceId` → map → `workspaceMemberRef` → employee → роль. Снимает IDOR полностью, не доверяя params. **Стоимость:** новый объект + механизм заполнения (где взять `userWorkspaceId↔workspaceMemberRef` достоверно при install — открытый вопрос, требует проверки install-hook payload на наличие identity).
+2. **Доверенный заголовок от gateway.** Если перед `/s/` стоит прокси Twenty, прокинуть подписанный заголовок с workspaceMemberId (`forwardedRequestHeaders` в `httpRouteTriggerSettings` — SDK поддерживает форвард заголовков). Требует доверенного источника заголовка на стороне платформы — на dev отсутствует.
+3. **RLS / fieldPermissions на уровне Twenty** (raw-API) — единственный по-настоящему путь-независимый enforcement (см. CISO-012 L3). Тоже вне SDK-logic, RBAC-волна.
+
+**До появления (1)/(2)/(3) — компенсирующий контрол текущей итерации:** identity-as-audit (`userWorkspaceId`→`approvedBy`) + UUID-валидация client-ref (CISO-006, инъекция закрыта) + UI-гейты ролей. Остаточный риск: клиент может подставить **чужой валидный** `workspaceMemberRef` и пройти isManager/ownership-guard (подмена легитимного UUID, не инъекция). Среда dev / 15–20 доверенных юзеров → severity смягчён, но при выходе в прод (1) обязателен ДО релиза.
+
+**Версионный долг (R4):** в новых версиях Twenty может появиться `currentWorkspaceMember`-резолвер для logic-function — тогда (1) не нужен. Перепроверять при апгрейде SDK.
+
+### Вывод по фейл-кложу
+
+Текущая логика уже **fail-safe для инъекции** (невалидный ref → actor=null) и **fail-open для подмены** (валидный чужой ref → проходит). Ужесточать «fail-closed при actor=null» в prod-режиме (отклонять операцию, если actor не резолвлен) — дешёвый частичный контрол: закрывает анонимный/пустой ref, НЕ закрывает подмену. Это паллиатив, не решение; не меняю поведение в этой итерации без решения arch (риск сломать рабочий dev-flow, где ref пуст у 42/43 — A1 §2.4).
