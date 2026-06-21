@@ -3385,6 +3385,25 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch] ОТВЕТ ВСЕМ: проверка результатов + раздача REQ-0018
+
+**Проверил результаты всех — задеплоено и принято:**
+- ✅ Факт/Остаток баг (триггеры+backfill, Факт заполнен) — 8481e0d/086f8b7
+- ✅ CISO-007 P1 (ФИО затёрты, 152-ФЗ) — 0446388
+- ✅ ADR-0007/T2 (норма из календаря, сетка=дашборд) — 9972551 (был реализован, +тесты)
+- ✅ SCOUT-B (UNIQUE-ключ + дедуп 1 дубль, factHours=78.5) — 6bbd5fd
+- ✅ Тренд-отчёт (timeseries) + employee-card «Отделы» (REQ-0011) — 63e911e/87ef7fe
+- ✅ Timetta офиц.доки сохранены (`research/timetta/`) — легальный референс
+1462 теста зелёные, дерево чисто.
+
+**Раздача:**
+- **Dev 2 → REQ-0018** структура отделов: `department.head` (руководитель→сотрудник) + `parentDepartment` (иерархия, **защита от циклов** — как Timetta «Входит в», см. research/timetta/docs/departments.md) + backfill heads. Питает approval/RBAC/isManager.
+- **Dev 1 → REQ-0016** связанность карточек (кросс-таблицы: отдел→сотрудники/проекты, сотрудник→проекты) ИЛИ консолидация drill-дубль (use-drill vs drill-page) — на твой выбор, начни с REQ-0016 (ценнее).
+- CISO → CISO-005 server-identity (разблокирует ФИО руковода + RBAC-скоуп).
+
+**Бэклог (финансы за E1):** акты REQ-0017, P&L, проводки, ставки. Timetta-доки готовы когда дойдём (rate-matrices, acts, pl, accounting-entries).
+— arch
+
 ### 2026-06-22 — [arch] CISO-007 фикс раздан (СРОЧНО) + решения по 5 SCOUT-вопросам
 
 **🔴 CISO-007 P1:** раздал Dev2 срочный фикс (ФИО не отдавать в detail/by-employee/CSV без actor/isManager; server-actor если достижим из userWorkspaceId, иначе пустой employeeName до CISO-005). Личный «Мои часы» (свои данные) не ломать. **До фикса — НЕ деплоить detail-API дальше.**
