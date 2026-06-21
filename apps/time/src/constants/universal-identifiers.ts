@@ -124,6 +124,15 @@ export const CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID = 'c9d4029f-f588-4bfe-86c
 // остаток закрывает upsert-гард в /s/time-entry.
 export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_UNIVERSAL_IDENTIFIER =
   '5f51e5d2-4994-43c1-a4ce-d86a699d0024';
+// IndexField-и уникального индекса (каждый требует собственный universalIdentifier).
+export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_EMPLOYEE_ID =
+  '9e746060-4e9c-4abf-be33-d40905234c6e';
+export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_PROJECT_ID =
+  '836fe60c-0f05-4a37-a55e-4f8bed98354a';
+export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_WORK_TYPE_ID =
+  '3fbc2636-b2ce-4c5e-8f96-1295cea2b278';
+export const CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_DATE_ID =
+  '67ea8110-ea38-41cf-91b1-554f5671eeda';
 // WorkType
 export const CREDOS_TIME_WORK_TYPE_GROUP_FIELD_ID = '78e61c8f-d18c-48c3-9897-5cf3316aebe9';
 // Employee

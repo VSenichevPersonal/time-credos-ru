@@ -5,6 +5,10 @@ import {
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
+  CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_DATE_ID,
+  CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_EMPLOYEE_ID,
+  CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_PROJECT_ID,
+  CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_WORK_TYPE_ID,
   CREDOS_TIME_ENTRY_UNIQUE_INDEX_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
 } from 'src/constants/universal-identifiers';
@@ -37,9 +41,21 @@ export default defineIndex({
   objectUniversalIdentifier: CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   isUnique: true,
   fields: [
-    { fieldUniversalIdentifier: CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID },
-    { fieldUniversalIdentifier: CREDOS_TIME_ENTRY_PROJECT_FIELD_ID },
-    { fieldUniversalIdentifier: CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID },
-    { fieldUniversalIdentifier: CREDOS_TIME_ENTRY_DATE_FIELD_ID },
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_EMPLOYEE_ID,
+      fieldUniversalIdentifier: CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_PROJECT_ID,
+      fieldUniversalIdentifier: CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_WORK_TYPE_ID,
+      fieldUniversalIdentifier: CREDOS_TIME_ENTRY_WORK_TYPE_FIELD_ID,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_UNIQUE_INDEX_FIELD_DATE_ID,
+      fieldUniversalIdentifier: CREDOS_TIME_ENTRY_DATE_FIELD_ID,
+    },
   ],
 });
