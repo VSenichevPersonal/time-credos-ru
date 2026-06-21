@@ -40,6 +40,17 @@ const REGISTRY_VIEWS = new Set([
 ]);
 const isRegistryView = (path: string): boolean => REGISTRY_VIEWS.has(path);
 
+// Technical-вид = INDEX-вид технического объекта, редактируемого ТОЛЬКО через
+// front-панели (project-plan-panel / employee-plan-panel), не напрямую. nav-item
+// намеренно убран из сайдбара (B4/B5 аудит): нативный object-view показывал сырые
+// слоты + кнопка «+Создать» = источник мусорных записей. Объект+view остаются
+// (для админ-доступа по прямой ссылке + SDK-pitfall требует index-view).
+// Добавлять сюда только по согласованию с arch (комментарий в view обязателен).
+const TECHNICAL_VIEWS = new Set([
+  'credos-time-plan-slot.view.ts', // план правится через панели «Планировать» (B4)
+]);
+const isTechnicalView = (path: string): boolean => TECHNICAL_VIEWS.has(path);
+
 // Все UUID, встречающиеся в конфигурациях page-layouts (для проверки привязки card-вкладок).
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
 const layoutReferencedUuids = new Set(
@@ -89,8 +100,13 @@ describe('pitfall: у каждой INDEX-view есть navigationMenuItem', () =
   );
   // Standalone INDEX-виды (сайдбар) — должен быть nav-item.
   // Registry-views (join-объекты) исключены: управляются через карточку, nav не нужен.
+  // Technical-views исключены: редактируются через front-панели, nav скрыт намеренно (B4).
   const standaloneIndexViews = views.filter(
-    (v) => cfg<string>(v.res, 'key') === 'INDEX' && !isCardView(v.path) && !isRegistryView(v.path),
+    (v) =>
+      cfg<string>(v.res, 'key') === 'INDEX' &&
+      !isCardView(v.path) &&
+      !isRegistryView(v.path) &&
+      !isTechnicalView(v.path),
   );
 
   it.each(standaloneIndexViews.map((v) => [v.path, v.res] as const))(

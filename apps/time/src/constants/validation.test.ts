@@ -7,6 +7,7 @@ import {
   type ValidationThresholds,
   hasBlockingError,
   validateEntry,
+  validatePositiveHours,
   validateWeekUnderfill,
 } from 'src/constants/validation';
 
@@ -98,6 +99,35 @@ describe('validateWeekUnderfill — недобор недели (WARNING)', () =
     expect(f?.level).toBe(VALIDATION_LEVEL.WARNING);
     expect(f?.code).toBe(VALIDATION_CODE.MIN_HOURS_PER_WEEK);
     expect(f?.message).toContain('8');
+  });
+});
+
+describe('validatePositiveHours — WI-52 / W5C.27 (пустая запись = ERROR)', () => {
+  it('часы > 0 → null (корректно)', () => {
+    expect(validatePositiveHours(8)).toBeNull();
+    expect(validatePositiveHours(0.5)).toBeNull();
+  });
+
+  it('hours=0 → ERROR positive_hours_required (не сохранять пустую)', () => {
+    const f = validatePositiveHours(0);
+    expect(f).not.toBeNull();
+    expect(f?.level).toBe(VALIDATION_LEVEL.ERROR);
+    expect(f?.code).toBe(VALIDATION_CODE.POSITIVE_HOURS_REQUIRED);
+  });
+
+  it('отрицательные часы → ERROR', () => {
+    expect(validatePositiveHours(-3)?.level).toBe(VALIDATION_LEVEL.ERROR);
+  });
+
+  it('NaN/Infinity → ERROR', () => {
+    expect(validatePositiveHours(Number.NaN)?.code).toBe(VALIDATION_CODE.POSITIVE_HOURS_REQUIRED);
+    expect(validatePositiveHours(Number.POSITIVE_INFINITY)?.code).toBe(
+      VALIDATION_CODE.POSITIVE_HOURS_REQUIRED,
+    );
+  });
+
+  it('finding попадает в hasBlockingError', () => {
+    expect(hasBlockingError([validatePositiveHours(0)!])).toBe(true);
   });
 });
 

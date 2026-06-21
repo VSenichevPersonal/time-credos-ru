@@ -119,9 +119,21 @@ export const escapeCsv = (v: string | number, delimiter: string = CSV_DELIMITER)
   return needsQuote ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
+// WI-54 / W6B.14: дробные часы в CSV под RU-локаль Excel. Разделитель полей `;`
+// (CSV_DELIMITER), поэтому десятичный разделитель числа = ЗАПЯТАЯ (8,5), иначе
+// RU-Excel читает `8.5` как текст/дату. Применяется ТОЛЬКО к числам; строки
+// (даты ISO `2026-06-10`, коды, ФИО) не трогаем. Целые остаются без дробной части
+// (8 → '8'). NaN/не-конечное → '0' (как и в расчётах: `Number(x)||0`).
+// Чистая, тестируемая.
+export const csvNum = (n: number): string => {
+  if (!Number.isFinite(n)) return '0';
+  return String(n).replace('.', ',');
+};
+
 // Чистая, тестируемая. Собирает одну CSV-строку из ячеек с экранированием.
+// Числовые ячейки → десятичная запятая (csvNum) для RU-Excel; строки — как есть.
 export const toCsvRow = (cells: Array<string | number>, delimiter: string = CSV_DELIMITER): string =>
-  cells.map((c) => escapeCsv(c, delimiter)).join(delimiter);
+  cells.map((c) => escapeCsv(typeof c === 'number' ? csvNum(c) : c, delimiter)).join(delimiter);
 
 export type CsvOptions = {
   delimiter?: string; // по умолчанию `;` (1С/RU-Excel)

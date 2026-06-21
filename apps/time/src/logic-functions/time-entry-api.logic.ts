@@ -8,6 +8,7 @@ import {
   VALIDATION_DEFAULTS,
   type ValidationThresholds,
   validateEntry,
+  validatePositiveHours,
 } from 'src/constants/validation';
 import { isIsoDate, isUuid } from './params-validate';
 // SSOT-пересчёт rollup-поля проекта (factHours/budgetRemaining). Один источник
@@ -164,6 +165,15 @@ const dayBounds = (iso: string): { from: string; to: string } => {
   return { from: `${day}T00:00:00.000Z`, to: `${day}T23:59:59.999Z` };
 };
 
+// WI-51 / W5C.2: уникальный БД-индекс по DATE_TIME (полное значение) vs гард по
+// диапазону ДНЯ. Если записи в один день имеют РАЗНОЕ время — индекс их различит
+// и пропустит обе → двойной счёт factHours. Нормализуем сохраняемый date к
+// канонической полуночи дня (UTC, 00:00:00.000Z): все записи одного дня получают
+// идентичный DATE_TIME → БД-индекс ловит дубль на ЛЮБОМ пути (а не только через
+// этот гард). Гард по диапазону дня остаётся (back-compat со старыми записями).
+const normalizeEntryDate = (iso: string | undefined): string | undefined =>
+  iso ? `${iso.slice(0, 10)}T00:00:00.000Z` : iso;
+
 const findExistingEntryIdByKey = async (key: {
   employeeId: string;
   projectId: string | null;
@@ -242,6 +252,15 @@ const run = async (event: RoutePayload) => {
     }
 
     const hours = Number(params.hours);
+    // WI-52 / W5C.27: пустая запись (hours<=0 / NaN) не сохраняется — иначе держит
+    // уникальный ключ (emp,proj,wt,date), блокируя реальную, но в факт не идёт
+    // (reports-calc: `if (hours===0) continue`). UI на 0 удаляет запись (commitCell);
+    // сервер — источник истины: отклоняем ERROR. Проверяем РАНЬШЕ лимита/переработки
+    // и резолва сотрудника (пустую запись валидируем независимо от прочего).
+    const positiveHours = validatePositiveHours(hours);
+    if (positiveHours) {
+      return { ok: false, error: 'hours must be positive', validation: positiveHours };
+    }
     // gap-аудит v3 #4: валидация как данные + уровни. Пороги из settings.
     // ERROR (лимит часов/день) блокирует операцию; WARNING (переработка) —
     // не блок, флаг в ответе. validateEntry — чистая (constants/validation).
@@ -260,7 +279,9 @@ const run = async (event: RoutePayload) => {
     const newProjectId = params.projectId && isUuid(params.projectId) ? params.projectId : null;
     const newWorkTypeId = params.workTypeId && isUuid(params.workTypeId) ? params.workTypeId : null;
     const data: Record<string, unknown> = {
-      date: params.date,
+      // WI-51: нормализуем к полуночи дня (UTC) → совпадение DATE_TIME для всех
+      // записей одного дня, БД-индекс ловит дубль. params.date гарантирован выше.
+      date: normalizeEntryDate(params.date),
       hours,
       description: params.description ?? null,
       employeeId,
@@ -354,7 +375,7 @@ const run = async (event: RoutePayload) => {
     entries: entriesRes.data?.credosTimeEntries ?? [],
     projects: (projectsRes.data?.credosTimeProjects ?? []).map((p) => ({
       id: p.id,
-      name: p.code ? `${p.code} — ${p.name}` : p.name,
+      name: p.name, // UX-5: name уже содержит код после пересева (код — клиент — название)
     })),
     workTypes: (workTypesRes.data?.credosTimeWorkTypes ?? []).map((w) => ({
       id: w.id,

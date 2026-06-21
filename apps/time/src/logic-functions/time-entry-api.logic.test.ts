@@ -391,3 +391,97 @@ describe('валидация: уровни Ошибка/Предупрежден
     expect(result).not.toHaveProperty('warnings');
   });
 });
+
+// WI-52 / W5C.27: запись с hours<=0 не сохраняется (держала бы уникальный ключ
+// (emp,proj,wt,date), блокируя реальную, но в факт не идёт). Сервер = источник
+// истины → ERROR positive_hours_required, без мутаций.
+describe('валидация: пустая запись 0 часов = ERROR (WI-52 / W5C.27)', () => {
+  const EMP = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const VALID_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  const empRes = { data: { credosTimeEmployees: [{ id: EMP, name: 'Test' }] } };
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('upsert create hours=0 → ERROR positive_hours_required, нет POST/PATCH', async () => {
+    // Проверка часов идёт ДО settings-fetch → нужен только resolveEmployeeId.
+    const mockFn = mockFetch([empRes]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', hours: '0', date: '2026-06-10' }));
+    expect(result).toMatchObject({
+      ok: false,
+      error: 'hours must be positive',
+      validation: { level: 'error', code: 'positive_hours_required' },
+    });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('upsert hours пусто/NaN → ERROR positive_hours_required', async () => {
+    vi.stubGlobal('fetch', mockFetch([empRes]));
+    const result = await handler(event({ op: 'upsert', hours: '', date: '2026-06-10' }));
+    expect(result).toMatchObject({ ok: false, validation: { code: 'positive_hours_required' } });
+  });
+
+  it('upsert patch hours=0 для существующей DRAFT → ERROR (не зануляем запись)', async () => {
+    // id передан → сначала status-read (DRAFT, не approved), затем проверка часов.
+    const mockFn = mockFetch([
+      empRes, // resolveEmployeeId
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'DRAFT', projectId: null }] } }, // status-read
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'upsert', id: VALID_ID, hours: '0', date: '2026-06-10' }));
+    expect(result).toMatchObject({ ok: false, validation: { code: 'positive_hours_required' } });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+});
+
+// WI-51 / W5C.2: сохраняемый date нормализуется к полуночи дня (UTC) → совпадение
+// DATE_TIME у всех записей одного дня → БД-индекс ловит дубль (защита от двойного
+// счёта factHours при записях с произвольным временем).
+describe('нормализация date к дню (WI-51)', () => {
+  const EMP = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const empRes = { data: { credosTimeEmployees: [{ id: EMP, name: 'Test' }] } };
+  const settingsRes = { data: { credosTimeSettings: [] } };
+  const emptyEntries = { data: { credosTimeEntries: [] } };
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('POST: date с произвольным временем → сохраняется полночь дня (00:00:00.000Z)', async () => {
+    const mockFn = mockFetch([
+      empRes, settingsRes, emptyEntries,
+      { data: { createCredosTimeEntry: { id: 'n1' } } },
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10T15:30:00.000Z' }));
+    const post = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'POST');
+    const body = JSON.parse(String((post?.[1] as { body?: string })?.body ?? '{}'));
+    expect(body.date).toBe('2026-06-10T00:00:00.000Z');
+  });
+
+  it('POST: date-only (без времени) → тоже полночь дня', async () => {
+    const mockFn = mockFetch([
+      empRes, settingsRes, emptyEntries,
+      { data: { createCredosTimeEntry: { id: 'n2' } } },
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10' }));
+    const post = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'POST');
+    const body = JSON.parse(String((post?.[1] as { body?: string })?.body ?? '{}'));
+    expect(body.date).toBe('2026-06-10T00:00:00.000Z');
+  });
+});

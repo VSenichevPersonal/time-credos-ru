@@ -11,6 +11,13 @@ import {
 
 // WI-47: index-view помесячных слотов плана. Колонки = проект, месяц, плановые
 // часы, отдел. Объект ОБЯЗАН иметь index-view (иначе SDK-pitfall).
+//
+// B4/B5 аудит (PERSON_PLAN_CONSISTENCY_AUDIT.md): технический view, nav-item из
+// сайдбара УБРАН намеренно. Нативный object-view показывал сырые слоты (UUID,
+// dept/person неразличимы) + кнопка «+Создать» создавала мусорные пустые записи
+// в обход логик-функции. Слоты редактируются ТОЛЬКО через панели «Планировать»
+// (project-plan-panel / employee-plan-panel). View остаётся для админ-доступа по
+// прямой ссылке. Исключён из nav-guard через TECHNICAL_VIEWS (schema-guard.test.ts).
 export default defineView({
   universalIdentifier: CREDOS_TIME_PLAN_SLOT_VIEW_UNIVERSAL_IDENTIFIER,
   name: 'Плановое распределение (по месяцам)',

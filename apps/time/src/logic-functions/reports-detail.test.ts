@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CSV_BOM, computeDetail, detailToCsv, escapeCsv, toCsvRow } from './reports-detail';
+import { CSV_BOM, computeDetail, csvNum, detailToCsv, escapeCsv, toCsvRow } from './reports-detail';
 import type { DetailRow } from './reports-detail';
 import type { ReportsInput } from './reports-calc';
 
@@ -268,5 +268,56 @@ describe('toCsvRow', () => {
 
   it('кастомный разделитель', () => {
     expect(toCsvRow(['a', 'b'], ',')).toBe('a,b');
+  });
+
+  // WI-54: дробное число-ячейка → десятичная запятая (RU-Excel при `;`-разделителе).
+  it('дробное число-ячейка → запятая', () => {
+    expect(toCsvRow(['2026-06-10', 8.5])).toBe('2026-06-10;8,5');
+  });
+
+  it('строка с точкой (ISO-дата) НЕ трогается — только числа', () => {
+    expect(toCsvRow(['2026-06-10', '8.5'])).toBe('2026-06-10;8.5');
+  });
+});
+
+// ─── csvNum (WI-54 / W6B.14 — десятичная запятая для RU-Excel) ───────────────
+
+describe('csvNum', () => {
+  it('целое → без дробной части', () => {
+    expect(csvNum(8)).toBe('8');
+  });
+
+  it('дробное → запятая вместо точки', () => {
+    expect(csvNum(8.5)).toBe('8,5');
+    expect(csvNum(0.25)).toBe('0,25');
+  });
+
+  it('NaN/Infinity → "0"', () => {
+    expect(csvNum(Number.NaN)).toBe('0');
+    expect(csvNum(Number.POSITIVE_INFINITY)).toBe('0');
+  });
+});
+
+// WI-54: дробные часы в реальной detail-CSV-строке выгружаются с запятой.
+describe('detailToCsv — дробные часы (RU decimal comma)', () => {
+  const row: DetailRow = {
+    date: '2026-06-10',
+    employeeName: 'Сотрудник·1234',
+    deptName: 'OPIB',
+    projectName: 'PA-001 — Проект А',
+    workTypeName: 'Разработка',
+    hours: 8.5,
+    status: 'DRAFT',
+  };
+
+  it('часы 8.5 → "8,5" в CSV (не "8.5")', () => {
+    const dataLine = detailToCsv([row]).split('\r\n')[1];
+    expect(dataLine).toContain(';8,5;');
+    expect(dataLine).not.toContain(';8.5;');
+  });
+
+  it('целые часы остаются без дробной части', () => {
+    const dataLine = detailToCsv([{ ...row, hours: 8 }]).split('\r\n')[1];
+    expect(dataLine).toContain(';8;');
   });
 });

@@ -156,17 +156,28 @@ const readParams = (event: RoutePayload): Record<string, unknown> => {
   return out;
 };
 
-type InputSlot = {
+export type InputSlot = {
   periodMonth: string;
   plannedHours: number;
   departmentId: string | null;
   employeeId: string | null;
 };
 
-// Нормализация входных слотов: только валидный 'YYYY-MM', departmentId/employeeId —
-// UUID|null. plannedHours приводится к числу (NaN → 0 → удаление). Дубли по ключу
-// (month|dept|employee) схлопываются (последний выигрывает).
-const parseInputSlots = (raw: unknown): InputSlot[] => {
+// B3-гард мусорных слотов: входной слот ПРИНИМАЕТСЯ только если periodMonth строго
+// 'YYYY-MM' (MONTH_RE) И plannedHours — конечное число (не null/undefined/NaN/Inf).
+// Источник мусора был нативный object-view (создавал слоты с пустым periodMonth /
+// null plannedHours), серверный гард защищает на любом пути. Слот с явным 0/<0
+// часов — ВАЛИДНЫЙ вход (семантика «удалить по ключу»), его не отбрасываем здесь.
+// Невалидный по любому критерию слот пропускается молча (не блокирует остальные).
+// departmentId/employeeId → UUID|null. Дубли по ключу (month|dept|employee)
+// схлопываются (последний выигрывает).
+const isValidPlannedHours = (v: unknown): boolean => {
+  if (v === null || v === undefined || v === '') return false;
+  const n = Number(v);
+  return Number.isFinite(n);
+};
+
+export const parseInputSlots = (raw: unknown): InputSlot[] => {
   let arr: unknown = raw;
   if (typeof raw === 'string') {
     try {
@@ -180,15 +191,16 @@ const parseInputSlots = (raw: unknown): InputSlot[] => {
   for (const item of arr) {
     if (!item || typeof item !== 'object') continue;
     const o = item as Record<string, unknown>;
+    // periodMonth строго 'YYYY-MM' — пустой/мусорный месяц отбрасывается (B3).
     const periodMonth = String(o.periodMonth ?? '');
     if (!MONTH_RE.test(periodMonth)) continue;
+    // plannedHours обязателен и конечен — null/пусто/NaN/Inf отбрасываются (B3).
+    if (!isValidPlannedHours(o.plannedHours)) continue;
     const departmentId = o.departmentId ? validUuidParam(String(o.departmentId)) : null;
     const employeeId = o.employeeId ? validUuidParam(String(o.employeeId)) : null;
-    const hoursNum = Number(o.plannedHours);
-    const plannedHours = Number.isFinite(hoursNum) ? hoursNum : 0;
     byKey.set(slotKey(periodMonth, departmentId, employeeId), {
       periodMonth,
-      plannedHours,
+      plannedHours: Number(o.plannedHours),
       departmentId,
       employeeId,
     });

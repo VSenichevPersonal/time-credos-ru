@@ -23,6 +23,9 @@ export const VALIDATION_CODE = {
   MAX_HOURS_PER_DAY: 'max_hours_per_day',
   OVERTIME_PER_DAY: 'overtime_per_day',
   MIN_HOURS_PER_WEEK: 'min_hours_per_week',
+  // WI-52 / W5C.27: запись с hours<=0 (или пусто/NaN) не хранится — занимала бы
+  // уникальный ключ (emp,proj,wt,date), блокируя реальную запись, но в факт не идёт.
+  POSITIVE_HOURS_REQUIRED: 'positive_hours_required',
 } as const;
 
 export type ValidationCode =
@@ -106,6 +109,22 @@ export const validateWeekUnderfill = (
     level: VALIDATION_LEVEL.WARNING,
     code: VALIDATION_CODE.MIN_HOURS_PER_WEEK,
     message: `Недобор недельной нормы: ${weekHours} из ${minHoursPerWeek} ч (не хватает ${missing} ч)`,
+  };
+};
+
+// WI-52 / W5C.27: запись трудозатрат требует положительных часов. hours<=0 / пусто
+// / NaN → ERROR (не сохранять пустую запись — иначе она держит уникальный ключ
+// (emp,proj,wt,date) и блокирует реальную, но в факт не попадает: reports-calc
+// делает `if (hours===0) continue`). Отдельно от validateEntry (там 0 — валидный
+// «низ диапазона», а WARNING/ERROR — про лимит/переработку): пустую запись надо
+// УДАЛЯТЬ (или не создавать) на стороне UI, а на сервере явно отклонять как ERROR.
+// Чистая, тестируемая. Возвращает finding или null (часы корректны и > 0).
+export const validatePositiveHours = (hours: number): ValidationFinding | null => {
+  if (Number.isFinite(hours) && hours > 0) return null;
+  return {
+    level: VALIDATION_LEVEL.ERROR,
+    code: VALIDATION_CODE.POSITIVE_HOURS_REQUIRED,
+    message: 'Часы должны быть больше 0 (пустую запись не сохраняем — удалите её)',
   };
 };
 
