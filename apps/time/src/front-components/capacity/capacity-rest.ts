@@ -3,6 +3,7 @@ import { RestApiClient } from 'twenty-client-sdk/rest';
 import { fteHeadcountByDept } from 'src/front-components/capacity/calc-load';
 import type {
   Absence,
+  Booking,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -190,6 +191,43 @@ export const fetchDeptPlans = async (): Promise<DeptPlan[]> => {
     plannedEffort: d.plannedEffort ?? null,
     startDate: d.startDate ?? null,
     endDate: d.endDate ?? null,
+  }));
+};
+
+type RawBooking = {
+  id: string;
+  employeeId?: string | null;
+  projectId?: string | null;
+  bookingType?: string | null;
+  hours?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+};
+
+// REQ-0004 Часть C: брони ресурса (credosTimeBooking), пересекающие горизонт доски
+// [from, to]. Пересечение: endDate >= from И startDate <= to (как у отсутствий).
+// HARD → в Demand (потребляет ёмкость), SOFT → отдельный слой (см. calc-load).
+// bookingType — SELECT в UPPER (SOFT/HARD); нераспознанный трактуем как SOFT
+// (безопаснее — не потребляет ёмкость по умолчанию).
+export const fetchBookings = async (
+  from: string,
+  to: string,
+): Promise<Booking[]> => {
+  const resp = await client().get<ListResp<RawBooking>>('/rest/credosTimeBookings', {
+    query: {
+      filter: `endDate[gte]:${from},startDate[lte]:${to}`,
+      limit: '400',
+      orderBy: 'startDate[AscNullsFirst]',
+    },
+  });
+  return pickList(resp, 'credosTimeBookings').map((b) => ({
+    id: b.id,
+    employeeId: b.employeeId ?? null,
+    projectId: b.projectId ?? null,
+    bookingType: b.bookingType === 'HARD' ? 'HARD' : 'SOFT',
+    hours: b.hours ?? null,
+    startDate: b.startDate ?? null,
+    endDate: b.endDate ?? null,
   }));
 };
 

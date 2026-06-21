@@ -6,7 +6,7 @@
 
 | Метрика | Значение |
 |---|---|
-| unit-тестов | **1720 + 15 todo** (55 файл, все зелёные) |
+| unit-тестов | **1752 + 15 todo** (55 файл, все зелёные) |
 | integration-тестов | 1 (`schema`, нужен сервер) |
 | backend-smoke (REST) | ✅ health 200 + 9/9 объектов 200 (incl. credosTimeAbsences) |
 | logic-smoke `/s/reports` | ✅ live: byCategory 6 кат., Σ==fact, byDept/byEmployee/byProject |
@@ -27,7 +27,7 @@
 | `constants/universal-identifiers.ts` | инвариант данных | ✅ covered | `constants/universal-identifiers.test.ts` |
 | `constants/select-options.ts` | UI-пиклисты + cross-SSOT | ✅ covered | `constants/select-options.test.ts` |
 | `constants/labels.ts` | cross-SSOT labels↔options | ✅ covered | `constants/labels.test.ts` |
-| `front-components/capacity/calc-load.ts` | расчёты ёмкости/загрузки | ✅ covered | `front-components/capacity/calc-load.test.ts` |
+| `front-components/capacity/calc-load.ts` | расчёты ёмкости/загрузки + `plannedHoursInPeriod`/`bookingHoursInPeriod`/`buildBookingCtx` (REQ-0004 C) | ✅ covered | `front-components/capacity/calc-load.test.ts` |
 | `front-components/grid/format.ts` | UX-логика ячеек/индикаторов | ✅ covered | `front-components/grid/format.test.ts` |
 | `front-components/calendar/calc-month.ts` | агрегат произв. календаря | ✅ covered | `front-components/calendar/calc-month.test.ts` |
 | `logic-functions/reports-calc.ts` | отчёты: util/norm/under/byCategory/F-D норма | ✅ covered | `logic-functions/reports-calc.test.ts` |

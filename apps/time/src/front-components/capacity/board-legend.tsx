@@ -1,4 +1,4 @@
-import { T, loadTone, gapTone } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, gapTone, BOOK_INK, BOOK_SOFT_INK, CONFLICT_RING } from 'src/front-components/capacity/cap-tokens';
 import type { CellMetric } from 'src/front-components/capacity/types';
 
 // Легенда цветовой шкалы доски: что значит цвет ячейки. Без неё новый юзер не
@@ -55,7 +55,36 @@ const LoadLegend = () => (
   </>
 );
 
-export const BoardLegend = ({ metric }: { metric: CellMetric }) => (
+// REQ-0004 Часть C: легенда слоя брони. HARD — в загрузке (▪N); SOFT — пунктир,
+// не потребляет, показ по тумблеру tentativeBookingEnabled; ▲ — овербукинг.
+const BookingLegend = ({ includeSoft }: { includeSoft: boolean }) => (
+  <>
+    <span style={{ width: 1, height: 14, background: T.border }} aria-hidden />
+    <span style={{ fontSize: 11, fontWeight: 600, color: T.textFaint }}>Бронь:</span>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+      <span aria-hidden style={{ fontSize: 10, color: BOOK_INK, fontWeight: 700 }}>▪ N</span>
+      <span style={{ fontSize: 11, color: T.textMuted }}>HARD (в загрузке)</span>
+    </span>
+    {includeSoft && (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+        <span aria-hidden style={{ fontSize: 10, color: BOOK_SOFT_INK, fontWeight: 700, borderBottom: `1px dashed ${BOOK_SOFT_INK}` }}>N</span>
+        <span style={{ fontSize: 11, color: T.textMuted }}>SOFT (предв., не потребляет)</span>
+      </span>
+    )}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+      <span aria-hidden style={{ fontSize: 10, color: CONFLICT_RING, fontWeight: 700 }}>▲</span>
+      <span style={{ fontSize: 11, color: T.textMuted }}>овербукинг</span>
+    </span>
+  </>
+);
+
+export const BoardLegend = ({
+  metric,
+  includeSoft = false,
+}: {
+  metric: CellMetric;
+  includeSoft?: boolean;
+}) => (
   <div
     style={{
       display: 'flex',
@@ -68,5 +97,6 @@ export const BoardLegend = ({ metric }: { metric: CellMetric }) => (
     }}
   >
     {metric === 'gap' ? <GapLegend /> : <LoadLegend />}
+    <BookingLegend includeSoft={includeSoft} />
   </div>
 );

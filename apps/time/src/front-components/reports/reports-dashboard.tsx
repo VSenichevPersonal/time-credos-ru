@@ -18,6 +18,8 @@ import { useOlap } from 'src/front-components/reports/use-olap';
 import { DrillView } from 'src/front-components/reports/drill-view';
 import { dimLabel, nextAxis, valueLabel } from 'src/front-components/reports/drill-axis';
 import type { OlapDim, OlapFilter, OlapRow } from 'src/front-components/reports/olap-types';
+import { ExportCsvButton } from 'src/front-components/reports/export-csv';
+import type { DetailFilters } from 'src/front-components/reports/reports-rest';
 import { departmentLabel } from 'src/constants/labels';
 
 // Все оси (кроме stage — нет справочника этапов на фронте). Для первого провала из
@@ -164,6 +166,17 @@ export const ReportsDashboard = () => {
   const olapRowDrillable = (r: ReportRow): boolean =>
     nextAxis(childAxis, (r as OlapRow).drillable ?? []) !== null;
 
+  // F-F (REQ-0006): фильтры для экспорта detail-CSV = накопленный путь drill,
+  // спроецированный на оси deptId/projectId/employeeId (бэк-контракт detail).
+  // Без drill — пустые фильтры (весь период). Остальные оси (category/workType)
+  // в detail-фильтре не участвуют — экспорт сужается до этих трёх измерений.
+  const exportFilters: DetailFilters = {};
+  for (const f of olapFilters) {
+    if (f.dim === 'dept') exportFilters.deptId = f.value;
+    else if (f.dim === 'project') exportFilters.projectId = f.value;
+    else if (f.dim === 'employee') exportFilters.employeeId = f.value;
+  }
+
   // Опции отдела для фильтра тренда: byDept[].key = id отдела, name = код.
   // Тренд шлёт departmentId (id), пользователь видит русское название отдела.
   const deptOptions: DeptOption[] = (data?.byDept ?? []).map((d) => ({
@@ -174,6 +187,7 @@ export const ReportsDashboard = () => {
   return (
     <div
       style={{
+        position: 'relative', // якорь для поповера экспорта CSV
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
@@ -229,7 +243,7 @@ export const ReportsDashboard = () => {
                 onClear={() => setCatFilter(new Set())}
               />
             )}
-            <span style={{ marginLeft: 'auto' }}>
+            <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
               <Segmented
                 ariaLabel="Срез группировки"
                 value={groupBy}
@@ -240,6 +254,7 @@ export const ReportsDashboard = () => {
                 ]}
                 onChange={(g: GroupBy) => switchGroupBy(g)}
               />
+              <ExportCsvButton from={period.from} to={period.to} filters={exportFilters} disabled={loading} />
             </span>
           </>
         )}

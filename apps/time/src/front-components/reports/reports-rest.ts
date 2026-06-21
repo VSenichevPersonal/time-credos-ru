@@ -43,3 +43,65 @@ export const fetchReports = async (
     return EMPTY(from, to, e instanceof Error ? e.message : 'Ошибка загрузки отчёта');
   }
 };
+
+// F-F (REQ-0006): экспорт detail-отчёта в CSV. Контракт Dev2: /s/reports
+// {groupBy:'detail', format:'csv', from, to, deptId?/projectId?/employeeId?} →
+// {ok, csv, mimeType, filename}. CSV уже с BOM и разделителем `;` (1С/RU-Excel).
+// drill-фильтры опциональны (для экспорта текущего среза drill-down).
+export type DetailFilters = {
+  deptId?: string | null;
+  projectId?: string | null;
+  employeeId?: string | null;
+};
+
+export type CsvExport = {
+  ok: boolean;
+  csv: string;
+  mimeType: string;
+  filename: string;
+  error?: string;
+};
+
+type RawCsvResp = {
+  ok?: boolean;
+  csv?: string;
+  mimeType?: string;
+  filename?: string;
+  error?: string;
+};
+
+export const fetchDetailCsv = async (
+  from: string,
+  to: string,
+  filters: DetailFilters = {},
+): Promise<CsvExport> => {
+  const fail = (error: string): CsvExport => ({
+    ok: false,
+    csv: '',
+    mimeType: 'text/csv;charset=utf-8',
+    filename: '',
+    error,
+  });
+  try {
+    const resp = await client().post<RawCsvResp>('/s/reports', {
+      from,
+      to,
+      groupBy: 'detail',
+      format: 'csv',
+      ...(filters.deptId ? { deptId: filters.deptId } : {}),
+      ...(filters.projectId ? { projectId: filters.projectId } : {}),
+      ...(filters.employeeId ? { employeeId: filters.employeeId } : {}),
+    });
+    if (!resp?.ok || typeof resp.csv !== 'string') {
+      return fail(resp?.error ?? 'Сервис отчётов недоступен');
+    }
+    return {
+      ok: true,
+      csv: resp.csv,
+      mimeType: resp.mimeType ?? 'text/csv;charset=utf-8',
+      filename: resp.filename ?? `timesheet-detail_${from.slice(0, 10)}_${to.slice(0, 10)}.csv`,
+    };
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Ошибка экспорта');
+  }
+};

@@ -8,7 +8,7 @@ import {
   employeeLoadCells,
   firstFreePeriod,
 } from 'src/front-components/capacity/calc-load';
-import type { AbsenceCtx } from 'src/front-components/capacity/calc-load';
+import type { AbsenceCtx, BookingCtx } from 'src/front-components/capacity/calc-load';
 import type {
   CapProject,
   CellMetric,
@@ -30,6 +30,7 @@ type DeptProps = {
   periods: Period[];
   absenceCtx?: AbsenceCtx;
   sharesByProject?: Map<string, ProjectDeptShare[]>;
+  bookingCtx?: BookingCtx;
   nameWidth: number;
   metric: CellMetric;
   expanded: Set<string>;
@@ -49,6 +50,7 @@ export const DeptRows = ({
   periods,
   absenceCtx,
   sharesByProject,
+  bookingCtx,
   nameWidth,
   metric,
   expanded,
@@ -60,7 +62,8 @@ export const DeptRows = ({
   <>
     {departments.map((dept) => {
       // REQ-0012: ячейки отдела учитывают план без проекта (deptPlans).
-      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx, sharesByProject);
+      // REQ-0004 C: + слой брони (bookingCtx).
+      const cells = cellsByDept.get(dept.id) ?? deptLoadCells(dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx);
       const isOpen = expanded.has(dept.id);
       const detail = isOpen ? deptProjectLoads(dept, projects, periods, sharesByProject) : null;
       const planRows = isOpen ? deptPlanLoads(dept, deptPlans, periods) : null;
@@ -107,6 +110,7 @@ type EmpProps = {
   periods: Period[];
   absenceCtx?: AbsenceCtx;
   sharesByProject?: Map<string, ProjectDeptShare[]>;
+  bookingCtx?: BookingCtx;
   nameWidth: number;
   metric: CellMetric;
 };
@@ -122,6 +126,7 @@ export const EmployeeRows = ({
   periods,
   absenceCtx,
   sharesByProject,
+  bookingCtx,
   nameWidth,
   metric,
 }: EmpProps) => {
@@ -134,7 +139,7 @@ export const EmployeeRows = ({
     <>
       {sorted.map((emp) => {
         const dept = emp.departmentId ? deptById.get(emp.departmentId) : undefined;
-        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx, sharesByProject);
+        const cells = employeeLoadCells(emp, dept, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx);
         return (
           <EmployeeRow
             key={emp.id}

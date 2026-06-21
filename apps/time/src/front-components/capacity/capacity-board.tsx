@@ -28,7 +28,7 @@ export const CapacityBoard = () => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [planning, setPlanning] = useState(false);
 
-  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, absenceCtx, sharesByProject, reload, reloadProjects, reloadDeptPlans } =
+  const { loading, error, isManager, departments, employees, projects, deptPlans, periods, absenceCtx, sharesByProject, bookingCtx, includeSoft, reload, reloadProjects, reloadDeptPlans } =
     useCapacity(granularity);
   const { save, saveDeptPlan, status: saveStatus, error: saveError } = usePlanEdit(
     reloadProjects,
@@ -44,11 +44,12 @@ export const CapacityBoard = () => {
   );
 
   // REQ-0012: ёмкость/загрузка отдела включает план без проекта (deptPlans).
+  // REQ-0004 C: + слой брони (HARD в Demand, SOFT отдельно) через bookingCtx.
   const cellsByDept = useMemo(() => {
     const map = new Map<string, ReturnType<typeof deptLoadCells>>();
-    for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods, deptPlans, absenceCtx, sharesByProject));
+    for (const d of departments) map.set(d.id, deptLoadCells(d, projects, periods, deptPlans, absenceCtx, sharesByProject, bookingCtx));
     return map;
-  }, [departments, projects, deptPlans, periods, absenceCtx, sharesByProject]);
+  }, [departments, projects, deptPlans, periods, absenceCtx, sharesByProject, bookingCtx]);
 
   const summary = useMemo(
     () => summaryCells([...cellsByDept.values()], periods),
@@ -98,7 +99,7 @@ export const CapacityBoard = () => {
         onTogglePlanning={() => setPlanning((v) => !v)}
       />
 
-      <BoardLegend metric={metric} />
+      <BoardLegend metric={metric} includeSoft={includeSoft} />
 
       {planning && saveError && (
         <div
@@ -140,6 +141,7 @@ export const CapacityBoard = () => {
                 periods={periods}
                 absenceCtx={absenceCtx}
                 sharesByProject={sharesByProject}
+                bookingCtx={bookingCtx}
                 nameWidth={NAME_WIDTH}
                 metric={metric}
                 expanded={expanded}
@@ -159,6 +161,7 @@ export const CapacityBoard = () => {
                 periods={periods}
                 absenceCtx={absenceCtx}
                 sharesByProject={sharesByProject}
+                bookingCtx={bookingCtx}
                 nameWidth={NAME_WIDTH}
                 metric={metric}
               />

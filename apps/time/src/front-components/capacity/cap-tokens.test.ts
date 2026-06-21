@@ -8,6 +8,9 @@ const cell = (capacity: number, load: number): LoadCell => ({
   load,
   free: capacity - load,
   ratio: capacity > 0 ? load / capacity : null,
+  hardBooking: 0,
+  softBooking: 0,
+  conflict: false,
 });
 
 // ─── loadTone ─────────────────────────────────────────────────────────────

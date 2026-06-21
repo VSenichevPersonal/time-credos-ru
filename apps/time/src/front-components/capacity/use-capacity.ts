@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   fetchAbsences,
+  fetchBookings,
   fetchCalendar,
   fetchDepartments,
   fetchDeptPlans,
@@ -13,12 +14,14 @@ import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
 import {
   buildAbsenceCtx,
+  buildBookingCtx,
   buildPeriods,
   buildSharesByProject,
 } from 'src/front-components/capacity/calc-load';
-import type { AbsenceCtx } from 'src/front-components/capacity/calc-load';
+import type { AbsenceCtx, BookingCtx } from 'src/front-components/capacity/calc-load';
 import type {
   Absence,
+  Booking,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -67,6 +70,7 @@ type State = {
   calendar: CalendarDay[];
   absences: Absence[]; // W3-1: отсутствия для вычета из ёмкости доски
   shares: ProjectDeptShare[]; // REQ-0013 13b: доли отделов в проектах
+  bookings: Booking[]; // REQ-0004 C: брони ресурса (HARD/SOFT) для слоя Demand
 };
 
 // Загрузка данных доски + расчёт колонок горизонта. reloadProjects() — точечный
@@ -81,6 +85,9 @@ export const useCapacity = (granularity: Granularity) => {
   // Месяцы оставлены фиксированными (HORIZON.month) — отдельной настройки нет.
   const settings = useGlobalSettings();
   const weekCount = clampHorizonWeeks(settings?.planningHorizonWeeks);
+  // REQ-0004 C: тумблер показа SOFT-броней. fallback false до загрузки настроек
+  // (SOFT-слой консервативно скрыт, пока не подтверждено настройкой).
+  const includeSoft = settings?.tentativeBookingEnabled ?? false;
   const periodCount = granularity === 'week' ? weekCount : HORIZON.month;
   const [state, setState] = useState<State>({
     loading: true,
@@ -92,6 +99,7 @@ export const useCapacity = (granularity: Granularity) => {
     calendar: [],
     absences: [],
     shares: [],
+    bookings: [],
   });
   // reload() — полный повтор загрузки доски (кнопка «Повторить» при ошибке).
   const [nonce, setNonce] = useState(0);
@@ -108,8 +116,9 @@ export const useCapacity = (granularity: Granularity) => {
       fetchCalendar(range.from, range.to),
       fetchAbsences(range.from, range.to),
       fetchProjectDeptShares(),
+      fetchBookings(range.from, range.to),
     ])
-      .then(([departments, employees, projects, deptPlans, calendar, absences, shares]) => {
+      .then(([departments, employees, projects, deptPlans, calendar, absences, shares, bookings]) => {
         if (!alive) return;
         setState({
           loading: false,
@@ -121,6 +130,7 @@ export const useCapacity = (granularity: Granularity) => {
           calendar,
           absences,
           shares,
+          bookings,
         });
       })
       .catch((e: unknown) => {
@@ -150,6 +160,13 @@ export const useCapacity = (granularity: Granularity) => {
     setState((s) => ({ ...s, shares }));
   }, []);
 
+  // REQ-0004 C: точечный рефетч броней (после правки/добавления резерва).
+  const reloadBookings = useCallback(async () => {
+    const range = horizonRange(anchor, granularity, weekCount);
+    const bookings = await fetchBookings(range.from, range.to);
+    setState((s) => ({ ...s, bookings }));
+  }, [anchor, granularity, weekCount]);
+
   const periods: Period[] = useMemo(
     () => buildPeriods(anchor, state.calendar, granularity, periodCount),
     [anchor, state.calendar, granularity, periodCount],
@@ -169,16 +186,27 @@ export const useCapacity = (granularity: Granularity) => {
     [state.shares],
   );
 
+  // REQ-0004 C: контекст броней (группировка по сотруднику + тумблер SOFT).
+  // Передаётся в deptLoadCells/employeeLoadCells. includeSoft = настройка
+  // tentativeBookingEnabled (SOFT-слой рисуется только когда включён).
+  const bookingCtx: BookingCtx = useMemo(
+    () => buildBookingCtx(state.bookings, state.employees, includeSoft),
+    [state.bookings, state.employees, includeSoft],
+  );
+
   return {
     ...state,
     isManager,
     periods,
     absenceCtx,
     sharesByProject,
+    bookingCtx,
+    includeSoft,
     anchor,
     reload,
     reloadProjects,
     reloadDeptPlans,
     reloadShares,
+    reloadBookings,
   };
 };

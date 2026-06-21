@@ -4,9 +4,11 @@ import {
   absenceHoursByEmpInPeriod,
   absenceHoursInPeriod,
   buildAbsenceCtx,
+  buildBookingCtx,
   buildHoursByDay,
   buildPeriods,
   buildSharesByProject,
+  bookingHoursInPeriod,
   deptCapacity,
   deptLoadCells,
   deptPlanHoursInPeriod,
@@ -16,6 +18,7 @@ import {
   firstFreePeriod,
   fteHeadcountByDept,
   isAssignmentActive,
+  plannedHoursInPeriod,
   projectDeptShareLoads,
   projectHoursInPeriod,
   projectShareHoursInPeriod,
@@ -25,6 +28,7 @@ import type {
   Absence,
   CalendarDay,
   CapProject,
+  Booking,
   DeptPlan,
   DeptRef,
   EmpDeptAssignment,
@@ -40,6 +44,9 @@ const cell = (capacity: number, load: number): LoadCell => ({
   load,
   free: capacity - load,
   ratio: capacity > 0 ? load / capacity : null,
+  hardBooking: 0,
+  softBooking: 0,
+  conflict: false,
 });
 
 const utc = (y: number, m: number, d: number): Date => new Date(Date.UTC(y, m, d));
@@ -768,5 +775,220 @@ describe('fteHeadcountByDept', () => {
   it('ftePercent=null → трактуется как 100% (1.0)', () => {
     const result = fteHeadcountByDept([asgn({ ftePercent: null })], [], '2026-01-01', '2026-01-31');
     expect(result.get('d1')).toBeCloseTo(1.0);
+  });
+});
+
+// ─── plannedHoursInPeriod (REQ-0004 Часть C) ─────────────────────────────────
+
+const mkPeriod = (from: string, to: string): Period => ({
+  key: `${from}/${to}`,
+  label: from,
+  from: new Date(from),
+  to: new Date(to),
+  workHours: 40,
+});
+
+const mkBooking = (over: Partial<Booking> = {}): Booking => ({
+  id: '00000000-0000-4000-8000-000000000001',
+  employeeId: 'e1',
+  projectId: 'p1',
+  bookingType: 'HARD',
+  hours: 80,
+  startDate: '2026-06-01',
+  endDate: '2026-06-30',
+  ...over,
+});
+
+describe('plannedHoursInPeriod', () => {
+  it('период совпадает с бронью → 100% часов', () => {
+    // Jun 1..Jun 30 = 30 дней, overlap = 30 → все 80 ч
+    const period = mkPeriod('2026-06-01', '2026-06-30');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-30', period)).toBeCloseTo(80);
+  });
+
+  it('частичное перекрытие → пропорционально', () => {
+    // бронь Jun 1..Jun 30 (30 дн), период Jun 1..Jun 15 (15 дн) → 80 * 15/30 = 40
+    const period = mkPeriod('2026-06-01', '2026-06-15');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-30', period)).toBeCloseTo(40);
+  });
+
+  it('нет пересечения → 0', () => {
+    const period = mkPeriod('2026-07-01', '2026-07-31');
+    expect(plannedHoursInPeriod(80, '2026-06-01', '2026-06-30', period)).toBe(0);
+  });
+
+  it('null plannedEffort → 0', () => {
+    expect(plannedHoursInPeriod(null, '2026-06-01', '2026-06-30', mkPeriod('2026-06-01', '2026-06-30'))).toBe(0);
+  });
+
+  it('null startDate → 0', () => {
+    expect(plannedHoursInPeriod(80, null, '2026-06-30', mkPeriod('2026-06-01', '2026-06-30'))).toBe(0);
+  });
+
+  it('endDate < startDate → 0', () => {
+    expect(plannedHoursInPeriod(80, '2026-06-30', '2026-06-01', mkPeriod('2026-06-01', '2026-06-30'))).toBe(0);
+  });
+});
+
+describe('bookingHoursInPeriod', () => {
+  it('делегирует к plannedHoursInPeriod (HARD/полный период)', () => {
+    const b = mkBooking({ hours: 80, startDate: '2026-06-01', endDate: '2026-06-30' });
+    const period = mkPeriod('2026-06-01', '2026-06-30');
+    expect(bookingHoursInPeriod(b, period)).toBeCloseTo(80);
+  });
+
+  it('SOFT-бронь считается так же (тип не влияет на часы)', () => {
+    const b = mkBooking({ bookingType: 'SOFT', hours: 40 });
+    const period = mkPeriod('2026-06-01', '2026-06-30');
+    expect(bookingHoursInPeriod(b, period)).toBeCloseTo(40);
+  });
+
+  it('нет пересечения → 0', () => {
+    const b = mkBooking({ startDate: '2026-05-01', endDate: '2026-05-31' });
+    expect(bookingHoursInPeriod(b, mkPeriod('2026-06-01', '2026-06-30'))).toBe(0);
+  });
+});
+
+const bookEmp = (id: string, departmentId: string | null = 'd1'): EmployeeRef => ({
+  id,
+  departmentId,
+  name: 'Test',
+});
+
+describe('buildBookingCtx', () => {
+  const emp = bookEmp;
+
+  it('группирует брони по employeeId', () => {
+    const b1 = mkBooking({ id: 'b1', employeeId: 'e1' });
+    const b2 = mkBooking({ id: 'b2', employeeId: 'e1' });
+    const b3 = mkBooking({ id: 'b3', employeeId: 'e2' });
+    const ctx = buildBookingCtx([b1, b2, b3], [emp('e1'), emp('e2')], true);
+    expect(ctx.byEmployee.get('e1')).toHaveLength(2);
+    expect(ctx.byEmployee.get('e2')).toHaveLength(1);
+  });
+
+  it('бронь без employeeId пропускается', () => {
+    const b = mkBooking({ employeeId: null });
+    const ctx = buildBookingCtx([b], [], false);
+    expect(ctx.byEmployee.size).toBe(0);
+  });
+
+  it('includeSoft сохраняется в ctx', () => {
+    expect(buildBookingCtx([], [], true).includeSoft).toBe(true);
+    expect(buildBookingCtx([], [], false).includeSoft).toBe(false);
+  });
+
+  it('пустой массив броней → пустая Map', () => {
+    const ctx = buildBookingCtx([], [emp('e1')], true);
+    expect(ctx.byEmployee.size).toBe(0);
+  });
+});
+
+// ─── REQ-0004 C: бронь как слой Demand в deptLoadCells/employeeLoadCells ──────
+describe('deptLoadCells с бронями (REQ-0004 C)', () => {
+  // Период 5 дней; ёмкость отдела (headcount 5 × 40ч × 0.8) — пересчитывается из
+  // workHours. Берём период с workHours=40 → capacity = 40*5*0.8 = 160.
+  const periods = [period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40)];
+  // Бронь целиком внутри периода → все hours в этой колонке.
+  const book = (over: Partial<Booking> = {}): Booking =>
+    mkBooking({ startDate: '2026-01-01', endDate: '2026-01-05', ...over });
+
+  it('HARD-бронь суммируется в load (потребляет ёмкость)', () => {
+    const ctx = buildBookingCtx([book({ hours: 50, bookingType: 'HARD' })], [bookEmp('e1')], true);
+    const [c] = deptLoadCells(dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.load).toBeCloseTo(50);
+    expect(c.hardBooking).toBeCloseTo(50);
+    expect(c.softBooking).toBe(0);
+    expect(c.free).toBeCloseTo(160 - 50);
+  });
+
+  it('SOFT-бронь НЕ суммируется в load, но видна softBooking при includeSoft', () => {
+    const ctx = buildBookingCtx([book({ hours: 50, bookingType: 'SOFT' })], [bookEmp('e1')], true);
+    const [c] = deptLoadCells(dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.load).toBe(0);
+    expect(c.hardBooking).toBe(0);
+    expect(c.softBooking).toBeCloseTo(50);
+  });
+
+  it('SOFT скрыт когда includeSoft=false (softBooking=0)', () => {
+    const ctx = buildBookingCtx([book({ hours: 50, bookingType: 'SOFT' })], [bookEmp('e1')], false);
+    const [c] = deptLoadCells(dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.softBooking).toBe(0);
+    expect(c.load).toBe(0);
+  });
+
+  it('HARD-бронь + план суммируются; конфликт при Demand>ёмкости', () => {
+    // план проекта 100 на 10 дн → 50 в 5-дневном периоде; + HARD 150 → 200 > 160.
+    const ctx = buildBookingCtx([book({ hours: 150, bookingType: 'HARD' })], [bookEmp('e1')], true);
+    const [c] = deptLoadCells(dept(), [project()], periods, [], undefined, undefined, ctx);
+    expect(c.load).toBeCloseTo(200);
+    expect(c.conflict).toBe(true);
+  });
+
+  it('нет конфликта когда Demand ≤ ёмкости', () => {
+    const ctx = buildBookingCtx([book({ hours: 40, bookingType: 'HARD' })], [bookEmp('e1')], true);
+    const [c] = deptLoadCells(dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.conflict).toBe(false);
+  });
+
+  it('бронь сотрудника другого отдела не учитывается', () => {
+    const ctx = buildBookingCtx([book({ hours: 50 })], [bookEmp('e1', 'OTHER')], true);
+    const [c] = deptLoadCells(dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.hardBooking).toBe(0);
+  });
+
+  it('без bookingCtx — прежнее поведение (поля брони = 0/false)', () => {
+    const [c] = deptLoadCells(dept(), [], periods);
+    expect(c.hardBooking).toBe(0);
+    expect(c.softBooking).toBe(0);
+    expect(c.conflict).toBe(false);
+  });
+});
+
+describe('employeeLoadCells с бронями (REQ-0004 C)', () => {
+  const periods = [period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40)];
+  // Личная ёмкость = workHours(40) × factor(0.8) = 32.
+  const book = (over: Partial<Booking> = {}): Booking =>
+    mkBooking({ startDate: '2026-01-01', endDate: '2026-01-05', ...over });
+
+  it('HARD-бронь сотрудника входит в load (не делится на численность)', () => {
+    const ctx = buildBookingCtx([book({ hours: 20, bookingType: 'HARD' })], [bookEmp('e1')], true);
+    const [c] = employeeLoadCells(bookEmp('e1'), dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.hardBooking).toBeCloseTo(20);
+    expect(c.load).toBeCloseTo(20);
+  });
+
+  it('HARD-бронь > личной ёмкости → конфликт', () => {
+    const ctx = buildBookingCtx([book({ hours: 50, bookingType: 'HARD' })], [bookEmp('e1')], true);
+    const [c] = employeeLoadCells(bookEmp('e1'), dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.load).toBeCloseTo(50);
+    expect(c.conflict).toBe(true); // 50 > 32
+  });
+
+  it('SOFT не потребляет ёмкость сотрудника', () => {
+    const ctx = buildBookingCtx([book({ hours: 50, bookingType: 'SOFT' })], [bookEmp('e1')], true);
+    const [c] = employeeLoadCells(bookEmp('e1'), dept(), [], periods, [], undefined, undefined, ctx);
+    expect(c.load).toBe(0);
+    expect(c.softBooking).toBeCloseTo(50);
+    expect(c.conflict).toBe(false);
+  });
+});
+
+describe('summaryCells с бронями (REQ-0004 C)', () => {
+  it('суммирует hardBooking/softBooking; conflict по сумме Demand vs ёмкости', () => {
+    // cap 100+50=150, load 90+80=170 > 150 → conflict.
+    const a: LoadCell = { capacity: 100, load: 90, free: 10, ratio: 0.9, hardBooking: 30, softBooking: 10, conflict: false };
+    const b: LoadCell = { capacity: 50, load: 80, free: -30, ratio: 1.6, hardBooking: 20, softBooking: 5, conflict: true };
+    const [s] = summaryCells([[a], [b]], [period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40)]);
+    expect(s.hardBooking).toBe(50);
+    expect(s.softBooking).toBe(15);
+    expect(s.load).toBe(170);
+    expect(s.conflict).toBe(true); // 170 > 150
+  });
+
+  it('conflict=false когда суммарный Demand ≤ суммарной ёмкости', () => {
+    const a: LoadCell = { capacity: 100, load: 80, free: 20, ratio: 0.8, hardBooking: 0, softBooking: 0, conflict: false };
+    const [s] = summaryCells([[a]], [period('w', utc(2026, 0, 1), utc(2026, 0, 5), 40)]);
+    expect(s.conflict).toBe(false);
   });
 });

@@ -81,6 +81,21 @@ export type Absence = {
   endDate: string | null; // ISO
 };
 
+// REQ-0004 Часть C: бронь ёмкости ресурса (резерв человека под проект на период).
+// Самостоятельная ось данных (НЕ план-оценка, НЕ факт). hours раскидывается по
+// раб. дням периода (как план). type:
+//   HARD — потребляет ёмкость → в Demand наравне с планом (сплошная плашка);
+//   SOFT — НЕ потребляет → отдельный пунктирный слой (тумблер tentativeBookingEnabled).
+export type Booking = {
+  id: string;
+  employeeId: string | null;
+  projectId: string | null;
+  bookingType: 'SOFT' | 'HARD';
+  hours: number | null;
+  startDate: string | null; // ISO
+  endDate: string | null; // ISO
+};
+
 // День производственного календаря (для ёмкости недели).
 export type CalendarDay = {
   date: string; // YYYY-MM-DD
@@ -97,11 +112,21 @@ export type Period = {
 };
 
 // Ячейка загрузки отдела за период.
+// REQ-0004 Часть C: бронь учитывается как отдельный слой Demand.
+//   · hardBooking — часы HARD-броней периода. ВКЛЮЧЕНЫ в load (потребляют ёмкость,
+//     влияют на free/ratio/gap) и продублированы здесь как индикатор.
+//   · softBooking — часы SOFT-броней периода. НЕ включены в load (не потребляют);
+//     показываются отдельным пунктирным слоем (тумблер tentativeBookingEnabled).
+//   · conflict — true, если суммарный Demand (план + HARD-бронь) > ёмкости
+//     (овербукинг). Подсветка, НЕ блок.
 export type LoadCell = {
   capacity: number; // ёмкость (человеко-часы)
-  load: number; // плановая загрузка (человеко-часы)
+  load: number; // плановая загрузка + HARD-брони (человеко-часы) = Demand
   free: number; // свободно = ёмкость − загрузка (может быть < 0 при перегрузе)
   ratio: number | null; // load/capacity (null если ёмкость 0)
+  hardBooking: number; // часы HARD-броней (уже входят в load) — индикатор
+  softBooking: number; // часы SOFT-броней (НЕ входят в load) — пунктирный слой
+  conflict: boolean; // Demand > ёмкости (овербукинг) — подсветка
 };
 
 // Патч плана проекта (ввод руководителем). undefined-поля не трогаются.

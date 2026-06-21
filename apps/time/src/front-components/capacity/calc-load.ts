@@ -1,5 +1,6 @@
 import type {
   Absence,
+  Booking,
   CalendarDay,
   CapProject,
   DeptPlan,
@@ -184,8 +185,8 @@ export const deptCapacity = (
 
 // Раскид плановых часов РАВНОМЕРНО по календарным дням диапазона [startDate,
 // endDate], пересечённым с колонкой периода. Общая логика для проектов и плановых
-// загрузок отдела без проекта (REQ-0012).
-const plannedHoursInPeriod = (
+// загрузок отдела без проекта (REQ-0012), а также броней (REQ-0004 Часть C).
+export const plannedHoursInPeriod = (
   plannedEffort: number | null,
   startDate: string | null,
   endDate: string | null,
@@ -282,9 +283,119 @@ export const deptPlanHoursInPeriod = (
 ): number =>
   plannedHoursInPeriod(plan.plannedEffort, plan.startDate, plan.endDate, period);
 
+// ===========================================================================
+// REQ-0004 Часть C: БРОНЬ ёмкости ресурса (credosTimeBooking) как СЛОЙ Demand.
+// Инвариант Timetta (booking-concept/methods): бронь — отдельная ось (резерв),
+// НЕ план-оценка и НЕ факт. HARD потребляет ёмкость → суммируется к load (Demand)
+// наравне с планом; SOFT НЕ потребляет → отдельный пунктирный слой (тумблер
+// tentativeBookingEnabled). Овербукинг НЕ блокируется — показывается как конфликт.
+// Раскид hours — той же plannedHoursInPeriod (равномерно по дням периода брони).
+// ===========================================================================
+
+// Часы ОДНОЙ брони, попадающие в период (раскид hours по дням [startDate..endDate]).
+export const bookingHoursInPeriod = (booking: Booking, period: Period): number =>
+  plannedHoursInPeriod(booking.hours, booking.startDate, booking.endDate, period);
+
+// Суммарные часы броней (HARD и SOFT раздельно) для набора броней за период.
+export type BookingHours = { hard: number; soft: number };
+
+const sumBookingHours = (bookings: Booking[], period: Period): BookingHours => {
+  let hard = 0;
+  let soft = 0;
+  for (const b of bookings) {
+    const h = bookingHoursInPeriod(b, period);
+    if (h <= 0) continue;
+    if (b.bookingType === 'HARD') hard += h;
+    else soft += h;
+  }
+  return { hard, soft };
+};
+
+// Контекст броней, собираемый в UI один раз на загрузку доски. byEmployee —
+// брони, сгруппированные по employeeId (раскид по проектам не нужен: на доске
+// учитываем нагрузку ЧЕЛОВЕКА/ОТДЕЛА, не проекта). includeSoft зеркалит
+// settings.tentativeBookingEnabled — когда выкл, SOFT-слой не рисуем (но всё равно
+// считаем для индикатора=0 при выкл проще: фильтруем на показе, см. cells ниже).
+export type BookingCtx = {
+  byEmployee: Map<string, Booking[]>;
+  employees: EmployeeRef[]; // для агрегации по отделу (employeeId → departmentId)
+  includeSoft: boolean;
+};
+
+export const buildBookingCtx = (
+  bookings: Booking[],
+  employees: EmployeeRef[],
+  includeSoft: boolean,
+): BookingCtx => {
+  const byEmployee = new Map<string, Booking[]>();
+  for (const b of bookings) {
+    if (!b.employeeId) continue;
+    const arr = byEmployee.get(b.employeeId) ?? [];
+    arr.push(b);
+    byEmployee.set(b.employeeId, arr);
+  }
+  return { byEmployee, employees, includeSoft };
+};
+
+// Часы броней ОТДЕЛА за период = Σ броней его сотрудников (HARD/SOFT раздельно).
+const deptBookingHours = (
+  dept: DeptRef,
+  ctx: BookingCtx | undefined,
+  period: Period,
+): BookingHours => {
+  if (!ctx) return { hard: 0, soft: 0 };
+  let hard = 0;
+  let soft = 0;
+  for (const e of ctx.employees) {
+    if (e.departmentId !== dept.id) continue;
+    const bs = ctx.byEmployee.get(e.id);
+    if (!bs) continue;
+    const h = sumBookingHours(bs, period);
+    hard += h.hard;
+    soft += h.soft;
+  }
+  return { hard, soft };
+};
+
+// Часы броней ОДНОГО сотрудника за период (HARD/SOFT раздельно).
+const empBookingHours = (
+  employeeId: string,
+  ctx: BookingCtx | undefined,
+  period: Period,
+): BookingHours => {
+  if (!ctx) return { hard: 0, soft: 0 };
+  const bs = ctx.byEmployee.get(employeeId);
+  return bs ? sumBookingHours(bs, period) : { hard: 0, soft: 0 };
+};
+
+// Собрать LoadCell с учётом слоёв брони. planLoad — Demand плана (проекты+dept-plan).
+// HARD прибавляется к load (потребляет ёмкость); SOFT отдельно (не входит в load,
+// показывается, только если includeSoft). conflict = Demand > ёмкости.
+const composeCell = (
+  capacity: number,
+  planLoad: number,
+  booking: BookingHours,
+  includeSoft: boolean,
+): LoadCell => {
+  const hardBooking = booking.hard;
+  const softBooking = includeSoft ? booking.soft : 0;
+  const load = planLoad + hardBooking; // Demand (потребляющий ёмкость)
+  const conflict = capacity > 0 && load > capacity;
+  return {
+    capacity,
+    load,
+    free: capacity - load,
+    ratio: capacity > 0 ? load / capacity : null,
+    hardBooking,
+    softBooking,
+    conflict,
+  };
+};
+
 // Ячейки загрузки отдела по всем периодам. Загрузка = Σ часов проектов отдела +
-// Σ плановых загрузок отдела без проекта (REQ-0012). REQ-0013 13b: вклад проектов
-// считается по долям отделов (sharesByProject), с fallback на целый plannedEffort.
+// Σ плановых загрузок отдела без проекта (REQ-0012) + Σ HARD-броней (REQ-0004 C).
+// REQ-0013 13b: вклад проектов считается по долям отделов (sharesByProject), с
+// fallback на целый plannedEffort. bookingCtx опционален (без него — прежнее).
 export const deptLoadCells = (
   dept: DeptRef,
   projects: CapProject[],
@@ -292,17 +403,19 @@ export const deptLoadCells = (
   deptPlans: DeptPlan[] = [],
   ctx?: AbsenceCtx,
   sharesByProject?: Map<string, ProjectDeptShare[]>,
+  bookingCtx?: BookingCtx,
 ): LoadCell[] =>
   periods.map((period) => {
     const capacity = deptCapacity(dept, period, ctx);
-    let load = 0;
+    let planLoad = 0;
     for (const p of projects) {
-      load += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject);
+      planLoad += projectDeptHoursInPeriod(p, dept.id, period, sharesByProject);
     }
     for (const dp of deptPlans) {
-      if (dp.departmentId === dept.id) load += deptPlanHoursInPeriod(dp, period);
+      if (dp.departmentId === dept.id) planLoad += deptPlanHoursInPeriod(dp, period);
     }
-    return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
+    const booking = deptBookingHours(dept, bookingCtx, period);
+    return composeCell(capacity, planLoad, booking, bookingCtx?.includeSoft ?? false);
   });
 
 // Срез «по людям»: ячейки загрузки сотрудника. Личная ёмкость = рабочие часы
@@ -317,6 +430,7 @@ export const employeeLoadCells = (
   deptPlans: DeptPlan[] = [],
   ctx?: AbsenceCtx,
   sharesByProject?: Map<string, ProjectDeptShare[]>,
+  bookingCtx?: BookingCtx,
 ): LoadCell[] => {
   const factor = dept?.capacityFactor ?? 0.8;
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
@@ -339,8 +453,11 @@ export const employeeLoadCells = (
         if (dp.departmentId === dept.id) deptLoad += deptPlanHoursInPeriod(dp, period);
       }
     }
-    const load = deptLoad * share;
-    return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
+    // REQ-0004 C: личные брони сотрудника НЕ делятся на численность — это его
+    // персональный резерв (employee×проект). HARD → в Demand, SOFT → пунктир.
+    const planLoad = deptLoad * share;
+    const booking = empBookingHours(employee.id, bookingCtx, period);
+    return composeCell(capacity, planLoad, booking, bookingCtx?.includeSoft ?? false);
   });
 };
 
@@ -359,15 +476,30 @@ export const firstFreePeriod = (
 };
 
 // Сводная строка «Все отделы»: суммарная ёмкость/загрузка компании по периодам.
+// REQ-0004 C: суммируем и слои брони (hard/soft); conflict — если сумма Demand
+// превышает суммарную ёмкость.
 export const summaryCells = (perDept: LoadCell[][], periods: Period[]): LoadCell[] =>
   periods.map((_, i) => {
     let capacity = 0;
     let load = 0;
+    let hardBooking = 0;
+    let softBooking = 0;
     for (const cells of perDept) {
-      capacity += cells[i]?.capacity ?? 0;
-      load += cells[i]?.load ?? 0;
+      const c = cells[i];
+      capacity += c?.capacity ?? 0;
+      load += c?.load ?? 0;
+      hardBooking += c?.hardBooking ?? 0;
+      softBooking += c?.softBooking ?? 0;
     }
-    return { capacity, load, free: capacity - load, ratio: capacity > 0 ? load / capacity : null };
+    return {
+      capacity,
+      load,
+      free: capacity - load,
+      ratio: capacity > 0 ? load / capacity : null,
+      hardBooking,
+      softBooking,
+      conflict: capacity > 0 && load > capacity,
+    };
   });
 
 // Детализация: вклад каждого проекта отдела по периодам (только с планом/датами).

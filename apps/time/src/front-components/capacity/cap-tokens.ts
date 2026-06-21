@@ -87,6 +87,30 @@ export const avgRatio = (cells: LoadCell[]): number | null => {
   return valid.reduce((s, c) => s + (c.ratio ?? 0), 0) / valid.length;
 };
 
+// ─── REQ-0004 Часть C: индикатор брони в ячейке ──────────────────────────────
+// Бронь — отдельный слой Demand, показывается ПОД основным значением ячейки тихой
+// подстрокой (не badge, не цвет-заливка — заливка уже несёт load-тон). HARD —
+// сплошная (потребляет ёмкость, входит в load); SOFT — пунктир + приглушённо
+// (не потребляет, тумблер). Конфликт (Demand>ёмкости) — тонкая терракот-обводка
+// + знак ▲, без смены заливки. impeccable: quiet, дублирование не-цветом (a11y).
+export const BOOK_INK = '#5b6472'; // приглушённый HARD-текст (тон нейтрали)
+export const BOOK_SOFT_INK = '#8a93a3'; // ещё тише — SOFT
+export const CONFLICT_RING = '#b3401a'; // та же терракот-семантика перегруза
+
+// Метка-подстрока брони: «📌4 ⋯2» (HARD 4ч, SOFT 2ч). Возвращает части, чтобы UI
+// мог стилизовать SOFT пунктиром. Пусто, если броней нет.
+export const bookingParts = (
+  cell: LoadCell,
+): { hard: number; soft: number; has: boolean } => {
+  const hard = Math.round(cell.hardBooking);
+  const soft = Math.round(cell.softBooking);
+  return { hard, soft, has: hard > 0 || soft > 0 };
+};
+
+// Обводка конфликта (овербукинг) — inset-тень, поверх любой заливки. '' если нет.
+export const conflictShadow = (cell: LoadCell): string =>
+  cell.conflict ? `inset 0 0 0 1.5px ${CONFLICT_RING}` : '';
+
 // Значение ячейки по выбранной метрике. Свободно — со знаком (+можно взять / −перегруз).
 export const formatCell = (metric: CellMetric, cell: LoadCell): string => {
   if (cell.capacity <= 0) return '';
