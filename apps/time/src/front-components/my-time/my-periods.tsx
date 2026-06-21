@@ -38,34 +38,39 @@ const StatusBadge = ({ status }: { status: WeekSummary['status'] }) => {
 };
 
 const Row = ({ w }: { w: WeekSummary }) => (
-  <div
-    style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      padding: '11px 14px',
-      borderBottom: `1px solid ${T.border}`,
-    }}
-  >
-    <span style={{ fontSize: 13, color: T.text, fontWeight: 500, minWidth: 170 }}>
-      {fmtRange(w.weekStart, w.weekEnd)}
-    </span>
-    <span
-      style={{
-        fontSize: 13,
-        color: T.text,
-        fontVariantNumeric: 'tabular-nums',
-        minWidth: 64,
-      }}
-    >
-      {fmtHrs(w.hours)} ч
-    </span>
-    <span style={{ fontSize: 12, color: T.textFaint, minWidth: 90 }}>
-      {w.count} {w.count === 1 ? 'запись' : 'записей'}
-    </span>
-    <span style={{ marginLeft: 'auto' }}>
-      <StatusBadge status={w.status} />
-    </span>
+  <div style={{ borderBottom: `1px solid ${T.border}` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px 8px' }}>
+      <span style={{ fontSize: 13, color: T.text, fontWeight: 500, minWidth: 170 }}>
+        {fmtRange(w.weekStart, w.weekEnd)}
+      </span>
+      <span style={{ fontSize: 13, color: T.text, fontVariantNumeric: 'tabular-nums', minWidth: 64 }}>
+        {fmtHrs(w.hours)} ч
+      </span>
+      <span style={{ fontSize: 12, color: T.textFaint, minWidth: 90 }}>
+        {w.count} {w.count === 1 ? 'запись' : 'записей'}
+      </span>
+      <span style={{ marginLeft: 'auto' }}>
+        <StatusBadge status={w.status} />
+      </span>
+    </div>
+    {/* UC-APR-05: причина отклонения — что исправить. {text} экранирован React (XSS-safe). */}
+    {w.rejectComment && (
+      <div
+        style={{
+          margin: '0 14px 11px',
+          padding: '7px 10px',
+          background: T.overSoft,
+          borderRadius: 8,
+          borderLeft: `2px solid ${T.over}`,
+          fontSize: 12,
+          color: T.text,
+          lineHeight: 1.45,
+        }}
+      >
+        <span style={{ fontWeight: 600, color: T.over }}>Причина отклонения: </span>
+        {w.rejectComment}
+      </div>
+    )}
   </div>
 );
 

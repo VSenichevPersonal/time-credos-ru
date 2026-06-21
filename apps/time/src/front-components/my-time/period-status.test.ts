@@ -85,4 +85,49 @@ describe('summarizeWeeks', () => {
     ]);
     expect(weeks[0].hours).toBe(0.3); // 0.1 + 0.2 = 0.30000000000000004 → round2
   });
+
+  it('UC-APR-05: rejectComment из первой REJECTED-записи (не null)', () => {
+    const e = (date: string, status: string, rejectComment?: string): ApiEntry => ({
+      id: `${date}-rc`,
+      date,
+      hours: 8,
+      description: null,
+      status,
+      projectId: 'p1',
+      workTypeId: 'w1',
+      employeeId: 'e1',
+      rejectComment: rejectComment ?? null,
+    });
+    const weeks = summarizeWeeks([
+      e('2026-06-15T10:00:00.000Z', 'REJECTED', 'Часы завышены'),
+      e('2026-06-16T10:00:00.000Z', 'REJECTED', 'Второй комментарий'),
+    ]);
+    expect(weeks[0].rejectComment).toBe('Часы завышены');
+    expect(weeks[0].status).toBe(ENTRY_STATUS.REJECTED);
+  });
+
+  it('UC-APR-05: rejectComment = null если нет REJECTED-записей', () => {
+    const weeks = summarizeWeeks([
+      entry('2026-06-15T10:00:00.000Z', 8, 'APPROVED'),
+    ]);
+    expect(weeks[0].rejectComment).toBeNull();
+  });
+
+  it('UC-APR-05: REJECTED-запись без rejectComment текста — не попадает в список', () => {
+    const e = (date: string, status: string, rejectComment?: string): ApiEntry => ({
+      id: `${date}-rc2`,
+      date,
+      hours: 8,
+      description: null,
+      status,
+      projectId: 'p1',
+      workTypeId: 'w1',
+      employeeId: 'e1',
+      rejectComment: rejectComment ?? null,
+    });
+    const weeks = summarizeWeeks([
+      e('2026-06-15T10:00:00.000Z', 'REJECTED'), // без текста
+    ]);
+    expect(weeks[0].rejectComment).toBeNull();
+  });
 });
