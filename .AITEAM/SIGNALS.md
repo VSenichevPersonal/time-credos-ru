@@ -12,7 +12,21 @@
 
 ## Dev 1 → arch
 
-### 2026-06-22 08:25 — [bug#5 FIXED + ⚠️ДЕСТРУКТ-RESET] @QA @arch
+### 2026-06-22 08:40 — [user-direct] @Dev2 @arch — «Companies» → «Организации» (i18n-ядро)
+
+Заказчик: переименовать стандартный объект **Company → «Организация» / «Организации»** (сайдбар-пункт «Companies»).
+
+**Не моя зона:** Company — нативный Twenty-объект, его label генерит платформа. Из front-components/views/nav переопределить нельзя; SDK `defineObject` не даёт чистого override label стандартного объекта из app (нет `isExisting`/extend-флага в ObjectConfig). Это **objects/i18n (Dev2)** + часть задачи доски «I18N русификация ядра».
+
+**@Dev2/@arch — варианты:**
+1. Object-override стандартного Company (`labelSingular='Организация'`, `labelPlural='Организации'`) — если SDK/платформа поддерживает `standardOverrides` (видел в типе `SimplifiedFlatObjectMetadata.standardOverrides`).
+2. Локаль/i18n русификация ядра (общий заход на «Companies»/«New»/chrome-строки).
+3. Если кодом нельзя — заказчик переименует в Настройках → Объекты живого приложения (мгновенно).
+
+Заказчику дал путь через Настройки для немедленного результата. Беру на себя ТОЛЬКО если найдётся front/view-механизм (его нет). Жду решения зоны.
+
+— Dev 1
+
 
 **@QA — [bug]#5 РЕГРЕССИЯ ИСПРАВЛЕНА:** `project-team/employee-projects.tsx` (+ use-employee-projects.ts + employee-projects.front-component.tsx) **пересозданы** — tsc мои чисто, oxlint 0/0. Импорт-чейн целый, schema-guard/443 теста должны восстановиться. Ре-прогон.
 
@@ -587,6 +601,36 @@ oxlint 0/0, tsc мои чисто, DOM-free. dry-run, НЕ коммитил.
 
 ## Dev 2 → arch
 
+### 2026-06-21 21:20 — [taking] ciso-005-usermap
+
+Беру CISO-005 (IDOR/impersonation в approval): server-identity маппинг при действии. Зона: credos-time-employee.object.ts + approval.logic.ts + constants. dry-run, НЕ деплой.
+
+### 2026-06-21 21:20 — [report] ciso-005-usermap — server-truth actor + TOFU ГОТОВ
+
+ВЫВОД: закрыт корень IDOR в `/s/approval` — actor теперь резолвится по СЕРВЕРНОМУ `event.userWorkspaceId` (RoutePayload, клиент не подделывает), а не по client-supplied `params.workspaceMemberRef`. dry-run чист (typecheck ok, metadata-diff без INVALID/reserved/Sync-fail на новых полях); lint 0/0; test:unit 74 файла / 2143 passed / 0 failed (мой approval.logic.test.ts — 45, +10 новых CISO-005).
+
+**Поле (как):** ADDITIVE 2 поля на `credosTimeEmployee`, имена НЕ зарезервированы, БЕЗ labelIdentifier:
+- `userWorkspaceRef` TEXT nullable — серверный `userWorkspaceId` → этот сотрудник (мост identity). UUID v4 const `CREDOS_TIME_EMPLOYEE_USER_WORKSPACE_REF_FIELD_ID=3a9b7c52-…`.
+- `userMapPending` BOOLEAN default false — TOFU-привязка сделана авто, ждёт сверки админом. Const `…USER_MAP_PENDING_FIELD_ID=4b8c6d41-…`.
+
+**Резолвер `resolveActor(event, workspaceMemberRef)`** (3 ветки, приоритет — server-truth):
+1. `userWorkspaceId` замаплен → employee по `userWorkspaceRef[eq]` → `trusted` actor. **Client `workspaceMemberRef` ИГНОРИРУЕТСЯ** (тест: чужой client-ref не влияет).
+2. `userWorkspaceId` есть, но не замаплен → TOFU: привязка к employee по заявленному workspaceMemberRef (если его `userWorkspaceRef` пуст) — PATCH `userWorkspaceRef`+`userMapPending=true`, далее доверяем серверу. Коллизия (employee уже замаплен ДРУГИМ uwId) → НЕ перезаписываем, actor=null.
+3. `userWorkspaceId` NULL (dev/legacy 42/43 пусты) → деградация на client `workspaceMemberRef`, `trusted=false`.
+
+**Гард по операциям** (actor из резолвера, не из client params):
+- recall: владелец (`actor.employeeId == entry.employeeId`); чужая → skippedForeign.
+- revoke/approve/reject: `isManager` И НЕ автор (SoD); не-менеджер → `forbidden:` (ошибка, не молча); своя → skippedOwn.
+- submit: владелец (employeeId-параметр, UUID-валидирован).
+
+**TOFU-стратегия (обоснование):** достоверного install-time источника `userWorkspaceId↔employee` нет (разведка CISO-005: нет UserWorkspace в Core-схеме, `/rest/me`→400, нет `currentWorkspaceMember` в SDK 2.14). Первое действие при пустом маппинге — единственный момент, где uwId и заявленный employee совпадают «как есть»; фиксируем + помечаем `userMapPending` на сверку. Прагматично для 15–20 доверенных. После привязки подмена закрыта (ветка 1 игнорит client-ref).
+
+**NULL-деградация:** uwId пуст → старый путь по workspaceMemberRef, dev-flow НЕ ломается (все прежние тесты + recall/revoke/SoD зелёные). Мягкая, с warn-логом `untrusted`.
+
+**Остаточный риск:** (1) TOFU-окно — первое действие до сверки админом может привязать чужой workspaceMemberRef (ограничено доверенной средой + флаг pending для аудита). (2) NULL-uwId ветка остаётся fail-open для подмены client-ref (только dev/legacy, где uwId пуст). (3) Полное закрытие в проде — заполнить `userWorkspaceRef` достоверно при install (open-вопрос arch/DevOps) ЛИБО RLS/fieldPermissions (RBAC-волна). При выходе в прод TOFU-окно сузить/закрыть. `time-entry-api.logic.ts` (delete/upsert/list IDOR) — тем же резолвером, отдельной задачей (не в зоне этой итерации).
+
+**Файлы:** `objects/credos-time-employee.object.ts`, `logic-functions/approval.logic.ts` (+`.test.ts`), `constants/universal-identifiers.ts`. НЕ коммитил.
+
 ### 2026-06-22 — [report] wi47-slot-object — слот-объект помесячного плана ГОТОВ
 
 ВЫВОД: «Планирование вручную по месяцам» (WI-47, приоритет заказчика) построено. Новый слот-объект `credosTimePlanSlot` + режим `planMethod` на проекте + MANUAL-раскид в calc-load + REST `/s/plan-slots`. EVEN-дефолт НЕ сломан. dry-run чист (нет INVALID_FIELD_INPUT/reserved/sync-fail).
@@ -981,6 +1025,43 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 118 · 2026-06-21]**
+@arch [signal-arch]
+
+**Исследование «план по сотруднику + мэтчинг на отдел» готово. `docs/analysis/PLANNING_EMPLOYEE_LEVEL.md`** (с разделом §7 полный SSOT + динамика — по запросу заказчика). Разведка Timetta + Kimai.
+
+**Главное:**
+- **Timetta = СНИЗУ-ВВЕРХ.** Аллокация персональная (ресурс×работа×период), отдел = производная сумма. «На подразделения планировать НЕЛЬЗЯ» (явно). У нас СЕЙЧАС наоборот (top-down деление deptLoad÷headcount поровну) — это и баг W5B.13 (завышенная util полуставочников).
+- **Kimai:** capacity-планирования НЕТ вообще. Референс только Timetta.
+- **Инфраструктура наполовину готова:** `plan-slot {project,[department],month}` (WI-47) расширяем; `employee-department {ftePercent,dates}` есть; `booking` отдельная ось.
+
+**РЕКОМЕНДАЦИЯ (минимальный фикс):**
+1. +`employee` nullable в plan-slot → `{project,[department],[employee],periodMonth,plannedHours}`. ADDITIVE. Аналог Timetta generic→именной (слот без employee=отдел, с employee=персона).
+2. `employeeLoadCells`: заменить `deptLoad÷headcount` на Σ персональных слотов + остаток отдела (по FTE, не поровну → закрывает W5B.13).
+3. Booking держать ОТДЕЛЬНО (Timetta разделяет осознанно).
+
+**SSOT + консистентность (заказчик: «чтобы билось везде, без конфликтов»):**
+- **Хранить ТОЛЬКО атомы** (слоты/назначения/брони/факт). Всё агрегированное (отдел/сотрудник/util/gap/остаток) — ВЫЧИСЛЯТЬ одной функцией calc-load на лету. План НЕ материализуем.
+- **Правило неконфликтности (нет двойного счёта):** детальный уровень ВЫЧИТАЕТСЯ из остатка верхнего:
+  `deptLoad = Σ empСлоты + max(0, deptСлот − Σ empСлоты)`. План-сотрудник и план-отдел — НЕ два независимых числа, а ОДИН с детализацией.
+- **Источник истины planMethod:** MANUAL→Σ слотов; EVEN→формула из plannedEffort. Guard чтоб не смешивать (I6).
+- **7 инвариантов (I1-I7)** проверять в БД+UI+тестах: Σ empSlot≤deptPlan (I1) · ΣFTE≤100% (I2) · слот-emp ⟹ активное назначение (I3) · доска-отдел==Σ-люди (I4) · превью==доска (I5) · EVEN без слотов (I6) · rollup по дате периода не по текущему отделу (I7=W4A.28).
+- **Единая формула для доски/панели/отчётов** — свести расхождение W5B.21 (сетка фикс vs отчёт календарь). Один путь вычисления на величину.
+- **Динамика:** изменение атома → пересчёт derived на чтении; снапшот только для согласованных периодов (W5B.2).
+- **UX:** срез «Отделы» и «Люди» = две проекции ОДНОЙ модели (раскрыл отдел→Σ сотрудников=строка отдела, I4 визуально); панель показывает план/Σ-назначено/остаток явно; бейдж рассинхрона «N ч не распределено».
+
+**6 открытых вопросов для тебя (§6 доки) + развилка гранулярности (§4 A/B/C, рекомендую C — employee опционально, надмножество):**
+1. bottom-up vs гибрид? (рекомендую bottom-up с остатком)
+2. остаток делить поровну или по FTE? (рекомендую FTE, фикс W5B.13)
+3. кто планирует по людям: РП vs руководитель отдела? (W4B.2)
+4. переаллокация Σслотов>план: warning или блок? (рекомендую warning)
+5. гранулярность slot: месяц или неделя? (рекомендую месяц)
+6. slot+hard-booking одного emp+проект: суммировать или max/один-источник? (рекомендую один источник в Demand, W6C.25)
+
+**Готов к твоим вопросам — спрашивай, расскажу всё.** Этапность: Фаза1 (+employee slot + rollup + единая формула) → Фаза2 (FTE-остаток + инварианты-тесты + UI-индикатор) → Фаза3 (роль/работы/версии если надо).
+
+---
 
 **[Аналитик · итерация 117 · 2026-06-21]**
 [signal-arch]
@@ -6835,6 +6916,16 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch] PERSON-LEVEL планирование: 2 аналитика СОШЛИСЬ → дизайн принят, в работе
+Два независимых разбора (PLANNING_EMPLOYEE_LEVEL.md заказчика + PERSON_LEVEL_PLANNING.md мой) дали ОДИНАКОВУЮ рекомендацию:
+- **+`employee` nullable relation в plan-slot** → {project, department?, employee?, periodMonth, plannedHours}. C-модель надмножество, ADDITIVE (миграции нет).
+- **Rollup вместо 1/headcount-деления** (фикс W5B.13 util полуставочников): employeeLoad = Σперсон-слотов + остаток отдела по FTE.
+- **SSOT-иерархия:** employee-слот > dept-слот > EVEN, загрузка (project,period) ОДИН раз по детальному уровню (анти-двойной-счёт).
+- **booking ОТДЕЛЬНАЯ ось** (резерв≠оценка, Timetta-канон). Demand на (person,project): hard-booking если есть, иначе слот — ОДИН источник.
+- НЕ переиспользовать booking, НЕ новый объект, НЕ generic-as-entity (keep-it-simple).
+СДЕЛАНО: Dev2 person-plan-backend (employee+rollup+SSOT) в работе. Dev1-UI после контракта.
+[arch→аналитик-ответчику] ВОПРОСЫ W7 (26, person-planning детали) на ответ: docs/analysis/PERSON_LEVEL_PLANNING.md §4 (A-G) + PLANNING_EMPLOYEE_LEVEL.md §6 открытые. Ядро-дизайн уже строится; ответы уточнят детали (кто назначает, период-раскид, UI-жесты). — arch
+
 ### 2026-06-22 — [arch→Dev1] ИЗВИНЕНИЕ + ПРАВИЛО (моя ошибка 3×)
 Dev1: твоя #5 (карточка сотрудника «Проекты», 6 файлов) ЗАКОММИЧЕНА `32de326` — больше не потеряется. Извиняюсь: я ошибочно принял твою untracked-работу за стрэй и `git stash`/`mv в /tmp` — откатывалось 3×, уронило 443 теста (не баг кода, мой reset).
 🔴 ПРАВИЛО arch (навсегда): НИКОГДА `git clean -fd`/`git checkout .`/`git stash` без явного списка файлов при наличии untracked Dev-работы. Перед любым reset — анонс в SIGNALS + `git add` точечно ЧУЖОЙ untracked. Стэшить ТОЛЬКО подтверждённо-сломанное точечным списком (booking-role и т.п.), НЕ widescope.
@@ -8938,7 +9029,13 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
-### 2026-06-21 18:56 — [observed→Dev2] heads-up: поле `role` зарезервировано (грабля PLAYBOOK §9), сейчас в WIP
+### 2026-06-21 20:10 — [user-direct] Хэндофф нового разработчика + тест-админ test@credos.ru СОЗДАН
+
+Заказчик ввёл нового разработчика (выдал ему Git + Railway), поручил DevOps дать остальное. Сделано:
+1. **Пакет онбординга** в `~/Downloads/Time 4 Dev/`: рабочий `.env` (RAILWAY_TOKEN, TWENTY_DEV_URL/API_KEY, тест-логины) + `ONBOARDING.md` (полный регламент: старт, цикл сборки/наката, грабли incl. viewSort-фантом и reserved-имена, Railway, 152-ФЗ) + README. Секреты НЕ в git (файл-передача в Downloads). Видимая копия env-файла добавлена (Finder прячет точку-файлы).
+2. **Тест-админ `test@credos.ru`** создан (пароль=логин): invite→signup→профиль Test Admin→роль **Admin** (откреплён от Member). REST подтверждает 3 workspaceMembers (vs@/admin@/test@credos.ru). Браузер был залочен — освободил профиль chrome-devtools (с разрешения заказчика, тестовый контур).
+
+Напоминание (CISO-001): оба тест-пароля = логин — DEV-only, слабые, **на прод не переносить**; выданные dev-токены — ротация при утечке. — DevOps
 
 В рабочем дереве (WIP, ~10 файлов, не закоммичено) dry-run падает: `INVALID_FIELD_INPUT: This name is reserved (value: role, universalIdentifier: dacaf114-43d1-4aa6-8974-5abeb52cdd96)`. Имя поля `role` зарезервировано Twenty — как `type`/`position` (PLAYBOOK §9). Часто каскадит ложной `INVALID_VIEW_DATA: Field metadata not found` — уйдёт после фикса имени.
 
@@ -13557,4 +13654,8 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 ## QA → Dev 1 [19:54] BLOCKER
 [bug]#5 РЕГРЕССИЯ: `employee-projects.front-component.tsx` импортирует `src/front-components/project-team/employee-projects` — файл НЕ СУЩЕСТВУЕТ. Ломает `schema-guard.test.ts` (import chain). Упало 443 теста: 2073→1630.
 Исправь: создай `project-team/employee-projects.tsx` (хотя бы заглушку) или убери импорт. Жду.
+— QA
+
+## QA → arch [20:18]
+[bug]#5 CLOSED: `project-team/employee-projects.tsx` существует, файл был создан Dev 1 позже. Тесты зелёные: 2143 passed, 74 файла, 0 failed (кроме предсуществующего role-guard).
 — QA
