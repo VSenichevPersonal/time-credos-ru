@@ -2,13 +2,16 @@ import { definePageLayout, PageLayoutTabLayoutMode } from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_DEPARTMENT_CARD_EMPLOYEES_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_CARD_OVERVIEW_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_CARD_PROJECTS_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RECORD_PAGE_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RP_TAB_EMPLOYEES_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_RP_TAB_OVERVIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RP_TAB_PROJECTS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RP_W_EMPLOYEES_REGISTRY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RP_W_EMPLOYEES_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_DEPARTMENT_RP_W_OVERVIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RP_W_PROJECTS_REGISTRY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_DEPARTMENT_RP_W_PROJECTS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_EMPLOYEE_DEPARTMENT_VIEW_UNIVERSAL_IDENTIFIER,
@@ -33,12 +36,38 @@ export default definePageLayout({
   type: 'RECORD_PAGE',
   objectUniversalIdentifier: CREDOS_TIME_DEPARTMENT_OBJECT_UNIVERSAL_IDENTIFIER,
   tabs: [
-    // 0. Сотрудники — FTE-назначения отдела (обратная связь employeeAssignments).
+    // 0. Обзор — реквизиты отдела: руководитель (head → Employee) + вышестоящий
+    // отдел (parentDepartment self). Нативные relation-поля (выбор+правка из
+    // коробки). REQ-0018 follow-up. Иерархия зеркалит Timetta «Входит в».
+    {
+      universalIdentifier:
+        CREDOS_TIME_DEPARTMENT_RP_TAB_OVERVIEW_UNIVERSAL_IDENTIFIER,
+      title: 'Обзор',
+      position: 0,
+      icon: 'IconInfoCircle',
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier:
+            CREDOS_TIME_DEPARTMENT_RP_W_OVERVIEW_UNIVERSAL_IDENTIFIER,
+          title: 'Руководитель и иерархия',
+          type: 'FIELDS',
+          gridPosition: { row: 0, column: 0, rowSpan: 4, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_DEPARTMENT_CARD_OVERVIEW_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: false,
+          },
+        },
+      ],
+    },
+    // 1. Сотрудники — FTE-назначения отдела (обратная связь employeeAssignments).
     {
       universalIdentifier:
         CREDOS_TIME_DEPARTMENT_RP_TAB_EMPLOYEES_UNIVERSAL_IDENTIFIER,
       title: 'Сотрудники',
-      position: 0,
+      position: 1,
       icon: 'IconUsersGroup',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [
@@ -68,12 +97,12 @@ export default definePageLayout({
         },
       ],
     },
-    // 1. Проекты — доли отдела в проектах (обратная связь projectShares).
+    // 2. Проекты — доли отдела в проектах (обратная связь projectShares).
     {
       universalIdentifier:
         CREDOS_TIME_DEPARTMENT_RP_TAB_PROJECTS_UNIVERSAL_IDENTIFIER,
       title: 'Проекты',
-      position: 1,
+      position: 2,
       icon: 'IconChartPie',
       layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
       widgets: [

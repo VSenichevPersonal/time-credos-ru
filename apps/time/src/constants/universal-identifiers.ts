@@ -547,6 +547,12 @@ export const CREDOS_TIME_EMPLOYEE_CARD_VF_1 =
   '9e92acc8-6dca-41dd-8a3e-312b7c5183a6';
 export const CREDOS_TIME_EMPLOYEE_CARD_VF_2 =
   '425cf91a-05f3-489b-bb7a-f20a442d3f94';
+// REQ-0018 follow-up. View-field «Руководит отделами» (headedDepartments,
+// ONE_TO_MANY обратная сторона credosTimeDepartment.head) во вкладке «Отделы»
+// карточки сотрудника. Read-only список возглавляемых отделов (правка head — в
+// карточке отдела, вкладка «Обзор»).
+export const CREDOS_TIME_EMPLOYEE_CARD_VF_5 =
+  '0cfca133-16ea-43fd-94a8-d3e25958935d';
 
 // Post-install бэкфилл REQ-0013 13a: project.departmentId → доля 100% в join.
 // ЕДИНСТВЕННАЯ post-install функция приложения (SDK берёт E[0]) — будущие
@@ -630,6 +636,21 @@ export const CREDOS_TIME_DEPARTMENT_CARD_VF_3 =
   '080d5470-6d57-4707-99e5-c5f8d046477f';
 export const CREDOS_TIME_DEPARTMENT_CARD_VF_4 =
   'e3ceb357-faff-41db-a58c-e303a33ec126';
+// REQ-0018 follow-up. Вкладка «Обзор» карточки отдела: руководитель (head →
+// Employee) + вышестоящий отдел (parentDepartment self) — нативные relation-поля
+// (выбор+правка из коробки). + card-view «Отдел — обзор» и его view-fields.
+export const CREDOS_TIME_DEPARTMENT_RP_TAB_OVERVIEW_UNIVERSAL_IDENTIFIER =
+  '12e2b2bc-0493-4cc0-84d4-4012ae17393f';
+export const CREDOS_TIME_DEPARTMENT_RP_W_OVERVIEW_UNIVERSAL_IDENTIFIER =
+  '9d6e535c-c849-4345-8eab-06b9652d6c0e';
+export const CREDOS_TIME_DEPARTMENT_CARD_OVERVIEW_VIEW_UNIVERSAL_IDENTIFIER =
+  'e2e5218b-c2cc-4d82-a9f2-f43895555ca0';
+export const CREDOS_TIME_DEPARTMENT_CARD_OVF_1 =
+  'ae6c6208-36bc-4cb5-a399-535a4c0b7241';
+export const CREDOS_TIME_DEPARTMENT_CARD_OVF_2 =
+  '7e01b427-c90b-46db-801e-37b4a6dc81d7';
+export const CREDOS_TIME_DEPARTMENT_CARD_OVF_3 =
+  'b8e663cd-cf4f-4ad0-9fc6-6dae4d8eac2d';
 
 // Карточка сотрудника — вкладка «Трудозатраты» (relation timeEntries,
 // ONE_TO_MANY). Записи сотрудника инлайн-таблицей, кликабельно в карточку записи
