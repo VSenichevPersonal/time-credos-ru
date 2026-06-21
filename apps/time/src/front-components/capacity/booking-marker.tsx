@@ -37,8 +37,11 @@ export const BookingMarker = ({ cell }: Props) => {
       )}
       {soft > 0 && (
         <span
-          title={`Бронь (предварительная, SOFT): ${soft} ч — не потребляет ёмкость`}
+          title={`Бронь (предварительная, SOFT): ${soft} ч — не потребляет ёмкость, учтена отдельным слоем (не в спросе)`}
           style={{
+            // RG-приём SSOT-визуал: SOFT учтена «в другом месте» (отдельный слой,
+            // не в Demand) → приглушаем opacity, чтобы глаз не складывал её в загрузку.
+            opacity: 0.55,
             color: BOOK_SOFT_INK,
             borderBottom: `1px dashed ${BOOK_SOFT_INK}`,
             paddingBottom: 1,

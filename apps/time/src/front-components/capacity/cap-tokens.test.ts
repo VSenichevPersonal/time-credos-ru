@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { loadTone, formatPct, formatCell, gapHours, gapPct, gapTone, gapIcon, formatGap, formatGapHours, formatGapPctShort, colWidth, COL_W, COL_W_GAP, childCell } from './cap-tokens';
+import { loadTone, formatPct, formatCell, gapHours, gapPct, gapTone, gapIcon, formatGap, formatGapHours, formatGapPctShort, colWidth, COL_W, COL_W_GAP, childCell, overbookTip } from './cap-tokens';
 import type { LoadCell } from './types';
 
 const cell = (capacity: number, load: number): LoadCell => ({
@@ -11,6 +11,12 @@ const cell = (capacity: number, load: number): LoadCell => ({
   hardBooking: 0,
   softBooking: 0,
   conflict: false,
+});
+
+// Ячейка-перегруз: тот же, но с conflict=true (Demand>ёмкости).
+const overCell = (capacity: number, load: number): LoadCell => ({
+  ...cell(capacity, load),
+  conflict: true,
 });
 
 // ─── loadTone ─────────────────────────────────────────────────────────────
@@ -210,5 +216,24 @@ describe('childCell (метрика проекта/плана внутри ра�
     for (const m of ['plan', 'pct', 'gap', 'free'] as const) {
       expect(childCell(m, 0, 160)).toBe('');
     }
+  });
+});
+
+// ─── overbookTip (W6C.23 RG elastic-overtime: разбивка перегруза для тултипа) ──
+describe('overbookTip', () => {
+  it('нет конфликта → пусто (даже если load > capacity без флага)', () => {
+    expect(overbookTip(cell(160, 200))).toBe(''); // conflict=false
+  });
+
+  it('конфликт → «Перегруз: спрос / ёмкость (+превышение)» по-русски, целые часы', () => {
+    expect(overbookTip(overCell(160, 200))).toBe('Перегруз: 200 ч спрос / 160 ч ёмкость (+40 ч)');
+  });
+
+  it('округляет дробные часы', () => {
+    expect(overbookTip(overCell(159.6, 200.4))).toBe('Перегруз: 200 ч спрос / 160 ч ёмкость (+41 ч)');
+  });
+
+  it('дробный перегруз < 1 ч → показывает «+1 ч» (не «+0 ч»)', () => {
+    expect(overbookTip(overCell(160, 160.4))).toBe('Перегруз: 160 ч спрос / 160 ч ёмкость (+1 ч)');
   });
 });

@@ -1,4 +1,4 @@
-import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow, overbookTip } from 'src/front-components/capacity/cap-tokens';
 import type { CellMetric, LoadCell, Period } from 'src/front-components/capacity/types';
 
 // Сводная строка «Все отделы»: суммарная загрузка компании по периодам.
@@ -47,7 +47,7 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
       return (
         <div
           key={p.key}
-          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${isGap ? ` · баланс ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ' · ⚠ овербукинг' : ''}`}
+          title={`${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${isGap ? ` · баланс ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ` · ⚠ ${overbookTip(cell)}` : ''}`}
           style={{
             flex: 1,
             minWidth: colWidth(metric),
@@ -67,7 +67,7 @@ export const SummaryRow = ({ cells, periods, nameWidth, metric }: Props) => (
           }}
         >
           {icon && <span aria-hidden style={{ fontSize: isGap ? 8 : 9, alignSelf: 'center' }}>{icon}</span>}
-          {cell.conflict && <span aria-hidden title="Овербукинг" style={{ fontSize: isGap ? 8 : 9, alignSelf: 'center', color: T.over }}>▲</span>}
+          {cell.conflict && <span aria-hidden title={overbookTip(cell)} style={{ fontSize: isGap ? 8 : 9, alignSelf: 'center', color: T.over }}>▲</span>}
           {isGap ? (
             <>
               <span style={{ fontWeight: 700 }}>{formatGapHours(cell)}</span>

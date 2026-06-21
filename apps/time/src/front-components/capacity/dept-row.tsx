@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatCell, formatPct, formatGapHours, formatGapPctShort, avgRatio, SIGMA_W, colWidth, gapTone, gapPct, gapIcon, conflictShadow, overbookTip } from 'src/front-components/capacity/cap-tokens';
 import { BookingMarker } from 'src/front-components/capacity/booking-marker';
 import type { CellMetric, DeptRef, LoadCell, Period } from 'src/front-components/capacity/types';
 import { departmentLabel } from 'src/constants/labels';
@@ -112,7 +112,7 @@ export const DeptRow = ({
       return (
         <div
           key={p.key}
-          title={`Загрузка ${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${cell.ratio !== null ? ` (${Math.round(cell.ratio * 100)}%)` : ''} · свободно ${Math.round(cell.free)} ч${isGap ? ` · баланс ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ' · ⚠ овербукинг' : ''}`}
+          title={`Загрузка ${Math.round(cell.load)} / ${Math.round(cell.capacity)} ч${cell.ratio !== null ? ` (${Math.round(cell.ratio * 100)}%)` : ''} · свободно ${Math.round(cell.free)} ч${isGap ? ` · баланс ${Math.round(cell.load - cell.capacity)} ч` : ''}${cell.hardBooking > 0 ? ` · бронь HARD ${Math.round(cell.hardBooking)} ч` : ''}${cell.softBooking > 0 ? ` · бронь SOFT ${Math.round(cell.softBooking)} ч` : ''}${cell.conflict ? ` · ⚠ ${overbookTip(cell)}` : ''}`}
           style={{
             flex: 1,
             minWidth: colW,
@@ -134,7 +134,7 @@ export const DeptRow = ({
           {isGap ? (
             <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 2, lineHeight: 1, whiteSpace: 'nowrap' }}>
               {icon && <span aria-hidden style={{ fontSize: 8, alignSelf: 'center' }}>{icon}</span>}
-              {cell.conflict && <span aria-hidden title="Овербукинг" style={{ fontSize: 8, alignSelf: 'center', color: T.over }}>▲</span>}
+              {cell.conflict && <span aria-hidden title={overbookTip(cell)} style={{ fontSize: 8, alignSelf: 'center', color: T.over }}>▲</span>}
               <span style={{ fontWeight: 600 }}>{formatGapHours(cell)}</span>
               {formatGapPctShort(cell) && (
                 <span style={{ fontSize: 9, fontWeight: 500, color: T.textFaint }}>{formatGapPctShort(cell)}</span>
@@ -142,7 +142,7 @@ export const DeptRow = ({
             </span>
           ) : (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
-              {cell.conflict && <span aria-hidden title="Овербукинг" style={{ fontSize: 9, color: T.over }}>▲</span>}
+              {cell.conflict && <span aria-hidden title={overbookTip(cell)} style={{ fontSize: 9, color: T.over }}>▲</span>}
               {formatCell(metric, cell)}
             </span>
           )}

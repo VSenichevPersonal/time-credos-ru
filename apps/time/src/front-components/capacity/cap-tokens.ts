@@ -143,6 +143,18 @@ export const bookingParts = (
 export const conflictShadow = (cell: LoadCell): string =>
   cell.conflict ? `inset 0 0 0 1.5px ${CONFLICT_RING}` : '';
 
+// W6C.23 (RG elastic-overtime): пояснение перегруза для тултипа ячейки.
+// «Перегруз: N ч спрос / M ч ёмкость (+K ч)» — спрос (Demand=load, план+HARD-бронь),
+// ёмкость и превышение (K = спрос − ёмкость, округлено вверх ≥1 чтобы не показать
+// «+0 ч» при дробном перегрузе). Пусто, если конфликта нет. Числа — целые часы.
+export const overbookTip = (cell: LoadCell): string => {
+  if (!cell.conflict) return '';
+  const demand = Math.round(cell.load);
+  const capacity = Math.round(cell.capacity);
+  const over = Math.max(1, Math.round(cell.load - cell.capacity));
+  return `Перегруз: ${demand} ч спрос / ${capacity} ч ёмкость (+${over} ч)`;
+};
+
 // Значение ДОЧЕРНЕЙ строки (проект / план без проекта) в выбранной метрике.
 // Метрика согласована на всех уровнях (как drill в Timetta): дочерняя строка
 // показывает свой ВКЛАД в показатель отдела.
