@@ -1,11 +1,48 @@
 import { RestApiClient } from 'twenty-client-sdk/rest';
 
-// Доступ к Core REST из песочницы виджета. Записи проекта + справочник сотрудников.
+import type { TeamMember } from 'src/front-components/project-team/types';
+
+// Доступ из песочницы виджета. ОСНОВНОЙ путь — серверный агрегат /s/project-team
+// (PII-redaction по revealEmployeeNames + курсор-пагинация на сервере). Прямой
+// REST (fetchProjectEntries/fetchEmployees) оставлен для тестов/fallback.
 
 const client = () => new RestApiClient();
 
 type ListResp<T> = { data: Record<string, T[]> };
 const pickList = <T>(resp: ListResp<T>, key: string): T[] => resp.data?.[key] ?? [];
+
+// Серверный агрегат «Команда проекта» (REQ-0016). Контракт Dev2: POST /s/project-team
+// {mode:'team', projectId} → {ok, total, members:[{employeeId, name, deptCode,
+// totalHours, entryCount, lastDate, share}]}. ФИО при reveal, иначе КОД (CISO-007).
+type RawTeamMember = {
+  employeeId: string;
+  name: string;
+  deptCode?: string | null;
+  totalHours: number;
+  entryCount: number;
+  lastDate: string | null;
+  share: number | null;
+};
+type TeamResp = { ok?: boolean; total?: number; members?: RawTeamMember[]; error?: string };
+
+export type ProjectTeamResult = { members: TeamMember[]; total: number };
+
+export const fetchProjectTeam = async (projectId: string): Promise<ProjectTeamResult> => {
+  const resp = await client().post<TeamResp>('/s/project-team', {
+    mode: 'team',
+    projectId,
+  });
+  if (!resp?.ok) throw new Error(resp?.error ?? 'Сервис команды недоступен');
+  const members: TeamMember[] = (resp.members ?? []).map((m) => ({
+    employeeId: m.employeeId,
+    name: m.name || '—',
+    hours: m.totalHours,
+    entries: m.entryCount,
+    lastDate: m.lastDate,
+    share: m.share ?? 0,
+  }));
+  return { members, total: resp.total ?? 0 };
+};
 
 export type RawEntry = {
   hours?: number | null;

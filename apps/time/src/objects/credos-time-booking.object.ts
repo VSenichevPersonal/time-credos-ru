@@ -4,6 +4,7 @@ import {
   NumberDataType,
   OnDeleteAction,
   RelationType,
+  STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS,
 } from 'twenty-sdk/define';
 
 import {
@@ -11,6 +12,7 @@ import {
   BOOKING_TYPE_OPTIONS,
 } from 'src/constants/select-options';
 import {
+  CREDOS_TIME_BOOKING_COMPANY_FIELD_ID,
   CREDOS_TIME_BOOKING_EMPLOYEE_FIELD_ID,
   CREDOS_TIME_BOOKING_END_DATE_FIELD_ID,
   CREDOS_TIME_BOOKING_HOURS_FIELD_ID,
@@ -20,6 +22,7 @@ import {
   CREDOS_TIME_BOOKING_PROJECT_FIELD_ID,
   CREDOS_TIME_BOOKING_START_DATE_FIELD_ID,
   CREDOS_TIME_BOOKING_TYPE_FIELD_ID,
+  CREDOS_TIME_COMPANY_BOOKINGS_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_BOOKINGS_FIELD_ID,
   CREDOS_TIME_EMPLOYEE_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_BOOKINGS_FIELD_ID,
@@ -138,13 +141,17 @@ export default defineObject({
         joinColumnName: 'employeeId',
       },
     },
-    // Booking.project -> Project.bookings (MANY_TO_ONE, CASCADE).
+    // Booking.project -> Project.bookings (MANY_TO_ONE, nullable).
+    // Заказчик: бронь под проект ИЛИ под компанию. project nullable — при пресейле
+    // проекта ещё нет, бронь привязана к company. onDelete SET_NULL: удаление
+    // проекта не должно сносить бронь (резерв ресурса остаётся).
     {
       universalIdentifier: CREDOS_TIME_BOOKING_PROJECT_FIELD_ID,
       name: 'project',
       type: FieldType.RELATION,
       label: 'Проект',
       icon: 'IconBriefcase',
+      isNullable: true,
       relationTargetObjectMetadataUniversalIdentifier:
         CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
       relationTargetFieldMetadataUniversalIdentifier:
@@ -153,6 +160,26 @@ export default defineObject({
         relationType: RelationType.MANY_TO_ONE,
         onDelete: OnDeleteAction.CASCADE,
         joinColumnName: 'projectId',
+      },
+    },
+    // Booking.company -> стандартный Company (MANY_TO_ONE, nullable). ADDITIVE.
+    // Пресейл: клиент известен, проект ещё не создан → бронь под компанию.
+    // onDelete SET_NULL (как Project.company): удаление компании оставляет бронь.
+    {
+      universalIdentifier: CREDOS_TIME_BOOKING_COMPANY_FIELD_ID,
+      name: 'company',
+      type: FieldType.RELATION,
+      label: 'Клиент',
+      icon: 'IconBuildingSkyscraper',
+      isNullable: true,
+      relationTargetObjectMetadataUniversalIdentifier:
+        STANDARD_OBJECT_UNIVERSAL_IDENTIFIERS.company.universalIdentifier,
+      relationTargetFieldMetadataUniversalIdentifier:
+        CREDOS_TIME_COMPANY_BOOKINGS_FIELD_ID,
+      universalSettings: {
+        relationType: RelationType.MANY_TO_ONE,
+        onDelete: OnDeleteAction.SET_NULL,
+        joinColumnName: 'companyId',
       },
     },
   ],

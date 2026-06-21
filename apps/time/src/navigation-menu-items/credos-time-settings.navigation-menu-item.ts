@@ -4,10 +4,10 @@ import {
 } from 'twenty-sdk/define';
 
 import {
-  CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_SETTINGS_OBJ_NAV_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_SETTINGS_VIEW_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
+import { FOLDER_SETTINGS_NAV_UNIVERSAL_IDENTIFIER } from 'src/navigation-menu-items/folder-settings.navigation-menu-item';
 
 // REQ-0019 — пункт index-view singleton-настроек в папке «Трудозатраты».
 // Нужен, чтобы объект credosTimeSettings был доступен (Common Pitfalls: view без
@@ -15,10 +15,10 @@ import {
 // «Настройки» (PAGE_LAYOUT, position 11, Dev1); этот пункт — для контроля записи.
 export default defineNavigationMenuItem({
   universalIdentifier: CREDOS_TIME_SETTINGS_OBJ_NAV_UNIVERSAL_IDENTIFIER,
-  name: 'Настройки модуля',
+  name: 'Настройки · данные',
   icon: 'IconAdjustments',
   position: 9,
   type: NavigationMenuItemType.VIEW,
   viewUniversalIdentifier: CREDOS_TIME_SETTINGS_VIEW_UNIVERSAL_IDENTIFIER,
-  folderUniversalIdentifier: CREDOS_TIME_FOLDER_NAV_UNIVERSAL_IDENTIFIER,
+  folderUniversalIdentifier: FOLDER_SETTINGS_NAV_UNIVERSAL_IDENTIFIER,
 });

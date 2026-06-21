@@ -16,6 +16,11 @@
 | Project ID | `0f4c3f20-1af6-463f-9c69-3a5f953c8d07` |
 | Окружение | production (ID `e4d88262-5237-4297-8fe1-20f583ca0aad`) |
 | Workspace | vsenichevpersonal's Projects |
+| Регион хостинга | Railway (US/EU-регионы; **РФ-региона у Railway НЕТ**) |
+
+> 🔴 **152-ФЗ / локализация ПДн (CISO 152FZ-001):** Railway не имеет РФ-региона → БД (Postgres) физически вне юрисдикции РФ. По ст. 18.5 152-ФЗ хранить ПДн граждан РФ (реальные ФИО/email сотрудников) на этом сервере **нельзя**.
+> - **Dev приемлем ТОЛЬКО на обезличенных данных** (синтетические ФИО ≠ ПДн). Реальный сид (`scripts/.employees.local.json`) — gitignored и НЕ заливать на этот сервер.
+> - **Прод — блокер запуска (P0):** прод-таргет обязан быть РФ-контур (ADR-0002 / prod-standup §«Предусловия» D3), НЕ Railway. См. [runbooks/prod-standup.md](runbooks/prod-standup.md).
 
 ## Сервисы (все Online)
 

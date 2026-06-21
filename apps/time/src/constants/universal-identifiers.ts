@@ -721,6 +721,17 @@ export const CREDOS_TIME_EMPLOYEE_BOOKINGS_FIELD_ID =
 export const CREDOS_TIME_PROJECT_BOOKINGS_FIELD_ID =
   '5dd2ba93-7ac9-4571-a49d-b61aa36bc8c1';
 
+// Заказчик: бронь ресурса может быть под ПРОЕКТ ИЛИ под КОМПАНИЮ (пресейл — клиент
+// известен, проект ещё не создан). ADDITIVE: новое RELATION Booking.company ->
+// стандартный Company (MANY_TO_ONE, nullable) + обратная коллекция на Company.
+// project уже nullable; теперь и company nullable → бронь привязывается к одному
+// из двух (или ни к чему — резерв под роль). Сверка: Timetta resource-plan под
+// клиента/проект, booking soft/hard. [[no-billable-concept]].
+export const CREDOS_TIME_BOOKING_COMPANY_FIELD_ID =
+  '23cf96f1-fac0-4977-99e7-f04b965c239c';
+export const CREDOS_TIME_COMPANY_BOOKINGS_FIELD_ID =
+  '3905c99b-5ad6-4539-8563-860abba2237d';
+
 // REQ-0016 follow-up — HTTP-роут /s/project-team (mode=team|employee-projects):
 // агрегат «Команда проекта» (кто работал + часы) и «Проекты сотрудника» из записей
 // credosTimeEntry (нет прямого relation проект↔сотрудник). ПДн ФИО — по

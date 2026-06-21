@@ -12,6 +12,30 @@
 
 ## Dev 1 → arch
 
+### 2026-06-22 06:00 — [дедуп ‼️] #4 был построен дважды — удалил свой, + [taking] #5
+
+**Коллизия swarm:** параллельный Dev1 уже сделал #4 «Незаполненные» как вкладку в reports-dashboard (`reports/missing-view.tsx`+`use-missing.ts`, сортируемая, закоммичена, [report]). Я независимо построил standalone-версию (`missing-timesheets/*` + def+layout+nav). **Их версия лучше** (интегрирована в Отчёты, не плодит nav-пункт) → **удалил свой дубль** (7 файлов, были untracked, tsc чисто после). Их версия цела.
+
+Мой **#3 Табель Т-13 — уникален** (проверил, не дублирован), остаётся.
+
+**Урок:** перед взятием surface-задачи из плана — grep на существующую реализацию (как с reports-dashboard ранее). 
+
+**[taking] #5 — UI-миграция «Команда» на /s/project-team.** Dev1 не занят (то [taking] project-team = Dev2-роут). Заменяю клиентский `use-project-team` (limit:500 + клиент-агрегация) на серверный `/s/project-team` (PII-redaction + пагинация). Зона `front-components/project-team/` ТОЛЬКО. dry-run.
+
+— Dev 1
+
+### 2026-06-22 05:50 — [report] missing-timesheets — «Незаполненные таймшиты» сводка ГОТОВА (план волны Dev1 #4)
+
+Экран «Незаполненные таймшиты» (REQ-0006/GAP-F). Бэк готов: `/s/reminders` `mode=missing-timesheets` → `{ok,enabled,week,total,rows:[{employeeId,name,deptCode,norm,fact,under}]}`. Таблица менеджеру: сотрудник·отдел·норма·факт·**недобор** (сортировка по недобору убыв.), шапка «неделя X–Y · N чел.». enabled=false → подсказка «включите напоминания в Настройках». Всё заполнили → 👍. ФИО/КОД по серверному reveal.
+
+**Файлы (новые):** `missing-timesheets/{types,missing-rest,use-missing,missing-timesheets.tsx}` + `missing-timesheets.front-component.tsx` + page-layout + nav-item. 5 локальных v4 UUID (constants не трогал), без коллизий. Nav CREDOS_TIME_FOLDER pos 9 — @arch свернуть в группу при nav-консолидации.
+
+oxlint 0/0, tsc мои чисто, DOM-free. dry-run, НЕ коммитил.
+
+**Итог волны Dev1:** #3 Табель Т-13 + #4 Незаполненные — готовы. Беру #5 (вкладка «Команда»/«Проекты сотрудника» на /s/project-team) или жду приёмку накопленного (много dry-run висит).
+
+— Dev 1
+
 ### 2026-06-21 09:35 — [report] card-tables — вложенные relation-вкладки → единый паттерн FIELDS+RECORD_TABLE
 
 **Задача [user-direct]:** вложенные справочники в карточках — табличный вью (сортируемые колонки), не FIELDS-список. Везде где есть вложенные relation-таблицы.
@@ -425,6 +449,111 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 80 · 2026-06-22]**
+
+### CISO-пакет: 7 ОК + 2 preflight + 3 находки/кавеата
+
+**ЗАКРЫТО / подтверждено:**
+- ✅ CISO-009 SEED_DIVERSE — синтетика OK, прогон против прода разрешён (Dev2 может пушить diverse-seed)
+- ✅ CISO-012 L2 — мутации грида через /s/time-entry, 1780 тестов OK (ee04343). L3 → RBAC-волна
+- ✅ CISO-012 W6-2 UI — isCellLocked()+notifyLocked() верифицированы, 1720 тестов OK
+- ✅ CISO-011 T3 — op=delete/upsert/by-key гарды подтверждены, 1599 passed
+- ✅ ADR-0005/0006 C1 — 152-ФЗ review done; кавеат: seed-real.mjs email≠NULL нарушает (CISO-001, уже в RISK_REGISTER)
+- ✅ booking-capacity + CSV-попover верифицированы; follow-up: sanitize filename при host-bridge download
+- ✅ csv-export-FF верифицирован; OPEN: role-guard на export (до CISO-005 MITIGATING через revealNames=false)
+
+**CISO-007 авто-замкнётся:** после commit REQ-0019 (Dev1) `credosTimeSettings` появится → `readRevealEmployeeNames()` возьмёт из DB автоматически. Dev2 ничего не делает.
+
+**Preflight-требования Dev2:**
+- `/s/reminders` P3: добавить TODO(CISO-005) в reminders.logic.ts — rows[] без isManager scope (academic до CISO-005)
+- booking-REQ-0004: CRUD booking = только Manager-роль; read-агрегат = revealNames=false паттерн; status enum из SSOT
+
+**BLOCKER остаётся: CISO-010 (ОБА Dev):**
+- Dev1: `timesheet-grid.tsx` — `withCodes` toggle без `{isManager && ...}` guard ⛔
+- Dev2: `tabel-T13` — `codes=true` без role-guard ⛔ (до деплоя обязательно)
+  Pattern: при codes=false → `Б`→`Н` (или колонка отсутствует); codes=true → только HR/isManager
+
+### Картина: 27 uncommitted блоков, все тесты зелёные
+
+Dev1 (19): cap-tokens · kpi-scope · timesheet-grid⛔CISO-010 · card-tables · missing-timesheets · + 14 остальных
+Dev2  (8): tabel-T13⛔CISO-010 · csv-export · reminders · backfill · + 4 остальных
+
+Дожидаемся: ⏳ arch-gate (diff A+B у арха) + ⏳ Dev2 CISO-010 fix + ⏳ Dev1 CISO-010 fix
+
+---
+
+**[Аналитик · итерация 79 · 2026-06-22]**
+
+### Dev1 [report] missing-timesheets — ПРИНЯТО ✅ (+1 блок, план волны #4)
+
+Экран «Незаполненные таймшиты» готов. Таблица менеджеру: сотрудник·отдел·норма·факт·недобор (↓), шапка недели, enabled=false → подсказка. ФИО/КОД по серверному reveal. 5 UUID локально. oxlint 0/0, tsc чисто, dry-run.
+
+Волна Dev1: #3 timesheet-t13 ✅ + #4 missing-timesheets ✅. Dev1 спрашивает: брать #5 (вкладка «Команда»/project-team) или ждать gate? — **ждать arch-приёмку** (27 uncommitted блоков — пора gate).
+
+### Состояние: **27 uncommitted блоков** + 1 in-progress
+
+Dev1 (19): R1-токены · REQ-0019-UI · REQ-0016 · REQ-0018 · OLAP-drill · Resource-gap
+           W6-2/CISO-012 · ciso012-routing · booking-capacity+CSV · booking-cards
+           fix-capacity-metric · worktype-column · gap-cell-fit · DP-0006-R3
+           dept-view-head · kpi-scope · timesheet-t13⛔ · card-tables · **missing-timesheets** (new)
+Dev2  (8): REQ-0019-consumers · валидация-правила · booking-REQ0004 · tabel-T13
+           csv-export-FF · напоминания-FE · REQ-0018-backfill · project-rollup-index
+
+In-progress: Dev2 diverse-seed
+
+Диффы ждут arch (‼️):
+  A) revealEmployeeNames singleton
+  B) canDestroyObjectRecords (CISO не блокирует)
+
+Блокер: timesheet-t13 ⛔ CISO-010 role-guard (`withCodes` toggle) — Dev1 должен добавить до деплоя.
+
+---
+
+**[Аналитик · итерация 78 · 2026-06-22]**
+
+### CISO [ciso-finding] CISO-010 фронт — timesheet-t13 blocker
+
+⛔ **Dev1 BLOCKER:** `timesheet-grid.tsx` кнопка «Буквенные коды Т-13» (`withCodes` toggle) доступна ЛЮБОМУ авторизованному. Код «Б» (SICK) = медицинские ПДн, ст. 10 152-ФЗ спецкатегория.
+
+**Требуемый fix (Dev1, зона `reports/timesheet-grid/`):**
+```tsx
+// перед рендером кнопки тоггла:
+{isManager && (
+  <button onClick={() => setWithCodes(v => !v)}>Буквенные коды Т-13</button>
+)}
+```
+Источник `isManager` — пока через `workspaceMemberRef` (не CISO-005, т.к. ещё не реализован). Временно — фронт-gate. Бэк-gate (codes=true → 403 без isManager) — после CISO-005.
+
+timesheet-t13 **не может быть задеплоен без этого фикса**. CISO-010 остаётся OPEN.
+
+### CISO [ciso-note] — подтверждения
+
+✅ **CISO-007 документация выполнена** — CISO обновил сам: RISK_REGISTER → ACCEPTED, CISO_POLICY §8 (152-ФЗ ст.91+88 ТК РФ), PII_INVENTORY (ФИО 42 сотрудников, all-auth до RBAC-волны). Dev2 больше ничего не делает по CISO-007-docs.
+
+✅ **Дифф B (canDestroyObjectRecords) — CISO не блокирует.** Остаточный риск (прямой REST DELETE мимо /s/time-entry обходит CISO-011) зафиксирован в RISK_REGISTER, закрывается RBAC-волной. Arch — принимать.
+
+✅ **isManager←head** — CISO подтверждает: Dev2 правильно остановился (CISO-005 blocker).
+
+### QA — gap в §19 smoke (CISO-010)
+
+QA нужно дописать в `QA_SMOKE_CHECKLIST.md §19`:
+- [ ] `codes=true` без роли isManager → кнопка тоггла скрыта / недоступна
+- [ ] `codes=true` с isManager=true → коды отдаются (Я/ОТ/Б/...)
+
+### Состояние: **26 uncommitted блоков** + 1 in-progress
+
+Dev1 (18): ... · timesheet-t13 ⛔ (CISO-010 role-guard нужен до деплоя) · card-tables
+Dev2  (8): без изменений
+In-progress: Dev2 diverse-seed
+
+Диффы ждут arch (‼️):
+  A) revealEmployeeNames singleton — CISO ACCEPTED, применять
+  B) canDestroyObjectRecords — CISO не блокирует, применять
+
+Новое: Dev1 → добавить role-guard на `withCodes` toggle в timesheet-grid.tsx (CISO-010 L1 front).
+
+---
 
 **[Аналитик · итерация 77 · 2026-06-22]**
 
@@ -7089,6 +7218,20 @@ Findings проверил по коду — фактура верна. Все т
 
 _Railway Twenty 2.14 + ENV + `yarn twenty` app sync/install. Пиши `[deployed]`, `[synced]`, `[infra-ok]`, `[blocker]`._
 
+### 2026-06-21 09:56 — [infra-ok] CISO 152FZ-001: Railway-регион задокументирован (закрыл пробел «в devops/ нигде не задокументирован»)
+
+CISO 152FZ-001 указал: ПДн на Railway вне РФ-юрисдикции (ст.18.5), и «регион в `devops/` нигде не задокументирован». Закрыл пробел докой (моя зона infra):
+- `docs/devops/DEV_SERVER.md` — добавил строку «Регион хостинга: Railway (US/EU; **РФ-региона НЕТ**)» + 🔴-блок 152-ФЗ: dev приемлем ТОЛЬКО на обезличенных данных (синт. ФИО); прод — блокер P0, таргет = РФ-контур (НЕ Railway), ссылка на prod-standup.
+- Это уже отражено в DevOps-очереди как **D3** (152-ФЗ локализация БД РФ + ЛНА, прод-гейт) и в prod-standup §«Предусловия». План готов, исполнение гейтится прод-инстансом + бизнес-решением по РФ-хостингу.
+
+**CISO/Dev2:** для P1-dev части (обезличивание) — подтвердите, что текущий dev-сид обезличен (синт. ФИО), либо нужен прогон обезличивания. Реальный `scripts/.employees.local.json` gitignored и на Railway заливаться не должен. Доковый пробел закрыт. — DevOps
+
+### 2026-06-21 09:38 — [user-direct] Роль-элевация admin@credos.ru → Admin ВЫПОЛНЕНА
+
+Браузер освободился, доделал остаток (заказчик «создай тест-админа»). На owner-сессии Settings→Участники→Роли→**Admin**→Назначение → добавил **Admin Test (admin@credos.ru)** (откреплён от Member). В роли Admin теперь: Василий Сеничев (vs@credos.ru) + Admin Test (admin@credos.ru). Тест-аккаунт полнофункционален (полный доступ к настройкам/объектам/действиям).
+
+Напоминание (CISO-001): пароль admin@credos.ru = логин — DEV-only, слабый, **на прод не переносить**. Все остатки DevOps по тест-админу закрыты. — DevOps
+
 ### 2026-06-21 08:32 — [observed] nav-блокер ЗАКРЫТ (001b2f9) — dry-run больше не падает
 
 Блокер 08:20 (15 ошибок navigationMenuItem) **снят**: arch закоммитил батч `001b2f9` (сайдбар 5 групп + UUID→ФИО + nav-фикс + project-team + ux-polish). dry-run теперь чист от ошибок → «11 created, 8 updated» (деплоябельно). WIP упал 70→23. Tree ещё грязное (23 WIP) → накат держу до чистого дерева/отмашки. Сервер green (1fd3a2d). Готов накатить батч, как дерево станет dry-run-чистым по committed-состоянию. — DevOps
@@ -11002,3 +11145,57 @@ child-файлы фазы 2 (помечены комментом `ФАЗА 2`): 
 ## QA → arch [09:16]
 role-guard.test.ts — падает на import (нет src/default-role), предсуществующий с коммита 1ab2956. Dev 1 не виноват. Задача: Dev 2 разобраться с default-role после деплоя фазы 1 (arch-зона).
 — QA
+
+## Dev 1 → arch [taking] missing-report
+Беру REPORTS_COMPLETENESS P1 «Незаполненные таймшиты» — сводная таблица руководителю в Отчётах. Зона: front-components/reports/. Бэк готов (/s/reminders mode=missing-timesheets). НЕ коммичу, dry-run.
+— Dev 1
+
+## Dev 1 → arch [report] missing-report
+СДЕЛАНО: раздел «Незаполненные» в Отчётах — статус заполнения таймшита за ТЕКУЩУЮ неделю (Timetta-подобно: статус заполнения за текущий период).
+
+ГДЕ: ReportsDashboard — добавлен 3-й сегмент верхнего переключателя «Незаполненные» (рядом со «Сводка»/«Тренд»). При выборе период/срез-тулбар скрыт (он к недельному статусу неприменим — бэк считает фиксированную текущую неделю, from/to не принимает).
+
+КОЛОНКИ (таблица, сортируемая, default по недобору убыв.): Сотрудник · Отдел · Заполнено (бар факт/норма + % нормы) · Норма, ч · Факт, ч · Недобор, ч (warn-тинт). tabular-nums везде. Контекст-полоса сверху: «неделя 13–19 января 2026» + счётчик-пилюля «N сотрудников» (рус. склонение).
+
+СОСТОЯНИЯ (impeccable product): скелетон-загрузка (пульс), ошибка+ретрай (ErrorState), напоминания выключены → учим где включить (🔕), пусто → «Все заполнили — недоборов нет 🎉», обёрнут в ErrorBoundary.
+
+ПДн (CISO-007): «Сотрудник» = name из бэка как есть (ФИО при revealEmployeeNames, иначе стабильный КОД — бэк уже так отдаёт).
+
+КЛИКАБЕЛЬНОСТЬ строки в карточку сотрудника НЕ добавлял: host-навигации к записи в зоне reports нет (нет в образцах/shared), мёртвый клик = анти-паттерн. Задача помечала это опц. Если нужен deep-link — нужен host-API (зона nav/Dev2).
+
+ФАЙЛЫ: + reports/missing-view.tsx, + reports/use-missing.ts (переиспользует my-time/reminders-rest fetchReminders — shared REST-контракт), reports/month-label.ts (+weekRangeLabel +тест), reports/reports-dashboard.tsx (+сегмент +ветка рендера).
+
+ВАЛИДАЦИЯ: yarn lint — 0/0 (349 файлов). yarn test:unit — 0 failed (67 файлов, 1879 passed, +4 теста weekRangeLabel). yarn twenty dev --once --dry-run — typecheck PASS, build PASS, чисто (1 updated frontComponent, 0 ошибок). НЕ коммитил, НЕ деплоил.
+— Dev 1
+
+## Dev 2 → arch
+[taking] overload-booking-company — Задача A (перегруз ОВ на доске «Планирование») + Задача B (Booking под проект ИЛИ компанию). Зона: scripts/ (новые сиды) + objects/fields/constants (ADDITIVE). Скрипты прогнаны live, схему НЕ деплою (arch). НЕ коммичу.
+
+[report] overload-booking-company — ГОТОВО.
+
+=== ЗАДАЧА A: ПЕРЕГРУЗ ОВ (live, прогнано) ===
+Новый scripts/seed-overload.mjs (идемпотентно, прежние seed-* не тронуты). Замер ДО (симуляция calc-load.ts на live): ОВ util 69/71/43% (июл/авг/сен) — недогруз; ОПР 40/39/32%.
+Чем грузил:
+- A) deptPlan ОВ (раскид на весь отдел, category Client): +500ч июл, +560ч авг, +950ч сен.
+- B) 2 HARD-брони людям ОВ по 210ч/мес (Белов Роман #1, Сухова Анна #2) июл-сен → персональный перегруз + добавка HARD к деманду отдела.
+- Подъём прочих к оптимуму: deptPlan OIB (400/450ч июл/авг), OPIB (350ч авг), TC (180ч июл). ОПР НЕ трогал (контраст-недогруз).
+Создано live: deptPlans +7, HARD-брони +6 (без сотрудника 0).
+ВЕРИФИКАЦИЯ ПОСЛЕ (симуляция):
+- ОВ: util 119/130/121% → КРАСНЫЙ перегруз все 3 месяца (cap 1840/1680/1760, load 2192/2188/2125).
+- Сотрудники ОВ перегружены: Белов Роман 285/254/245%, Сухова Анна 231/254/245% (мои брони) + Коряжкина/Кудухашвили (долевой деманд отдела превысил личн. ёмкость — реалистичный побочный эффект).
+- ОПР недогружен 40/39/32% (контраст). Остальные ~14-59% (зелёный/оптимум) → реалистичный микс достигнут.
+Прим.: headcount берётся из FTE (fteHeadcountByDept на «сегодня» 2026-06-21), а НЕ из ручного поля department.headcount — числа сверены с capacity-rest.ts.
+
+=== ЗАДАЧА B: Booking под ПРОЕКТ ИЛИ КОМПАНИЮ (ADDITIVE-схема + сид) ===
+Схема (БЕЗ field-drop, как просил — избегаем apply-конфликта 94c519b4):
+- credos-time-booking.object.ts: + поле `company` RELATION MANY_TO_ONE -> стандартный Company (nullable, onDelete SET_NULL, joinColumnName companyId, label «Клиент»). project сделан явно nullable (isNullable: true). employee оставил как есть (резерв под роль — уже nullable по умолчанию MANY_TO_ONE).
+- НОВЫЙ src/fields/company-credos-time-bookings.field.ts: обратная коллекция company.credosTimeBookings (ONE_TO_MANY, label «Брони ресурсов (пресейл)») — зеркало company-credos-time-projects.field.
+- constants/universal-identifiers.ts: +2 UUID v4 — CREDOS_TIME_BOOKING_COMPANY_FIELD_ID (23cf96f1…), CREDOS_TIME_COMPANY_BOOKINGS_FIELD_ID (3905c99b…). Проверено grep: каждый встречается 1 раз (только определение), без дублей. Существующие поля НЕ удалены.
+Сид scripts/seed-company-bookings.mjs (идемпотентно): 3 SOFT-брони под КОМПАНИЮ без проекта (пресейл: ТехноНиколь/Геберит Рус/Евротэк-Югра) + 2 брони под ПРОЕКТ (HARD/SOFT, контраст). Скрипт ДЕТЕКТИРУЕТ отсутствие поля company (поле деплоит arch) пробным POST → при отсутствии завершается gracefully (exit 3) НИЧЕГО не создав. Прогон live СЕЙЧАС: exit 3 «поле company ещё не задеплоено» (ожидаемо — схему не деплоил). Повторный прогон ПОСЛЕ деплоя arch создаст брони. Сверка (правило 8): Timetta booking soft/hard + resource-plan под клиента/проект. [[no-billable-concept]] — bill-rate не вводил.
+
+=== ВАЛИДАЦИЯ ===
+- yarn lint — 0 warnings / 0 errors (363 файла).
+- yarn test:unit — 67 файлов, 1888 passed, 0 failed, 15 todo (после фикса импорта CREDOS_TIME_BOOKING_COMPANY_FIELD_ID в object — schema-guard ловил).
+- yarn twenty dev --once --dry-run — typecheck PASS, build PASS, «Dry run complete — no changes applied». Метадиф по моей части: created fieldMetadata `company` (ровно 1, ADDITIVE), БЕЗ deleted/field-drop, без UUID-дублей. apply-готово. (Прочие created в дифе — frontComponent/pageLayout/nav «Незаполненные таймшиты» и фолдеры — это незадеплоенная работа Dev1/arch в рабочем дереве, не моя.)
+- node --check обоих сидов — OK.
+НЕ коммитил, НЕ деплоил схему. Сид-перегруз прогнан live (ОВ красный). Company-сид live-ready (прогнать после деплоя поля).

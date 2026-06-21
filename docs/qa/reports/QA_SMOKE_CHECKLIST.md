@@ -315,12 +315,20 @@ curl -s -o /dev/null -w "/s/reminders %{http_code}\n" -X POST "$BASE/s/reminders
 - ⬜ CISO-007: без `revealNames=true` строки = КОД, не ФИО.
 - ⬜ `gridToCsv`: BOM + `;` + `\r\n` (→ §17).
 
-### 19-B. Frontend экран Т-13 (Dev1) — ⏳ IN-PROGRESS
+### 19-B. Frontend экран Т-13 (Dev1) — ✅ DONE (uncommitted)
 - ⬜ Nav-item «Табель Т-13» виден в сайдбаре.
 - ⬜ Экран рендерит матрицу сотрудник × день за выбранный месяц.
 - ⬜ Переключение месяца (‹ ›) перезапрашивает данные.
 - ⬜ Кнопка «Экспорт CSV» (→ §17).
 - ⬜ Пустой период: пустой стейт, не crash.
+
+### 19-C. CISO-010 — role-guard на коды Т-13 ⛔ (blocker до деплоя)
+- ⛔ **Кнопка «Буквенные коды Т-13»** (`withCodes` toggle) должна быть скрыта для не-HR/не-менеджера.
+  - Код «Б» (SICK) = медицинские ПДн, ст. 10 152-ФЗ спецкатегория.
+- ⬜ Без роли `isManager`: кнопка тоггла **скрыта** (нет в DOM / disabled).
+- ⬜ С ролью `isManager=true`: кнопка видна и переключает коды.
+- ⬜ Backend guard (post CISO-005): `codes=true` без isManager → 403.
+- ⚠️ До реализации CISO-005: фронт-gate через `isManager` из `workspaceMemberRef` (временно). Не деплоить без фронт-gate минимум.
 
 ---
 
