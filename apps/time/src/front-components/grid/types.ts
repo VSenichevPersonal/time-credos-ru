@@ -41,6 +41,7 @@ export type ApiEntry = {
   hours: number;
   description: string | null;
   status?: string | null; // UPPER_CASE код статуса согласования
+  rejectComment?: string | null; // UC-APR-05: причина отклонения (показ сотруднику)
   tags?: string[] | null; // W3-2: теги записи (MULTI_SELECT, коды EntryTag)
   projectId: string | null;
   workTypeId: string | null;

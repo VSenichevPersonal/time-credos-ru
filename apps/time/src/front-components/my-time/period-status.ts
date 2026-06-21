@@ -27,6 +27,7 @@ export type WeekSummary = {
   hours: number; // Σ часов недели (2 знака)
   count: number; // число записей
   status: EntryStatusCode; // агрегатный статус
+  rejectComment: string | null; // UC-APR-05: причина отклонения (если неделя REJECTED)
 };
 
 // Понедельник недели записи по её полю date (берём дату-часть, UTC).
@@ -46,14 +47,18 @@ const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 1
 // Записи → недели (по убыванию даты: свежие сверху). После отправки период не
 // «исчезает» — он остаётся в списке со статусом SUBMITTED.
 export const summarizeWeeks = (entries: ReadonlyArray<ApiEntry>): WeekSummary[] => {
-  const byWeek = new Map<string, { hours: number; count: number; statuses: string[] }>();
+  const byWeek = new Map<string, { hours: number; count: number; statuses: string[]; rejectComments: string[] }>();
   for (const e of entries) {
     if (!e.date) continue;
     const ws = weekStartOf(e.date);
-    const bucket = byWeek.get(ws) ?? { hours: 0, count: 0, statuses: [] };
+    const bucket = byWeek.get(ws) ?? { hours: 0, count: 0, statuses: [], rejectComments: [] };
     bucket.hours += typeof e.hours === 'number' ? e.hours : 0;
     bucket.count += 1;
     bucket.statuses.push(e.status ?? ENTRY_STATUS.DRAFT);
+    // UC-APR-05: причина отклонения — только с REJECTED-записей с непустым текстом.
+    if ((e.status ?? '').toUpperCase() === ENTRY_STATUS.REJECTED && e.rejectComment) {
+      bucket.rejectComments.push(e.rejectComment);
+    }
     byWeek.set(ws, bucket);
   }
   return [...byWeek.entries()]
@@ -63,6 +68,7 @@ export const summarizeWeeks = (entries: ReadonlyArray<ApiEntry>): WeekSummary[] 
       hours: round2(b.hours),
       count: b.count,
       status: aggregateStatus(b.statuses),
+      rejectComment: b.rejectComments[0] ?? null,
     }))
     .sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
 };
