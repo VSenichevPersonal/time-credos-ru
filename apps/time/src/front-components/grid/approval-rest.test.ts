@@ -98,4 +98,32 @@ describe('resolveEntries — reject', () => {
     await resolveEntries(['a', 'b', 'c'], false);
     expect(mockPost).toHaveBeenCalledWith('/s/approval', expect.objectContaining({ ids: 'a,b,c' }));
   });
+
+  // UC-APR-04: причина отклонения должна доходить до бэка (rejectComment).
+  it('comment передаётся в route как поле comment', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    await resolveEntries(['id5'], false, 'нет описания работ');
+    expect(mockPost).toHaveBeenCalledWith(
+      '/s/approval',
+      expect.objectContaining({ op: 'reject', comment: 'нет описания работ' }),
+    );
+  });
+
+  it('comment пишется в rejectComment при fallback PATCH', async () => {
+    mockPost.mockRejectedValueOnce(new Error('x'));
+    mockPatch.mockResolvedValue({});
+    await resolveEntries(['id6'], false, 'переделать');
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/rest/credosTimeEntries/id6',
+      expect.objectContaining({ status: 'REJECTED', rejectComment: 'переделать' }),
+    );
+  });
+
+  it('approve не отправляет comment и очищает rejectComment в fallback', async () => {
+    mockPost.mockRejectedValueOnce(new Error('x'));
+    mockPatch.mockResolvedValue({});
+    await resolveEntries(['id7'], true, 'не должно попасть');
+    const [, body] = mockPatch.mock.calls[0];
+    expect(body).toMatchObject({ status: 'APPROVED', rejectComment: null });
+  });
 });

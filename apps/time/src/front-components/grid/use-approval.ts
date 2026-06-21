@@ -105,10 +105,15 @@ export const useApproval = ({
     void wrap(() => resolveEntries(submittedIds, true));
   }, [submittedIds, wrap]);
 
-  const reject = useCallback(() => {
-    if (submittedIds.length === 0) return;
-    void wrap(() => resolveEntries(submittedIds, false));
-  }, [submittedIds, wrap]);
+  // reject — с обязательной причиной (Timetta: отклонение таймшита с комментарием).
+  // comment прокидывается до /s/ роута → rejectComment (сотрудник видит причину).
+  const reject = useCallback(
+    (comment: string) => {
+      if (submittedIds.length === 0) return;
+      void wrap(() => resolveEntries(submittedIds, false, comment));
+    },
+    [submittedIds, wrap],
+  );
 
   return {
     required,

@@ -19,11 +19,15 @@ const callRoute = async (body: Record<string, unknown>): Promise<ApprovalResp | 
 };
 
 // Прямой фоллбэк-PATCH статуса (без фиксации actor — /s/ недоступна).
-const patchStatus = async (id: string, status: string): Promise<void> => {
+// comment: причина отклонения — пишется в rejectComment при REJECT, иначе очищается.
+const patchStatus = async (id: string, status: string, comment: string | null = null): Promise<void> => {
   const data: Record<string, unknown> =
     status === ENTRY_STATUS.APPROVED || status === ENTRY_STATUS.REJECTED
       ? { status, approvedAt: new Date().toISOString() }
       : { status };
+  if (status === ENTRY_STATUS.APPROVED || status === ENTRY_STATUS.REJECTED) {
+    data.rejectComment = status === ENTRY_STATUS.REJECTED ? comment ?? null : null;
+  }
   await client().patch(`/rest/credosTimeEntries/${id}`, data);
 };
 
@@ -41,12 +45,16 @@ export const submitEntries = async (
 };
 
 // approve/reject: SUBMITTED-записи → APPROVED/REJECTED (фиксирует actor на сервере).
+// comment: причина отклонения (только reject) — прокидывается в /s/ роут и фоллбэк.
 export const resolveEntries = async (
   ids: string[],
   approve: boolean,
+  comment: string | null = null,
 ): Promise<void> => {
   const status = approve ? ENTRY_STATUS.APPROVED : ENTRY_STATUS.REJECTED;
-  const route = await callRoute({ op: approve ? 'approve' : 'reject', ids: ids.join(',') });
+  const body: Record<string, unknown> = { op: approve ? 'approve' : 'reject', ids: ids.join(',') };
+  if (!approve && comment != null) body.comment = comment;
+  const route = await callRoute(body);
   if (route?.ok) return;
-  for (const id of ids) await patchStatus(id, status);
+  for (const id of ids) await patchStatus(id, status, approve ? null : comment);
 };
