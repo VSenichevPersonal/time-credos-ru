@@ -23,3 +23,10 @@ Owner: CISO. Severity: P0 (freeze) · P1 (high) · P2 (medium) · P3 (low). Ст
 | ID | Sev | Решение |
 |---|---|---|
 | — | — | Секреты (Railway-токены, API-ключи): `.env`/`.env.*`/`**/secrets/**` в `.gitignore`, в коде только `process.env`, в CI — `secrets.*`. ✅ Утечек не найдено. |
+
+## CISO-012 — Фронт-CRUD мимо logic-гардов (server enforcement bypass)
+**Уровень:** MITIGATING (частично) · Выявлено: Dev1 2026-06-22
+**Суть:** грид ввода пишет напрямую Core REST (`grid/time-rest.ts`), НЕ через `/s/time-entry`. Серверные гарды в `time-entry-api.logic.ts` (lock-approved T3/CISO-011, валидация ERROR #4, upsert-дедуп) на этом пути НЕ срабатывают.
+**Что спасает:** factHours — database-event триггеры (любой путь). Дедуп — UNIQUE-индекс на уровне БД (любой путь). 
+**Что обходится:** lock-approved (можно править согласованную через грид), валидация-лимит (только клиентская проверка validateEntry). Клиент-сайд гарды = UX, не enforcement.
+**План (RBAC-волна, после CISO-005):** либо роутить запись через `/s/time-entry`, либо fieldPermissions/RLS на уровне БД (approved=read-only для не-руководителя), либо database-event guard на entry-update (отвергать правку APPROVED). Последнее — самое надёжное, путь-независимое.
