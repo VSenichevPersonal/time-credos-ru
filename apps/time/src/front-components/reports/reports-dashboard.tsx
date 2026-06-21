@@ -81,6 +81,56 @@ const NavBtn = ({
   );
 };
 
+// P2-пресет «Загрузка людей»: тумблер-кнопка (срез employee + util-сортировка).
+// Активное состояние — заливка бренд-акцентом (≤10% площади, impeccable);
+// неактивное — тихая обводка. aria-pressed для скринридера.
+const PresetBtn = ({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) => {
+  const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      title="Срез по сотрудникам, отсортированный по утилизации (рейтинг загрузки)"
+      style={{
+        height: 28,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '0 10px',
+        border: `1px solid ${active ? T.accent : hover || focus ? T.accentRing : T.border}`,
+        borderRadius: 7,
+        background: active ? T.accent : hover ? T.accentSoft : T.surface,
+        color: active ? T.onAccent : hover || focus ? T.accent : T.textMuted,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        fontSize: 12,
+        fontWeight: 500,
+        whiteSpace: 'nowrap',
+        outline: 'none',
+        boxShadow: focus ? `0 0 0 2px ${T.accentRing}` : undefined,
+        transition: 'background 120ms ease, color 120ms ease, border-color 120ms ease, box-shadow 120ms ease',
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 12 }}>▦</span>
+      {label}
+    </button>
+  );
+};
+
 const PeriodNav = ({
   label,
   isCurrent,
@@ -125,6 +175,11 @@ export const ReportsDashboard = () => {
   const [view, setView] = useState<View>('summary');
   const { period, gran, isCurrent, prev, next, setGran } = usePeriod();
   const [groupBy, setGroupBy] = useState<GroupBy>('dept');
+  // P2-пресет «Загрузка людей» (REPORTS_COMPLETENESS): срез employee + сортировка
+  // по утилизации (desc) — рейтинг загрузки людей одним кликом. Сбрасывается при
+  // ручной смене среза. Чистый фронт: переиспользует существующий OLAP-срез
+  // employee + клиентскую сортировку BreakdownTable (бэк не трогаем).
+  const [utilPreset, setUtilPreset] = useState(false);
   const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
   const { stack, drillInto, goToLevel, reset } = useDrill();
   // Корень: 3-срезовый ответ (KPI + норма/утил по периоду). Backend не дёргаем
@@ -150,6 +205,14 @@ export const ReportsDashboard = () => {
   const switchGroupBy = (g: GroupBy) => {
     reset();
     setGroupBy(g);
+    setUtilPreset(false); // ручной выбор среза снимает пресет
+  };
+  // P2-пресет «Загрузка людей»: срез employee + util-сортировка. Тумблер — повторный
+  // клик возвращает обычный срез сотрудников (сортировка по факту).
+  const toggleUtilPreset = () => {
+    reset();
+    setGroupBy('employee');
+    setUtilPreset((on) => !on);
   };
   // Смена ПЕРИОДА (‹ › / Месяц/Квартал/Год) НЕ трогает drill-стек и фильтры:
   // скоуп (Отдел→Проект→Сотрудник) сохраняется, useOlap перезапрашивает тот же
@@ -287,6 +350,11 @@ export const ReportsDashboard = () => {
               />
             )}
             <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              <PresetBtn
+                label="Загрузка людей"
+                active={utilPreset}
+                onClick={toggleUtilPreset}
+              />
               <Segmented
                 ariaLabel="Срез группировки"
                 value={groupBy}
@@ -354,10 +422,16 @@ export const ReportsDashboard = () => {
                 }}
               >
                 <BreakdownTable
+                  // Пересоздаём таблицу при переключении пресета/среза, чтобы новая
+                  // начальная сортировка (defaultSort) применилась (useSortable
+                  // читает default только на маунте). Дальше колонки-сортировка живёт.
+                  key={`${groupBy}-${utilPreset ? 'util' : 'fact'}`}
                   groupBy={groupBy}
                   rows={filterRows(pickRows(groupBy, data))}
                   onDrill={rootDrillable() ? drillRow(rootAxis, ALL_DIMS) : undefined}
                   drillable={rootDrillable() ? () => true : undefined}
+                  // P2-пресет «Загрузка людей»: util-сортировка (колонка «Утил.» = metric).
+                  defaultSort={utilPreset && groupBy === 'employee' ? 'metric' : 'fact'}
                 />
               </div>
             ) : (

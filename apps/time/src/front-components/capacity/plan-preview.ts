@@ -310,3 +310,13 @@ export const validateRange = (
 // доски. Не ошибка (не блокирует сохранение), отдельно от validateRange.
 export const openEndedHint = (endKey: string): string | null =>
   endKey ? null : 'открытый план — раскид до конца горизонта доски';
+
+// W3B.16: утилизация периода = план / СВОБОДНАЯ ёмкость (PreviewRow.capacity).
+// Это доля свободной ёмкости, которую съедает план периода — иной показатель, чем
+// hours/maxHours (масштаб бара). null = нет ёмкости (capacity null или ≤ 0) →
+// бар-утилизации не рисуем. > 1 = овербукинг (совпадает с row.over). Не округляем
+// — округление в UI (formatPct из cap-tokens).
+export const utilPct = (row: Pick<PreviewRow, 'hours' | 'capacity'>): number | null => {
+  if (row.capacity == null || row.capacity <= 0) return null;
+  return row.hours / row.capacity;
+};

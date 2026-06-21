@@ -7,6 +7,7 @@
  */
 
 // CLIENT_CATEGORY — из SSOT select-options (тип-завязан на WorkCategory), не хардкод. [ssot-bug]#1
+import { resolveCapacityFactor } from 'src/constants/capacity';
 import { CLIENT_CATEGORY } from 'src/constants/select-options';
 
 export { CLIENT_CATEGORY };
@@ -273,13 +274,13 @@ export const computeReports = (
   // Вычет не опускает норму ниже 0 (защита от переучёта отсутствий).
   const deptNorm = (d: RawDepartment): number => {
     const headcount = headcountByDept.get(d.id) ?? 0;
-    const base = baseNorm * headcount * (d.capacityFactor ?? 1);
+    const base = baseNorm * headcount * resolveCapacityFactor(d.capacityFactor);
     return Math.max(0, base - (absenceHoursByDept.get(d.id) ?? 0));
   };
   // Личная норма = база × factor отдела − часы отсутствий сотрудника (не ниже 0).
   const empNorm = (e: RawEmployee): number => {
     const d = e.departmentId ? deptById.get(e.departmentId) : undefined;
-    const base = baseNorm * (d?.capacityFactor ?? 1);
+    const base = baseNorm * resolveCapacityFactor(d?.capacityFactor);
     return Math.max(0, base - (absenceHoursByEmp.get(e.id) ?? 0));
   };
 
@@ -612,12 +613,12 @@ export const computeOlap = (
       const e = empById.get(key);
       if (!e) return null;
       const d = e.departmentId ? deptById.get(e.departmentId) : undefined;
-      return Math.max(0, baseNorm * (d?.capacityFactor ?? 1) - (absByEmp.get(key) ?? 0));
+      return Math.max(0, baseNorm * resolveCapacityFactor(d?.capacityFactor) - (absByEmp.get(key) ?? 0));
     }
     // dept
     const d = deptById.get(key);
     if (!d) return null;
-    return Math.max(0, baseNorm * (headcountByDept.get(key) ?? 0) * (d.capacityFactor ?? 1) - (absByDept.get(key) ?? 0));
+    return Math.max(0, baseNorm * (headcountByDept.get(key) ?? 0) * resolveCapacityFactor(d.capacityFactor) - (absByDept.get(key) ?? 0));
   };
 
   // --- Один проход: фильтр → накопление по ключу groupBy ---
@@ -829,7 +830,7 @@ export const computeTimeseries = (
     let sum = 0;
     for (const d of normDepartments) {
       const headcount = headcountByDept.get(d.id) ?? 0;
-      const gross = base * headcount * (d.capacityFactor ?? 1);
+      const gross = base * headcount * resolveCapacityFactor(d.capacityFactor);
       const abs = absHoursByDeptMonth.get(`${d.id}|${month}`) ?? 0;
       sum += Math.max(0, gross - abs);
     }

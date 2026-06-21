@@ -140,6 +140,88 @@ describe('approval.logic — runSubmit', () => {
     expect(result).toMatchObject({ ok: true, updated: 0 });
   });
 
+  // BUG-1 (W5A.6/W5A.30): submit переотправляет REJECTED-записи (исправленный
+  // отклонённый таймшит). Без фикса REJECTED не попадал в submit → сотрудник застревал.
+  it('submit: REJECTED-запись переотправляется → SUBMITTED, updated:1', async () => {
+    const mockFn = mockFetch([
+      { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: true, departmentId: null }] } },
+      { data: { credosTimeDepartments: [] } },
+      { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'REJECTED', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      {}, // PATCH
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+    const patchCall = mockFn.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes(`/rest/credosTimeEntries/${ENTRY_UUID}`),
+    );
+    expect(patchCall).toBeTruthy();
+    const body = JSON.parse((patchCall![1] as { body: string }).body);
+    expect(body.status).toBe('SUBMITTED');
+  });
+
+  // BUG-1: при переотправке REJECTED→SUBMITTED rejectComment очищается (новая попытка).
+  it('submit: переотправка REJECTED очищает rejectComment + аудит-поля', async () => {
+    const mockFn = mockFetch([
+      { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: true, departmentId: null }] } },
+      { data: { credosTimeDepartments: [] } },
+      { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'REJECTED', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      {}, // PATCH
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }));
+    const patchCall = mockFn.mock.calls.find(
+      (c: unknown[]) => typeof c[0] === 'string' && c[0].includes(`/rest/credosTimeEntries/${ENTRY_UUID}`),
+    );
+    const body = JSON.parse((patchCall![1] as { body: string }).body);
+    expect(body.rejectComment).toBeNull();
+    expect(body.approvedBy).toBeNull();
+    expect(body.approvedAt).toBeNull();
+  });
+
+  // BUG-1: APPROVED/SUBMITTED НЕ переотправляются (только DRAFT|REJECTED submittable).
+  it('submit: APPROVED-запись НЕ переотправляется → updated:0', async () => {
+    vi.stubGlobal(
+      'fetch',
+      mockFetch([
+        { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: true, departmentId: null }] } },
+        { data: { credosTimeDepartments: [] } },
+        { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'APPROVED', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      ]),
+    );
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 0 });
+  });
+
+  // BUG-1: смешанный период (DRAFT+REJECTED+APPROVED) → submit берёт оба submittable.
+  it('submit: DRAFT+REJECTED+APPROVED → updated:2 (только DRAFT и REJECTED)', async () => {
+    const ID_DRAFT = 'cccccccc-3333-4ccc-8ccc-cccccccccc01';
+    const ID_REJ = 'cccccccc-3333-4ccc-8ccc-cccccccccc02';
+    const ID_APP = 'cccccccc-3333-4ccc-8ccc-cccccccccc03';
+    vi.stubGlobal(
+      'fetch',
+      mockFetch([
+        { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: true, departmentId: null }] } },
+        { data: { credosTimeDepartments: [] } },
+        { data: { credosTimeEntries: [
+          { id: ID_DRAFT, status: 'DRAFT', projectId: PROJ_UUID, employeeId: EMP_UUID },
+          { id: ID_REJ, status: 'REJECTED', projectId: PROJ_UUID, employeeId: EMP_UUID },
+          { id: ID_APP, status: 'APPROVED', projectId: PROJ_UUID, employeeId: EMP_UUID },
+        ] } },
+        {}, // PATCH draft
+        {}, // PATCH rejected
+      ]),
+    );
+    const result = await handler(
+      event({ op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID }),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 2 });
+  });
+
   it('submit: approvalMap через отдел (project=null, dept=true) → updated:1', async () => {
     const mockFn = mockFetch([
       { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: null, departmentId: DEPT_UUID }] } },

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 
-import { T } from 'src/front-components/capacity/cap-tokens';
+import { T, loadTone, formatPct } from 'src/front-components/capacity/cap-tokens';
 import {
   computePreview,
   openEndedHint,
   previewLoadCtxFor,
+  utilPct,
   validateRange,
   type PreviewSource,
 } from 'src/front-components/capacity/plan-preview';
@@ -320,6 +321,10 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
                 <div>
                   {preview.rows.map((r) => {
                     const w = preview.maxHours > 0 ? Math.round((r.hours / preview.maxHours) * 100) : 0;
+                    // W3B.16: утилизация периода = план / свободная ёмкость (доля
+                    // съеденной ёмкости). null = нет ёмкости → util%-чип не рисуем.
+                    const util = utilPct(r);
+                    const tone = loadTone(util);
                     return (
                       <div
                         key={r.key}
@@ -340,21 +345,30 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
                         <span style={{ width: 44, flexShrink: 0, textAlign: 'right', color: T.text, ...tnum }}>
                           {round(r.hours)} ч
                         </span>
-                        {r.over && (
+                        {/* W3B.16: util%-чип — план vs свободная ёмкость периода.
+                            Цвет/насыщенность — loadTone (свободно→зелёный тише,
+                            перегруз→терракот), как ячейки доски. null → плейсхолдер
+                            «—», чтобы колонка не разъезжалась. */}
+                        {util != null ? (
                           <span
                             style={{
+                              width: 38,
                               flexShrink: 0,
+                              textAlign: 'center',
                               fontSize: 10,
-                              color: T.warnSolid,
-                              background: T.warnTint,
+                              color: tone.fg,
+                              background: tone.bg,
                               borderRadius: 3,
-                              padding: '0 4px',
-                              whiteSpace: 'nowrap',
+                              padding: '1px 0',
                               ...tnum,
                             }}
-                            title={`План ${round(r.hours)} ч > свободной ёмкости ${round(r.capacity ?? 0)} ч${r.fullCapacity != null ? ` (из ${round(r.fullCapacity)} ч полной)` : ''}`}
+                            title={`Утилизация ${formatPct(util)}: план ${round(r.hours)} ч из ${round(r.capacity ?? 0)} ч свободной ёмкости${r.fullCapacity != null ? ` (полная ${round(r.fullCapacity)} ч)` : ''}`}
                           >
-                            ⚠ +{round(r.hours - (r.capacity ?? 0))}
+                            {formatPct(util)}
+                          </span>
+                        ) : (
+                          <span style={{ width: 38, flexShrink: 0, textAlign: 'center', fontSize: 10, color: T.textFaint }}>
+                            —
                           </span>
                         )}
                       </div>

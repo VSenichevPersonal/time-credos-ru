@@ -67,13 +67,16 @@ type Props = {
   // OLAP-drill: заголовок колонки имени для произвольной оси (вид работ/категория/
   // группа), когда срез выходит за dept/project/employee. Не задан → по groupBy.
   axisLabel?: string;
+  // P2-пресет «Загрузка людей»: начальная сортировка таблицы (по умолчанию 'fact').
+  // 'metric' для среза employee = утилизация (desc) — рейтинг загрузки сотрудников.
+  defaultSort?: SortKey;
 };
 
-export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel }: Props) => {
+export const BreakdownTable = ({ groupBy, rows, onDrill, drillable, axisLabel, defaultSort = 'fact' }: Props) => {
   const isProject = groupBy === 'project';
   const nameHeader = axisLabel ?? (isProject ? 'Проект' : groupBy === 'dept' ? 'Отдел' : 'Сотрудник');
   const maxFact = Math.max(1, ...rows.map((r) => r.fact));
-  const { key: sortKey, dir, toggle, sort } = useSortable<SortKey>('fact');
+  const { key: sortKey, dir, toggle, sort } = useSortable<SortKey>(defaultSort);
   const [hover, setHover] = useState<string | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
 

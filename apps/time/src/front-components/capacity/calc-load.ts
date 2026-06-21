@@ -14,6 +14,8 @@ import type {
   ProjectLoad,
 } from 'src/front-components/capacity/types';
 
+import { resolveCapacityFactor } from 'src/constants/capacity';
+
 const DAY_MS = 86400000;
 const MONTHS = [
   'янв', 'фев', 'мар', 'апр', 'май', 'июн',
@@ -196,7 +198,7 @@ export const deptCapacity = (
   period: Period,
   ctx?: AbsenceCtx,
 ): number => {
-  const base = period.workHours * dept.headcount * dept.capacityFactor;
+  const base = period.workHours * dept.headcount * resolveCapacityFactor(dept.capacityFactor);
   return Math.max(0, base - deptAbsenceHours(dept, ctx, period));
 };
 
@@ -509,7 +511,7 @@ export const employeeLoadCells = (
   bookingCtx?: BookingCtx,
   spread?: PlanSpread,
 ): LoadCell[] => {
-  const factor = dept?.capacityFactor ?? 0.8;
+  const factor = resolveCapacityFactor(dept?.capacityFactor);
   const share = dept && dept.headcount > 0 ? 1 / dept.headcount : 0;
   return periods.map((period) => {
     // W3-1: личная ёмкость уменьшается на часы отсутствий ЭТОГО сотрудника

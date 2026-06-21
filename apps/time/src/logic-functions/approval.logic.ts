@@ -126,25 +126,32 @@ const setStatus = async (
   await restPatch(`/rest/credosTimeEntries/${id}`, data);
 };
 
-// submit: все DRAFT-записи периода сотрудника (где проект требует согласования) → SUBMITTED.
+// submit: DRAFT И REJECTED записи периода сотрудника (где проект требует согласования)
+// → SUBMITTED. REJECTED включён намеренно (W5A.6/W5A.30, Ref=Timetta): исправленный
+// отклонённый таймшит переотправляется ТЕМ ЖЕ submit — иначе сотрудник застревал после
+// reject (нет перехода REJECTED→SUBMITTED). setStatus при SUBMITTED обнуляет rejectComment
+// и аудит-поля — новая попытка согласования начинается «с чистого листа».
+const SUBMITTABLE = new Set<string>([ENTRY_STATUS.DRAFT, ENTRY_STATUS.REJECTED]);
 const runSubmit = async (params: Record<string, string>): Promise<object> => {
   const { from, to, employeeId } = params;
   if (!from || !to || !employeeId) return { ok: false, error: 'from/to/employeeId required' };
   // CISO-006 вектор A: эти три параметра идут в filter-строку, где запятая —
   // разделитель условий. Инъекция в employeeId (напр. `id,status[neq]:DRAFT`)
-  // обошла бы `status[eq]:DRAFT` → submit чужих/не-DRAFT записей. Валидируем формат.
+  // дала бы submit чужих записей. Валидируем формат.
   if (!isIsoDate(from) || !isIsoDate(to)) return { ok: false, error: 'invalid from/to' };
   if (!isUuid(employeeId)) return { ok: false, error: 'invalid employeeId' };
   const approvalMap = await buildApprovalMap();
+  // Статус-условие НЕ в filter ([in]:DRAFT,REJECTED конфликтует с запятой-разделителем
+  // условий REST) — фильтруем статус в коде (как projectId-фильтр ниже).
   const res = await restGet<{ data: { credosTimeEntries: RawEntry[] } }>(
     '/rest/credosTimeEntries',
     {
-      filter: `date[gte]:${from},date[lte]:${to},employeeId[eq]:${employeeId},status[eq]:${ENTRY_STATUS.DRAFT}`,
+      filter: `date[gte]:${from},date[lte]:${to},employeeId[eq]:${employeeId}`,
       limit: '500',
     },
   );
   const targets = (res.data?.credosTimeEntries ?? []).filter(
-    (e) => e.projectId && approvalMap.get(e.projectId),
+    (e) => SUBMITTABLE.has(e.status) && e.projectId && approvalMap.get(e.projectId),
   );
   for (const e of targets) await setStatus(e.id, ENTRY_STATUS.SUBMITTED, null);
   return { ok: true, updated: targets.length };

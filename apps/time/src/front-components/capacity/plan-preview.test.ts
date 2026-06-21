@@ -7,6 +7,7 @@ import {
   previewDeptsForProject,
   previewGranularity,
   previewLoadCtxFor,
+  utilPct,
   validateRange,
   type PreviewSource,
 } from 'src/front-components/capacity/plan-preview';
@@ -277,5 +278,20 @@ describe('computePreview — open-ended endDate (W3B.23)', () => {
     const res = computePreview(480, '2026-07-01', '', cal, dept);
     expect(res.rows).toEqual([]);
     expect(res.total).toBe(0);
+  });
+});
+
+// ── W3B.16: util% периода (план / свободная ёмкость) ───────────────────────────
+describe('utilPct — утилизация периода', () => {
+  it('план / свободная ёмкость', () => {
+    expect(utilPct({ hours: 40, capacity: 80 })).toBe(0.5);
+    expect(utilPct({ hours: 80, capacity: 80 })).toBe(1);
+  });
+  it('овербукинг → > 1', () => {
+    expect(utilPct({ hours: 120, capacity: 80 })).toBeGreaterThan(1);
+  });
+  it('нет ёмкости (null / 0) → null', () => {
+    expect(utilPct({ hours: 40, capacity: null })).toBeNull();
+    expect(utilPct({ hours: 40, capacity: 0 })).toBeNull();
   });
 });
