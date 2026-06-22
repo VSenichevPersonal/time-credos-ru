@@ -27,6 +27,7 @@ import {
   CREDOS_TIME_PROJECT_MK_VF_12,
   CREDOS_TIME_PROJECT_MK_VF_13,
   CREDOS_TIME_PROJECT_MK_VF_14,
+  CREDOS_TIME_PROJECT_MK_VF_15,
   CREDOS_TIME_PROJECT_MARKETING_ACTUAL_ON_FIELD_ID,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
@@ -154,8 +155,10 @@ export default defineView({
       isVisible: true,
       size: 240,
     },
-    // Актуальность маркетинг-данных: ручная дата ревью + нативный whole-record
-    // updatedAt ядра (бесплатно, без объявления поля) — «когда проект менялся».
+    // Актуальность маркетинг-данных: ручная дата ревью + нативные whole-record
+    // updatedAt/updatedBy ядра (бесплатно, без объявления полей) — «когда менялся»
+    // и «кто менял». Per-field детализация «какое поле кто/когда» — в credosTimeMarketingLog
+    // (см. marketingLogs relation в карточке проекта).
     {
       universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_13,
       fieldMetadataUniversalIdentifier:
@@ -170,6 +173,14 @@ export default defineView({
       position: 13,
       isVisible: true,
       size: 200,
+    },
+    // Нативный updatedBy ядра — «кто последним менял запись» (whole-record), бесплатно.
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_15,
+      fieldMetadataUniversalIdentifier: nativeFieldId('updatedBy'),
+      position: 14,
+      isVisible: true,
+      size: 220,
     },
   ],
 });

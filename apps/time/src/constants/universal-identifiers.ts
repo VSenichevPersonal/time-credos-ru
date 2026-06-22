@@ -973,3 +973,49 @@ export const CREDOS_TIME_ENTRY_LOGS_FIELD_ID =
 // исключён из nav-guard через TECHNICAL_VIEWS, как plan-slot).
 export const CREDOS_TIME_ENTRY_LOG_VIEW_UNIVERSAL_IDENTIFIER =
   '3b75f9f8-8b8f-491f-85a1-d5a753a7c906';
+
+// --- MARKETING-LOG: per-field журнал изменений МАРКЕТИНГ-полей проекта ---
+// credosTimeMarketingLog — узкий аудит «кто/когда/что» по МАРКЕТИНГ-полям проекта
+// (ndaLevel/canPublishOnSite/isPublished/... — разрешения NDA/публикации меняются за
+// долгий LTV клиента; нужно знать «кто снял NDA / разрешил публикацию когда»).
+// 1 строка = 1 изменённое поле (fieldName + oldValue→newValue + actor + changedAt).
+// Пишется database-event триггером credosTimeProject.updated (НЕ все поля проекта,
+// только маркетинг — [[keep-it-simple]]). actor — server-truth по event.userWorkspaceId.
+// [[twenty-sdk-apply-gotchas]]: имена полей НЕ резервные; labelIdentifier на fieldName
+// (TEXT, searchable). project MANY_TO_ONE CASCADE (лог производный — без проекта смысла
+// нет). Техн.объект: nav-item скрыт (как entry-log), index-view есть (SDK-pitfall +
+// админ-аудит по прямой ссылке), исключён из nav-guard через TECHNICAL_VIEWS.
+export const CREDOS_TIME_MARKETING_LOG_OBJECT_UNIVERSAL_IDENTIFIER =
+  '5c597a7e-4d26-47a7-88bf-5844a0a7469e';
+// Скаляры лога.
+export const CREDOS_TIME_MARKETING_LOG_FIELD_NAME_FIELD_ID =
+  'b1a99d7a-d039-4a45-82b7-89b7bae9d1e9';
+export const CREDOS_TIME_MARKETING_LOG_OLD_VALUE_FIELD_ID =
+  'ea32d776-7dc9-4c3e-9c78-9fe394bec57d';
+export const CREDOS_TIME_MARKETING_LOG_NEW_VALUE_FIELD_ID =
+  'f105f959-93c0-495a-b617-193a00bda4b9';
+export const CREDOS_TIME_MARKETING_LOG_ACTOR_FIELD_ID =
+  '5cdd20df-c3c7-4122-8bcd-c8329ad9e750';
+export const CREDOS_TIME_MARKETING_LOG_CHANGED_AT_FIELD_ID =
+  'eaee3a26-e215-436a-adc6-3836f9750498';
+// MarketingLog.project -> Project.marketingLogs (MANY_TO_ONE CASCADE + обратная ONE_TO_MANY).
+export const CREDOS_TIME_MARKETING_LOG_PROJECT_FIELD_ID =
+  'c37e875f-5b21-4275-b594-65c6c13dbdc2';
+export const CREDOS_TIME_PROJECT_MARKETING_LOGS_FIELD_ID =
+  '79933790-8c20-4562-b530-55af1bad5042';
+// Index-view (техн.объект; nav-item НЕ создаём — журнал по прямой ссылке, исключён
+// из nav-guard через TECHNICAL_VIEWS, как entry-log).
+export const CREDOS_TIME_MARKETING_LOG_VIEW_UNIVERSAL_IDENTIFIER =
+  'e10d1322-968b-4083-b78a-a447648b119e';
+export const CREDOS_TIME_MARKETING_LOG_VIEW_SORT_UNIVERSAL_IDENTIFIER =
+  'bd3f4500-e52f-4734-bf34-c90d28d6b327';
+export const CREDOS_TIME_MARKETING_LOG_VF_1 = 'd33f4356-911e-4bd0-a3d4-cdd780d16eb3';
+export const CREDOS_TIME_MARKETING_LOG_VF_2 = 'c313df05-0ffe-4045-8867-c8622f60c93f';
+export const CREDOS_TIME_MARKETING_LOG_VF_3 = 'e9778daf-015f-4538-9eac-7c2f7b04b87b';
+export const CREDOS_TIME_MARKETING_LOG_VF_4 = '27587a62-a1d4-4929-be28-79787540adc5';
+export const CREDOS_TIME_MARKETING_LOG_VF_5 = '45762441-2b25-4d4d-8fa7-d377c3a8bfd3';
+// database-event триггер per-field marketing-log на credosTimeProject.updated.
+export const PROJECT_MARKETING_LOG_UPDATED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
+  'd99054ca-e561-4025-8f55-d838f681e941';
+// Card-view marketing: нативный whole-record updatedBy ядра (бесплатно, «кто менял»).
+export const CREDOS_TIME_PROJECT_MK_VF_15 = '25b01645-7040-4df8-a507-08fa23e04155';
