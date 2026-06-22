@@ -3,6 +3,7 @@ import { definePageLayout, PageLayoutTabLayoutMode } from 'twenty-sdk/define';
 import {
   CREDOS_TIME_PROJECT_CARD_BILLING_LINKS_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_CARD_MARKETING_HISTORY_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_OVERVIEW_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_STAGES_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
@@ -20,6 +21,7 @@ import {
   CREDOS_TIME_PROJECT_RP_W_BUDGET_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_DOCS_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_MARKETING_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_MARKETING_HISTORY_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_OVERVIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_STAGES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_TEAM_UNIVERSAL_IDENTIFIER,
@@ -361,6 +363,10 @@ export default definePageLayout({
     },
     // 6. Маркетинг — NDA проекта + публикация на сайте (FIELDS по card-view
     // «Проект — маркетинг»): уровень NDA, можно/опубликовано на сайте, ссылка.
+    //  • Виджет 1 (FIELDS «Проект — маркетинг») — основные маркетинг-поля проекта.
+    //  • Виджет 2 (FIELDS «Проект — история маркетинга», relation marketingLogs)
+    //    — инлайн-журнал изменений ПОД полями: поле/было→стало/кто/когда, свежие
+    //    сверху (сортировка changedAt DESC из index-view marketing-log). Read-only.
     {
       universalIdentifier:
         CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER,
@@ -374,12 +380,25 @@ export default definePageLayout({
             CREDOS_TIME_PROJECT_RP_W_MARKETING_UNIVERSAL_IDENTIFIER,
           title: 'NDA и публикация',
           type: 'FIELDS',
-          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          gridPosition: { row: 0, column: 0, rowSpan: 6, columnSpan: 12 },
           configuration: {
             configurationType: 'FIELDS',
             viewUniversalIdentifier:
               CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
             newFieldDefaultVisibility: true,
+          },
+        },
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_MARKETING_HISTORY_UNIVERSAL_IDENTIFIER,
+          title: 'История изменений маркетинга',
+          type: 'FIELDS',
+          gridPosition: { row: 6, column: 0, rowSpan: 6, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_PROJECT_CARD_MARKETING_HISTORY_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: false,
           },
         },
       ],

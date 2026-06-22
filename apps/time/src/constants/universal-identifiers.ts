@@ -402,6 +402,19 @@ export const CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER =
   'b2ba6840-d14a-4a81-a395-adf382c2717c';
 export const CREDOS_TIME_PROJECT_RP_W_MARKETING_UNIVERSAL_IDENTIFIER =
   '095e4f5e-109b-4bff-87be-d34c65c457e3';
+// Card-view «Проект — история маркетинга» (набор полей для 2-го FIELDS-виджета
+// вкладки «Маркетинг»): code + relation marketingLogs → ядро рендерит инлайн-список
+// логов изменений ТЕКУЩЕГО проекта (поле/было→стало/кто/когда). По образцу
+// card-view «Проект — трудозатраты» (timeEntries-инлайн). Read-only — история.
+export const CREDOS_TIME_PROJECT_CARD_MARKETING_HISTORY_VIEW_UNIVERSAL_IDENTIFIER =
+  '62c8feb7-1296-49d2-80fd-c78be0764adb';
+export const CREDOS_TIME_PROJECT_MKH_VF_1 =
+  '93b71086-77ed-4c6e-9bb7-6db32e9292ae';
+export const CREDOS_TIME_PROJECT_MKH_VF_2 =
+  '107cbd39-9193-4511-894b-e48770336060';
+// 2-й виджет вкладки «Маркетинг» — инлайн-история изменений (marketingLogs).
+export const CREDOS_TIME_PROJECT_RP_W_MARKETING_HISTORY_UNIVERSAL_IDENTIFIER =
+  '275721b9-2f2f-44e9-a1ba-5cc017eb95b8';
 
 // --- Wave 2 (REPORTS): агрегатная аналитика /s/reports ---
 // Logic-функция /s/reports (утилизация + загрузка/недогруз, группировки
