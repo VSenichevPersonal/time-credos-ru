@@ -349,6 +349,164 @@ describe('PERIOD-LOCKDOWN: закрытие прошлых периодов по
   });
 });
 
+// ON-BEHALF server-gate (MANAGER_ENTRY_ON_BEHALF §3.1): trusted actor может писать
+// ЗА сотрудника, только если canWriteFor (руководитель отдела / PM проекта / админ).
+// Чужой actor → FORBIDDEN_ON_BEHALF. Свой ввод — без gate. on-behalf-запись стампит
+// enteredByActor = actor.employeeId. NULL/untrusted actor → деградация (gate выкл).
+describe('ON-BEHALF server-gate (canWriteFor + enteredByActor)', () => {
+  const ACTOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'; // руководитель/PM
+  const TARGET = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'; // подчинённый
+  const DEPT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const UW = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+  const PROJ = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const ENTRY = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+  // trusted actor (ветка-1 resolveActor: userWorkspaceId задан + замаплен).
+  const trustedManager = {
+    data: { credosTimeEmployees: [{ id: ACTOR, isManager: true, workspaceMemberRef: 'wm-a', userWorkspaceRef: UW }] },
+  };
+  // canWriteFor head-ветка: actor — head отдела DEPT, target.primaryDept == DEPT.
+  const headedDepts = { data: { credosTimeDepartments: [{ id: DEPT }] } };
+  const targetInDept = { data: { credosTimeEmployees: [{ departmentId: DEPT }] } };
+  const targetNoDept = { data: { credosTimeEmployees: [{ departmentId: null }] } };
+  const noEmployeeDepts = { data: { credosTimeEmployeeDepartments: [] } };
+
+  // event с trusted-идентичностью (userWorkspaceId непуст).
+  const trustedEvent = (body: Record<string, unknown>) => ({
+    ...event(body),
+    userWorkspaceId: UW,
+  });
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('руководитель отдела пишет ЗА подчинённого → ok + enteredByActor стамп', async () => {
+    const mockFn = mockFetch([
+      trustedManager, // resolveActor ветка-1
+      settingsRes(), // readSettings (lockdown)
+      headedDepts, // canWriteFor: отделы actor (head)
+      targetInDept, // canWriteFor: primaryDept target == DEPT → true
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'oh-1' } } }, // POST
+      {}, // writeEntryLog
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({
+      op: 'upsert', hours: '8', date: '2026-06-10', employeeId: TARGET,
+    }));
+    expect(result).toMatchObject({ ok: true });
+    const post = mockFn.mock.calls.find(
+      (c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'),
+    );
+    const body = JSON.parse(String((post?.[1] as { body?: string })?.body ?? '{}'));
+    expect(body.employeeId).toBe(TARGET);
+    expect(body.enteredByActor).toBe(ACTOR); // стамп «внёс руководитель»
+  });
+
+  it('чужой actor (не head, не PM, не admin) пишет за чужого → FORBIDDEN_ON_BEHALF, без POST', async () => {
+    // НЕ-руководитель actor: isManager=false → нет admin-деградации.
+    const nonManager = {
+      data: { credosTimeEmployees: [{ id: ACTOR, isManager: false, workspaceMemberRef: 'wm-a', userWorkspaceRef: UW }] },
+    };
+    const mockFn2 = mockFetch([
+      nonManager, // resolveActor
+      settingsRes(), // readSettings
+      headedDepts, // canWriteFor: отделы actor (head) — есть отдел, но...
+      targetNoDept, // target.primaryDept = null → не совпал
+      noEmployeeDepts, // target FTE-назначения пусты → не head → false
+      // PM-ветка: projectId не передан → пропущена → canWriteFor=false
+    ]);
+    vi.stubGlobal('fetch', mockFn2);
+    const result = await handler(trustedEvent({
+      op: 'upsert', hours: '8', date: '2026-06-10', employeeId: TARGET,
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'FORBIDDEN_ON_BEHALF' });
+    const mutations = mockFn2.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('свой ввод (employeeId == actor) trusted → ok, enteredByActor = null (не on-behalf)', async () => {
+    const mockFn = mockFetch([
+      trustedManager, // resolveActor → actor.employeeId = ACTOR
+      settingsRes(), // readSettings
+      // gate НЕ вызывается (employeeId == actor) → сразу findExistingEntryIdByKey
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'self-1' } } }, // POST
+      {}, // writeEntryLog
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({
+      op: 'upsert', hours: '8', date: '2026-06-10', employeeId: ACTOR,
+    }));
+    expect(result).toMatchObject({ ok: true });
+    const post = mockFn.mock.calls.find(
+      (c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'),
+    );
+    const body = JSON.parse(String((post?.[1] as { body?: string })?.body ?? '{}'));
+    expect(body.employeeId).toBe(ACTOR);
+    expect(body.enteredByActor).toBeNull(); // свой ввод не стампится
+  });
+
+  it('NULL-actor (untrusted, uwId пуст) → деградация: gate выкл, пишет по resolveEmployeeId', async () => {
+    // userWorkspaceId=null → resolveActor ветка-3 (untrusted) или null. Без wmRef →
+    // actor=null → деградация на resolveEmployeeId (DEV-fallback). gate не применяется.
+    const mockFn = mockFetch([
+      emptyEmployees, // resolveEmployeeId DEV-fallback → первый активный
+      settingsRes(), // readSettings
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'deg-1' } } }, // POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    // employeeId target передан, но actor=null → gate выкл, не FORBIDDEN.
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-06-10', employeeId: TARGET,
+    }));
+    // employee not resolved ИЛИ ok — главное НЕ FORBIDDEN_ON_BEHALF (gate выкл).
+    expect((result as { error?: string }).error).not.toBe('FORBIDDEN_ON_BEHALF');
+  });
+
+  it('delete чужой записи руководителем отдела → ok (canWriteFor разрешил)', async () => {
+    const mockFn = mockFetch([
+      trustedManager, // resolveActor
+      { data: { credosTimeEntries: [{ id: ENTRY, status: 'DRAFT', projectId: PROJ, hours: 4, date: '2026-06-10T00:00:00.000Z', employeeId: TARGET }] } }, // pre-read (с employeeId владельца)
+      // canWriteFor (isManager=true) head-ветка:
+      headedDepts, // отделы actor
+      targetInDept, // target.primaryDept == DEPT → true
+      settingsRes(), // readSettings (lockdown) — после gate
+      {}, // DELETE
+      {}, // writeEntryLog
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({ op: 'delete', id: ENTRY }));
+    expect(result).toMatchObject({ ok: true });
+    const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deletes).toHaveLength(1);
+  });
+
+  it('delete чужой записи НЕ-руководителем → FORBIDDEN_ON_BEHALF, без DELETE', async () => {
+    const nonManager = {
+      data: { credosTimeEmployees: [{ id: ACTOR, isManager: false, workspaceMemberRef: 'wm-a', userWorkspaceRef: UW }] },
+    };
+    const mockFn = mockFetch([
+      nonManager, // resolveActor
+      { data: { credosTimeEntries: [{ id: ENTRY, status: 'DRAFT', projectId: null, hours: 4, date: '2026-06-10T00:00:00.000Z', employeeId: TARGET }] } }, // pre-read
+      // canWriteFor (isManager=false) head-ветка не совпала, PM нет → false
+      headedDepts, targetNoDept, noEmployeeDepts,
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({ op: 'delete', id: ENTRY }));
+    expect(result).toMatchObject({ ok: false, error: 'FORBIDDEN_ON_BEHALF' });
+    const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deletes).toHaveLength(0);
+  });
+});
+
 // CISO-007 (P2): /s/reports отдаёт byEmployee (ФИО+переработки 42 сотрудников)
 // любому аутентифицированному юзеру без role-guard. Подтверждено live QA-smoke
 // (byEmployee=42 строки, без isManager-проверки). reports.logic.ts run().

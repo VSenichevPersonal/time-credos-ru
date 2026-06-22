@@ -30,6 +30,7 @@ type Props = {
   days: WeekDay[];
   hoursByDay: number[];
   lockedByDay?: boolean[];
+  periodLockedByDay?: boolean[]; // PERIOD-LOCKDOWN: день закрыт по дате (read-only-индикация)
   entryIdByDay?: (string | null)[]; // WI-10: id записей строки по дням (для отзыва)
   statusByDay?: (string | null)[]; // WI-10: статус записей строки по дням (для отзыва)
   isManager?: boolean; // WI-10: UI-гейт revoke (серверный гард в /s/approval)
@@ -58,6 +59,7 @@ export const GridRow = ({
   days,
   hoursByDay,
   lockedByDay,
+  periodLockedByDay,
   entryIdByDay,
   statusByDay,
   isManager,
@@ -234,6 +236,7 @@ export const GridRow = ({
         weekend={day.isWeekend}
         today={day.isToday}
         locked={lockedByDay?.[i]}
+        periodLocked={periodLockedByDay?.[i]}
         normHint={normFor ? normFor(day.iso, day.isWeekend) : undefined}
         overtimeThreshold={overtimeThreshold}
         active={nav.isActive(rowIndex, i)}

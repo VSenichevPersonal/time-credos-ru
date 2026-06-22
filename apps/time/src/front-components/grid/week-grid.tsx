@@ -27,6 +27,7 @@ type Props = {
   lastWorkTypeByProject?: Record<string, string>;
   normFor: NormForDay;
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек
+  periodLockedByDay?: boolean[]; // PERIOD-LOCKDOWN: дни недели в закрытом периоде
   loading: boolean;
   onCellCommit: (rowKey: string, dayIso: string, hours: number) => void;
   onBulkFill: (rowKey: string, hours: number) => void;
@@ -53,6 +54,7 @@ export const WeekGrid = ({
   lastWorkTypeByProject,
   normFor,
   overtimeThreshold,
+  periodLockedByDay,
   loading,
   onCellCommit,
   onBulkFill,
@@ -173,6 +175,7 @@ export const WeekGrid = ({
               days={days}
               hoursByDay={row.hoursByDay}
               lockedByDay={row.lockedByDay}
+              periodLockedByDay={periodLockedByDay}
               entryIdByDay={row.entryIdByDay}
               statusByDay={row.statusByDay}
               isManager={isManager}

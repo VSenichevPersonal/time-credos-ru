@@ -5,8 +5,11 @@ import { PLAN_SLOTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/un
 
 import { validUuidParam } from './params-validate';
 // CISO-005 server-truth актор (фундамент on-behalf/lockdown/аудита plan-write).
-// Резолвится на входе для БУДУЩИХ фаз; upsert/read пока работают как раньше.
+// Резолвится на входе; при trusted-акторе ВКЛЮЧАЕТСЯ on-behalf-gate (canWriteFor).
 import { type Actor, resolveActor } from './shared/resolve-actor';
+// ON-BEHALF server-gate (MANAGER_ENTRY_ON_BEHALF §3.1.B): может ли trusted-actor
+// писать план ЗА сотрудника/отдел (свой / руководитель отдела / PM проекта / админ).
+import { canWriteFor, isActorProjectManager } from './shared/can-write-for';
 // PERIOD-LOCKDOWN: план прошлых периодов тоже не править (AUDIT_LOG_PERIOD_LOCKDOWN
 // §3.Б). Тот же guard, что в time-entry-api (SSOT): закрытый месяц read-only,
 // КРОМЕ руководителя (override). canMutatePlanMonth — по месяцу слота.
@@ -248,6 +251,31 @@ const runUpsert = async (
     if (gate.isOverride) overridden = true;
   }
 
+  // ON-BEHALF-gate (MANAGER_ENTRY_ON_BEHALF §3.1.B). Применяется ТОЛЬКО к trusted
+  // актору; null/untrusted (dev/legacy без identity) → деградация, план пишется как
+  // раньше (текущее поведение не ломаем). Для каждого входного слота:
+  //   · персональный (employeeId) ≠ actor → canWriteFor(actor, employeeId, {projectId});
+  //   · отдельский/проектный (employeeId пуст) — планирование: разрешено руководителю
+  //     (isManager-деградация admin) ИЛИ PM проекта (canWriteFor с projectId, target=null
+  //     отсекает «свой», поэтому отдельский слот пропускаем через явную проверку роли).
+  // Любой запрещённый слот → отклоняем всю пачку (FORBIDDEN_ON_BEHALF), без частичной записи.
+  if (actor?.trusted) {
+    for (const inp of inputs) {
+      if (inp.employeeId && inp.employeeId !== actor.employeeId) {
+        // Персональный слот ЗА другого сотрудника → полное правило canWriteFor.
+        const ok = await canWriteFor(actor, inp.employeeId, { projectId });
+        if (!ok) return { ok: false as const, error: 'FORBIDDEN_ON_BEHALF', employeeId: inp.employeeId };
+      } else if (!inp.employeeId) {
+        // Отдельский/проектный слот (без сотрудника) — это планирование проекта, не
+        // «свой ввод». Разрешаем руководителю (isManager-деградация admin) ИЛИ PM/
+        // владельцу проекта. Прочим trusted-акторам планировать чужой отдел нельзя.
+        const ok = actor.isManager === true || (await isActorProjectManager(actor, projectId));
+        if (!ok) return { ok: false as const, error: 'FORBIDDEN_ON_BEHALF', departmentId: inp.departmentId };
+      }
+      // Персональный слот СВОЙ (employeeId == actor) — обычный ввод, без gate.
+    }
+  }
+
   const existing = await restGetAllSlots(projectId);
   const byKey = new Map<string, RawSlot>();
   for (const s of existing) {
@@ -307,17 +335,11 @@ const run = async (event: RoutePayload) => {
   const projectId = validUuidParam(params.projectId != null ? String(params.projectId) : undefined);
   if (!projectId) return { ok: false, error: 'projectId is required (UUID)' };
 
-  // CISO-005 ФУНДАМЕНТ: серверный actor резолвится на входе для будущих фаз (audit
-  // plan-write + on-behalf canWriteFor + lockdown). СЕЙЧАС НЕ enforcement: upsert/read
-  // по projectId работают как раньше. При недоступной server-identity resolveActor
-  // вернёт null без лишних запросов → деградация, текущее поведение сохраняется.
+  // CISO-005: серверный actor. При TRUSTED-акторе включается on-behalf-gate в
+  // runUpsert (canWriteFor по сотруднику/отделу/PM проекта). При NULL/untrusted
+  // (dev/legacy без server-identity) — деградация: план пишется как раньше.
   const wmRef = params.workspaceMemberRef != null ? String(params.workspaceMemberRef) : undefined;
   const actor: Actor = await resolveActor(event, wmRef);
-  if (actor && actor.trusted) {
-    // На фазе on-behalf здесь будет canWriteFor(actor, проект/отдел/сотрудник). Пока — лог.
-    // eslint-disable-next-line no-console
-    console.warn('[plan-slots] server-actor=%s (trusted) — фундамент для аудита/on-behalf', actor.employeeId);
-  }
 
   const mode = params.mode != null ? String(params.mode) : 'read';
   if (mode === 'read') return runRead(projectId);

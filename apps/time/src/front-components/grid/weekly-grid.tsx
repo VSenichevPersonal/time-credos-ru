@@ -19,6 +19,7 @@ import { useActorName } from 'src/front-components/grid/actor-names';
 import { buildTimesheetOwner } from 'src/front-components/grid/whose-timesheet';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { useValidation } from 'src/front-components/grid/use-validation';
+import { isDayLockedByPeriod } from 'src/front-components/grid/period-lock';
 import { ValidationToast } from 'src/front-components/grid/validation-toast';
 import { UndoToast, type UndoState } from 'src/front-components/grid/undo-toast';
 import { splitRowKey, type ViewMode } from 'src/front-components/grid/types';
@@ -83,6 +84,18 @@ export const WeeklyGrid = () => {
   const overtimeThreshold = globalSettings?.overtimeWarnHours;
   // ПДн (CISO-007): ФИО актора-аудита показываем только при revealEmployeeNames.
   const revealNames = globalSettings?.revealEmployeeNames === true;
+
+  // PERIOD-LOCKDOWN: дни недели в закрытом периоде (по дате) — read-only-индикация
+  // в сетке. Серверный гард (canMutateInPeriod) остаётся источником истины; здесь
+  // лишь визуальная подсказка до отправки. Конфиг из settings (lockdownDate/grace).
+  const lockdownView = {
+    lockdownDate: globalSettings?.lockdownDate ?? null,
+    graceDays: globalSettings?.lockdownGraceDays ?? 0,
+  };
+  const periodLockedByDay = useMemo(
+    () => week.days.map((d) => isDayLockedByPeriod(d.iso, lockdownView)),
+    [week.days, lockdownView.lockdownDate, lockdownView.graceDays],
+  );
 
   // Обёртки над действиями: клиентский validateEntry — быстрый pre-check (избегаем
   // лишних запросов при явном ERROR). Затем пишем через /s/time-entry (CISO-012) и
@@ -354,6 +367,7 @@ export const WeeklyGrid = () => {
           lastWorkTypeByProject={lastWorkTypeByProject}
           normFor={normFor}
           overtimeThreshold={overtimeThreshold}
+          periodLockedByDay={periodLockedByDay}
           loading={data.loading}
           onCellCommit={commitCell}
           onBulkFill={bulkFill}

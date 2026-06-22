@@ -34,6 +34,10 @@ export type GlobalSettings = {
   // Согласование
   defaultApprovalRequired: boolean;
   approvalPeriod: string;
+  // Закрытие периода (PERIOD-LOCKDOWN). lockdownDate=null → выключено.
+  // Записи с датой ≤ (lockdownDate − lockdownGraceDays) read-only (кроме руководителя).
+  lockdownDate: string | null; // ISO 'YYYY-MM-DD' или null (выкл)
+  lockdownGraceDays: number; // грейс-окно в днях (≥0): сдвигает границу назад
   // Напоминания
   reminderEnabled: boolean;
   reminderDayOfWeek: string;

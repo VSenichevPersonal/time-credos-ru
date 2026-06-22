@@ -15,8 +15,12 @@ import { isIsoDate, isUuid } from './params-validate';
 // формулы и поведения — общий с database-event триггерами (project-fact-rollup.logic.ts).
 import { recalcProjectFactHours } from './project-fact-rollup';
 // CISO-005 server-truth актор (фундамент on-behalf/lockdown/аудита). Резолвится на
-// входе для БУДУЩИХ фаз; CRUD пока работает на текущем resolveEmployeeId (деградация).
+// входе; при trusted-акторе ВКЛЮЧАЕТСЯ on-behalf-gate (canWriteFor), иначе CRUD
+// деградирует на resolveEmployeeId (текущее поведение, dev/legacy без identity).
 import { type Actor, resolveActor } from './shared/resolve-actor';
+// ON-BEHALF server-gate (MANAGER_ENTRY_ON_BEHALF §3.1.B): может ли trusted-actor
+// писать ЗА сотрудника target (свой / руководитель отдела / PM проекта / админ).
+import { canWriteFor } from './shared/can-write-for';
 // AUDIT-LOG (MVP-гибрид): запись строки журнала изменений на каждой мутации.
 // Побочная — НИКОГДА не роняет CRUD (writeEntryLog глотает ошибки внутри).
 import { writeEntryLog } from './shared/write-entry-log';
@@ -231,19 +235,27 @@ const run = async (event: RoutePayload) => {
   const op = params.op ?? 'list';
   // CISO-006: синхронный UUID-guard до сетевого resolveEmployeeId — fail fast.
   if (params.id && !isUuid(params.id)) return { ok: false, error: 'invalid id' };
-  // CISO-005 ФУНДАМЕНТ: серверный actor («кто действует достоверно») резолвится на
-  // входе для будущих фаз (audit «кто внёс» + on-behalf canWriteFor + lockdown).
-  // СЕЙЧАС НЕ enforcement: CRUD-личность по-прежнему берётся из resolveEmployeeId
-  // (client workspaceMemberRef / DEV-fallback). При недоступной server-identity
-  // resolveActor вернёт null без лишних запросов → деградация, текущее поведение
-  // сохраняется (записи пишутся как раньше). См. shared/resolve-actor.
+  // CISO-005: серверный actor («кто действует достоверно»). При TRUSTED-акторе он же
+  // источник личности для CRUD (on-behalf-gate ниже); при NULL/untrusted (dev/legacy
+  // без server-identity) деградируем на resolveEmployeeId — текущее поведение, записи
+  // пишутся как раньше. См. shared/resolve-actor + shared/can-write-for.
   const actor: Actor = await resolveActor(event, params.workspaceMemberRef);
-  if (actor && actor.trusted && actor.employeeId !== params.employeeId) {
-    // На фазе on-behalf здесь будет canWriteFor(actor, целевой employee). Пока — лог.
-    // eslint-disable-next-line no-console
-    console.warn('[time-entry-api] server-actor=%s (trusted) — фундамент для аудита/on-behalf', actor.employeeId);
-  }
-  const employeeId = await resolveEmployeeId(params.workspaceMemberRef);
+
+  // ON-BEHALF (MANAGER_ENTRY_ON_BEHALF §3.1): целевой сотрудник записи.
+  //   · trusted actor → target = client params.employeeId (ввод ЗА другого), иначе
+  //     сам actor (свой ввод). Если target ≠ actor → требуем canWriteFor, иначе
+  //     FORBIDDEN_ON_BEHALF; при on-behalf стампим enteredByActor = actor.employeeId.
+  //   · actor null/untrusted → деградация: employeeId из resolveEmployeeId, gate
+  //     НЕ применяется (dev-flow не ломаем), enteredByActor не пишем.
+  // Целевой employeeId для upsert (delete берёт target из существующей записи ниже).
+  const clientTargetEmployeeId =
+    params.employeeId && isUuid(params.employeeId) ? params.employeeId : null;
+  const employeeId =
+    actor?.trusted
+      ? clientTargetEmployeeId ?? actor.employeeId
+      : await resolveEmployeeId(params.workspaceMemberRef);
+  // enteredByActor проставляется ТОЛЬКО при on-behalf (trusted actor пишет за ≠ себя).
+  const isOnBehalf = !!actor?.trusted && !!employeeId && employeeId !== actor.employeeId;
 
   // delete — удаление записи по id.
   if (op === 'delete') {
@@ -252,7 +264,7 @@ const run = async (event: RoutePayload) => {
     if (!isUuid(params.id)) return { ok: false, error: 'invalid id' };
     // Читаем status + projectId + hours + date до удаления (CISO-011 guard +
     // rollup пересчёт + AUDIT-LOG: oldHours/entryDate для строки журнала).
-    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string; hours: number | null; date: string | null }> } }>(
+    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string; hours: number | null; date: string | null; employeeId: string | null }> } }>(
       '/rest/credosTimeEntries',
       { filter: `id[eq]:${params.id}`, limit: '1' },
     );
@@ -260,6 +272,18 @@ const run = async (event: RoutePayload) => {
     // CISO-011: согласованные записи нельзя удалять — целостность табеля/1С.
     if (preEntry?.status === ENTRY_STATUS.APPROVED) {
       return { ok: false, error: 'cannot_modify_approved' };
+    }
+    // ON-BEHALF-gate (delete): trusted actor удаляет ЧУЖУЮ запись (владелец ≠ actor) →
+    // требуем canWriteFor (руководитель отдела / PM проекта / админ), иначе FORBIDDEN.
+    // actor null/untrusted → деградация (gate не применяется). Свой delete — всегда ок.
+    if (actor?.trusted) {
+      const targetOwner = preEntry?.employeeId ?? null;
+      if (targetOwner && targetOwner !== actor.employeeId) {
+        const allowed = await canWriteFor(actor, targetOwner, {
+          projectId: preEntry?.projectId ?? null,
+        });
+        if (!allowed) return { ok: false, error: 'FORBIDDEN_ON_BEHALF' };
+      }
     }
     // PERIOD-LOCKDOWN (2-е правило guard, SSOT с CISO-011): удаление записи в
     // ЗАКРЫТОМ периоде запрещено всем, КРОМЕ руководителя (override, логируется).
@@ -352,6 +376,16 @@ const run = async (event: RoutePayload) => {
 
     const newProjectId = params.projectId && isUuid(params.projectId) ? params.projectId : null;
     const newWorkTypeId = params.workTypeId && isUuid(params.workTypeId) ? params.workTypeId : null;
+
+    // ON-BEHALF-gate (upsert): trusted actor пишет ЗА другого (employeeId ≠ actor) →
+    // требуем canWriteFor (руководитель отдела / PM проекта / админ), иначе FORBIDDEN.
+    // Свой ввод (employeeId == actor) проходит без проверки. actor null/untrusted →
+    // деградация: gate пропущен (dev-flow не ломаем). isOnBehalf вычислен на входе.
+    if (isOnBehalf && actor) {
+      const allowed = await canWriteFor(actor, employeeId, { projectId: newProjectId });
+      if (!allowed) return { ok: false, error: 'FORBIDDEN_ON_BEHALF' };
+    }
+
     const data: Record<string, unknown> = {
       // WI-51: нормализуем к полуночи дня (UTC) → совпадение DATE_TIME для всех
       // записей одного дня, БД-индекс ловит дубль. params.date гарантирован выше.
@@ -361,6 +395,10 @@ const run = async (event: RoutePayload) => {
       employeeId,
       projectId: newProjectId,
       workTypeId: newWorkTypeId,
+      // ON-BEHALF-аудит: кто ВНЁС, если ≠ владелец (руководитель/PM/админ). При
+      // самостоятельном вводе (или деградации) NULL — обычная запись. Питает
+      // UI-пометку «введено X за Y» + audit. ADDITIVE-поле credos-time-entry.
+      enteredByActor: isOnBehalf && actor ? actor.employeeId : null,
     };
 
     // SCOUT-B upsert-семантика: если id не передан, ищем существующую запись по

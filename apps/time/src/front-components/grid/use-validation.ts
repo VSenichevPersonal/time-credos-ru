@@ -6,6 +6,7 @@ import {
   type ValidationFinding,
 } from 'src/constants/validation';
 import type { MutationResult } from 'src/front-components/grid/time-rest';
+import { PERIOD_LOCKED_MESSAGE } from 'src/front-components/grid/period-lock';
 import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
 
 // Показ результатов валидации записи при вводе (REQ-0019-UI).
@@ -24,6 +25,23 @@ import { useGlobalSettings } from 'src/front-components/shared/use-global-settin
 export type Notice = ValidationFinding & { id: number };
 
 const WARNING_TTL_MS = 6000; // янтарь-предупреждение само гаснет; ERROR держится
+
+// Машинный код серверной ошибки /s/time-entry → понятный русский текст (SSOT для
+// плашки). Чистая функция — тестируется без рендера. Неизвестный код → общий текст.
+export const serverErrorMessage = (error: string | undefined): string => {
+  switch (error) {
+    case 'cannot_modify_approved':
+      return 'Согласовано — правка запрещена. Нужен отзыв согласования.';
+    case 'LOCKED_PERIOD':
+      return PERIOD_LOCKED_MESSAGE;
+    case 'hours out of range':
+      return 'Часы за день вне допустимого диапазона';
+    case 'employee not resolved':
+      return 'Сотрудник не сопоставлен — обратитесь к администратору';
+    default:
+      return 'Сервер отклонил операцию. Изменение не сохранено.';
+  }
+};
 
 export const useValidation = () => {
   const settings = useGlobalSettings();
@@ -105,15 +123,11 @@ export const useValidation = () => {
       if (result.validation) {
         push(result.validation);
       } else {
-        const message =
-          result.error === 'cannot_modify_approved'
-            ? 'Согласовано — правка запрещена. Нужен отзыв согласования.'
-            : result.error === 'hours out of range'
-              ? 'Часы за день вне допустимого диапазона'
-              : result.error === 'employee not resolved'
-                ? 'Сотрудник не сопоставлен — обратитесь к администратору'
-                : 'Сервер отклонил операцию. Изменение не сохранено.';
-        push({ level: 'error', code: 'max_hours_per_day', message });
+        push({
+          level: 'error',
+          code: 'max_hours_per_day',
+          message: serverErrorMessage(result.error),
+        });
       }
       return { blocked: true };
     },

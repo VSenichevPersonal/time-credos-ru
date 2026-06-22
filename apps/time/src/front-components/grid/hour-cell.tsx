@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { T, cellFill } from 'src/front-components/grid/tokens';
 import { fmtHours, isOvertime, parseHours } from 'src/front-components/grid/format';
+import { PERIOD_LOCKED_CELL_TITLE } from 'src/front-components/grid/period-lock';
 
 // Ячейка часов: ЧИСТЫЙ ВВОД (WI-01, решение C1). Клик / печать цифры → сразу
 // inline-редактирование. Никаких плавающих кнопок в ячейке (чип-нормы / ⇥-fill /
@@ -20,6 +21,7 @@ type Props = {
   active: boolean;
   selected?: boolean; // E1.3: входит в прямоугольник выделения (Shift+клик)
   locked?: boolean; // W6-2: согласованная запись — только чтение
+  periodLocked?: boolean; // PERIOD-LOCKDOWN: день в закрытом периоде → read-only (по дате)
   normHint?: number; // W3A.17: норма дня — бледный плейсхолдер пустой ячейки (0=нет)
   overtimeThreshold?: number; // REQ-0019: порог переработки/день из настроек (fallback 12)
   seed: string | null; // символ, с которого начали печатать
@@ -38,6 +40,7 @@ export const HourCell = ({
   active,
   selected,
   locked,
+  periodLocked,
   normHint,
   overtimeThreshold,
   seed,
@@ -59,9 +62,14 @@ export const HourCell = ({
   // Вход в редактирование по seed (печать цифры на активной ячейке). Заблокированную
   // (согласованную) ячейку не редактируем — только seed гасим. Seed уже ЗАМЕНЯЕТ
   // значение (E1.5): draft = сам символ, не дописывается к старому.
+  // Read-only по любой причине: согласовано (APPROVED) ИЛИ день в закрытом периоде.
+  // periodOnly — закрыт по дате, но НЕ согласован (свой визуал/тултип, без замка-revoke).
+  const readOnly = locked || periodLocked;
+  const periodOnly = periodLocked && !locked;
+
   useEffect(() => {
     if (active && seed !== null && !editing) {
-      if (!locked) {
+      if (!readOnly) {
         setDraft(seed === '0' ? '' : seed);
         setInvalid(false);
         selectOnFocus.current = false; // seed-ввод: не выделять (уже заменили)
@@ -69,7 +77,7 @@ export const HourCell = ({
       }
       onSeedConsumed();
     }
-  }, [active, seed, editing, locked, onSeedConsumed]);
+  }, [active, seed, editing, readOnly, onSeedConsumed]);
 
   useEffect(() => {
     if (!editing) {
@@ -78,14 +86,17 @@ export const HourCell = ({
     }
   }, [value, editing]);
 
-  // E1.5: при входе по клику — выделить весь текст (Excel: клик в ячейку = заменить).
-  // Remote DOM: у input в песочнице может НЕ быть метода select() → гард по typeof,
-  // иначе TypeError роняет виджет (краш при клике по ячейке).
+  // Remote DOM: autoFocus не работает в Web Worker (хост не получает фокус через
+  // атрибут, только через явный вызов). Фокусируем вручную после commit рендера.
+  // select() тоже может отсутствовать → гард по typeof (та же sandbox-проблема).
   useEffect(() => {
-    if (editing && selectOnFocus.current) {
-      const el = inputRef.current as { select?: () => void } | null;
-      if (el && typeof el.select === 'function') el.select();
-      selectOnFocus.current = false;
+    if (editing) {
+      const el = inputRef.current as { focus?: () => void; select?: () => void } | null;
+      if (el && typeof el.focus === 'function') el.focus();
+      if (selectOnFocus.current) {
+        if (el && typeof el.select === 'function') el.select();
+        selectOnFocus.current = false;
+      }
     }
   }, [editing]);
 
@@ -122,7 +133,6 @@ export const HourCell = ({
       <div style={{ position: 'relative', width: '100%' }}>
         <input
           ref={inputRef}
-          autoFocus
           value={draft}
           placeholder="" // подсказку формата убрали (засоряла) — форматы 8 / 8:30 понятны
           aria-invalid={invalid || undefined}
@@ -197,20 +207,24 @@ export const HourCell = ({
   return (
     <div
       tabIndex={-1}
-      aria-disabled={locked || undefined}
+      aria-disabled={readOnly || undefined}
       aria-label={
-        locked
-          ? `Согласовано, только чтение: ${fmtHours(value)} ч${onLockedClick ? '. Нажмите, чтобы отозвать согласование для правки' : ''}`
-          : undefined
+        periodOnly
+          ? `Период закрыт, только чтение: ${fmtHours(value)} ч`
+          : locked
+            ? `Согласовано, только чтение: ${fmtHours(value)} ч${onLockedClick ? '. Нажмите, чтобы отозвать согласование для правки' : ''}`
+            : undefined
       }
       title={
-        locked
-          ? onLockedClick
-            ? 'Согласовано — нажмите, чтобы отозвать для правки'
-            : 'Согласовано — правка запрещена'
-          : over
-            ? 'Переработка: часов больше порога'
-            : description || undefined
+        periodOnly
+          ? PERIOD_LOCKED_CELL_TITLE
+          : locked
+            ? onLockedClick
+              ? 'Согласовано — нажмите, чтобы отозвать для правки'
+              : 'Согласовано — правка запрещена'
+            : over
+              ? 'Переработка: часов больше порога'
+              : description || undefined
       }
       onClick={(e) => {
         // E1.3: Shift+клик — расширить выделение-диапазон, в правку НЕ входим.
@@ -219,46 +233,53 @@ export const HourCell = ({
           return;
         }
         onActivate(false);
+        if (periodOnly) return; // PERIOD-LOCKDOWN: день закрыт по дате — read-only, не редактируем
         if (locked) {
           // WI-10: клик по 🔒 — не тупик. Ведём к отзыву согласования (revoke/recall),
           // если путь доступен (onLockedClick задан); иначе остаётся read-only.
           onLockedClick?.();
           return; // W6-2: согласованную не редактируем
         }
+        // Remote DOM: активация только в onClick (не в onMouseDown) — иначе ре-рендер
+        // между mousedown и click разрывает поток событий → нужно 2 клика.
         setDraft(fmtHours(value));
         selectOnFocus.current = true; // E1.5: клик = выделить всё (Excel-паттерн)
         setEditing(true);
       }}
-      onMouseDown={() => onActivate(false)}
       style={{
         ...base,
         position: 'relative',
-        cursor: locked ? (onLockedClick ? 'pointer' : 'default') : 'text',
+        cursor: periodOnly ? 'not-allowed' : locked ? (onLockedClick ? 'pointer' : 'default') : 'text',
         // Read-only: тихий нейтральный фон (не цвет-сигнал), приглушённый текст.
         // E1.3: ячейка в диапазоне выделения (не активная) — лёгкая accent-подложка.
         background:
           selected && !active
             ? T.accentSoft
-            : locked
+            : readOnly
               ? T.panelBg
               : value > 0
                 ? cellFill(value)
                 : bg,
-        color: locked ? T.textMuted : over ? T.warn : value > 0 ? T.text : T.textFaint,
+        color: readOnly ? T.textMuted : over ? T.warn : value > 0 ? T.text : T.textFaint,
+        // PERIOD-LOCKDOWN: лёгкое приглушение всей закрытой ячейки (отличает от
+        // согласованной, у которой полная насыщенность + замок-revoke).
+        opacity: periodOnly ? 0.55 : 1,
         fontWeight: value > 0 ? 500 : 400,
         boxShadow: active ? `inset 0 0 0 2px ${T.accent}` : 'none',
         borderRadius: active ? 4 : 0,
       }}
     >
-      {/* W6-2: замок — статус read-only не только цветом (a11y). Слева, тихо. */}
-      {locked && <LockGlyph />}
+      {/* W6-2: замок — статус read-only не только цветом (a11y). Слева, тихо.
+          Период-замок (periodOnly) рисуем тем же глифом — единый «закрыто», но
+          приглушение + тултип отличают «период закрыт» от «согласовано». */}
+      {(locked || periodOnly) && <LockGlyph />}
 
       {/* W3A.17: пустая ячейка показывает бледную норму дня (placeholder), а не «·».
           Подсказывает ожидаемое значение, не навязчиво. Для locked/нулевой нормы
           (выходной/праздник) — прежняя нейтральная точка. */}
       {value > 0 ? (
         fmtHours(value)
-      ) : !locked && normHint && normHint > 0 ? (
+      ) : !readOnly && normHint && normHint > 0 ? (
         <span aria-hidden style={{ color: T.textFaint, opacity: 0.55, fontWeight: 400 }}>
           {fmtHours(normHint)}
         </span>

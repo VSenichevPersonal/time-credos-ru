@@ -196,3 +196,145 @@ describe('plan-slots: lockdown прошлых периодов', () => {
     expect(result).toMatchObject({ ok: true, overridden: true });
   });
 });
+
+// ON-BEHALF server-gate plan-slots (MANAGER_ENTRY_ON_BEHALF §3.1): персональный слот
+// ЗА другого сотрудника → canWriteFor (head/PM/admin), иначе FORBIDDEN_ON_BEHALF.
+// Отдельский/проектный слот — планирование руководителя/PM. NULL/untrusted → деградация.
+describe('plan-slots: on-behalf gate (canWriteFor)', () => {
+  const handler = (
+    planDef as unknown as { config: { handler: (event: unknown) => Promise<unknown> } }
+  ).config.handler;
+  const PROJECT = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const ACTOR = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const TARGET = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const DEPT = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const UW = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+  const offSettings = { data: { credosTimeSettings: [{ lockdownDate: null }] } };
+  const emptySlots = { data: { credosTimePlanSlots: [], pageInfo: { hasNextPage: false } } };
+  const headedDepts = { data: { credosTimeDepartments: [{ id: DEPT }] } };
+  const targetInDept = { data: { credosTimeEmployees: [{ departmentId: DEPT }] } };
+  const targetNoDept = { data: { credosTimeEmployees: [{ departmentId: null }] } };
+  const noEmployeeDepts = { data: { credosTimeEmployeeDepartments: [] } };
+  const trustedManager = {
+    data: { credosTimeEmployees: [{ id: ACTOR, isManager: true, workspaceMemberRef: 'wm-a', userWorkspaceRef: UW }] },
+  };
+  const trustedWorker = {
+    data: { credosTimeEmployees: [{ id: ACTOR, isManager: false, workspaceMemberRef: 'wm-a', userWorkspaceRef: UW }] },
+  };
+
+  const trustedEvent = (body: Record<string, unknown>) => ({
+    headers: {}, queryStringParameters: {}, pathParameters: {}, body,
+    isBase64Encoded: false,
+    requestContext: { http: { method: 'POST', path: '/plan-slots' } },
+    userWorkspaceId: UW,
+  });
+  const nullEvent = (body: Record<string, unknown>) => ({
+    headers: {}, queryStringParameters: {}, pathParameters: {}, body,
+    isBase64Encoded: false,
+    requestContext: { http: { method: 'POST', path: '/plan-slots' } },
+    userWorkspaceId: null,
+  });
+
+  const mockFetch = (responses: unknown[]) => {
+    let i = 0;
+    return vi.fn().mockImplementation(() => {
+      const data = responses[i++] ?? {};
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(data), text: () => Promise.resolve('') });
+    });
+  };
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('руководитель отдела пишет персональный слот ЗА подчинённого → ok', async () => {
+    const mockFn = mockFetch([
+      trustedManager, // resolveActor
+      offSettings, // readLockdownConfig
+      headedDepts, // canWriteFor head: отделы actor
+      targetInDept, // target.primaryDept == DEPT → true
+      emptySlots, // existing
+      { data: { createCredosTimePlanSlot: { id: 'p1' } } }, // POST
+      emptySlots, // final
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({
+      mode: 'upsert', projectId: PROJECT,
+      slots: JSON.stringify([{ periodMonth: '2026-07', plannedHours: 40, employeeId: TARGET }]),
+    }));
+    expect(result).toMatchObject({ ok: true, mode: 'upsert' });
+  });
+
+  it('НЕ-руководитель пишет персональный слот за чужого → FORBIDDEN_ON_BEHALF, без мутаций', async () => {
+    const mockFn = mockFetch([
+      trustedWorker, // resolveActor (isManager=false)
+      offSettings, // readLockdownConfig
+      headedDepts, // canWriteFor head: отделы actor
+      targetNoDept, // target.primaryDept null → не совпал
+      noEmployeeDepts, // FTE пусто → не head → false; PM нет projectId-моста → false
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({
+      mode: 'upsert', projectId: PROJECT,
+      slots: JSON.stringify([{ periodMonth: '2026-07', plannedHours: 40, employeeId: TARGET }]),
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'FORBIDDEN_ON_BEHALF', employeeId: TARGET });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH' || m === 'DELETE';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('руководитель пишет ОТДЕЛЬСКИЙ слот (без сотрудника) → ok (планирование)', async () => {
+    const mockFn = mockFetch([
+      trustedManager, // resolveActor (isManager=true)
+      offSettings, // readLockdownConfig
+      // отдельский слот: actor.isManager → разрешено без сетевой PM-проверки
+      emptySlots, // existing
+      { data: { createCredosTimePlanSlot: { id: 'p2' } } }, // POST
+      emptySlots, // final
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({
+      mode: 'upsert', projectId: PROJECT,
+      slots: JSON.stringify([{ periodMonth: '2026-07', plannedHours: 40, departmentId: DEPT }]),
+    }));
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('свой персональный слот (employeeId == actor) → ok без gate', async () => {
+    const mockFn = mockFetch([
+      trustedWorker, // resolveActor (employeeId = ACTOR)
+      offSettings, // readLockdownConfig
+      emptySlots, // existing (gate не вызывал сетевых проверок)
+      { data: { createCredosTimePlanSlot: { id: 'p3' } } }, // POST
+      emptySlots, // final
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(trustedEvent({
+      mode: 'upsert', projectId: PROJECT,
+      slots: JSON.stringify([{ periodMonth: '2026-07', plannedHours: 8, employeeId: ACTOR }]),
+    }));
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('NULL-actor (untrusted) → деградация: gate выкл, план пишется', async () => {
+    // uwId null + ref не передан → resolveActor вернёт null БЕЗ fetch (деградация).
+    const mockFn = mockFetch([
+      offSettings, // readLockdownConfig
+      emptySlots, // existing
+      { data: { createCredosTimePlanSlot: { id: 'p4' } } }, // POST
+      emptySlots, // final
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(nullEvent({
+      mode: 'upsert', projectId: PROJECT,
+      slots: JSON.stringify([{ periodMonth: '2026-07', plannedHours: 40, employeeId: TARGET }]),
+    }));
+    expect((result as { error?: string }).error).not.toBe('FORBIDDEN_ON_BEHALF');
+  });
+});

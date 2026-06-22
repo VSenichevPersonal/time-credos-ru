@@ -78,6 +78,8 @@ const GLOBAL_FALLBACK: Omit<GlobalSettings, 'id'> = {
   tentativeBookingEnabled: true,
   defaultApprovalRequired: false,
   approvalPeriod: 'WEEK',
+  lockdownDate: null,
+  lockdownGraceDays: 0,
   reminderEnabled: false,
   reminderDayOfWeek: 'FRIDAY',
   revealEmployeeNames: false,
@@ -88,6 +90,14 @@ const num = (v: number | null | undefined, d: number): number =>
 const bool = (v: boolean | null | undefined, d: boolean): boolean =>
   typeof v === 'boolean' ? v : d;
 const str = (v: string | null | undefined, d: string): string => v ?? d;
+
+// lockdownDate хранится как DATE_TIME — UI оперирует календарным днём 'YYYY-MM-DD'.
+// Пустое/нечитаемое → null (lockdown выкл).
+const isoDay = (v: string | null | undefined): string | null => {
+  if (typeof v !== 'string' || !v) return null;
+  const day = v.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+};
 
 // GET singleton (первая запись). Возвращает null, если записи ещё нет (сид не
 // прошёл) — UI покажет сообщение вместо формы.
@@ -112,6 +122,8 @@ export const fetchGlobalSettings = async (): Promise<GlobalSettings | null> => {
     tentativeBookingEnabled: bool(row.tentativeBookingEnabled, f.tentativeBookingEnabled),
     defaultApprovalRequired: bool(row.defaultApprovalRequired, f.defaultApprovalRequired),
     approvalPeriod: str(row.approvalPeriod, f.approvalPeriod),
+    lockdownDate: isoDay(row.lockdownDate),
+    lockdownGraceDays: Math.max(0, Math.floor(num(row.lockdownGraceDays, f.lockdownGraceDays))),
     reminderEnabled: bool(row.reminderEnabled, f.reminderEnabled),
     reminderDayOfWeek: str(row.reminderDayOfWeek, f.reminderDayOfWeek),
     revealEmployeeNames: bool(row.revealEmployeeNames, f.revealEmployeeNames),
@@ -120,9 +132,18 @@ export const fetchGlobalSettings = async (): Promise<GlobalSettings | null> => {
 
 export type GlobalPatch = Partial<Omit<GlobalSettings, 'id'>>;
 
+// Дата закрытия в БД — DATE_TIME (как entryDate: фикс. час 10:00 UTC, день стабилен
+// в любом TZ). Пустая строка/null → null (снять lockdown). Прочие поля — как есть.
+const toWirePatch = (patch: GlobalPatch): Record<string, unknown> => {
+  if (!('lockdownDate' in patch)) return { ...patch };
+  const d = patch.lockdownDate;
+  const wireDate = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T10:00:00.000Z` : null;
+  return { ...patch, lockdownDate: wireDate };
+};
+
 export const patchGlobalSettings = async (
   id: string,
   patch: GlobalPatch,
 ): Promise<void> => {
-  await client().patch(`/rest/credosTimeSettings/${id}`, patch);
+  await client().patch(`/rest/credosTimeSettings/${id}`, toWirePatch(patch));
 };

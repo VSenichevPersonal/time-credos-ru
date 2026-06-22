@@ -4,7 +4,7 @@ import {
   DAY_OF_WEEK_OPTIONS,
   WEEK_STARTS_ON_OPTIONS,
 } from 'src/constants/select-options';
-import { SelectField, Toggle } from 'src/front-components/settings/field-controls';
+import { DateField, SelectField, Toggle } from 'src/front-components/settings/field-controls';
 import { NumField } from 'src/front-components/settings/num-field';
 import type { GlobalPatch } from 'src/front-components/settings/settings-rest';
 import type { GlobalSettings } from 'src/front-components/settings/types';
@@ -121,6 +121,21 @@ export const GeneralSection = ({ settings: s, onUpdate }: Props) => (
       </Row>
       <Row label="Период согласования">
         <SelectField value={s.approvalPeriod} options={APPROVAL_PERIOD_OPTIONS} onChange={(v) => onUpdate({ approvalPeriod: v })} />
+      </Row>
+    </Group>
+
+    <Group title="Закрытие периода">
+      <Row
+        label="Дата закрытия периода"
+        hint="Записи с датой ≤ закрыты для правок (кроме руководителя). Пусто = выключено."
+      >
+        <DateField value={s.lockdownDate} onChange={(v) => onUpdate({ lockdownDate: v })} />
+      </Row>
+      <Row
+        label="Грейс-дни"
+        hint="Окно после даты, пока правка ещё разрешена. Граница закрытия = дата − грейс."
+      >
+        <NumField value={s.lockdownGraceDays} min={0} onCommit={(v) => onUpdate({ lockdownGraceDays: v })} />
       </Row>
     </Group>
 

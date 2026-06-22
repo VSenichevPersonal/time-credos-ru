@@ -129,6 +129,12 @@ export const CREDOS_TIME_ENTRY_RESOLVED_BY_FIELD_ID = '12f510fc-4441-4c18-b601-0
 export const CREDOS_TIME_ENTRY_RESOLVED_AT_FIELD_ID = 'c5209758-47bf-4ee8-89af-093f12fde9ac';
 export const CREDOS_TIME_ENTRY_REVOKED_BY_FIELD_ID = '179888ee-c661-40a5-bc82-72dc7f2227aa';
 export const CREDOS_TIME_ENTRY_REVOKED_AT_FIELD_ID = '8947e2c9-ceb7-456d-b857-96f79109275d';
+// ON-BEHALF (MANAGER_ENTRY_ON_BEHALF §3.1.C): кто ВНЁС запись, если ≠ сотрудник
+// (актёр-руководитель/PM/админ при on-behalf-вводе). TEXT = employeeId актора.
+// Зеркалит approval approvedBy/resolvedBy. Питает audit «введено X за Y» + UI-пометку.
+// Пусто (NULL) = обычный самостоятельный ввод (actor == владелец записи).
+export const CREDOS_TIME_ENTRY_ENTERED_BY_ACTOR_FIELD_ID =
+  'c96cfa3d-c63e-4699-ab25-bb83efe90fbf';
 // Уникальный индекс записи трудозатрат (SCOUT-B): защита factHours от дублей.
 // UNIQUE(employeeId, projectId, workTypeId, date). БД-уровень — ловит дубли на
 // ВСЕХ путях (REST/грид/CSV), кроме строк с NULL в ключе (PG: NULL != NULL) —

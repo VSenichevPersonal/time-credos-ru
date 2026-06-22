@@ -37,6 +37,62 @@ export const Toggle = ({
   </button>
 );
 
+// Поле даты (ISO 'YYYY-MM-DD'). Нативный <input type="date"> — календарь и
+// клавиатура «из коробки». Пустое значение → null (контрол не выбран). Кнопка
+// «Сбросить» очищает дату (отдельно: type=date не всегда даёт удобный clear в RemDOM).
+export const DateField = ({
+  value,
+  onChange,
+  width = 160,
+}: {
+  value: string | null;
+  onChange: (next: string | null) => void;
+  width?: number;
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <input
+      type="date"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      style={{
+        width,
+        height: 28,
+        padding: '0 8px',
+        fontSize: 12.5,
+        border: `1px solid ${T.borderStrong}`,
+        borderRadius: 6,
+        outline: 'none',
+        boxSizing: 'border-box',
+        fontFamily: 'inherit',
+        fontVariantNumeric: 'tabular-nums',
+        color: value ? T.text : T.textMuted,
+        background: T.surface,
+      }}
+    />
+    {value && (
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        aria-label="Сбросить дату закрытия (выключить)"
+        title="Сбросить — закрытие периода выключено"
+        style={{
+          height: 28,
+          padding: '0 8px',
+          fontSize: 12,
+          border: `1px solid ${T.borderStrong}`,
+          borderRadius: 6,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          color: T.textMuted,
+          background: T.surface,
+        }}
+      >
+        Сброс
+      </button>
+    )}
+  </div>
+);
+
 // Дропдаун SELECT: значения/ярлыки из select-options. Нативный <select>,
 // стилизован токенами (доступность/клавиатура «из коробки»).
 export const SelectField = ({

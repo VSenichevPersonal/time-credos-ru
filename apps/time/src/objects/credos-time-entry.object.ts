@@ -18,6 +18,7 @@ import {
   CREDOS_TIME_ENTRY_APPROVED_BY_FIELD_ID,
   CREDOS_TIME_ENTRY_DESCRIPTION_FIELD_ID,
   CREDOS_TIME_ENTRY_EMPLOYEE_FIELD_ID,
+  CREDOS_TIME_ENTRY_ENTERED_BY_ACTOR_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_PROJECT_FIELD_ID,
   CREDOS_TIME_ENTRY_REJECT_COMMENT_FIELD_ID,
@@ -166,6 +167,19 @@ export default defineObject({
       type: FieldType.DATE_TIME,
       label: 'Дата отзыва',
       icon: 'IconCalendarMinus',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // ON-BEHALF (MANAGER_ENTRY_ON_BEHALF §3.1.C): кто ВНЁС запись, если ≠ владелец
+    // (руководитель/PM/админ при вводе ЗА сотрудника). TEXT = employeeId актора.
+    // Пусто = обычный самостоятельный ввод. Питает audit «введено X за Y» + UI-пометку.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_ENTERED_BY_ACTOR_FIELD_ID,
+      name: 'enteredByActor',
+      type: FieldType.TEXT,
+      label: 'Внёс (за сотрудника)',
+      icon: 'IconUserShare',
+      description: 'employeeId руководителя/PM, внёсшего запись ЗА сотрудника (on-behalf). Пусто = ввёл сам сотрудник.',
       isNullable: true,
       defaultValue: null,
     },
