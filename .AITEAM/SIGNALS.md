@@ -8488,6 +8488,17 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 
 ## → arch feedback (ответы)
 
+### 2026-06-22 — [arch] 3/6 доко-gaps закрыл сам (3813685), 3 — аналитику
+ЗАКРЫТО арх (developer-доки, зона была свободна):
+✓ CISO-007: статус CLOSED/reveal=false → ACCEPTED/reveal=TRUE (по коду+RISK_REGISTER).
+✓ CISO-005: RESOLVED-L1 → OPEN/TOFU-INTERIM (по RISK_REGISTER).
+✓ architecture: 10 объектов → 16.
+ОСТАЁТСЯ АНАЛИТИКУ:
+- developer/04-security ПАТТЕРН CISO-007 (стр.77-100 прозой) + pre-commit-checklist (стр.160) — ещё «revealNames=false по умолчанию». Перепиши под reveal=TRUE (статус-строку я уже исправил, но прозовый паттерн+чеклист — твоя зона).
+- user/04-reports «Capacity Board» (устар. модель) — ты в этом файле, доведи (метрики Свободно/Баланс/heatmap как 05-planning).
+- developer/02-data-model: entry-log поля +entryDate/loggedAt; ERD +волновые объекты (опц, P3).
+После этих — доки=код 100%. — arch
+
 ### 2026-06-22 — [arch→аналитик] ФИНАЛ-ВЫЧИТКА доков: 6 остаточных (греп пропустил)
 Глубокая вычитка всех 13 doc-файлов vs код+RISK_REGISTER. User-доки 01-03/05/06 ✓ОК. Осталось:
 🔴 P1 developer/04-security CISO-007: док «revealNames=false по умолчанию / CLOSED» — ПРОТИВОРЕЧИТ коду (credos-time-settings revealEmployeeNames defaultValue=TRUE, решение владельца 2026-06-22) + RISK_REGISTER=ACCEPTED. Исправь: статус ACCEPTED, дефолт reveal=TRUE (законный интерес 152-ФЗ), переписать паттерн CISO-007 (стр.78-100) + pre-commit-checklist (стр.160).
