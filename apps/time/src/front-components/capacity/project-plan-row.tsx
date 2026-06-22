@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { T } from 'src/front-components/capacity/cap-tokens';
+import { CoverageIndicator } from 'src/front-components/capacity/coverage-indicator';
 import { ProjectPlanPanel } from 'src/front-components/capacity/project-plan-panel';
-import type { PreviewSource } from 'src/front-components/capacity/plan-preview';
+import { allocatedHours, planCoverage, type PreviewSource } from 'src/front-components/capacity/plan-preview';
 import type { PlanSpread } from 'src/front-components/capacity/calc-load';
-import type { CapProject, DeptRef, ProjectPatch } from 'src/front-components/capacity/types';
+import type { CapProject, DeptRef, PlanSlot, ProjectPatch } from 'src/front-components/capacity/types';
 
 // Редактируемая строка проекта (режим планирования): руководитель задаёт плановые
 // часы и срок прямо в строке (быстрый путь). Пустой план → видимый affordance
@@ -20,6 +21,10 @@ type Props = {
   spread?: PlanSpread; // WI-11: рабочие дни для превью раскида
   dept?: DeptRef; // WI-11: ёмкость отдела для овербукинга в превью (fallback)
   previewSource?: PreviewSource; // WI-48: свободная ёмкость + мульти-отдел в превью
+  // Слоты проекта (уже загружены доской) — для индикатора «распланировано X / Y».
+  // X = Σ dept-слотов (allocatedHours), Y = plannedEffort (бюджет). Опционально:
+  // нет слотов → индикатор не рисуется (или X=0 при заданном бюджете).
+  slots?: PlanSlot[];
 };
 
 const isoToDate = (iso: string | null): string => (iso ? String(iso).slice(0, 10) : '');
@@ -69,9 +74,25 @@ const inputStyle = {
   boxSizing: 'border-box' as const,
 };
 
-export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread, dept, previewSource }: Props) => {
+export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread, dept, previewSource, slots }: Props) => {
   const [hours, setHours] = useState(project.plannedEffort != null ? String(project.plannedEffort) : '');
   const [end, setEnd] = useState(isoToDate(project.endDate));
+
+  // Индикатор «распланировано X / Y»: Y = бюджет (plannedEffort). X зависит от
+  // способа раскида:
+  //  MANUAL → X = Σ dept-слотов (реальное помесячное распределение, из данных доски);
+  //  EVEN   → X = Y (бюджет раскидывается равномерно на лету, без слотов — по
+  //           определению распланирован полностью; иначе показывал бы ложное «0/N»).
+  // Слоты приходят из доски (ноль доп.запросов). Бюджет НЕ перезаписывается.
+  const isManual = project.planMethod === 'MANUAL';
+  const coverage = useMemo(
+    () =>
+      planCoverage(
+        project.plannedEffort,
+        isManual ? allocatedHours(slots ?? []) : project.plannedEffort,
+      ),
+    [project.plannedEffort, isManual, slots],
+  );
 
   // Синхронизация после рефетча (внешнее значение могло измениться).
   useEffect(() => {
@@ -188,7 +209,11 @@ export const ProjectPlanRow = ({ project, nameWidth, fieldsWidth, onSave, spread
             style={{ ...inputStyle, width: 130 }}
           />
         </label>
-        <span style={{ marginLeft: 'auto' }}>
+        {/* Индикатор «распланировано X / Y» — стыковка распределения с бюджетом.
+            Терракот-warning при переаллокации, ✓ при полном покрытии. Скрыт, если
+            бюджет не задан (нечего сверять). marginLeft:auto толкает к панели. */}
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          {coverage.hasBudget && <CoverageIndicator coverage={coverage} variant="compact" />}
           <ProjectPlanPanel project={project} spread={spread} dept={dept} previewSource={previewSource} onSave={onSave} />
         </span>
       </div>

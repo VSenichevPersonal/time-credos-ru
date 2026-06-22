@@ -397,6 +397,66 @@ export const personalSlotsByMonth = <
   return { byMonth, total: Math.round(total * 100) / 100 };
 };
 
+// «Распланировано» (X) проекта = Σ ОТДЕЛЬСКИХ слотов раскида (employeeId пуст).
+// Это и есть распределение бюджета по периодам (модель «отдел=контейнер»).
+// Персональные слоты (employeeId задан) — детализация ВНУТРИ отдельского объёма,
+// поверх не суммируются (иначе двойной счёт). Тот же фильтр, что deptInputSlots.
+export const allocatedHours = <T extends SlotLike & { plannedHours: number | null }>(
+  slots: T[],
+): number => sumSlotHours(deptInputSlots(slots));
+
+// ─── Coverage «распланировано X из Y» (бюджет vs Σслотов) ────────────────────
+// Заказчик: plannedEffort = БЮДЖЕТ-оценка проекта (по нему считали стоимость),
+// НЕ перезаписывается распределением. «Распланировано» = Σслотов (MANUAL) /
+// =бюджет (EVEN: объём и есть основа раскида). Coverage отвечает на вопрос
+// «всё ли распланировано»: остаток = бюджет − Σслотов, переаллокация = Σ > бюджет.
+// Разведка (Float/Runn/Timetta §2 PLAN_VS_BUDGET_COVERAGE): три РАЗДЕЛЁННЫЕ
+// величины (бюджет → распланировано → факт), over-budget = warning (не блок).
+// Чистая ф-ция (без сети/React) — используется в строке проекта и в панели.
+
+export type PlanCoverage = {
+  budget: number; // Y — плановая трудоёмкость (бюджет), 0 если не задан
+  allocated: number; // X — сколько распланировано (Σслотов / =budget для EVEN)
+  remaining: number; // Y − X (может быть < 0 при переаллокации)
+  over: number; // max(0, X − Y) — сверх бюджета (для warning)
+  pct: number; // X / Y, 0 если budget=0 (не делим на ноль)
+  full: boolean; // X ≈ Y (распланировано всё, допуск 1 ч) и budget > 0
+  hasBudget: boolean; // budget задан (> 0) — иначе coverage не считается
+};
+
+// Допуск равенства X≈Y (как sigmaOk/reconcileSlots — 1 ч: округления раскида).
+const COVERAGE_TOL = 1;
+
+// budget = project.plannedEffort (бюджет, Y). allocated = Σслотов проекта (X).
+// null/нечисло → 0. pct/full/over выводятся, ничего не мутируется.
+export const planCoverage = (
+  budget: number | null,
+  allocated: number | null,
+): PlanCoverage => {
+  const Y = budget != null && Number.isFinite(budget) && budget > 0 ? budget : 0;
+  const X = allocated != null && Number.isFinite(allocated) && allocated > 0 ? allocated : 0;
+  const remaining = Math.round((Y - X) * 100) / 100;
+  const over = Math.max(0, Math.round((X - Y) * 100) / 100);
+  const hasBudget = Y > 0;
+  const pct = hasBudget ? X / Y : 0;
+  // «всё распланировано»: |X−Y| ≤ допуск (и при переаллокации full=false — это
+  // сверх бюджета, отдельный warning, а не «готово»).
+  const full = hasBudget && Math.abs(X - Y) <= COVERAGE_TOL;
+  return { budget: Y, allocated: X, remaining, over, pct, full, hasBudget };
+};
+
+// Подпись индикатора для tooltip/aria: «распланировано 300 / 480 ч · 63% ·
+// осталось 180» / «…✓ всё распланировано» / «…сверх бюджета +N ч». Округление
+// целыми (часы). Без budget → краткая форма (нечего сверять). Чистая ф-ция.
+const r0 = (n: number): number => Math.round(n);
+export const coverageLabel = (c: PlanCoverage): string => {
+  if (!c.hasBudget) return `распланировано ${r0(c.allocated)} ч · бюджет не задан`;
+  const base = `распланировано ${r0(c.allocated)} / ${r0(c.budget)} ч · ${Math.round(c.pct * 100)}%`;
+  if (c.over > 0) return `${base} · сверх бюджета +${r0(c.over)} ч`;
+  if (c.full) return `${base} · ✓ всё распланировано`;
+  return `${base} · осталось ${r0(c.remaining)} ч`;
+};
+
 // W3B.16: утилизация периода = план / СВОБОДНАЯ ёмкость (PreviewRow.capacity).
 // Это доля свободной ёмкости, которую съедает план периода — иной показатель, чем
 // hours/maxHours (масштаб бара). null = нет ёмкости (capacity null или ≤ 0) →

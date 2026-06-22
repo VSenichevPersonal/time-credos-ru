@@ -12,6 +12,9 @@ import {
 import { APPROVAL_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import { isIsoDate, isUuid } from './params-validate';
+// CISO-005 server-truth актор вынесен в общий SSOT-модуль (shared/resolve-actor),
+// переиспользуется time-entry-api/plan-slots. Поведение approval идентично прежнему.
+import { type Actor, resolveActor } from './shared/resolve-actor';
 
 // /s/approval — согласование трудозатрат (фиксирует userWorkspaceId руководителя).
 //   submit  — записи периода сотрудника (где требуется согласование) DRAFT → SUBMITTED.
@@ -31,85 +34,6 @@ type RawEntry = {
 };
 type RawProject = { id: string; approvalRequired: boolean | null; departmentId: string | null };
 type RawDepartment = { id: string; approvalRequired: boolean | null };
-type RawEmployee = {
-  id: string;
-  isManager: boolean | null;
-  workspaceMemberRef: string | null;
-  userWorkspaceRef: string | null;
-};
-
-// Actor-сотрудник, выполняющий действие. trusted=true → личность резолвлена СЕРВЕРНО
-// (event.userWorkspaceId → employee.userWorkspaceRef), клиент её не подделывал.
-// trusted=false → деградация (legacy/dev): личность из client-supplied workspaceMemberRef,
-// когда server-identity недоступна (event.userWorkspaceId NULL).
-type Actor = { employeeId: string; isManager: boolean; trusted: boolean } | null;
-
-// CISO-005 server-truth резолв actor. Приоритет — серверный event.userWorkspaceId.
-//   1) userWorkspaceId → employee по userWorkspaceRef[eq] → trusted actor.
-//   2) не замаплен, но клиент дал workspaceMemberRef → TOFU (trust-on-first-use):
-//      найдём employee по workspaceMemberRef; если его userWorkspaceRef ПУСТ — захватим
-//      (привяжем userWorkspaceId один раз + userMapPending=true для админ-сверки) и далее
-//      доверяем серверу. Если userWorkspaceRef уже занят ДРУГИМ значением — коллизия/
-//      подмена, привязку НЕ делаем, actor=null (guard откажет).
-//   3) event.userWorkspaceId NULL (dev/legacy 42/43 пусты) → мягкая деградация: actor
-//      из workspaceMemberRef, trusted=false (не ломаем рабочий dev-flow).
-// TOFU выбран прагматично для 15–20 доверенных юзеров: достоверного install-time источника
-// userWorkspaceId↔employee нет (разведка CISO-005), а server-side currentWorkspaceMember в
-// SDK 2.14 отсутствует. Первое действие при пустом маппинге — единственный момент, где
-// userWorkspaceId и заявленный employee совпадают «как есть»; фиксируем связь и помечаем
-// на сверку. Риск (чужой workspaceMemberRef в первый раз) ограничен окном до сверки и
-// доверенной средой; после привязки подмена закрыта (ветка 1 игнорирует client-ref).
-const resolveActor = async (
-  event: RoutePayload,
-  workspaceMemberRef: string | undefined,
-): Promise<Actor> => {
-  const uwId = event.userWorkspaceId ?? null;
-
-  // Ветка 1: серверная личность есть → ищем уже замапленного сотрудника.
-  if (uwId) {
-    const byUw = await restGet<{ data: { credosTimeEmployees: RawEmployee[] } }>(
-      '/rest/credosTimeEmployees',
-      { filter: `userWorkspaceRef[eq]:${uwId}`, limit: '1' },
-    );
-    const mapped = byUw.data?.credosTimeEmployees?.[0];
-    if (mapped) {
-      return { employeeId: mapped.id, isManager: mapped.isManager === true, trusted: true };
-    }
-    // Ветка 2 (TOFU): не замаплен. Привязываем по заявленному workspaceMemberRef.
-    if (!workspaceMemberRef || !isUuid(workspaceMemberRef)) return null;
-    const claimed = await restGet<{ data: { credosTimeEmployees: RawEmployee[] } }>(
-      '/rest/credosTimeEmployees',
-      { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
-    );
-    const e = claimed.data?.credosTimeEmployees?.[0];
-    if (!e) return null;
-    // userWorkspaceRef уже занят другим userWorkspaceId → коллизия (двойной маппинг/
-    // подмена). Не перезаписываем, отказываем (actor=null).
-    if (e.userWorkspaceRef && e.userWorkspaceRef !== uwId) return null;
-    if (!e.userWorkspaceRef) {
-      // eslint-disable-next-line no-console
-      console.warn(`[approval] TOFU: привязка userWorkspaceRef=${uwId} → employee=${e.id} (на сверку)`);
-      await restPatch(`/rest/credosTimeEmployees/${e.id}`, {
-        userWorkspaceRef: uwId,
-        userMapPending: true,
-      });
-    }
-    return { employeeId: e.id, isManager: e.isManager === true, trusted: true };
-  }
-
-  // Ветка 3: server-identity недоступна (dev/legacy) → деградация на client-ref.
-  // CISO-006: workspaceMemberRef интерполируется в filter — только UUID.
-  if (!workspaceMemberRef || !isUuid(workspaceMemberRef)) return null;
-  const res = await restGet<{ data: { credosTimeEmployees: RawEmployee[] } }>(
-    '/rest/credosTimeEmployees',
-    { filter: `workspaceMemberRef[eq]:${workspaceMemberRef}`, limit: '1' },
-  );
-  const e = res.data?.credosTimeEmployees?.[0];
-  if (!e) return null;
-  // eslint-disable-next-line no-console
-  console.warn('[approval] actor из client workspaceMemberRef (event.userWorkspaceId пуст) — DEV-деградация, untrusted');
-  return { employeeId: e.id, isManager: e.isManager === true, trusted: false };
-};
 
 const apiBase = () => (process.env.TWENTY_API_URL ?? '').replace(/\/$/, '');
 const authHeaders = () => ({

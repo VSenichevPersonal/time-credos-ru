@@ -4,6 +4,9 @@ import type { RoutePayload } from 'twenty-sdk/logic-function';
 import { PLAN_SLOTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/universal-identifiers';
 
 import { validUuidParam } from './params-validate';
+// CISO-005 server-truth актор (фундамент on-behalf/lockdown/аудита plan-write).
+// Резолвится на входе для БУДУЩИХ фаз; upsert/read пока работают как раньше.
+import { type Actor, resolveActor } from './shared/resolve-actor';
 
 /**
  * /s/plan-slots — помесячные слоты плана проекта (WI-47, «Планирование вручную по
@@ -275,6 +278,18 @@ const run = async (event: RoutePayload) => {
   const params = readParams(event);
   const projectId = validUuidParam(params.projectId != null ? String(params.projectId) : undefined);
   if (!projectId) return { ok: false, error: 'projectId is required (UUID)' };
+
+  // CISO-005 ФУНДАМЕНТ: серверный actor резолвится на входе для будущих фаз (audit
+  // plan-write + on-behalf canWriteFor + lockdown). СЕЙЧАС НЕ enforcement: upsert/read
+  // по projectId работают как раньше. При недоступной server-identity resolveActor
+  // вернёт null без лишних запросов → деградация, текущее поведение сохраняется.
+  const wmRef = params.workspaceMemberRef != null ? String(params.workspaceMemberRef) : undefined;
+  const actor: Actor = await resolveActor(event, wmRef);
+  if (actor && actor.trusted) {
+    // На фазе on-behalf здесь будет canWriteFor(actor, проект/отдел/сотрудник). Пока — лог.
+    // eslint-disable-next-line no-console
+    console.warn('[plan-slots] server-actor=%s (trusted) — фундамент для аудита/on-behalf', actor.employeeId);
+  }
 
   const mode = params.mode != null ? String(params.mode) : 'read';
   if (mode === 'read') return runRead(projectId);

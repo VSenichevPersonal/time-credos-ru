@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { T, loadTone, formatPct } from 'src/front-components/capacity/cap-tokens';
+import { CoverageIndicator } from 'src/front-components/capacity/coverage-indicator';
 import {
   computePreview,
   deptInputSlots,
   monthsInRange,
   openEndedHint,
   personalSlotsByMonth,
+  planCoverage,
   previewLoadCtxFor,
   reconcileSlots,
   utilPct,
@@ -139,6 +141,15 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
     return reconcileSlots(slots, effort);
   }, [months, slotHours, effort]);
 
+  // Индикатор coverage «распланировано X / Y» В ПАНЕЛИ. Y = бюджет (effort, поле
+  // «Объём»). X = сколько распланировано: MANUAL — живая Σ dept-слотов
+  // (manualRecon.sum); EVEN — раскид = бюджет (X=Y, full по определению — объём и
+  // есть основа равномерного раскида). Бюджет НЕ перезаписывается (см. save).
+  const coverage = useMemo(
+    () => planCoverage(effort, method === 'MANUAL' ? manualRecon.sum : effort),
+    [effort, method, manualRecon.sum],
+  );
+
   // WI-47: префилл слотов проекта из бэка при первом переключении в MANUAL
   // (один раз на открытие — если уже грузили или есть значения, не перезатираем).
   useEffect(() => {
@@ -210,8 +221,15 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
           employeeId: null,
         }));
         const slotsOk = await savePlanSlots(project.id, slots);
+        // РЕШЕНИЕ заказчика (PLAN_VS_BUDGET_COVERAGE §3.1): plannedEffort = БЮДЖЕТ-
+        // оценка проекта, НЕ перезаписывается Σслотов. Раньше тут писалось
+        // `plannedEffort: manualRecon.sum` → бюджет стирался распределением, остаток
+        // всегда 0, индикатор coverage невозможен. Теперь бюджет = введённый объём
+        // (effort), меняется ТОЛЬКО когда пользователь правит поле «Объём».
+        // Σслотов сохраняется отдельно (savePlanSlots) и НЕ затирает бюджет.
+        // effort === 0 → null (снять бюджет), как в EVEN (0-часовой план бессмыслен).
         const rowOk = await onSave(project.id, {
-          plannedEffort: manualRecon.sum,
+          plannedEffort: effort === 0 ? null : effort,
           startDate: start || null,
           endDate: end || null,
           planMethod: 'MANUAL',
@@ -340,6 +358,12 @@ export const ProjectPlanPanel = ({ project, spread, dept, previewSource, onSave 
                 <span style={{ fontWeight: 600, ...tnum }}>{round(personalHours)} ч</span>
               </div>
             )}
+
+            {/* Индикатор «распланировано X / Y» (бюджет vs Σслотов): остаток, ✓ при
+                полном покрытии, terracotta-warning при переаллокации (не блок).
+                Рисуется при заданном бюджете (Объём). EVEN → X=Y (✓ по определению),
+                MANUAL → живая Σ dept-слотов vs бюджет. */}
+            <CoverageIndicator coverage={coverage} variant="full" />
 
             {/* Способ */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, marginBottom: 12 }} role="radiogroup" aria-label="Способ распределения">

@@ -121,6 +121,7 @@ export const DeptRows = ({
               currentDeptId={dept.id}
               dept={dept}
               previewSource={previewSource}
+              slotsByProject={slotsByProject}
             />
           )}
         </div>

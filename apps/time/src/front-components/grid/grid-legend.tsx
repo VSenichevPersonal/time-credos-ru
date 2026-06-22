@@ -51,6 +51,43 @@ const FillSwatch = () => (
   />
 );
 
+// Точка-заполнялка (U5 fill-handle): акцент-квадратик в углу активной ячейки с
+// часами → клик заполняет будни строки этим значением. Юзер не понимал «синюю точку».
+const HandleSwatch = () => (
+  <span
+    aria-hidden
+    style={{
+      position: 'relative',
+      width: 14,
+      height: 14,
+      borderRadius: 3,
+      background: cellFill(8),
+      border: `1px solid ${T.accent}`,
+      flexShrink: 0,
+    }}
+  >
+    <span
+      style={{
+        position: 'absolute',
+        right: 0,
+        bottom: 0,
+        width: 5,
+        height: 5,
+        borderRadius: 1,
+        background: T.accent,
+      }}
+    />
+  </span>
+);
+
+// Свотч фона дня (сегодня / выходной) — квадрат с фоном-токеном.
+const BgSwatch = ({ bg }: { bg: string }) => (
+  <span
+    aria-hidden
+    style={{ width: 14, height: 14, borderRadius: 3, background: bg, border: `1px solid ${T.border}`, flexShrink: 0 }}
+  />
+);
+
 // Цифра-образец: переработка (T.warn) и норма-подсказка (T.textFaint). tabular-nums —
 // как числа в ячейках сетки, чтобы образец совпадал с реальным начертанием.
 const NumGlyph = ({ color, faint }: { color: string; faint?: boolean }) => (
@@ -75,9 +112,12 @@ const NumGlyph = ({ color, faint }: { color: string; faint?: boolean }) => (
 // Вынесено для теста (чистые данные без рендера, env=node).
 export const LEGEND_LABELS = [
   'Согласовано (только чтение)',
-  'Цвет = заполненные часы',
-  'Переработка (больше нормы)',
-  'Норма дня (подсказка)',
+  'Заливка ячейки = чем больше часов, тем насыщеннее',
+  'Точка в углу: заполнить будни строки этим значением',
+  'Переработка (больше нормы дня)',
+  'Бледная цифра = норма дня (подсказка, не введено)',
+  'Сегодня',
+  'Выходной / праздник',
 ] as const;
 
 export const GridLegend = () => {
@@ -128,8 +168,11 @@ export const GridLegend = () => {
         <>
           <Item swatch={<LockSwatch />} label={LEGEND_LABELS[0]} />
           <Item swatch={<FillSwatch />} label={LEGEND_LABELS[1]} />
-          <Item swatch={<NumGlyph color={T.warn} />} label={LEGEND_LABELS[2]} />
-          <Item swatch={<NumGlyph color={T.textFaint} faint />} label={LEGEND_LABELS[3]} />
+          <Item swatch={<HandleSwatch />} label={LEGEND_LABELS[2]} />
+          <Item swatch={<NumGlyph color={T.warn} />} label={LEGEND_LABELS[3]} />
+          <Item swatch={<NumGlyph color={T.textFaint} faint />} label={LEGEND_LABELS[4]} />
+          <Item swatch={<BgSwatch bg={T.todayCol} />} label={LEGEND_LABELS[5]} />
+          <Item swatch={<BgSwatch bg={T.weekendBg} />} label={LEGEND_LABELS[6]} />
         </>
       )}
     </div>

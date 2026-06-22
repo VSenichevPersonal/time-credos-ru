@@ -8,8 +8,8 @@ import { ENTRY_STATUS_LABELS } from 'src/constants/labels';
 // Тест держит легенду в синхроне с этим набором — без рендера (env=node).
 
 describe('LEGEND_LABELS — подписи легенды сетки', () => {
-  it('ровно 4 сигнала (lock / заливка / переработка / норма) — не перегружено', () => {
-    expect(LEGEND_LABELS).toHaveLength(4);
+  it('7 визуальных сигналов сетки покрыты (lock / заливка / точка / переработка / норма / сегодня / выходной)', () => {
+    expect(LEGEND_LABELS).toHaveLength(7);
   });
 
   it('подписи непустые и без англицизмов в видимом тексте', () => {
@@ -28,12 +28,21 @@ describe('LEGEND_LABELS — подписи легенды сетки', () => {
     expect(LEGEND_LABELS[0]).toContain(ENTRY_STATUS_LABELS.Approved);
   });
 
-  it('есть пояснение цвета-заливки и переработки', () => {
-    expect(LEGEND_LABELS.some((l) => l.includes('Цвет'))).toBe(true);
+  it('есть пояснение заливки и переработки', () => {
+    expect(LEGEND_LABELS.some((l) => l.toLowerCase().includes('заливк'))).toBe(true);
     expect(LEGEND_LABELS.some((l) => l.includes('Переработка'))).toBe(true);
   });
 
   it('есть пояснение нормы дня (бледный хинт пустой ячейки)', () => {
-    expect(LEGEND_LABELS.some((l) => l.includes('Норма дня'))).toBe(true);
+    expect(LEGEND_LABELS.some((l) => l.toLowerCase().includes('норма дня'))).toBe(true);
+  });
+
+  it('есть пояснение точки-заполнения будней', () => {
+    expect(LEGEND_LABELS.some((l) => l.toLowerCase().includes('будни'))).toBe(true);
+  });
+
+  it('есть пояснение сегодня и выходного', () => {
+    expect(LEGEND_LABELS.some((l) => l.includes('Сегодня'))).toBe(true);
+    expect(LEGEND_LABELS.some((l) => l.toLowerCase().includes('выходной'))).toBe(true);
   });
 });

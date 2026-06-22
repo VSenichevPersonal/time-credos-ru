@@ -6,7 +6,7 @@ vi.mock('twenty-client-sdk/rest', () => ({
   RestApiClient: vi.fn().mockImplementation(() => ({ post: mockPost, patch: mockPatch })),
 }));
 
-import { resolveEntries, submitEntries } from './approval-rest';
+import { recallEntries, resolveEntries, revokeEntries, submitEntries } from './approval-rest';
 
 beforeEach(() => { mockPost.mockReset(); mockPatch.mockReset(); });
 
@@ -125,5 +125,85 @@ describe('resolveEntries — reject', () => {
     await resolveEntries(['id7'], true, 'не должно попасть');
     const [, body] = mockPatch.mock.calls[0];
     expect(body).toMatchObject({ status: 'APPROVED', rejectComment: null });
+  });
+});
+
+// ─── recallEntries (WI-10/A4.3) ──────────────────────────────────────────
+// SUBMITTED → DRAFT: сотрудник отзывает свою отправку до решения руководителя.
+
+describe('recallEntries — /s/approval ok', () => {
+  it('route ok → PATCH не вызывается', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    await recallEntries(['id1', 'id2']);
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it('POST body: op=recall + ids comma-joined', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    await recallEntries(['a', 'b']);
+    expect(mockPost).toHaveBeenCalledWith('/s/approval', { op: 'recall', ids: 'a,b' });
+  });
+});
+
+describe('recallEntries — fallback', () => {
+  it('route throw → PATCH каждого id в DRAFT', async () => {
+    mockPost.mockRejectedValueOnce(new Error('500'));
+    mockPatch.mockResolvedValue({});
+    await recallEntries(['x', 'y']);
+    expect(mockPatch).toHaveBeenCalledTimes(2);
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/rest/credosTimeEntries/x',
+      expect.objectContaining({ status: 'DRAFT' }),
+    );
+  });
+
+  it('route ok=false → PATCH fallback DRAFT', async () => {
+    mockPost.mockResolvedValueOnce({ ok: false });
+    mockPatch.mockResolvedValue({});
+    await recallEntries(['z']);
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/rest/credosTimeEntries/z',
+      expect.objectContaining({ status: 'DRAFT' }),
+    );
+  });
+});
+
+// ─── revokeEntries (WI-10/A4.25) ─────────────────────────────────────────
+// APPROVED → SUBMITTED: руководитель отзывает согласование («Reopen»).
+
+describe('revokeEntries — /s/approval ok', () => {
+  it('route ok → PATCH не вызывается', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    await revokeEntries(['id-approved']);
+    expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it('POST body: op=revoke + ids', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    await revokeEntries(['r1', 'r2', 'r3']);
+    expect(mockPost).toHaveBeenCalledWith('/s/approval', { op: 'revoke', ids: 'r1,r2,r3' });
+  });
+});
+
+describe('revokeEntries — fallback', () => {
+  it('route throw → PATCH каждого id в SUBMITTED', async () => {
+    mockPost.mockRejectedValueOnce(new Error('503'));
+    mockPatch.mockResolvedValue({});
+    await revokeEntries(['p', 'q']);
+    expect(mockPatch).toHaveBeenCalledTimes(2);
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/rest/credosTimeEntries/p',
+      expect.objectContaining({ status: 'SUBMITTED' }),
+    );
+  });
+
+  it('route ok=false → fallback SUBMITTED', async () => {
+    mockPost.mockResolvedValueOnce({ ok: false });
+    mockPatch.mockResolvedValue({});
+    await revokeEntries(['w']);
+    expect(mockPatch).toHaveBeenCalledWith(
+      '/rest/credosTimeEntries/w',
+      expect.objectContaining({ status: 'SUBMITTED' }),
+    );
   });
 });

@@ -14,6 +14,9 @@ import { isIsoDate, isUuid } from './params-validate';
 // SSOT-пересчёт rollup-поля проекта (factHours/budgetRemaining). Один источник
 // формулы и поведения — общий с database-event триггерами (project-fact-rollup.logic.ts).
 import { recalcProjectFactHours } from './project-fact-rollup';
+// CISO-005 server-truth актор (фундамент on-behalf/lockdown/аудита). Резолвится на
+// входе для БУДУЩИХ фаз; CRUD пока работает на текущем resolveEmployeeId (деградация).
+import { type Actor, resolveActor } from './shared/resolve-actor';
 
 // /s/time-entry — CRUD трудозатрат для front-компонента (песочница без доступа к БД).
 // Работает поверх Core REST воркспейса (TWENTY_API_URL + TWENTY_APP_ACCESS_TOKEN
@@ -203,6 +206,18 @@ const run = async (event: RoutePayload) => {
   const op = params.op ?? 'list';
   // CISO-006: синхронный UUID-guard до сетевого resolveEmployeeId — fail fast.
   if (params.id && !isUuid(params.id)) return { ok: false, error: 'invalid id' };
+  // CISO-005 ФУНДАМЕНТ: серверный actor («кто действует достоверно») резолвится на
+  // входе для будущих фаз (audit «кто внёс» + on-behalf canWriteFor + lockdown).
+  // СЕЙЧАС НЕ enforcement: CRUD-личность по-прежнему берётся из resolveEmployeeId
+  // (client workspaceMemberRef / DEV-fallback). При недоступной server-identity
+  // resolveActor вернёт null без лишних запросов → деградация, текущее поведение
+  // сохраняется (записи пишутся как раньше). См. shared/resolve-actor.
+  const actor: Actor = await resolveActor(event, params.workspaceMemberRef);
+  if (actor && actor.trusted && actor.employeeId !== params.employeeId) {
+    // На фазе on-behalf здесь будет canWriteFor(actor, целевой employee). Пока — лог.
+    // eslint-disable-next-line no-console
+    console.warn('[time-entry-api] server-actor=%s (trusted) — фундамент для аудита/on-behalf', actor.employeeId);
+  }
   const employeeId = await resolveEmployeeId(params.workspaceMemberRef);
 
   // delete — удаление записи по id.

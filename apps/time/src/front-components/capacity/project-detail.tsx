@@ -12,6 +12,7 @@ import type {
   DeptRef,
   LoadCell,
   Period,
+  PlanSlot,
   ProjectDeptShare,
   ProjectLoad,
   ProjectPatch,
@@ -45,6 +46,9 @@ type Props = {
   dept?: DeptRef;
   // WI-48: данные доски для превью vs СВОБОДНОЙ ёмкости отдела(ов) + мульти-отдел.
   previewSource?: PreviewSource;
+  // Слоты по проекту (уже загружены доской) — для индикатора «распланировано X / Y»
+  // на строке проекта в режиме планирования. Передаётся насквозь в ProjectPlanRow.
+  slotsByProject?: Map<string, PlanSlot[]>;
 };
 
 // План отдела без проекта → форма проекта (те же поля plannedEffort/start/end).
@@ -70,12 +74,14 @@ const PlanningList = ({
   spread,
   dept,
   previewSource,
+  slotsByProject,
 }: Required<Pick<Props, 'planned' | 'unplanned' | 'nameWidth' | 'periods' | 'onSave'>> & {
   deptPlans: DeptPlanLoad[];
   onSaveDeptPlan?: Props['onSaveDeptPlan'];
   spread?: PlanSpread;
   dept?: DeptRef;
   previewSource?: PreviewSource;
+  slotsByProject?: Map<string, PlanSlot[]>;
 }) => {
   const projects = [...planned.map((pl) => pl.project), ...unplanned];
   const fieldsWidth = Math.max(360, periods.length * 56);
@@ -98,6 +104,7 @@ const PlanningList = ({
           spread={spread}
           dept={dept}
           previewSource={previewSource}
+          slots={slotsByProject?.get(project.id)}
         />
       ))}
       {deptPlans.length > 0 && onSaveDeptPlan && (
@@ -139,6 +146,7 @@ export const ProjectDetail = ({
   currentDeptId,
   dept,
   previewSource,
+  slotsByProject,
 }: Props) => {
   if (planning && onSave) {
     return (
@@ -153,6 +161,7 @@ export const ProjectDetail = ({
         spread={spread}
         dept={dept}
         previewSource={previewSource}
+        slotsByProject={slotsByProject}
       />
     );
   }

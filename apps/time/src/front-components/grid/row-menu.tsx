@@ -189,18 +189,20 @@ export const RowMenu = ({
         aria-haspopup="menu"
         aria-expanded={open}
         style={{
-          width: 24,
+          width: 26,
           height: 24,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: 0,
-          border: 'none',
+          // Заметность (заказчик «⋯ незаметна»): видимая рамка + фон-чип, не голый глиф.
+          border: `1px solid ${open ? T.accent : T.borderStrong}`,
           borderRadius: 6,
-          background: open ? T.accentSoft : 'transparent',
-          color: open ? T.accent : T.textMuted,
+          background: open ? T.accentSoft : T.surface,
+          color: open ? T.accent : T.text,
           cursor: 'pointer',
           fontSize: 16,
+          fontWeight: 700,
           lineHeight: 1,
           fontFamily: 'inherit',
         }}

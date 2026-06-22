@@ -124,7 +124,7 @@ export const HourCell = ({
           ref={inputRef}
           autoFocus
           value={draft}
-          placeholder="8 / 8:30" // E1.7: подсказка форматов в пустом инпуте
+          placeholder="" // подсказку формата убрали (засоряла) — форматы 8 / 8:30 понятны
           aria-invalid={invalid || undefined}
           onChange={(e) => {
             setDraft(e.target.value);
