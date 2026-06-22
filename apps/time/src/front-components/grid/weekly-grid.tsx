@@ -27,6 +27,7 @@ import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { ErrorState } from 'src/front-components/shared/error-state';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
 import { useGlobalSettings } from 'src/front-components/shared/use-global-settings';
+import { useSubordinates } from 'src/front-components/grid/subordinates';
 
 // Корневой компонент таймшита. Виджет фиксированного размера: скроллится только
 // тело таблицы. 3 режима (День/Неделя/Проект), клавиатура, мультиселект-фильтры.
@@ -37,8 +38,10 @@ import { useGlobalSettings } from 'src/front-components/shared/use-global-settin
 export const WeeklyGrid = () => {
   const week = useWeek();
   const normFor = useDailyNorm(week.days.map((d) => d.iso)); // T2 SSOT норма дня
-  const { isManager } = useSelfEmployee();
-  const [viewEmployeeId] = useState<string | null>(null);
+  const { employeeId: selfEmployeeId, isManager } = useSelfEmployee();
+  // On-behalf «за кого»: руководитель выбирает подчинённого → грид грузит/пишет
+  // его записи (сервер защищает canWriteFor). null = свой таймшит.
+  const [viewEmployeeId, setViewEmployeeId] = useState<string | null>(null);
 
   const data = useGridData(week.range.from, week.range.to, viewEmployeeId);
   const { state, toggle, clearKey, clearAll, activeCount } = useFilters();
@@ -84,6 +87,12 @@ export const WeeklyGrid = () => {
   const overtimeThreshold = globalSettings?.overtimeWarnHours;
   // ПДн (CISO-007): ФИО актора-аудита показываем только при revealEmployeeNames.
   const revealNames = globalSettings?.revealEmployeeNames === true;
+
+  // On-behalf селектор: подчинённые руководителя (его отдел/отделы, head=я).
+  // Не-руководитель → пустой список → селектор не рисуется. Источник id —
+  // useSelfEmployee (роль-резолв, совпадает с Department.head).
+  const subordinates = useSubordinates(selfEmployeeId, isManager, data.employees);
+  const selectEmployee = (id: string | null) => setViewEmployeeId(id);
 
   // PERIOD-LOCKDOWN: дни недели в закрытом периоде (по дате) — read-only-индикация
   // в сетке. Серверный гард (canMutateInPeriod) остаётся источником истины; здесь
@@ -296,6 +305,10 @@ export const WeeklyGrid = () => {
         onNext={onNext}
         onToday={week.reset}
         owner={owner}
+        subordinates={subordinates}
+        viewEmployeeId={viewEmployeeId}
+        onSelectEmployee={isManager ? selectEmployee : undefined}
+        revealNames={revealNames}
         onCopyWeek={
           mode === 'week'
             ? () => setExtraRowKeys((prev) => [...new Set([...prev, ...actions.copyPreviousWeek()])])

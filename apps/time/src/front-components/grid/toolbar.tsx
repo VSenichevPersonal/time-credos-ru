@@ -7,9 +7,10 @@ import { CopyMenu } from 'src/front-components/grid/copy-menu';
 import { Cheatsheet } from 'src/front-components/grid/cheatsheet';
 import { SaveIndicator } from 'src/front-components/grid/save-indicator';
 import { OwnerBadge } from 'src/front-components/grid/owner-badge';
+import { EmployeeSelector } from 'src/front-components/grid/employee-selector';
 import type { TimesheetOwner } from 'src/front-components/grid/whose-timesheet';
 import type { SaveStatus } from 'src/front-components/grid/use-save-status';
-import type { ViewMode } from 'src/front-components/grid/types';
+import type { ViewMode, EmployeeRef } from 'src/front-components/grid/types';
 
 // Верхний тулбар: название · режимы · период · действия (копировать неделю, «?»).
 
@@ -29,6 +30,12 @@ type Props = {
   // «Чей таймшит» (REQ on-behalf #1, read-only): null/undefined — пока не резолвлен
   // → запасной заголовок «Таймшит». Резолвится в weekly-grid (свой/выбранный).
   owner?: TimesheetOwner | null;
+  // On-behalf селектор «за кого» (только руководитель). Пустой список → не рисуем
+  // (рядовой / нет подчинённых). viewEmployeeId=null — свой таймшит.
+  subordinates?: ReadonlyArray<EmployeeRef>;
+  viewEmployeeId?: string | null;
+  onSelectEmployee?: (employeeId: string | null) => void;
+  revealNames?: boolean;
 };
 
 const actionBtn = (disabled?: boolean) =>
@@ -60,6 +67,10 @@ export const Toolbar = ({
   onFillStandardWeek,
   copyDisabled,
   owner,
+  subordinates,
+  viewEmployeeId,
+  onSelectEmployee,
+  revealNames,
 }: Props) => {
   const [help, setHelp] = useState(false);
 
@@ -78,6 +89,16 @@ export const Toolbar = ({
         <OwnerBadge owner={owner} />
       ) : (
         <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Таймшит</span>
+      )}
+      {/* On-behalf селектор «за кого»: только руководителю с подчинёнными
+          (subordinates непустой). Рядовой / нет команды — селектора нет. */}
+      {onSelectEmployee && subordinates && subordinates.length > 0 && (
+        <EmployeeSelector
+          subordinates={subordinates}
+          viewEmployeeId={viewEmployeeId ?? null}
+          reveal={revealNames === true}
+          onSelect={onSelectEmployee}
+        />
       )}
       <SaveIndicator status={saveStatus} />
       <ModeSwitcher value={mode} onChange={onModeChange} />

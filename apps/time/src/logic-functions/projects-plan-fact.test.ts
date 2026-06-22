@@ -4,8 +4,17 @@ import {
   computeProjectsPlanFact,
   type ProjectsPlanFactInput,
   type RawEntry,
+  type RawPlanSlot,
   type RawProjectPlan,
 } from './projects-plan-fact';
+
+const slot = (over: Partial<RawPlanSlot> & { projectId: string }): RawPlanSlot => ({
+  departmentId: null,
+  employeeId: null,
+  periodMonth: '2026-06',
+  plannedHours: 0,
+  ...over,
+});
 
 const p = (over: Partial<RawProjectPlan> & { id: string }): RawProjectPlan => ({
   name: null,
@@ -41,7 +50,15 @@ describe('computeProjectsPlanFact', () => {
     expect(row.remaining).toBe(60);
     expect(row.overrun).toBe(false);
     expect(row.pct).toBe(0.4);
-    expect(res.totals).toEqual({ planned: 100, fact: 40, remaining: 60, overrunCount: 0 });
+    expect(res.totals).toEqual({
+      planned: 100,
+      allocated: 0,
+      fact: 40,
+      remaining: 60,
+      unallocated: 100,
+      overrunCount: 0,
+      overbookedCount: 0,
+    });
   });
 
   it('помечает перерасход (факт>план → remaining<0, overrun=true)', () => {
@@ -163,6 +180,103 @@ describe('computeProjectsPlanFact', () => {
     };
     const res = computeProjectsPlanFact(input);
     expect(res.rows[0].fact).toBe(15);
+  });
+
+  // ===== B1: ТРИ ВЕЛИЧИНЫ (бюджет / распланировано / факт) =====
+
+  it('бюджет, распланировано (Σслотов), факт — три РАЗНЫЕ величины', () => {
+    const input: ProjectsPlanFactInput = {
+      projects: [p({ id: 'P1', plannedEffort: 500 })], // бюджет 500
+      entries: [e({ projectId: 'P1', hours: 120 })], // факт 120
+      slots: [
+        slot({ projectId: 'P1', periodMonth: '2026-06', plannedHours: 200 }),
+        slot({ projectId: 'P1', periodMonth: '2026-07', plannedHours: 100 }),
+      ], // распланировано 300
+    };
+    const row = computeProjectsPlanFact(input).rows[0];
+    expect(row.planned).toBe(500); // бюджет
+    expect(row.allocated).toBe(300); // распланировано = Σслотов
+    expect(row.fact).toBe(120); // факт
+    // Ось распределения: остаток = 500 − 300 = 200, не переаллокация.
+    expect(row.unallocated).toBe(200);
+    expect(row.overbooked).toBe(false);
+    expect(row.allocatedPct).toBe(0.6);
+    // Ось освоения (отдельно): остаток = 500 − 120 = 380, освоение 0.24.
+    expect(row.remaining).toBe(380);
+    expect(row.pct).toBe(0.24);
+  });
+
+  it('переаллокация бюджета видна: распланировано > бюджет → overbooked, unallocated<0', () => {
+    const input: ProjectsPlanFactInput = {
+      projects: [p({ id: 'P1', plannedEffort: 100 })],
+      entries: [],
+      slots: [
+        slot({ projectId: 'P1', periodMonth: '2026-06', plannedHours: 80 }),
+        slot({ projectId: 'P1', periodMonth: '2026-07', plannedHours: 50 }),
+      ], // распланировано 130 > бюджет 100
+    };
+    const res = computeProjectsPlanFact(input);
+    const row = res.rows[0];
+    expect(row.allocated).toBe(130);
+    expect(row.unallocated).toBe(-30); // переаллокация на 30 ч
+    expect(row.overbooked).toBe(true);
+    expect(row.allocatedPct).toBe(1.3);
+    // overbooked НЕ есть overrun (факт=0 < бюджет) — разные оси.
+    expect(row.overrun).toBe(false);
+    expect(res.totals.overbookedCount).toBe(1);
+    expect(res.totals.allocated).toBe(130);
+    expect(res.totals.unallocated).toBe(-30);
+  });
+
+  it('распланировано режется периодом по месяцу слота', () => {
+    const input: ProjectsPlanFactInput = {
+      projects: [p({ id: 'P1', plannedEffort: 1000 })],
+      entries: [],
+      slots: [
+        slot({ projectId: 'P1', periodMonth: '2026-05', plannedHours: 100 }),
+        slot({ projectId: 'P1', periodMonth: '2026-06', plannedHours: 200 }),
+        slot({ projectId: 'P1', periodMonth: '2026-07', plannedHours: 300 }),
+      ],
+    };
+    const res = computeProjectsPlanFact(input, { from: '2026-06-01', to: '2026-06-30' });
+    expect(res.rows[0].allocated).toBe(200); // только июнь
+  });
+
+  it('слоты не переданы → allocated=0, unallocated=весь бюджет', () => {
+    const res = computeProjectsPlanFact({
+      projects: [p({ id: 'P1', plannedEffort: 80 })],
+      entries: [],
+    });
+    expect(res.rows[0].allocated).toBe(0);
+    expect(res.rows[0].unallocated).toBe(80);
+    expect(res.rows[0].overbooked).toBe(false);
+    expect(res.rows[0].allocatedPct).toBe(0);
+  });
+
+  it('мусорные/нулевые слоты не учитываются в распланировано', () => {
+    const input: ProjectsPlanFactInput = {
+      projects: [p({ id: 'P1', plannedEffort: 100 })],
+      entries: [],
+      slots: [
+        slot({ projectId: 'P1', periodMonth: '', plannedHours: 999 }), // мусор (пустой месяц)
+        slot({ projectId: 'P1', periodMonth: '2026-06', plannedHours: 0 }), // 0
+        slot({ projectId: 'P1', periodMonth: '2026-06', plannedHours: 40 }), // валидный
+        slot({ projectId: 'P2', periodMonth: '2026-06', plannedHours: 70 }), // чужой проект
+      ],
+    };
+    expect(computeProjectsPlanFact(input).rows[0].allocated).toBe(40);
+  });
+
+  it('персональные + отдельские слоты суммируются в распланировано проекта', () => {
+    const input: ProjectsPlanFactInput = {
+      projects: [p({ id: 'P1', plannedEffort: 300 })],
+      entries: [],
+      slots: [
+        slot({ projectId: 'P1', periodMonth: '2026-06', employeeId: 'E1', plannedHours: 50 }),
+        slot({ projectId: 'P1', periodMonth: '2026-06', departmentId: 'D1', plannedHours: 80 }),
+      ],
+    };
+    expect(computeProjectsPlanFact(input).rows[0].allocated).toBe(130);
   });
 
   it('name fallback: code, затем id если оба пусты', () => {

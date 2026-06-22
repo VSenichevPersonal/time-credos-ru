@@ -10,7 +10,15 @@
 import { resolveCapacityFactor } from 'src/constants/capacity';
 import { CLIENT_CATEGORY } from 'src/constants/select-options';
 
+import {
+  allocatedByEmployee,
+  allocatedByMonth,
+  allocatedByProject,
+  type RawPlanSlot,
+} from './shared/plan-slots-read';
+
 export { CLIENT_CATEGORY };
+export type { RawPlanSlot };
 
 export type RawEntry = {
   hours: number | null;
@@ -110,6 +118,10 @@ export type ReportsInput = {
   // в периоде назначений (fallback: сотрудник без записей = 100% по departmentId).
   // Не переданы → прежнее поведение: count активных сотрудников (обратная совместимость).
   assignments?: RawEmpDeptAssignment[];
+  // B1: плановые слоты (credosTimePlanSlot) для «распланировано» = Σ слотов.
+  // Используются в timeseries (план месяца) и OLAP employee (person-план). Не
+  // переданы → allocated=0/null (прежнее поведение прочих срезов не меняется).
+  planSlots?: RawPlanSlot[];
 };
 
 // Строка проекта + бюджет (F-A: план vs факт). budgetUsed = fact/plannedEffort.
@@ -467,7 +479,10 @@ export type OlapParams = {
   sort?: OlapSort;
 };
 
-export type OlapRow = Row & { drillable: OlapDimension[] };
+// allocated (B1): РАСПЛАНИРОВАНО = Σ слотов ключа строки. Заполняется только для
+// осей с естественным носителем слота — employee (персон. слоты) и project (Σ
+// слотов проекта). Прочие оси (dept/category/...) → null (слот не маппится 1:1).
+export type OlapRow = Row & { drillable: OlapDimension[]; allocated: number | null };
 export type OlapResult = {
   ok: true;
   period: { from: string; to: string };
@@ -488,6 +503,16 @@ export const computeOlap = (
   const absences = input.absences ?? [];
   const workTypes = input.workTypes ?? [];
   const groupBy = params.groupBy;
+
+  // B1: распланировано по ключу строки. Только для осей employee (персон. слоты)
+  // и project (Σ слотов проекта) — на прочих осях слот не маппится 1:1 (null).
+  const slotPeriod = { from: period.from, to: period.to };
+  const allocByKey: Map<string, number> | null =
+    groupBy === 'employee'
+      ? allocatedByEmployee(input.planSlots ?? [], slotPeriod)
+      : groupBy === 'project'
+        ? allocatedByProject(input.planSlots ?? [], slotPeriod)
+        : null;
   const filters = params.filters ?? [];
   const limit = Math.max(1, Math.min(params.limit ?? 100, 1000));
   const offset = params.cursor ? Math.max(0, parseInt(params.cursor, 10) || 0) : 0;
@@ -670,6 +695,7 @@ export const computeOlap = (
       byCategory: buildCats(a.cats, a.fact),
     }),
     drillable: availableDims,
+    allocated: allocByKey ? Number((allocByKey.get(key) ?? 0).toFixed(2)) : null,
   }));
 
   // Сортировка (дефолт: факт убыв.).
@@ -728,6 +754,10 @@ export type TimeseriesPoint = {
   norm: number; // нормо-часы месяца (рабочие дни месяца × headcount/FTE × factor − отсутствия)
   util: number | null; // client / fact, null если fact == 0
   under: number; // norm − fact (>0 недогруз, <0 перегруз)
+  // B1: РАСПЛАНИРОВАНО за месяц = Σ plannedHours слотов этого месяца (опц. фильтр
+  // отдела). План из доски (помесячный раскид слотов), а НЕ plannedEffort/период.
+  // 0, если слоты не переданы / нет слотов месяца.
+  allocated: number;
 };
 
 export type TimeseriesParams = {
@@ -751,6 +781,13 @@ export const computeTimeseries = (
   const { entries, projects, employees, departments, calendar } = input;
   const absences = input.absences ?? [];
   const deptFilter = params.departmentId ?? null;
+
+  // B1: распланировано по месяцам = Σ слотов месяца (опц. фильтр отдела слота).
+  const allocByMonth = allocatedByMonth(input.planSlots ?? [], {
+    from: period.from,
+    to: period.to,
+    departmentId: deptFilter,
+  });
 
   const projById = new Map(projects.map((p) => [p.id, p]));
   const empById = new Map(employees.map((e) => [e.id, e]));
@@ -854,9 +891,13 @@ export const computeTimeseries = (
     accByMonth.set(m, cur);
   }
 
-  // Множество месяцев = все месяцы с фактом ∪ все месяцы рабочего календаря
-  // (норма есть даже в месяце без записей — для тренда недогруза).
-  const monthsSet = new Set<string>([...accByMonth.keys(), ...baseNormByMonth.keys()]);
+  // Множество месяцев = месяцы с фактом ∪ месяцы рабочего календаря ∪ месяцы со
+  // слотами (план есть даже в месяце без записей — для тренда план/факт).
+  const monthsSet = new Set<string>([
+    ...accByMonth.keys(),
+    ...baseNormByMonth.keys(),
+    ...allocByMonth.keys(),
+  ]);
   const months = [...monthsSet].sort();
 
   const points: TimeseriesPoint[] = months.map((month) => {
@@ -870,6 +911,7 @@ export const computeTimeseries = (
       norm,
       util: util(a.client, a.fact),
       under: Number((norm - fact).toFixed(2)),
+      allocated: Number((allocByMonth.get(month) ?? 0).toFixed(2)),
     };
   });
 

@@ -34,6 +34,8 @@ export const serverErrorMessage = (error: string | undefined): string => {
       return 'Согласовано — правка запрещена. Нужен отзыв согласования.';
     case 'LOCKED_PERIOD':
       return PERIOD_LOCKED_MESSAGE;
+    case 'FORBIDDEN_ON_BEHALF':
+      return 'Нет прав вести этот таймшит. Можно только за сотрудников своего отдела.';
     case 'hours out of range':
       return 'Часы за день вне допустимого диапазона';
     case 'employee not resolved':

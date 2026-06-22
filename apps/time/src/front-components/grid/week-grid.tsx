@@ -172,6 +172,7 @@ export const WeekGrid = ({
               category={row.category}
               workTypeName={row.workTypeName}
               tags={row.tags}
+              onBehalf={row.onBehalfByDay.some(Boolean)}
               days={days}
               hoursByDay={row.hoursByDay}
               lockedByDay={row.lockedByDay}

@@ -6,6 +6,7 @@ import type {
   WorkTypeRef,
 } from 'src/front-components/grid/types';
 import { makeRowKey } from 'src/front-components/grid/types';
+import { isEnteredByManager } from 'src/front-components/grid/subordinates';
 import type { WeekDay } from 'src/front-components/grid/use-week';
 import type { FilterState } from 'src/front-components/grid/use-filters';
 import { rowPasses } from 'src/front-components/grid/use-filters';
@@ -25,6 +26,7 @@ export type GridRowModel = {
   statusByDay: (string | null)[]; // WI-10: статус записи дня (для recall/revoke из сетки)
   descByDay: (string | null)[];
   lockedByDay: boolean[]; // W6-2: день только для чтения (запись APPROVED)
+  onBehalfByDay: boolean[]; // ON-BEHALF: запись дня введена руководителем (≠ владелец)
   tags: string[]; // W3-2: объединение тегов записей строки (без дублей)
   rowTotal: number;
 };
@@ -62,6 +64,7 @@ export const calcGridModel = (
         statusByDay: Array(7).fill(null),
         descByDay: Array(7).fill(null),
         lockedByDay: Array(7).fill(false),
+        onBehalfByDay: Array(7).fill(false),
         tags: [],
         rowTotal: 0,
       };
@@ -88,6 +91,8 @@ export const calcGridModel = (
     row.statusByDay[idx] = e.status ?? null; // WI-10: статус дня для recall/revoke
     row.descByDay[idx] = e.description;
     if (e.status === 'APPROVED') row.lockedByDay[idx] = true; // W6-2: согласованное — read-only
+    // ON-BEHALF: запись введена руководителем за сотрудника (enteredByActor ≠ владелец).
+    if (isEnteredByManager(e.enteredByActor, e.employeeId)) row.onBehalfByDay[idx] = true;
     for (const t of entryTags) if (!row.tags.includes(t)) row.tags.push(t);
     row.rowTotal += e.hours;
   }

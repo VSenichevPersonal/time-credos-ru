@@ -5,6 +5,7 @@ import { REPORTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER } from 'src/constants/unive
 
 import { validDateParam } from './params-validate';
 import { computeProjectsPlanFact, type RawProjectPlan } from './projects-plan-fact';
+import type { RawPlanSlot } from './shared/plan-slots-read';
 import { computeDetail, detailToCsv } from './reports-detail';
 import { buildTimesheetGrid, gridToCsv } from './reports-timesheet-grid';
 import {
@@ -281,8 +282,12 @@ const run = async (event: RoutePayload) => {
     // projects загружены как RawProject (без status/дат); REST отдаёт полные
     // записи, поля присутствуют в runtime — приводим к RawProjectPlan.
     const planProjects = projects as unknown as RawProjectPlan[];
+    // B1: плановые слоты для «распланировано» (Σ). Lazy-фетч — только для этого
+    // отчёта (остальные срезы слоты не используют). Все слоты воркспейса (фильтр
+    // по периоду/проекту — в computeProjectsPlanFact). При ошибке → allocated=0.
+    const slots = await restGetAll<RawPlanSlot>('credosTimePlanSlots', {}).catch(() => []);
     return computeProjectsPlanFact(
-      { projects: planProjects, entries },
+      { projects: planProjects, entries, slots },
       {
         from,
         to,
@@ -293,9 +298,15 @@ const run = async (event: RoutePayload) => {
   }
 
   // C4: тренд утилизации по месяцам. mode=timeseries (или groupBy=month) →
-  // массив точек [{month, fact, client, norm, util, under}] за период, опц. фильтр отдела.
+  // массив точек [{month, fact, client, norm, util, under, allocated}] за период,
+  // опц. фильтр отдела. B1: allocated = Σ слотов месяца (план из доски).
   if (params.mode === 'timeseries' || params.groupBy === 'month') {
-    return computeTimeseries(input, { from, to }, { departmentId: params.departmentId ?? null });
+    const planSlots = await restGetAll<RawPlanSlot>('credosTimePlanSlots', {}).catch(() => []);
+    return computeTimeseries(
+      { ...input, planSlots },
+      { from, to },
+      { departmentId: params.departmentId ?? null },
+    );
   }
 
   // reports MVP: groupBy=detail → лист отдельных записей (7 колонок) + опц. CSV.
@@ -372,7 +383,17 @@ const run = async (event: RoutePayload) => {
   // CISO-007: затираем ФИО в OLAP employee-срезе/фильтре.
   const codeOf = makeEmployeeCodeResolver(employees, departments);
   if (olap) {
-    return redactOlap(computeOlap(input, { from, to }, olap), reveal, codeOf);
+    // B1: для осей employee/project нужен Σ слотов (allocated). Слоты фетчим только
+    // для этих осей (прочие OLAP-срезы слоты не используют) → меньше REST-запросов.
+    const needsSlots = olap.groupBy === 'employee' || olap.groupBy === 'project';
+    const planSlots = needsSlots
+      ? await restGetAll<RawPlanSlot>('credosTimePlanSlots', {}).catch(() => [])
+      : [];
+    return redactOlap(
+      computeOlap({ ...input, planSlots }, { from, to }, olap),
+      reveal,
+      codeOf,
+    );
   }
   // CISO-007: при reveal=false ФИО в byEmployee → стабильный КОД (не пусто/UUID).
   const result = computeReports(input, { from, to });

@@ -1,10 +1,18 @@
 /**
- * Чистый расчёт «Проекты — план/факт/остаток» (в ЧАСАХ) — REPORTS_COMPLETENESS P1.
+ * Чистый расчёт «Проекты — бюджет/распланировано/факт» (в ЧАСАХ) — B1 +
+ * REPORTS_COMPLETENESS P1.
  *
- * Аналог Timetta «Список проектов в работе» для РП: по каждому проекту план
- * (plannedEffort), факт (Σ часов записей за период), остаток (план−факт) и флаг
- * перерасхода (факт>план → remaining<0). БЕЗ денег/billable — [[no-billable-concept]]:
- * Timetta показывает план/факт/остаток в деньгах; у нас только часы.
+ * ТРИ РАЗНЫЕ величины на проект [[planning-identity-decisions]]:
+ *   · БЮДЖЕТ (planned)        = project.plannedEffort (оценка-бюджет, НЕИЗМЕНЕН).
+ *   · РАСПЛАНИРОВАНО (allocated) = Σ plannedHours plan-slots проекта за период.
+ *   · ФАКТ (fact)             = Σ часов записей проекта за период.
+ * Производные по ДВУМ осям (не путать, B1):
+ *   · ОСВОЕНИЕ: remaining=бюджет−факт, pct=факт/бюджет, overrun=факт>бюджет.
+ *   · РАСПРЕДЕЛЕНИЕ: unallocated=бюджет−распланировано, allocatedPct=распл/бюджет,
+ *     overbooked=распланировано>бюджет (переаллокация = warning, не блок).
+ *
+ * Аналог Timetta «Список проектов в работе» для РП. БЕЗ денег/billable —
+ * [[no-billable-concept]]: только часы. Чтение слотов — SSOT shared/plan-slots-read.
  *
  * Факт считается из записей credosTimeEntry (а НЕ из хранимого factHours), чтобы
  * работал опц. период-фильтр: с границами factHours (накопительный за всё время)
@@ -16,8 +24,9 @@
  */
 
 import type { RawEntry } from './reports-calc';
+import { allocatedByProject, type RawPlanSlot } from './shared/plan-slots-read';
 
-export type { RawEntry };
+export type { RawEntry, RawPlanSlot };
 
 // Проект с полями плана/факта/статуса/срока (срез credosTimeProject для отчёта).
 // factHours/budgetRemaining хранимые — НЕ используем для расчёта (период-фильтр),
@@ -32,7 +41,11 @@ export type RawProjectPlan = {
   endDate?: string | null;
 };
 
-// Строка отчёта по проекту: план/факт/остаток (часы) + флаг перерасхода.
+// Строка отчёта по проекту: ТРИ величины (бюджет/распланировано/факт) + производные.
+// [[planning-identity-decisions]]: planned=БЮДЖЕТ (plannedEffort, неизменен),
+// allocated=РАСПЛАНИРОВАНО (Σ слотов), fact=ФАКТ. budgetRemaining (план−факт) и
+// pct (освоение=факт/план) — про ОСВОЕНИЕ; unallocated (план−распланировано) и
+// overbooked — про РАСПРЕДЕЛЕНИЕ. Не путать две оси (B1, PLAN_VS_BUDGET_COVERAGE §1.2).
 export type ProjectPlanFactRow = {
   projectId: string;
   name: string; // имя проекта (fallback code/id) — НЕ ПДн
@@ -40,23 +53,31 @@ export type ProjectPlanFactRow = {
   status: string | null;
   startDate: string | null;
   endDate: string | null;
-  planned: number | null; // плановые часы (plannedEffort), null если не задан
-  fact: number; // факт = Σ часов записей проекта за период
-  remaining: number | null; // план − факт (часы); null если план не задан
-  overrun: boolean; // факт > план → перерасход (флаг подсветки UI)
-  pct: number | null; // факт / план (0..1+); null если план не задан/0
+  planned: number | null; // БЮДЖЕТ = plannedEffort, null если не задан
+  allocated: number; // РАСПЛАНИРОВАНО = Σ plannedHours слотов проекта за период
+  fact: number; // ФАКТ = Σ часов записей проекта за период
+  remaining: number | null; // остаток ОСВОЕНИЯ = бюджет − факт; null если бюджета нет
+  unallocated: number | null; // остаток РАСПРЕДЕЛЕНИЯ = бюджет − распланировано; null если бюджета нет
+  overrun: boolean; // факт > бюджет → перерасход освоения (флаг подсветки UI)
+  overbooked: boolean; // распланировано > бюджет → переаллокация (warning, не блок)
+  pct: number | null; // освоение = факт / бюджет (0..1+); null если бюджета нет/0
+  allocatedPct: number | null; // покрытие = распланировано / бюджет (0..1+); null если бюджета нет/0
 };
 
 export type ProjectsPlanFactInput = {
   projects: RawProjectPlan[];
   entries: RawEntry[];
+  slots?: RawPlanSlot[]; // plan-slots для «распланировано» (Σ). Не передано → allocated=0.
 };
 
 export type ProjectsPlanFactTotals = {
-  planned: number; // Σ плановых часов (проекты без плана не вносят вклад)
-  fact: number; // Σ факта
-  remaining: number; // Σ план − Σ факт (по проектам с планом)
-  overrunCount: number; // сколько проектов в перерасходе
+  planned: number; // Σ БЮДЖЕТОВ (проекты без бюджета не вносят вклад)
+  allocated: number; // Σ РАСПЛАНИРОВАНО (Σ слотов всех проектов за период)
+  fact: number; // Σ ФАКТА
+  remaining: number; // Σ бюджет − Σ факт (по проектам с бюджетом) — освоение
+  unallocated: number; // Σ бюджет − Σ распланировано (по проектам с бюджетом) — распределение
+  overrunCount: number; // сколько проектов в перерасходе (факт > бюджет)
+  overbookedCount: number; // сколько проектов в переаллокации (распланировано > бюджет)
 };
 
 export type ProjectsPlanFactResult = {
@@ -100,9 +121,11 @@ export type ProjectsPlanFactOptions = {
  *
  * Шаги:
  *  1. Факт по проектам = Σ часов записей (период-фильтр по дню записи).
- *  2. По каждому проекту: planned=plannedEffort, fact, remaining=planned−fact,
- *     overrun = fact>planned (только если план задан), pct=fact/planned.
- *  3. Сортировка: сначала перерасход (overrun), затем по |остатку| / факту убыв.,
+ *     Распланировано = Σ слотов проекта (период-фильтр по месяцу слота).
+ *  2. По каждому проекту: planned=бюджет, allocated=распланировано, fact;
+ *     remaining=бюджет−факт, unallocated=бюджет−распланировано, overrun=факт>бюджет,
+ *     overbooked=распланировано>бюджет, pct=факт/бюджет, allocatedPct=распл/бюджет.
+ *  3. Сортировка: сначала перерасход (overrun), затем по факту убыв.,
  *     чтобы РП видел проблемные проекты сверху.
  *
  * Фильтры departmentId/status — опц., сравниваются в памяти (инъекции нет).
@@ -126,6 +149,10 @@ export const computeProjectsPlanFact = (
     factByProject.set(e.projectId, (factByProject.get(e.projectId) ?? 0) + hours);
   }
 
+  // Распланировано по проектам = Σ plannedHours слотов (период-фильтр по месяцу).
+  // SSOT чтения слотов — shared/plan-slots-read (один контракт для всех отчётов).
+  const allocByProject = allocatedByProject(input.slots ?? [], { from, to });
+
   // Отдел проекта для опц. фильтра — поле departmentId на RawProjectPlan нет, но
   // фильтр departmentId применяем через расширенный тип (если поле присутствует).
   const projectDept = (p: RawProjectPlan): string | null =>
@@ -137,10 +164,16 @@ export const computeProjectsPlanFact = (
     .map((p) => {
       const planned = p.plannedEffort;
       const fact = round2(factByProject.get(p.id) ?? 0);
+      const allocated = round2(allocByProject.get(p.id) ?? 0);
       const hasPlan = planned != null;
+      // Ось ОСВОЕНИЯ (бюджет vs факт).
       const remaining = hasPlan ? round2(planned - fact) : null;
       const overrun = hasPlan ? fact > planned : false;
       const pct = hasPlan && planned > 0 ? round4(fact / planned) : null;
+      // Ось РАСПРЕДЕЛЕНИЯ (бюджет vs распланировано).
+      const unallocated = hasPlan ? round2(planned - allocated) : null;
+      const overbooked = hasPlan ? allocated > planned : false;
+      const allocatedPct = hasPlan && planned > 0 ? round4(allocated / planned) : null;
       return {
         projectId: p.id,
         name: p.name ?? p.code ?? p.id,
@@ -149,10 +182,14 @@ export const computeProjectsPlanFact = (
         startDate: p.startDate ?? null,
         endDate: p.endDate ?? null,
         planned: hasPlan ? round2(planned) : null,
+        allocated,
         fact,
         remaining,
+        unallocated,
         overrun,
+        overbooked,
         pct,
+        allocatedPct,
       };
     })
     .sort(
@@ -167,14 +204,25 @@ export const computeProjectsPlanFact = (
   const totals = rows.reduce<ProjectsPlanFactTotals>(
     (acc, r) => {
       acc.fact += r.fact;
+      acc.allocated += r.allocated;
       if (r.planned != null) {
         acc.planned += r.planned;
         acc.remaining += r.remaining ?? 0;
+        acc.unallocated += r.unallocated ?? 0;
       }
       if (r.overrun) acc.overrunCount += 1;
+      if (r.overbooked) acc.overbookedCount += 1;
       return acc;
     },
-    { planned: 0, fact: 0, remaining: 0, overrunCount: 0 },
+    {
+      planned: 0,
+      allocated: 0,
+      fact: 0,
+      remaining: 0,
+      unallocated: 0,
+      overrunCount: 0,
+      overbookedCount: 0,
+    },
   );
 
   return {
@@ -182,9 +230,12 @@ export const computeProjectsPlanFact = (
     period: { from, to },
     totals: {
       planned: round2(totals.planned),
+      allocated: round2(totals.allocated),
       fact: round2(totals.fact),
       remaining: round2(totals.remaining),
+      unallocated: round2(totals.unallocated),
       overrunCount: totals.overrunCount,
+      overbookedCount: totals.overbookedCount,
     },
     count: rows.length,
     rows,

@@ -99,6 +99,7 @@ export const ProjectView = ({
                   projectName={row.workTypeName}
                   category={null}
                   workTypeName=""
+                  onBehalf={row.onBehalfByDay.some(Boolean)}
                   singleColumn
                   days={days}
                   hoursByDay={row.hoursByDay}

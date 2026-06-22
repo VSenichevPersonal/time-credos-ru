@@ -16,6 +16,13 @@ describe('serverErrorMessage', () => {
     expect(serverErrorMessage('cannot_modify_approved')).toContain('Согласовано');
   });
 
+  it('FORBIDDEN_ON_BEHALF → понятный текст про права on-behalf (не сырой код)', () => {
+    const msg = serverErrorMessage('FORBIDDEN_ON_BEHALF');
+    expect(msg).not.toContain('FORBIDDEN_ON_BEHALF');
+    expect(msg).toContain('Нет прав');
+    expect(msg).toContain('отдела');
+  });
+
   it('hours out of range → текст про диапазон часов', () => {
     expect(serverErrorMessage('hours out of range')).toContain('диапазон');
   });

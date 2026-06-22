@@ -26,6 +26,7 @@ type Props = {
   category: string | null;
   workTypeName: string;
   tags?: string[]; // W3-2: теги записей строки (чипы под видом работ)
+  onBehalf?: boolean; // ON-BEHALF: в строке есть запись, введённая руководителем
   singleColumn?: boolean; // режим «Проект»: только колонка «Вид работ»
   days: WeekDay[];
   hoursByDay: number[];
@@ -55,6 +56,7 @@ export const GridRow = ({
   category,
   workTypeName,
   tags,
+  onBehalf,
   singleColumn,
   days,
   hoursByDay,
@@ -163,6 +165,7 @@ export const GridRow = ({
           >
             {projectName}
           </div>
+          {onBehalf && <OnBehalfBadge />}
           {menu}
         </div>
         <TagChips tags={tags} />
@@ -225,6 +228,7 @@ export const GridRow = ({
           >
             {workTypeName || '—'}
           </div>
+          {onBehalf && <OnBehalfBadge />}
         </div>
       </>
     )}
@@ -272,3 +276,36 @@ export const GridRow = ({
   </div>
   );
 };
+
+// ON-BEHALF: тихая подпись «введено руководителем» на строке, где хотя бы одна
+// запись внесена не самим сотрудником (enteredByActor задан). Не цвет-сигнал —
+// нейтральный приглушённый чип; смысл продублирован в title/aria (a11y).
+const OnBehalfBadge = () => (
+  <span
+    aria-label="Введено руководителем за сотрудника"
+    title="Записи внесены руководителем за сотрудника (on-behalf)"
+    style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 3,
+      flexShrink: 0,
+      height: 16,
+      padding: '0 5px',
+      fontSize: 10,
+      fontWeight: 600,
+      lineHeight: 1,
+      color: T.textMuted,
+      background: T.panelBg,
+      border: `1px solid ${T.border}`,
+      borderRadius: 5,
+      whiteSpace: 'nowrap',
+    }}
+  >
+    <svg aria-hidden width="9" height="9" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+      <circle cx="6" cy="5" r="2.3" stroke={T.textMuted} strokeWidth="1.3" />
+      <path d="M2 13c0-2.2 1.8-3.6 4-3.6s4 1.4 4 3.6" stroke={T.textMuted} strokeWidth="1.3" fill="none" />
+      <path d="M11 4.2a2.3 2.3 0 0 1 0 4.4M12 9.6c1.7.2 2.8 1.5 2.8 3.4" stroke={T.textMuted} strokeWidth="1.3" fill="none" />
+    </svg>
+    рук.
+  </span>
+);

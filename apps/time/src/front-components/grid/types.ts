@@ -50,6 +50,9 @@ export type ApiEntry = {
   projectId: string | null;
   workTypeId: string | null;
   employeeId?: string | null;
+  // ON-BEHALF: employeeId руководителя/PM, внёсшего запись ЗА сотрудника.
+  // Пусто = ввёл сам сотрудник. Питает UI-пометку «введено руководителем».
+  enteredByActor?: string | null;
 };
 
 // Строка сетки = пара (проект + вид работ).
