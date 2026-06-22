@@ -14,7 +14,7 @@ Owner: CISO. Полный реестр: `docs/security/RISK_REGISTER.md`.
 | CISO-002 | P2 | OPEN | `approval.logic.ts` не проверяет роль actor, separation of duties (actor ≠ автор записи), scope отдела | Dev2: добавить guard actor-role + `actor !== entry.employee.workspaceMemberRef` |
 | CISO-003 | P3 | OPEN | `manager.role.ts` — нет field-level ограничений; роль видит все поля (PII всё-или-ничего) | Оценить при появлении HR-роли; пока ACCEPTED-кандидат |
 | CISO-004 | P2 | OPEN | Общий мастер-объект Employee (PII) будет виден между time/catalog/CRM без явного RBAC | Определить владельца PII Employee до старта catalog-app |
-| CISO-005 | P1 | OPEN | IDOR: личность сотрудника берётся из client-supplied `workspaceMemberRef`, не из `event.userWorkspaceId`; delete без ownership-guard | Dev2: server-side резолв `userWorkspaceId` → employeeId; ownership-guard на delete/patch |
+| CISO-005 | P1 | **RESOLVED-L1** | IDOR: личность из client-ref. **Закрыт L1:** `resolveActor` (server-side `event.userWorkspaceId`→employee, TOFU-мост) + ownership/on-behalf guard (`canWriteFor`) на time-entry CRUD + plan-write + approval. L2 (строгий admin вместо isManager-деградации) — RBAC-волна. |
 | CISO-006 | P2 | MITIGATING | Filter injection: client params интерполируются в filter-строки Twenty REST без валидации | Dev2: `isUuid()` и `isIsoDate()` на всех params ПЕРЕД интерполяцией (детали ниже) |
 | CISO-007 | P1 | **CLOSED** (0446388) | `byEmployee` + detail-режим в `/s/reports` раскрывали ФИО без role-guard | **Закрыт:** `revealNames=false` по умолчанию во всех срезах (detail/byEmployee/OLAP/CSV). TODO: раскрыть ФИО менеджеру после CISO-005 (server-identity). |
 | CISO-008 | P3 | OPEN | `credosTimeAbsence.note` провоцирует ввод медицинских ПДн (тип SICK) | Dev2: help-текст в UI «не указывайте диагнозы»; внести в PII_INVENTORY |
@@ -178,3 +178,41 @@ if (toDelete.status === ENTRY_STATUS.APPROVED) {
 | `docs/security/specs/RBAC_MODEL.md` | Модель ролей: сотрудник / руководитель / admin |
 | `docs/security/PII_INVENTORY.md` | Реестр персональных данных (152-ФЗ) |
 | `docs/security/CISO_POLICY.md` | Политика безопасности проекта |
+
+---
+
+## Identity-домен: server-side actor (CISO-005)
+
+Личность вызывающего резолвится **на сервере** от аутентифицированного `event.userWorkspaceId`, НЕ из client-supplied `params.workspaceMemberRef` (был IDOR-вектор).
+
+- **`resolveActor`** (`logic-functions/shared/`): `event.userWorkspaceId → employee` по `userWorkspaceRef[eq]` → trusted actor. Если не замаплен, но клиент дал ref — TOFU (trust-on-first-use: захват связи один раз + `userMapPending` для админ-сверки; коллизия = reject). `userWorkspaceId` NULL (dev) → мягкая деградация.
+- Источник «кто» во всех аудит-полях (`resolvedBy`/`revokedBy`/`enteredByActor`) = серверный `actor.employeeId`, не клиент.
+- **Целевая модель:** заменить TOFU на детерминированный маппинг (SDK `currentWorkspaceMember` / install-seed) на RBAC-волне. Pre-seed связей при онбординге закрывает окно TOFU-захвата.
+
+## Ввод за сотрудника (on-behalf) — `canWriteFor`
+
+`shared/can-write-for.ts`: `canWriteFor(actor, target, ctx)` → разрешено, если:
+1. `actor == target` (свой ввод) — без проверок;
+2. руководитель отдела target (`department.head == actor` ∩ отделы target по `employee-department`);
+3. PM/owner проекта записи (`project.manager`/`owner` → WorkspaceMember → employee мост) при `ctx.projectId`;
+4. admin — **деградирует на `isManager`** (нет admin-роли; сужение → RBAC-волна/CISO-012).
+
+Enforcement: `time-entry-api` (upsert/delete) + `plan-slots` → `FORBIDDEN_ON_BEHALF` при отказе. UI-селектор — подсказка, сервер перепроверяет (UI не доверенный). `enteredByActor` стампится только при on-behalf.
+
+**SoD при on-behalf:** считается по **owner** (`employeeId`), не по `enteredByActor`. Руководитель, внёсший за подчинённого, может согласовать (он законный согласующий). Свои записи — нельзя (skippedOwn → вышестоящий, A4.17).
+
+## Закрытие периодов (lockdown)
+
+`shared/lockdown.ts`: `canMutateInPeriod(date, cfg, actor)` — записи/слоты с датой ≤ (`lockdownDate` − `graceDays`) read-only, кроме override-роли (сейчас isManager; строгий admin — RBAC-волна). Guard в `time-entry-api` (upsert/delete) + `plan-slots`. Override логируется (`entry-log.override=true`). Отдельный слой ПОВЕРХ APPROVED-lock (по статусу) — закрывает весь период по дате независимо от согласования.
+
+## Защита от каскадной потери (CISO-011 расширение)
+
+`Entry.project`/`Entry.employee` onDelete = **RESTRICT** (было CASCADE) — удаление проекта/сотрудника с записями запрещено, иначе каскад БД сносил бы согласованные записи в обход `cannot_modify_approved`. Справочники с историей **архивируются**, не удаляются.
+
+## Связи с документацией (дополнение)
+
+| Документ | Содержание |
+|---------|-----------|
+| `docs/security/findings/CISO-005-time-entry-idor.md` | Server-identity, resolveActor, TOFU |
+| `docs/analysis/PERIOD_LOCKDOWN.md` | Закрытие периодов: дизайн, конкуренты |
+| `docs/analysis/PLANNING_EMPLOYEE_LEVEL.md` | План по сотруднику + SSOT + on-behalf |

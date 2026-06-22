@@ -118,8 +118,8 @@ erDiagram
 | `approvedBy` | `TEXT` | Нет | `userWorkspaceId` руководителя; заполняет `/s/approval` |
 | `approvedAt` | `DATE_TIME` | Нет | Момент согласования/отклонения |
 | `rejectComment` | `TEXT` | Нет | Причина отклонения (видит сотрудник); очищается при re-submit |
-| `employee` | `RELATION (MANY_TO_ONE)` | Да | → `credosTimeEmployee` (CASCADE) |
-| `project` | `RELATION (MANY_TO_ONE)` | Да | → `credosTimeProject` (CASCADE) |
+| `employee` | `RELATION (MANY_TO_ONE)` | Да | → `credosTimeEmployee` (**RESTRICT** — нельзя удалить сотрудника с записями) |
+| `project` | `RELATION (MANY_TO_ONE)` | Да | → `credosTimeProject` (**RESTRICT** — нельзя удалить проект с записями) |
 | `stage` | `RELATION (MANY_TO_ONE)` | Нет | → `credosTimeStage` (SET_NULL) |
 | `workType` | `RELATION (MANY_TO_ONE)` | Нет | → `credosTimeWorkType` (SET_NULL) |
 
@@ -309,8 +309,8 @@ budgetRemaining  = project.plannedEffort − project.factHours
 
 | Источник | Поле | Тип | Цель | onDelete |
 |----------|------|-----|------|---------|
-| `Entry.employee` | `employee` | MANY_TO_ONE | `Employee` | CASCADE |
-| `Entry.project` | `project` | MANY_TO_ONE | `Project` | CASCADE |
+| `Entry.employee` | `employee` | MANY_TO_ONE | `Employee` | **RESTRICT** |
+| `Entry.project` | `project` | MANY_TO_ONE | `Project` | **RESTRICT** |
 | `Entry.stage` | `stage` | MANY_TO_ONE | `Stage` | SET_NULL |
 | `Entry.workType` | `workType` | MANY_TO_ONE | `WorkType` | SET_NULL |
 | `Project.department` | `department` | MANY_TO_ONE | `Department` | SET_NULL |
@@ -328,3 +328,37 @@ budgetRemaining  = project.plannedEffort − project.factHours
 | `WorkType.department` | `department` | MANY_TO_ONE | `Department` | SET_NULL |
 
 > **Note:** Обратные стороны (ONE_TO_MANY) вынесены в `src/fields/` отдельными файлами для соблюдения лимита размера объектов.
+
+---
+
+## Объекты планирования и аудита (волна identity/planning)
+
+### `credos-time-plan-slot` — помесячный слот плана
+Ручной раскид плана: `{ project, department?, employee?, periodMonth ('YYYY-MM'), plannedHours }`. При `project.planMethod=MANUAL` загрузка проекта = Σ слотов (вместо равномерного раскида из `plannedEffort`). Дедуп-ключ `(projectId, departmentId|null, employeeId|null, periodMonth)`.
+- `employee` nullable, SET_NULL — персональный план (bottom-up: отдел = Σ слотов сотрудников + остаток по FTE).
+- onDelete CASCADE по project (слот — производная плана проекта).
+- nav-пункт скрыт (правка только через панель «Планировать», не сырой реестр).
+
+### `credos-time-entry-log` — лог изменений записи
+Аудит изменений трудозатрат: `{ entryId, action (CREATE/UPDATE/DELETE/STATUS), actor, oldHours, newHours, oldStatus, newStatus, override }`. Пишется из `time-entry-api` (CRUD) и `approval.logic` (STATUS через casApply). Сбой лога НЕ валит мутацию (graceful).
+- `override` (BOOLEAN) — true, если правка в закрытом периоде уполномоченной ролью (lockdown-override).
+
+### Новые поля существующих объектов
+| Объект | Поле | Назначение |
+|---|---|---|
+| `Entry` | `enteredByActor` (TEXT, nullable) | Кто внёс (on-behalf): `actor.employeeId` при вводе за другого, иначе null. Аудит «введено X за Y» + UI-чип. НЕ участвует в SoD. |
+| `Project` | `planMethod` (SELECT EVEN/MANUAL) | Способ раскида плана. EVEN — из plannedEffort+дат; MANUAL — Σ слотов. |
+| `Booking` | `company` (MANY_TO_ONE → Company, SET_NULL) | Пресейл-бронь под клиента без проекта. |
+| `Settings` | `lockdownDate` (DATE_TIME), `lockdownGraceDays` (INT) | Закрытие прошлых периодов. Записи с датой ≤ (lockdownDate − grace) read-only. null = выкл. |
+
+### Связи (дополнение)
+| Связь | onDelete | Примечание |
+|---|---|---|
+| `Entry.project` | **RESTRICT** | Изменено с CASCADE — удаление проекта с записями запрещено (защита согласованных от каскад-обхода CISO-011). Проект архивируется, не удаляется. |
+| `Entry.employee` | **RESTRICT** | Аналогично — сотрудник деактивируется, не удаляется. |
+| `PlanSlot.project` | CASCADE | Слот без проекта смысла не имеет. |
+| `PlanSlot.employee` | SET_NULL | Удаление сотрудника не сносит слот (часы → остаток отдела). |
+| `Booking.company` | SET_NULL | Пресейл-связь. |
+
+### Норма дня — SSOT
+Норма дня берётся из производственного календаря (`useDailyNorm`/`reports-calc`); `Settings.normHoursPerDay` — только fallback. Коэффициент ёмкости — `resolveCapacityFactor(dept ?? settings ?? 0.8)` (единый, `constants/capacity.ts`).
