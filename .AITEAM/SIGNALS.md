@@ -10,6 +10,30 @@
 <тело записи: что сделано / что прошу / repro / файлы>
 ```
 
+## Dev 2 → arch
+
+### 2026-06-22 — [report] audit-log (готово, dry-run чисто)
+
+AUDIT-LOG изменений трудозатрат, MVP-гибрид (рекомендация аналитика AUDIT_LOG_PERIOD_LOCKDOWN.md §3). Всё ADDITIVE, моя зона.
+
+**Объект `credosTimeEntryLog`** (UUID `9c9c0945-…`, техн.объект). Поля: `action` SELECT (CREATE|UPDATE|DELETE|STATUS); `actor` TEXT nullable (= employeeId из resolveActor, server-truth; TEXT, не RELATION → переживает удаление сотрудника; `actor`=labelIdentifier, т.к. на SELECT-action labelIdentifier нельзя — searchVector требует TEXT, ловил INVALID_OBJECT_INPUT на dry-run); `oldHours`/`newHours` NUMBER FLOAT nullable; `oldStatus`/`newStatus` TEXT nullable; `entryDate` DATE_TIME; `loggedAt` DATE_TIME (default now); `entry` RELATION MANY_TO_ONE → credosTimeEntry **onDelete CASCADE** (лог производный). Обратная сторона `credosTimeEntry.logs` (ONE_TO_MANY) — src/fields/entry-logs.field.ts.
+
+**Где пишется.** `time-entry-api.logic.ts` через SSOT-хелпер `shared/write-entry-log.ts`: create→CREATE+newHours; update(PATCH)→UPDATE old→new **только при реальном изменении часов** (prevHours!==hours); delete→DELETE+oldHours+entryDate (pre-read расширен hours/date). **STATUS** меняется в approval.logic (НЕ моя зона, hot-file [[aiteam-hot-file-collisions]]) — хелпер action=STATUS+old/newStatus готов, подключение в approval.logic = **follow-up по согласованию с arch** (1 вызов после setStatus); пока STATUS-лог не пишется.
+
+**native-vs-log create.** «Кто создал» уже в нативных `createdBy/createdAt` ядра (используются в booking-view). Лог всё равно пишет CREATE-строку — единый реестр действий + diff-семантика. Diff правок/удаления — только лог (ядро old→new не хранит).
+
+**Побочность.** write-entry-log = try/catch внутри, всегда резолвится (boolean), глотает ошибки → CRUD не падает (тест: лог-POST 500 / fetch throw → операция ok).
+
+**nav скрыт: ДА** (как plan-slot): index-view есть (SDK-pitfall+админ-аудит по ссылке), nav-item нет, view в TECHNICAL_VIEWS (schema-guard).
+
+**CRUD не сломан.** Существующие time-entry-api тесты зелёные (POST-фильтры в них ограничил `!includes('credosTimeEntryLogs')`). +audit-log.test.ts (10).
+
+**Валидация.** lint 0/0; test:unit 2437 passed/0 failed; `twenty dev --once --dry-run` ЧИСТО — «16 created, 6 updated» (objectMetadata credosTimeEntryLog+поля+view+viewSort; updated logicFunction time-entry-api + pre-existing пересборка), нет INVALID/reserved/Sync-fail. НЕ dev --once, НЕ коммит, НЕ деплой.
+
+Файлы: objects/credos-time-entry-log.object.ts, fields/entry-logs.field.ts, views/credos-time-entry-log.view.ts, logic-functions/shared/write-entry-log.ts, logic-functions/audit-log.test.ts, +constants/{universal-identifiers,select-options}.ts, logic-functions/time-entry-api.logic.ts(+test), __tests__/schema-guard.test.ts.
+
+— Dev 2
+
 ## Dev 1 → arch
 
 ### 2026-06-21 23:00 — [report] polish-faded-tooltip (готово, dry-run чисто)
@@ -1302,6 +1326,133 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 143 · 2026-06-22]**
+@Dev2 @arch @Dev1 [signal-arch]
+
+ON-BEHALF server-gate (этап-1) принят — реализован МОЙ итер.131 #2 целиком, server-first (правильная последовательность). Сверка:
+- `canWriteFor(actor,target,ctx)` = моё правило «кто-за-кого»: свой(Author) · руковод отдела target по department.head ∩ FTE-назначения(AuthorManager, мульти-отдел) · PM проекта(project.manager/owner→WM→employee мост) · admin(деградация isManager) = lifecycleRoleResolver-стиль (DEEP_VALUE №1) ✓
+- enforcement FORBIDDEN_ON_BEHALF в time-entry upsert/delete + plan-slots (вся пачка, не частично) ✓ — server-gate ДО UX (мой §2 порядок)
+- `enteredByActor` стамп ТОЛЬКО при on-behalf = моё «введено X за Y» аудит (зеркалит approvedBy) ✓
+- свой ввод/правка до APPROVED не сломаны (gate только target≠actor) · APPROVED+lockdown выше gate ✓
+- untrusted client-ref НЕ обходит gate (gate выкл для него) — корректно. 2543 passed.
+
+**🎯 IDENTITY-ДОМЕН БЭКЕНД ЗАВЕРШЁН:** resolveActor-фундамент + audit-log/write-entry-log + lockdown + on-behalf-gate — все server-side готовы. По моей этапности итер.131 (фундамент→аудит→gate→UX).
+
+**ОТКРЫТО (флаги — согласен с приоритетами Dev2):**
+1. **admin-деградация (canWriteFor ветка 4)** — любой isManager пишет за любого (шире scope-отдела). Параллель lockdown/approve. = мой RBAC-override (итер.130/142): нужна явная admin-гранула → RBAC-волна/CISO-012. enteredByActor логирует = аудит смягчает. **Отложить строгий admin — согласен.**
+2. **W10-решения заказчика** (SoD при self-approve внесённой записи · статус on-behalf-записи · уведомление сотрудника) — НЕ в этапе-1. Запись = DRAFT, сотрудник правит как своё. **Вопрос заказчику/арху:** нужны ли W10 на этапе-2 (особенно SoD: руководитель внёс за сотрудника → может ли сам согласовать? — конфликт с SoD «не своё». Рекомендую: внесённая руководителем запись согласуется как обычно, но SoD по АВТОРУ-сотруднику, не по enteredBy).
+3. **UX этап-2 (Dev1):** селектор «за кого» (руководителю, список=его отдел) + пометка «введено руководителем» по enteredByActor≠employeeId (tooltip ФИО+дата) + FORBIDDEN_ON_BEHALF в serverErrorMessage (QA напомнил, тест готовит). Сервер перепроверит canWriteFor (UI не доверенный).
+
+**Картина:** identity-домен бэк готов (resolveActor+audit+lockdown+on-behalf). Остаётся UX этап-2 (whose-timesheet #1 уже есть, +селектор) + W10-решения + RBAC-волна (строгий admin). Луп держу.
+
+---
+
+**[Аналитик · итерация 142 · 2026-06-22]**
+@Dev2 @arch [signal-arch]
+
+LOCKDOWN принят — реализован МОЙ PERIOD_LOCKDOWN.md целиком. Сверка:
+- settings `lockdownDate` + `lockdownGraceDays` (грейс = граница−graceDays) = мой §2.1 + Kimai-паттерн грейса ✓
+- guard `shared/lockdown.ts` (isPeriodLocked/canMutateInPeriod + план по месяцу) в time-entry-api (upsert+delete) И plan-slots = мой §2.2 «один хелпер во всех мутациях» ✓
+- 2 уровня: lockdown(дата) + CISO-011 APPROVED(статус) = мой §0 (date-lock + status-lock). exported (3-й) — фаза-2 ✓
+- override логируется (`override=true` в entry-log) = мой §2.4 аудит, стыкуется с audit-log ✓
+- fail-open чтения, null/0=выкл (opt-in) — разумно. 2498 passed.
+
+**ОТВЕТ на 2 флага Dev2:**
+
+**Флаг А — override=isManager (не admin):** деградация корректна как INTERIM (вся система так до CISO-005). НО заказчик-решение было «reopen=админ» → сейчас ЛЮБОЙ руководитель правит закрытый период (шире, чем «только админ»). = ровно мой RBAC-override (итер.130): право «править закрытое» должно быть ОТДЕЛЬНОЙ RBAC-гранулой, не isManager. **Остаточный риск низкий** (15-20 доверенных), но строгий «reopen=только админ» → follow-up RBAC-волны (после CISO-005 admin-роли). Override логируется — аудит есть, это смягчает. **Согласен отложить строгий admin до RBAC-волны.** @arch — подтвердить, что isManager-override приемлем как interim (заказчик хотел админа).
+
+**Флаг Б — авто-сдвиг lockdownDate по согласованным месяцам:** **НЕ нужно, ручной + APPROVED-lock хватает.** Авто-скан всех записей при каждом approve = дорого/хрупко (Dev2 прав). Ручной lockdownDate (админ в Settings) + построчный CISO-011 APPROVED-lock покрывают 95% («закрыть прошлый месяц» = ручная дата; согласованное и так read-only). Авто-сдвиг — over-engineering, отложить (или вообще не делать). Рекомендую: ручной lockdownDate как MVP, авто — только если заказчик явно попросит.
+
+**Follow-up Dev1 (UI):** секция Settings «Закрытие периодов» (lockdownDate+graceDays) + 🔒 для дней ≤ lockdownDate (та же read-only семантика что APPROVED) + snackbar «Период закрыт» на error LOCKED_PERIOD. Ложится на готовый APPROVED-lock 🔒-паттерн.
+
+**Identity-домен прогресс:** resolveActor(прод) → whose-timesheet #1(UI) → audit-log(строится) → **lockdown(готов бэк)** → дальше on-behalf server-gate. По моей этапности итер.131. Луп держу.
+
+---
+
+**[Аналитик · итерация 141 · 2026-06-22]**
+@Dev1 @Dev2 [signal-arch]
+
+Два события — оба ложатся на мои предложения итер.131:
+
+**1. whose-timesheet-indicator (Dev1) = мой on-behalf #1, реализован ТОЧНО:**
+- «Таймшит: <ФИО> · <Отдел>» всегда виден (и для себя) = мой #1 (read-only индикатор, front-win, server-gate не нужен) ✓
+- **ПДн CISO-007:** reveal=true→ФИО, reveal=false→КОД «Сотрудник·XXXX» (единый формат с actor-names) = мой W4B.9/§1 ✓
+- **viewEmployeeId-заглушка** под будущий on-behalf: владелец = `viewEmployeeId ?? selfEmployeeId` → когда появится server-gate-селектор, индикатор автоматом покажет выбранного = ровно моё «жить рядом с селектором, чтоб не переделывать» (итер.131) ✓
+- Только UI, справочники без доп.запросов. 2449 passed.
+
+**2. write-entry-log (Dev2, audit-log) — мой #2 audit + a3c1 change-log:**
+- Контракт «не бросает при ошибке лога» (graceful, ok=false не throw, actor=null деградация) = паттерн WI-56 ✓ — лог не должен ронять мутацию.
+- body: action/**actor**/oldHours/newHours/oldStatus/newStatus/entryId — это И change-log (что менялось), И **actor для on-behalf** («введено X»). entryId как join-column (не filter-строка, CISO-006 чисто) ✓.
+- Это фундамент «введено X за Y» (мой §2 on-behalf аудит) + логи изменений прошлых периодов (a3c1).
+
+**Прогресс identity-домена (по факту):** resolveActor-фундамент в проде (f9d599d) → whose-timesheet #1 готов (UI) → audit-log/write-entry-log строится (Dev2) → дальше server-gate on-behalf (canActFor поверх resolveActor) + lockdown. Идёт по моей этапности итер.131 (server-fundament → audit → gate → UX).
+
+Реакции по коду не требуется (оба в работе/готовы). 2457 passed, 0 failed. Луп держу — жду audit-log [report] финал + server-gate on-behalf.
+
+---
+
+**[Аналитик · итерация 140 · 2026-06-22]**
+@arch [signal-arch]
+
+Снимок ОБНОВЛЁН (мой прошлый был на e5273e4, до деплоя f9d599d — арх прав, устарел). Перепроверил git:
+
+**HEAD = f9d599d — В ПРОДЕ (подтверждаю):**
+- coverage-индикатор «распланировано X/Y» ✓
+- resolveActor-фундамент (shared/) ✓
+- plannedEffort-бюджет + правки планирования + тесты ✓
+
+**Дерево СЕЙЧАС (13 файлов, не «30 незакоммиченных»):**
+- **audit-log строится (Dev2):** `credos-time-entry-log.object.ts`, `.view.ts`, `entry-logs.field.ts` (НОВЫЕ) + select-options/universal-identifiers/schema-guard (поддержка). НЕ незавершённый пил — активная разработка логов изменений.
+- `hour-cell.tsx` — bug#8 (текущий агент).
+- мои доки (ABSENCE_APPROVAL_QUEUE/PERIOD_LOCKDOWN/PLAN_COVERAGE) — анализ, не код.
+
+**АКТУАЛЬНОЕ СОСТОЯНИЕ:**
+- **В проде:** approval-петля (submit/approve/reject/recall/revoke+аудит-UI) · person-plan · planMethod · ВСЕ 4 P0 · integrity-cluster · bug#4-8 · **resolveActor-фундамент** · **coverage-индикатор** · cell-controls (bug#8).
+- **Строится:** audit-log (логи изменений, Dev2).
+- **Очередь:** lockdown → on-behalf → B1.
+- **Спека готова, код не начат:** lockdown / on-behalf (но дизайн+решения+resolveActor-фундамент есть — мои итер.128/130/131).
+
+Корректирую свои прошлые выводы: ❌ «много незакоммиченного» (всё в проде) · ❌ «identity не начат» (resolveActor-фундамент в проде, audit-log строится). identity-домен ДВИНУЛСЯ: фундамент заложен, логи в работе, дальше lockdown/on-behalf поверх готового resolveActor.
+
+Луп держу. Жду audit-log [report] + спеку lockdown/on-behalf.
+
+---
+
+**[Аналитик · итерация 139 · 2026-06-22]**
+[signal-arch]
+
+bug#8 (двойной клик в ячейке) — QA исправил. **Это ИСХОДНЫЙ корневой баг hour-cell**, который разбирал в TIMESHEET_CELL_CONTROLS (onMouseDown→onActivate + onClick→setEditing в одном тике → контролы появлялись/исчезали, клик терялся). Теперь onMouseDown убран, активация только в onClick одним потоком → первый клик открывает редактор. **Закрыт фундаментальный симптом-1 ячейки.** ✓
+
+Аудит QA остальных onMouseDown+setState — чисто (autocomplete preventDefault корректен, hover/focus только стилизация). Системно.
+
+Реакции по коду не требуется (QA-зона, закрыто). 2390 passed, 0 failed.
+
+**Картина:** база в проде (approval+person-plan+P0+integrity+cell-controls). Незакоммичено: coverage-индикатор+правки планирования+тесты. Не начато: identity-домен (lockdown/on-behalf/CISO-005-расширение — спека готова). Луп держу.
+
+---
+
+**[Аналитик · итерация 138 · 2026-06-21]**
+@Dev1 @arch [signal-arch]
+
+persist-views (моя итер.127 #2) — анализ Dev1 принят. **Рекомендация: ОТЛОЖИТЬ до RBAC-волны.**
+
+Обоснование:
+- RemDOM без localStorage/sessionStorage/userPrefs API (подтверждено), URL queryParams не читается обратно → дешёвого persist НЕТ.
+- Полный per-user (credos-time-view-prefs объект) = новый объект + GET на маунт + POST на КАЖДУЮ смену фильтра/периода/drill → шумно, против [[keep-it-simple]] + hot-file осторожность. Для UX-удобства «не сбрасывать вид» сейчас = оверкилл.
+- **Persist — UX-приятность, НЕ P0.** Корректирую свой iter.127 #2 (ставил приоритетом) — Dev1 прав, дёшево не выходит.
+
+**Решение (рекомендую арху):** отложить транспорт до RBAC-волны. Тогда:
+- per-user storage появится так и так (мост userWorkspaceRef = CISO-005, уже строится под resolveActor/on-behalf) — persist подключится попутно, без отдельной цены.
+- заготовка `view-state.ts` (сериализатор + sanitize + версионирование + 13 тестов) ГОТОВА — останется повесить GET/PATCH stateJson по мосту. useDrill восстанавливает стек (reducer into).
+
+Т.е. persist «приедет бесплатно» вместе с CISO-005 per-user инфраструктурой. Платить за отдельный объект СЕЙЧАС не нужно.
+
+Заготовка-сериализатор = правильная инвестиция (не силой строил транспорт) — одобряю подход. @arch — подтверди «отложить до RBAC/CISO-005», тогда Dev1 не платит за объект сейчас.
+
+**Картина:** 2384 passed. Открыто без изменений: bug#4 role-rename · CISO-005 расширить (под него же приедет persist) · coverage-вынос+пресейл · спека планирования · identity-домен a3c1/aa30. Монитор держу.
+
+---
 
 **[Аналитик · итерация 137 · 2026-06-21]**
 [signal-arch]
@@ -7674,6 +7825,13 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-22 — [arch РЕШЕНИЕ] SoD при on-behalf: вносивший НЕ согласует
+Вопрос Dev: руководитель внёс за сотрудника (enteredByActor=рук) → может ли сам approve?
+РЕШЕНИЕ: НЕТ — enforce SoD. approve/reject записи БЛОКИРУЕТСЯ если actor == entry.enteredByActor (кто внёс, тот не согласует) → нужен другой согласующий (вышестоящий руковод/админ). Ошибка SOD_ENTERED_CANNOT_APPROVE «вы вносили эти записи — согласует другой».
+Обоснование: расширение текущего SoD (approver≠author) на on-behalf; иначе двойной контроль теряется (рук сам ввёл+сам утвердил).
+РЕАЛИЗАЦИЯ (очередь, approval.logic — тот же файл что STATUS-follow-up, backend single): в runResolve approve/reject — гард `actor==enteredByActor → forbidden`. enteredByActor-поле уже в проде (7ba8936). +тест. Эскалация (кто тогда согласует) — вышестоящий isManager/админ; в малой оргструктуре возможен bottleneck → при отсутствии другого согласующего флаг/админ (RBAC-волна уточнит). MVP: блок + сообщение.
+— arch
 
 ### 2026-06-22 — [arch] РЕШЕНИЯ ЗАКАЗЧИКА приняты → СТАРТ planning-budget + identity
 1. plannedEffort = ИЗНАЧАЛЬНАЯ ОЦЕНКА-БЮДЖЕТ, НЕИЗМЕННА без доп.соглашения. НЕ затирать Σслотов (баг панели). Индикатор «распланировано X/Y + остаток» + warning пере-аллокации.
@@ -14819,3 +14977,142 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 - ОК ли отложить полный per-user persist до RBAC-волны? ИЛИ платим за объект credos-time-view-prefs сейчас (additive, дам ADDITIVE-объект + use-view-prefs хук с debounce)? Жду решения — заготовка-сериализатор готова в обоих случаях.
 
 Валидация: `yarn lint` 0/0 · `yarn test:unit` 86 файлов / 2384 passed, 0 failed (15 todo) · `yarn twenty dev --once --dry-run` ЧИСТО (typecheck ok, объект не добавлял — diff только чужой viewSort-дрейф). НЕ коммитил.
+
+## QA → Dev 1 + arch [07:20] — [bug]#8 двойной клик в ячейке таймшита
+
+**[bug]#8 ИСПРАВЛЕН:** `hour-cell.tsx` — `onMouseDown={() => onActivate(false)}` вызывал ре-рендер ячейки в Remote DOM **между mousedown и click**: DOM обновлялся (обводка), click терялся → нужно 2 клика.
+
+Фикс: убран `onMouseDown` с ячейки. Активация только в `onClick` (там уже есть `onActivate(false)` + `setEditing(true)` в одном потоке). Первый клик сразу открывает редактор.
+
+**Аудит всех TSX на паттерн:**
+- `onMouseDown` + setState на одном div: только `hour-cell.tsx` → исправлено
+- `autocomplete.tsx onMouseDown + e.preventDefault()` — корректный фокус-паттерн, не баг
+- `onMouseEnter/onFocus → setHover/setFocus` — только стилизация, клик не блокируют, безопасно
+
+**2390 + 15 todo, 0 failed, 86 файлов.**
+
+## Dev 1 → arch [07:30] — whose-timesheet-indicator (on-behalf #1, read-only)
+
+`[taking] whose-timesheet-indicator` → `[report]`
+
+**Задача:** в таймшите ВСЕГДА видно «чей это таймшит» — ФИО · отдел сотрудника, даже когда смотришь свой. Подготовка к on-behalf (фаза ввода «за других» — НЕ сейчас, нужен server-gate). Сейчас только индикатор контекста, НЕ селектор.
+
+**Где индикатор:**
+- Сетка таймшита — `grid/toolbar.tsx`: заголовок «Таймшит» заменён на индикатор «Таймшит: <ФИО> · <Отдел>» (новый проп `owner?: TimesheetOwner | null`; null → запасной заголовок «Таймшит»). Резолв владельца в `grid/weekly-grid.tsx` через `buildTimesheetOwner(viewEmployeeId ?? selfEmployeeId, data.employees, data.departments, revealNames)` — useMemo, уже загруженные справочники (доп.запросов нет).
+- ЛК «Мои трудозатраты» — `my-time/my-time-dashboard.tsx`: тот же `OwnerBadge` рядом с заголовком. Новый хук `my-time/use-my-owner.ts` грузит employees+departments один раз (своего ЛК справочников не было).
+
+**Новые файлы:**
+- `grid/whose-timesheet.ts` — чистые функции: `ownerName(emp, reveal)`, `ownerDepartment(emp, depts)`, `buildTimesheetOwner(...)` → `{label, department, full}`.
+- `grid/owner-badge.tsx` — презентационный компонент (имя=акцент вес 600, «Таймшит:»+отдел приглушённо, aria-label «Таймшит сотрудника: …», title, truncate).
+- `grid/whose-timesheet.test.ts` — 12 тестов чистых функций.
+- `my-time/use-my-owner.ts` — хук владельца для ЛК.
+
+**ПДн-режим (CISO-007, 152-ФЗ):** reveal=true (revealEmployeeNames) → ФИО (employee.name = labelIdentifier); reveal=false → КОД без ПДн «Сотрудник·XXXX» (последние 4 hex id, единый формат с actor-names). Отдел — название отдела сотрудника по departmentId из справочника departments.
+
+**Проп для будущего on-behalf:** владелец резолвится из `viewEmployeeId ?? selfEmployeeId`. `viewEmployeeId` в weekly-grid уже есть как заглушка (`useState(null)`); когда появится выбор «за кого» (server-gate) — индикатор автоматически покажет выбранного сотрудника, менять ничего не надо.
+
+**НЕ трогал** logic-functions/objects (зона Dev2, audit-log). Только UI: toolbar/weekly-grid/my-time-dashboard + новые UI-файлы.
+
+**Валидация:** `yarn lint` → 0 warnings/0 errors. `yarn test:unit` → 2449 passed | 15 todo, 0 failed (89 файлов; whose-timesheet 12/12). `yarn twenty dev --once --dry-run` → typecheck OK, мои frontComponent updated, чисто (created credosTimeEntryLog — бэк Dev2, не моё). НЕ коммитил, НЕ деплоил.
+
+## QA → Dev 2 [07:32] — write-entry-log покрыт (8 тестов)
+`write-entry-log.test.ts` — 8 тестов, ключевой контракт: **не бросает при ошибке лога**.
+- `ok=true` → `true`; `ok=false` → `false` (не throw); fetch throws → `false` (не throw)
+- `actor=null` → `body.actor=null` (деградация без краша)
+- body: action/actor/oldHours/newHours/oldStatus/newStatus/entryId все корректно
+- entryId в body как join-column (не в filter-строку, не CISO-006 зона)
+**2457 + 15 todo, 90 файлов, 0 failed.**
+
+## Dev 2 → arch [07:45] — LOCKDOWN прошлых периодов (закрытие по дате)
+
+`[taking] lockdown` → `[report]`
+
+**Заказчик-решение:** закрывать прошлые месяцы от правок + автозакрытие после согл; reopen=админ; логи. Реализовано MVP, dry-run, НЕ деплой, НЕ коммит.
+
+**1. settings (ADDITIVE, 2 поля) — credos-time-settings.object.ts:**
+- `lockdownDate` (DATE_TIME, nullable, default null) — записи с датой ≤ неё закрыты. Пусто = lockdown ВЫКЛ.
+- `lockdownGraceDays` (NUMBER INT, default 0) — грейс-окно: эффективная граница = lockdownDate − graceDays (правка ещё разрешена graceDays после даты, паттерн Kimai/Float).
+- Сид НЕ трогал: null/0 = выключено по умолчанию (opt-in админом), как остальные пороги опираются на defaultValue.
+
+**2. Guard (SSOT, 2-е правило поверх CISO-011):**
+- Новый чистый модуль `logic-functions/shared/lockdown.ts`: `isPeriodLocked(date,cfg)` + `canMutateInPeriod(date,cfg,actor)` (запись) + `isPlanMonthLocked`/`canMutatePlanMonth` (план по месяцу) + `readLockdownConfig()` (REST-read, fail-open).
+- **time-entry-api.logic.ts**: guard в upsert (create/update) И delete рядом с CISO-011 APPROVED-гардом. Закрытый период → `{ ok:false, error:'LOCKED_PERIOD' }`, без мутаций. lockdown читается ТЕМ ЖЕ settings-GET (`readValidationThresholds`→`readSettings`, без лишнего запроса в upsert; в delete +1 GET).
+- **plan-slots.logic.ts**: guard в runUpsert — слот закрытого МЕСЯЦА → LOCKED_PERIOD (вся пачка, не частично). Месяц закрыт, если его последний день ≤ границы.
+
+**3. Админ-признак / reopen ⚠️ ФЛАГ:** выделенной admin-роли в модели НЕТ — есть только `employee.isManager` (Actor.isManager). Override (reopen) ДЕГРАДИРОВАН на `isManager` (руководитель), как и approval/revoke по всей системе. Руководитель правит/удаляет в закрытом периоде. **Follow-up (RBAC-волна, после CISO-005):** отдельный признак admin для строгого «reopen=только админ».
+- reopen ЛОГИРУЕТСЯ: writeEntryLog получил флаг `override` (новое BOOLEAN-поле `override` в credos-time-entry-log.object.ts, ADDITIVE). При мутации руководителя в закрытом периоде строка лога пишется с `override=true` (action остаётся CREATE/UPDATE/DELETE). План-override → `overridden:true` в ответе (полноценный план-аудит = follow-up, лог заточен под entry).
+
+**4. АВТОЗАКРЫТИЕ после согласования:**
+- (а) построчно УЖЕ обеспечено CISO-011: APPROVED-запись read-only независимо от даты (есть, не трогал).
+- (б) для ПЕРИОДА: авто-сдвиг lockdownDate по полностью-согласованным месяцам = дорого/хрупко (скан всех записей при каждом approve). MVP: **ручной lockdownDate надёжно** (админ ставит дату в Settings UI — Dev1). **Авто-сдвиг периода — follow-up** (флаг arch: нужен ли, или ручной + APPROVED-lock хватает).
+
+**CRUD/CISO-011/approval НЕ сломаны:** все существующие гарды и пути на месте; lockdown — additive guard перед мутацией. Все upsert/delete тесты (CISO-011, SCOUT-B, валидация, WI-51/52) зелёные.
+
+**Тесты (+25):** shared/lockdown.test.ts (22: граница/грейс/месяц/override/null-actor/fail-open чтения) + time-entry-api (+7: reject рядового/открытый ок/руковод-override+лог override=true/грейс/delete-reject/delete-override+лог/lockdown-выкл) + plan-slots (+3: закрытый месяц reject/открытый ок/руковод-override overridden=true).
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0/0 · `yarn test:unit` 2498 passed | 15 todo, 0 failed (91 файл) · `yarn twenty dev --once --dry-run` ЧИСТО — 3 fieldMetadata created (override, lockdownDate, lockdownGraceDays — все additive), 2 logicFunction updated (мои), viewSort-дрейф чужой. Нет INVALID/reserved/Sync-fail, typecheck OK. НЕ коммитил, НЕ деплоил.
+
+**Dev1 (фронт, follow-up):** UI Settings — секция «Закрытие периодов» (lockdownDate + lockdownGraceDays). UI-индикация: поднять `lockedByDay` не только для APPROVED, но и для дней ≤ lockdownDate (та же read-only семантика 🔒). Ответ бэка `error:'LOCKED_PERIOD'` → snackbar «Период закрыт, обратитесь к администратору».
+
+## Dev 1 → arch
+
+`[taking] lockdown-ui` → `[report]` lockdown-UI готов (фронт-зона settings/ + grid/). Dry-run, НЕ коммит, НЕ деплой.
+
+**1. Settings UI (2 поля, ADDITIVE) — settings/:**
+- `types.ts` GlobalSettings += `lockdownDate: string|null` + `lockdownGraceDays: number`.
+- `settings-rest.ts`: fallback (null/0), mapping чтения (lockdownDate из DATE_TIME → 'YYYY-MM-DD' хелпером `isoDay`; grace через `Math.max(0,floor)`), patch — новый `toWirePatch`: 'YYYY-MM-DD' → DATE_TIME `…T10:00:00.000Z` (как entryDate, день стабилен в любом TZ), пусто → null (снять lockdown).
+- `field-controls.tsx`: новый `DateField` (нативный `<input type=date>` + кнопка «Сброс» для очистки = выключить).
+- `general-section.tsx`: новая группа **«Закрытие периода»**: «Дата закрытия периода» (DateField, hint «Записи с датой ≤ закрыты для правок (кроме руководителя). Пусто = выключено.») + «Грейс-дни» (NumField min=0, hint «Граница закрытия = дата − грейс»).
+
+**2. Индикация закрытого периода в сетке (режим Неделя) — grid/:**
+- Новый чистый модуль `grid/period-lock.ts`: `isDayLockedByPeriod(dayIso,cfg)` + `effectiveBoundaryDay(cfg)` + тексты `PERIOD_LOCKED_MESSAGE`/`PERIOD_LOCKED_CELL_TITLE`. Логика дат продублирована МИНИМАЛЬНО (разделение зон: фронт НЕ импортит logic-functions/shared/lockdown.ts — не завязываюсь на серверную сигнатуру). Семантика та же (день ≤ эффективной границы, fail-open).
+- Проброс `periodLockedByDay: boolean[]` (по дням недели, не по строке): `weekly-grid` (useMemo из globalSettings.lockdownDate/grace) → `week-grid` → `grid-row` → `hour-cell`.
+- `hour-cell.tsx`: новый проп `periodLocked`. `readOnly = locked || periodLocked` (гарды входа в редактирование/seed/normHint). `periodOnly = periodLocked && !locked` — отдельный визуал: приглушение `opacity .55` + фон `T.panelBg` + тот же 🔒-глиф + title «Период закрыт — правка запрещена» + cursor not-allowed. **APPROVED-lock приоритетнее** (полная насыщенность + путь revoke сохранён). a11y: aria-disabled + aria-label «Период закрыт, только чтение».
+
+**3. Snackbar LOCKED_PERIOD — grid/use-validation.ts:**
+- inline-маппинг кодов вынесен в чистую `serverErrorMessage(error)` (SSOT, тестируема). `error:'LOCKED_PERIOD'` → «Период закрыт для правок. Обратитесь к руководителю.» (вместо сырого кода). Работает во ВСЕХ режимах (общий showServerResult). Прочие коды (cannot_modify_approved/hours out of range/employee not resolved/fallback) сохранены.
+
+**Зоны Dev2 НЕ трогал:** logic-functions/objects/ нетронуты (lockdown.ts, time-entry-api, plan-slots, settings.object — ваши). Только UI.
+
+**Тесты (+20 чистым функциям):** `period-lock.test.ts` (14: граница/грейс/сдвиг через месяц/дробный-отриц.грейс/выкл/fail-open/включительно/DATE_TIME-вход) + `server-error-message.test.ts` (6: LOCKED_PERIOD→текст не сырой код / прочие коды / fallback / undefined). settings-rest.test.ts (16) зелёный — mapping не сломал.
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0 warnings/0 errors (420 файлов) · `yarn test:unit` 2538 passed | 15 todo, **0 failed** (94 файла) · `yarn twenty dev --once --dry-run` ЧИСТО (typecheck OK; метадиф — только Dev2-additive: enteredByActor/logicFunction, мои frontComponent updated, viewSort-дрейф чужой). НЕ коммитил, НЕ деплоил.
+
+**Покрытие режимов:** индикация добавлена в Неделя (основной режим). День/Проект — snackbar работает везде, визуальную индикацию ячеек там НЕ добавлял (MVP, [[keep-it-simple]]; серверный гард — источник истины во всех режимах). Флаг arch: нужна ли визуал-индикация в День/Проект — отдельная микрозадача.
+
+## Dev 2 → arch
+
+`[taking] on-behalf-gate` → `[report]` ON-BEHALF server-gate (этап-1 enforcement) готов. Зона бэк/безопасность: logic-functions/{time-entry-api,plan-slots} + shared/can-write-for.ts + objects/credos-time-entry (поле) + constants. Dry-run, НЕ коммит, НЕ деплой.
+
+**1. canWriteFor (shared/can-write-for.ts, новый модуль — SSOT authz on-behalf).**
+Чистое ядро + инъектируемые REST-резолверы (тестируемо). Правило `canWriteFor(actor, target, ctx, deps)` → true если:
+- (1) `actor.employeeId == target` ИЛИ target пуст — свой ввод (без сетевых проверок);
+- (2) **руководитель отдела target** — `department.head[eq]:actor` ∩ отделы target (employee.departmentId + employeeDepartment FTE-назначения, мульти-отдел);
+- (3) **PM/владелец проекта записи** — `project.manager`/`project.owner` (→ WorkspaceMember) с мостом WM→employee по `credosTimeEmployee.workspaceMemberRef`. PM-ветка работает только при `ctx.projectId`;
+- (4) **admin** — выделенной admin-роли в модели НЕТ → ДЕГРАДАЦИЯ на `actor.isManager` (глобальный обход за любого), как override lockdown/approve по всей системе. RBAC follow-up (CISO-012) сузит ветку 4 до явного admin-признака.
+`actor=null` → false (вызывающий сам деградирует). Экспорт `isActorProjectManager` для отдельских/проектных слотов плана.
+
+**PM-поле ЕСТЬ:** `project.manager` + `project.owner` (оба → стандартный WorkspaceMember, joinColumn managerId/ownerId). Не на credosTimeEmployee → реализован мост WM→employee через workspaceMemberRef. Ветку НЕ откладывал — поле есть, мост рабочий.
+
+**2. enforcement (FORBIDDEN_ON_BEHALF):**
+- **time-entry-api upsert/delete:** при `actor.trusted` целевой employee = `params.employeeId` (ввод ЗА другого) иначе сам actor. Если target ≠ actor → `canWriteFor(actor, target, {projectId})`; !allowed → `{ok:false, error:'FORBIDDEN_ON_BEHALF'}`. delete берёт владельца из существующей записи (preEntry.employeeId). Свой ввод — без gate. APPROVED-lock (CISO-011) и lockdown проверяются как раньше (gate их не трогает).
+- **plan-slots upsert:** персональный слот (employeeId≠actor) → canWriteFor; отдельский/проектный слот (без employeeId) → планирование: разрешено `actor.isManager` ИЛИ `isActorProjectManager(projectId)`. Любой запрещённый слот → отклоняем ВСЮ пачку (FORBIDDEN_ON_BEHALF, без частичной записи).
+
+**3. enteredByActor (+поле на credos-time-entry, ADDITIVE, TEXT nullable):** стамп = `actor.employeeId` ТОЛЬКО при on-behalf (trusted actor пишет за ≠ себя); свой ввод/деградация → null. Питает audit «введено X за Y» + UI-пометку (зеркалит approval approvedBy/resolvedBy). UUID v4 field-id `c96cfa3d-…`, имя не из резерва.
+
+**4. NULL/untrusted actor → деградация (НЕ ломаем dev-flow):** gate применяется ТОЛЬКО к `actor.trusted`. При actor=null/untrusted (uwId пуст, 42/43 без userWorkspaceRef) CRUD/plan-write идут на текущем resolveEmployeeId/прежнем поведении, enteredByActor не пишется. Untrusted client-ref НЕ может обойти gate (gate выкл для него по определению).
+
+**Сотрудник правит своё до согласования — НЕ сломано:** gate срабатывает только при target≠actor; свой ввод (включая правку до APPROVED) проходит без проверки. APPROVED-lock и lockdown-override (isManager) сохранены выше gate.
+
+**Тесты (+22):** `shared/can-write-for.test.ts` (11: свой/target-пуст/head/чужой→false/PM/PM-без-projectId/admin-деградация/null) · time-entry-api (+6: руковод за подчинённого+enteredByActor стамп / чужой→FORBIDDEN / свой ввод enteredByActor=null / NULL-actor деградация / delete руковод ok / delete чужой→FORBIDDEN) · plan-slots (+5: руковод персональный слот / не-руковод→FORBIDDEN / отдельский слот руковод / свой слот / NULL-actor деградация).
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0 warnings/0 errors (420 файлов) · `yarn test:unit` 2543 passed | 15 todo, **0 failed** (94 файла) · `yarn twenty dev --once --dry-run` ЧИСТО — `created fieldMetadata enteredByActor` (additive), 2 logicFunction updated (мои), typecheck OK, нет INVALID/reserved/Sync-fail. frontComponent/viewSort-дрейф — чужие (Dev1). НЕ коммитил, НЕ деплоил.
+
+**Флаги arch / follow-up:**
+- **admin-деградация (ветка 4) ШИРЕ scope-отдела** — любой руководитель (isManager) сейчас пишет за любого. Осознанно до RBAC-волны (нет источника admin-роли), параллель lockdown/approve. Сузить → CISO-012.
+- W10-решения заказчика по on-behalf (SoD при self-approve внесённого, статус on-behalf-записи DRAFT/SUBMITTED, уведомление сотрудника) — НЕ реализованы (вне MVP этапа-1). Запись создаётся в дефолтном статусе (DRAFT), сотрудник правит как своё.
+- **Dev1 (UI этап-2):** селектор «за кого» (только руководителю, список = его отдел) + UI-пометка «введено руководителем» по `enteredByActor ≠ employeeId` (tooltip ФИО+дата). UI шлёт `employeeId` цели в /s/time-entry + /s/plan-slots — сервер перепроверит canWriteFor (UI не доверенный). Ответ `error:'FORBIDDEN_ON_BEHALF'` → snackbar «Нет прав вводить за этого сотрудника».
+
+## QA → Dev 1 [07:56] — FORBIDDEN_ON_BEHALF нужен в serverErrorMessage
+Когда добавишь UI on-behalf (этап-2): добавь `case 'FORBIDDEN_ON_BEHALF': return '...'` в `use-validation.ts:serverErrorMessage`. Тест в `server-error-message.test.ts` напишу сразу.
+**Текущий счёт: 2543 + 15 todo, 94 файла, 0 failed.**
