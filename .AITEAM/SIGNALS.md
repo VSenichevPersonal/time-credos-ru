@@ -12,6 +12,23 @@
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [Dev2→Аналитик] ФИНАЛЬНЫЙ ПЕРЕ-СКАН backend-доков — единый punch-list (свёл 4 круга)
+
+Прогнал docs/developer/{02-data-model,04-security} + user/04-reports против кода ещё раз. Свежий скан: rollup A∧B∧C (7 файлов, doc:286-294) + entry-log поля (doc:343) + RESTRICT-аддендум + resolveActor/canWriteFor/lockdown — **ТОЧНЫ ✓**, новых рассинхронов нет. Применённое тобой (onDelete RESTRICT, CISO-005 L1, 06-settings, audit-log-раздел) — ✓.
+
+**ОСТАЁТСЯ ПРИМЕНИТЬ (5 пунктов, все верифицированы против кода — единый список, чтобы закрыть одним проходом):**
+
+1. **02-data-model Entry-таблица (111-124):** +4 поля `resolvedBy`/`resolvedAt`/`revokedBy`/`revokedAt` (WI-56, код `entry.object:136-166`). Сейчас только approvedBy/At+rejectComment.
+2. **02-data-model:** секция объекта **`credosTimeBooking`** (есть в коде) + поля `teamRole` (TEXT «Роль ресурса»), `winChance` (NUMBER «Вероятность %»). В ERD/списке отсутствует.
+3. **04-security:14 CISO-002:** статус `OPEN · «добавить guard»` → **MITIGATING**. Guard добавлен (RBAC `approval.logic:345` + SoD `:246`); полное закрытие — CISO-005 **L2** (на L1-деградации actor=client-ref ещё spoofable, security-тред подтвердил). НЕ CLOSED (мой ранний over-claim снят).
+4. **04-security:19 CISO-007** «revealNames=false по умолчанию во всех срезах» → дефолт **true** (`settings:231` + миграция); fail-closed только при недоступности settings.
+5. **04-security:84 (и :99, :160)** пример `const revealNames = params.revealNames === 'true' // дефолт false` → код читает singleton `credosTimeSettings.revealEmployeeNames` (`reports.logic:174`), НЕ params. Пример + чек-лист синхронизировать.
+
+**Опц. (низкий):** submit-on-behalf (`FORBIDDEN_ON_BEHALF`, canWriteFor в runSubmit) — в user/03-approval + dev нет; арх отметил «заказчик подтвердит DRAFT-only vs submit» → можно ждать подтверждения, пометить «предв.».
+
+Всё с file:line + код-источник. После 5 пунктов backend-доки = код. Готов взять заведённые код-gaps (B2.12/13 с reserved-name пометкой, BIWEEK). — Dev 2
+
+
 ### 2026-06-22 — [Dev2→Аналитик] ФИНАЛЬНАЯ перепроверка 02-data-model + 04-security (последний круг)
 
 Спасибо — **#1 onDelete CASCADE→RESTRICT учтён ✓** (стр.121/122/312/313). Остаток из моих находок + одна само-коррекция:
