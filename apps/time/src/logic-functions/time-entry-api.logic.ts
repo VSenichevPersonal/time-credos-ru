@@ -20,6 +20,9 @@ import { type Actor, resolveActor } from './shared/resolve-actor';
 // AUDIT-LOG (MVP-гибрид): запись строки журнала изменений на каждой мутации.
 // Побочная — НИКОГДА не роняет CRUD (writeEntryLog глотает ошибки внутри).
 import { writeEntryLog } from './shared/write-entry-log';
+// PERIOD-LOCKDOWN (CISO-011 SSOT, 2-е правило): закрытие прошлых периодов по дате.
+// canMutateInPeriod — закрыта ли дата записи для актора (override = руководитель).
+import { type LockdownConfig, canMutateInPeriod } from './shared/lockdown';
 
 // /s/time-entry — CRUD трудозатрат для front-компонента (песочница без доступа к БД).
 // Работает поверх Core REST воркспейса (TWENTY_API_URL + TWENTY_APP_ACCESS_TOKEN
@@ -83,8 +86,18 @@ type RawSettingsValidation = {
   maxHoursPerDay?: number | null;
   overtimeWarnHours?: number | null;
   warnOnScheduleDeviation?: boolean | null;
+  // PERIOD-LOCKDOWN: lockdown читается ТЕМ ЖЕ singleton-GET (без лишнего запроса).
+  lockdownDate?: string | null;
+  lockdownGraceDays?: number | null;
 };
-const readValidationThresholds = async (): Promise<ValidationThresholds> => {
+const LOCKDOWN_OFF: LockdownConfig = { lockdownDate: null, graceDays: 0 };
+// Один GET singleton-настроек → пороги валидации + lockdown-конфиг (SSOT-чтение,
+// не плодим запросы). Любая ошибка чтения → безопасные дефолты (лимит 24,
+// lockdown выкл). lockdown в том же ответе → upsert НЕ добавляет лишний fetch.
+const readSettings = async (): Promise<{
+  thresholds: ValidationThresholds;
+  lockdown: LockdownConfig;
+}> => {
   try {
     const res = await api.get<{
       data: { credosTimeSettings: RawSettingsValidation[] };
@@ -101,13 +114,22 @@ const readValidationThresholds = async (): Promise<ValidationThresholds> => {
       : typeof s?.overtimeWarnHours === 'number' && s.overtimeWarnHours > 0
         ? s.overtimeWarnHours
         : VALIDATION_DEFAULTS.overtimeWarnHours;
+    const lockdownDate =
+      typeof s?.lockdownDate === 'string' && s.lockdownDate ? s.lockdownDate : null;
+    const graceDays =
+      typeof s?.lockdownGraceDays === 'number' && s.lockdownGraceDays > 0
+        ? Math.floor(s.lockdownGraceDays)
+        : 0;
     return {
-      maxHoursPerDay,
-      overtimeWarnHours,
-      minHoursPerWeek: VALIDATION_DEFAULTS.minHoursPerWeek,
+      thresholds: {
+        maxHoursPerDay,
+        overtimeWarnHours,
+        minHoursPerWeek: VALIDATION_DEFAULTS.minHoursPerWeek,
+      },
+      lockdown: { lockdownDate, graceDays },
     };
   } catch {
-    return { ...VALIDATION_DEFAULTS };
+    return { thresholds: { ...VALIDATION_DEFAULTS }, lockdown: { ...LOCKDOWN_OFF } };
   }
 };
 
@@ -239,6 +261,13 @@ const run = async (event: RoutePayload) => {
     if (preEntry?.status === ENTRY_STATUS.APPROVED) {
       return { ok: false, error: 'cannot_modify_approved' };
     }
+    // PERIOD-LOCKDOWN (2-е правило guard, SSOT с CISO-011): удаление записи в
+    // ЗАКРЫТОМ периоде запрещено всем, КРОМЕ руководителя (override, логируется).
+    const { lockdown } = await readSettings();
+    const delGate = canMutateInPeriod(preEntry?.date ?? null, lockdown, actor);
+    if (!delGate.allowed) {
+      return { ok: false, error: 'LOCKED_PERIOD' };
+    }
     const deletedProjectId = preEntry?.projectId ?? null;
     await api.delete(`/rest/credosTimeEntries/${params.id}`);
     // AUDIT-LOG (action=DELETE): кто удалил + сколько часов было. Пишется ДО
@@ -251,6 +280,8 @@ const run = async (event: RoutePayload) => {
       oldHours: preEntry?.hours ?? null,
       newHours: null,
       entryDate: preEntry?.date ?? null,
+      // reopen-аудит: удаление в закрытом периоде руководителем (override).
+      override: delGate.isOverride,
     });
     if (deletedProjectId && isUuid(deletedProjectId)) {
       await recalcProjectFactHours(deletedProjectId);
@@ -298,7 +329,16 @@ const run = async (event: RoutePayload) => {
     // gap-аудит v3 #4: валидация как данные + уровни. Пороги из settings.
     // ERROR (лимит часов/день) блокирует операцию; WARNING (переработка) —
     // не блок, флаг в ответе. validateEntry — чистая (constants/validation).
-    const thresholds = await readValidationThresholds();
+    // PERIOD-LOCKDOWN: lockdown-конфиг приходит ТЕМ ЖЕ GET (без лишнего запроса).
+    const { thresholds, lockdown } = await readSettings();
+    // PERIOD-LOCKDOWN (2-е правило guard, SSOT с CISO-011): create/update записи в
+    // ЗАКРЫТОМ периоде запрещены всем, КРОМЕ руководителя (override, логируется).
+    // Дата записи — params.date (та, что сохраняем). Проверяем ДО мутаций и резолва
+    // ключа: закрытый период не зависит от наличия employee/ключа.
+    const upsertGate = canMutateInPeriod(params.date ?? null, lockdown, actor);
+    if (!upsertGate.allowed) {
+      return { ok: false, error: 'LOCKED_PERIOD' };
+    }
     const findings = validateEntry({ hours }, thresholds);
     const blocking = findings.find((f) => f.level === 'error');
     if (blocking) {
@@ -366,6 +406,8 @@ const run = async (event: RoutePayload) => {
           oldHours: prevHours,
           newHours: hours,
           entryDate: data.date as string | undefined,
+          // reopen-аудит: правка в закрытом периоде руководителем (override).
+          override: upsertGate.isOverride,
         });
       }
       const projectIdsToRecalc = new Set<string>(
@@ -392,6 +434,8 @@ const run = async (event: RoutePayload) => {
       oldHours: null,
       newHours: hours,
       entryDate: data.date as string | undefined,
+      // reopen-аудит: создание задним числом в закрытом периоде руководителем.
+      override: upsertGate.isOverride,
     });
     if (newProjectId) await recalcProjectFactHours(newProjectId);
     return {

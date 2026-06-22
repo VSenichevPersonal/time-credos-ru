@@ -630,6 +630,12 @@ export const CREDOS_TIME_SETTINGS_MIN_HOURS_PER_WEEK_FIELD_ID =
   'e2cfc76f-5c3c-4e13-9dba-546b8cdf454a';
 export const CREDOS_TIME_SETTINGS_WARN_ON_SCHEDULE_DEVIATION_FIELD_ID =
   '1abc7887-395d-491a-8606-3dd62975cd2f';
+// Lockdown прошлых периодов (AUDIT_LOG_PERIOD_LOCKDOWN.md §3.Б): дата-граница
+// закрытия + грейс-окно после конца периода. ADDITIVE поля singleton-настроек.
+export const CREDOS_TIME_SETTINGS_LOCKDOWN_DATE_FIELD_ID =
+  '3f2b8c4d-1e6a-49af-9b07-2c5d8e0a3f71';
+export const CREDOS_TIME_SETTINGS_LOCKDOWN_GRACE_DAYS_FIELD_ID =
+  'a7e1d932-4c08-4f5b-8d6e-91b3c2a47e80';
 export const CREDOS_TIME_SETTINGS_VIEW_UNIVERSAL_IDENTIFIER =
   'bc8bc1a0-e966-4eb9-94ac-ee1eec20fa19';
 export const CREDOS_TIME_SETTINGS_OBJ_NAV_UNIVERSAL_IDENTIFIER =
@@ -885,6 +891,9 @@ export const CREDOS_TIME_ENTRY_LOG_ENTRY_DATE_FIELD_ID =
   'e744b406-c86f-4813-9f18-7c2f53a93948';
 export const CREDOS_TIME_ENTRY_LOG_LOGGED_AT_FIELD_ID =
   '63845bd1-b114-4de6-9fe9-af0466a83450';
+// PERIOD-LOCKDOWN: пометка reopen/override — правка в ЗАКРЫТОМ периоде руководителем.
+export const CREDOS_TIME_ENTRY_LOG_OVERRIDE_FIELD_ID =
+  'd0c9b8a7-5e34-4f21-bc16-7a90e2d4f853';
 // EntryLog.entry -> Entry.logs (MANY_TO_ONE CASCADE + обратная ONE_TO_MANY).
 export const CREDOS_TIME_ENTRY_LOG_ENTRY_FIELD_ID =
   '6a42faed-d7e0-4b11-921a-60ec8c0bcdd9';

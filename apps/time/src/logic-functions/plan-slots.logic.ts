@@ -7,6 +7,14 @@ import { validUuidParam } from './params-validate';
 // CISO-005 server-truth актор (фундамент on-behalf/lockdown/аудита plan-write).
 // Резолвится на входе для БУДУЩИХ фаз; upsert/read пока работают как раньше.
 import { type Actor, resolveActor } from './shared/resolve-actor';
+// PERIOD-LOCKDOWN: план прошлых периодов тоже не править (AUDIT_LOG_PERIOD_LOCKDOWN
+// §3.Б). Тот же guard, что в time-entry-api (SSOT): закрытый месяц read-only,
+// КРОМЕ руководителя (override). canMutatePlanMonth — по месяцу слота.
+import {
+  type LockdownConfig,
+  canMutatePlanMonth,
+  readLockdownConfig,
+} from './shared/lockdown';
 
 /**
  * /s/plan-slots — помесячные слоты плана проекта (WI-47, «Планирование вручную по
@@ -221,7 +229,25 @@ const runRead = async (projectId: string) => {
   };
 };
 
-const runUpsert = async (projectId: string, inputs: InputSlot[]) => {
+const runUpsert = async (
+  projectId: string,
+  inputs: InputSlot[],
+  lockdown: LockdownConfig,
+  actor: Actor,
+) => {
+  // PERIOD-LOCKDOWN: если в пачке есть слот ЗАКРЫТОГО месяца и actor не руководитель
+  // (override) → отклоняем всю операцию (LOCKED_PERIOD), не правим частично. План
+  // прошлого периода защищён так же, как факт (time-entry). Руководитель —
+  // override (overridden=true в ответе; полноценный план-аудит — follow-up).
+  let overridden = false;
+  for (const inp of inputs) {
+    const gate = canMutatePlanMonth(inp.periodMonth, lockdown, actor);
+    if (!gate.allowed) {
+      return { ok: false as const, error: 'LOCKED_PERIOD', periodMonth: inp.periodMonth };
+    }
+    if (gate.isOverride) overridden = true;
+  }
+
   const existing = await restGetAllSlots(projectId);
   const byKey = new Map<string, RawSlot>();
   for (const s of existing) {
@@ -270,6 +296,8 @@ const runUpsert = async (projectId: string, inputs: InputSlot[]) => {
     created,
     updated,
     deleted,
+    // overridden=true → правка затронула закрытый период (руководитель, reopen).
+    ...(overridden ? { overridden: true as const } : {}),
     slots: sortSlots(final).map(toView),
   };
 };
@@ -293,7 +321,11 @@ const run = async (event: RoutePayload) => {
 
   const mode = params.mode != null ? String(params.mode) : 'read';
   if (mode === 'read') return runRead(projectId);
-  if (mode === 'upsert') return runUpsert(projectId, parseInputSlots(params.slots));
+  if (mode === 'upsert') {
+    // PERIOD-LOCKDOWN: читаем lockdown-конфиг только для write-пути (read не трогаем).
+    const lockdown = await readLockdownConfig();
+    return runUpsert(projectId, parseInputSlots(params.slots), lockdown, actor);
+  }
   return { ok: false, error: "unsupported mode (expected 'read' | 'upsert')" };
 };
 

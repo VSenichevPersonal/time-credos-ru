@@ -197,7 +197,8 @@ describe('integrity guard (CISO-011)', () => {
   it('op=delete, запись со статусом SUBMITTED → можно удалять (guard не срабатывает)', async () => {
     const mockFn = mockFetch([
       emptyEmployees,
-      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'SUBMITTED', projectId: null }] } }, // pre-read
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'SUBMITTED', projectId: null, date: '2026-06-01T00:00:00.000Z' }] } }, // pre-read
+      settingsRes(), // readSettings (lockdown-guard): lockdownDate пуст → не закрыто
       {}, // DELETE response
     ]);
     vi.stubGlobal('fetch', mockFn);
@@ -205,6 +206,146 @@ describe('integrity guard (CISO-011)', () => {
     expect(result).not.toMatchObject({ error: 'cannot_modify_approved' });
     const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
     expect(deletes).toHaveLength(1);
+  });
+});
+
+// PERIOD-LOCKDOWN (AUDIT_LOG_PERIOD_LOCKDOWN.md §3.Б): закрытие прошлых периодов по
+// дате. 2-е правило guard поверх CISO-011 (SSOT). Мутация записи с entryDate ≤
+// lockdownDate (с учётом грейса) → LOCKED_PERIOD, КРОМЕ руководителя (override,
+// логируется в audit-log override=true). lockdown читается тем же settings-GET.
+describe('PERIOD-LOCKDOWN: закрытие прошлых периодов по дате', () => {
+  const EMP = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const WM = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const VALID_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  // resolveActor (ветка деградации, userWorkspaceId=null) ищет employee по
+  // workspaceMemberRef → возвращает isManager-флаг. Рядовой / руководитель.
+  const workerEmp = { data: { credosTimeEmployees: [{ id: EMP, name: 'W', isManager: false }] } };
+  const managerEmp = { data: { credosTimeEmployees: [{ id: EMP, name: 'M', isManager: true }] } };
+  const lockedSettings = settingsRes({ lockdownDate: '2026-05-31T00:00:00.000Z', lockdownGraceDays: 0 });
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('upsert create в ЗАКРЫТОМ периоде (рядовой) → LOCKED_PERIOD, без мутаций', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor (деградация по workspaceMemberRef)
+      workerEmp, // resolveEmployeeId
+      lockedSettings, // readSettings (lockdown активен)
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-05-10', workspaceMemberRef: WM,
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'LOCKED_PERIOD' });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('upsert create в ОТКРЫТОМ периоде (после границы) → проходит, без LOCKED_PERIOD', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor
+      workerEmp, // resolveEmployeeId
+      lockedSettings, // readSettings
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'new-open' } } }, // POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-06-10', workspaceMemberRef: WM,
+    }));
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('upsert create в закрытом периоде РУКОВОДИТЕЛЕМ → проходит (override) + лог override=true', async () => {
+    const mockFn = mockFetch([
+      managerEmp, // resolveActor (isManager=true)
+      managerEmp, // resolveEmployeeId
+      lockedSettings, // readSettings
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'new-ovr' } } }, // POST
+      {}, // writeEntryLog POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-05-10', workspaceMemberRef: WM,
+    }));
+    expect(result).toMatchObject({ ok: true });
+    // Лог записан с override=true (reopen-аудит).
+    const logCall = mockFn.mock.calls.find((c) => String(c[0]).includes('credosTimeEntryLogs'));
+    expect(logCall).toBeDefined();
+    const logBody = JSON.parse(String((logCall?.[1] as { body?: string })?.body ?? '{}'));
+    expect(logBody.override).toBe(true);
+    expect(logBody.action).toBe('CREATE');
+  });
+
+  it('грейс: graceDays=5, lockdownDate=2026-05-31 → запись 2026-05-28 ещё в грейсе, проходит', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor
+      workerEmp, // resolveEmployeeId
+      settingsRes({ lockdownDate: '2026-05-31T00:00:00.000Z', lockdownGraceDays: 5 }), // readSettings
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'new-grace' } } }, // POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2026-05-28', workspaceMemberRef: WM,
+    }));
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('delete в ЗАКРЫТОМ периоде (рядовой) → LOCKED_PERIOD, без DELETE', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor
+      workerEmp, // resolveEmployeeId
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'DRAFT', projectId: null, hours: 8, date: '2026-05-10T00:00:00.000Z' }] } }, // pre-read
+      lockedSettings, // readSettings
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'delete', id: VALID_ID, workspaceMemberRef: WM }));
+    expect(result).toMatchObject({ ok: false, error: 'LOCKED_PERIOD' });
+    const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deletes).toHaveLength(0);
+  });
+
+  it('delete в закрытом периоде РУКОВОДИТЕЛЕМ → удаляет (override) + лог override=true', async () => {
+    const mockFn = mockFetch([
+      managerEmp, // resolveActor
+      managerEmp, // resolveEmployeeId
+      { data: { credosTimeEntries: [{ id: VALID_ID, status: 'DRAFT', projectId: null, hours: 8, date: '2026-05-10T00:00:00.000Z' }] } }, // pre-read
+      lockedSettings, // readSettings
+      {}, // DELETE
+      {}, // writeEntryLog
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({ op: 'delete', id: VALID_ID, workspaceMemberRef: WM }));
+    expect(result).toMatchObject({ ok: true });
+    const deletes = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'DELETE');
+    expect(deletes).toHaveLength(1);
+    const logCall = mockFn.mock.calls.find((c) => String(c[0]).includes('credosTimeEntryLogs'));
+    const logBody = JSON.parse(String((logCall?.[1] as { body?: string })?.body ?? '{}'));
+    expect(logBody.override).toBe(true);
+    expect(logBody.action).toBe('DELETE');
+  });
+
+  it('lockdown ВЫКЛ (lockdownDate пуст) → старая запись правится свободно (не закрыто)', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor
+      workerEmp, // resolveEmployeeId
+      settingsRes(), // readSettings — lockdownDate отсутствует → выкл
+      emptyEntries, // findExistingEntryIdByKey
+      { data: { createCredosTimeEntry: { id: 'new-off' } } }, // POST
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      op: 'upsert', hours: '8', date: '2020-01-01', workspaceMemberRef: WM,
+    }));
+    expect(result).toMatchObject({ ok: true });
   });
 });
 

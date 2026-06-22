@@ -23,6 +23,9 @@ export type EntryLogInput = {
   oldStatus?: string | null;
   newStatus?: string | null;
   entryDate?: string | null;
+  // PERIOD-LOCKDOWN: правка/удаление в ЗАКРЫТОМ периоде руководителем (reopen/
+  // override). true → действие в обход lockdown-гарда, важно для аудита.
+  override?: boolean;
 };
 
 const apiBase = () => (process.env.TWENTY_API_URL ?? '').replace(/\/$/, '');
@@ -47,6 +50,8 @@ export const writeEntryLog = async (
       oldStatus: input.oldStatus ?? null,
       newStatus: input.newStatus ?? null,
       entryDate: input.entryDate ?? null,
+      // override — пометка reopen (правка в закрытом периоде руководителем).
+      override: input.override === true,
       loggedAt: new Date().toISOString(),
       // entry — relation join-column. CASCADE: при delete записи логи снесутся, но
       // на момент записи лога (до фактического REST-delete) entry ещё существует.

@@ -13,6 +13,8 @@ import {
   CREDOS_TIME_SETTINGS_DEFAULT_APPROVAL_REQUIRED_FIELD_ID,
   CREDOS_TIME_SETTINGS_DEFAULT_CAPACITY_FACTOR_FIELD_ID,
   CREDOS_TIME_SETTINGS_FILL_TEMPLATE_HOURS_FIELD_ID,
+  CREDOS_TIME_SETTINGS_LOCKDOWN_DATE_FIELD_ID,
+  CREDOS_TIME_SETTINGS_LOCKDOWN_GRACE_DAYS_FIELD_ID,
   CREDOS_TIME_SETTINGS_MAX_HOURS_PER_DAY_FIELD_ID,
   CREDOS_TIME_SETTINGS_MIN_HOURS_PER_WEEK_FIELD_ID,
   CREDOS_TIME_SETTINGS_NORM_HOURS_PER_DAY_FIELD_ID,
@@ -116,6 +118,33 @@ export default defineObject({
       label: 'Предупреждать об отклонении от расписания',
       icon: 'IconCalendarStats',
       defaultValue: true,
+    },
+    // --- Закрытие прошлых периодов (lockdown, AUDIT_LOG_PERIOD_LOCKDOWN.md §3.Б) ---
+    // Дата-граница: записи с entryDate ≤ lockdownDate (с учётом грейса) read-only
+    // для всех, КРОМЕ роли «Руководитель» (override, действие логируется в журнал).
+    // null = lockdown выключен (период открыт). Дополняет построчный APPROVED-lock
+    // (CISO-011): один серверный guard, два правила. Сравнение по календарному дню.
+    {
+      universalIdentifier: CREDOS_TIME_SETTINGS_LOCKDOWN_DATE_FIELD_ID,
+      name: 'lockdownDate',
+      type: FieldType.DATE_TIME,
+      label: 'Закрыть период до даты (lockdown)',
+      icon: 'IconLock',
+      description:
+        'Записи трудозатрат/плана с датой ≤ этой (минус грейс) нельзя править. Пусто = выкл.',
+      isNullable: true,
+      defaultValue: null,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_SETTINGS_LOCKDOWN_GRACE_DAYS_FIELD_ID,
+      name: 'lockdownGraceDays',
+      type: FieldType.NUMBER,
+      // Грейс-окно (паттерн Kimai/Float): N дней после lockdownDate, когда правка
+      // ещё разрешена. Эффективная граница = lockdownDate − graceDays. 0 = без грейса.
+      label: 'Грейс-период закрытия (дней)',
+      icon: 'IconClockPause',
+      defaultValue: 0,
+      universalSettings: { dataType: NumberDataType.INT },
     },
     // --- Планирование ---
     {

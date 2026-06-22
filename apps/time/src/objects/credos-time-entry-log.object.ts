@@ -18,6 +18,7 @@ import {
   CREDOS_TIME_ENTRY_LOG_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_ENTRY_LOG_OLD_HOURS_FIELD_ID,
   CREDOS_TIME_ENTRY_LOG_OLD_STATUS_FIELD_ID,
+  CREDOS_TIME_ENTRY_LOG_OVERRIDE_FIELD_ID,
   CREDOS_TIME_ENTRY_LOGS_FIELD_ID,
   CREDOS_TIME_ENTRY_OBJECT_UNIVERSAL_IDENTIFIER,
 } from 'src/constants/universal-identifiers';
@@ -141,6 +142,18 @@ export default defineObject({
       label: 'Когда',
       icon: 'IconClock',
       defaultValue: 'now',
+    },
+    // PERIOD-LOCKDOWN reopen-аудит: действие совершено в ЗАКРЫТОМ периоде в обход
+    // lockdown-гарда (руководитель/override). Ключевая пометка для аудита правок
+    // задним числом (кто и когда трогал закрытый период). false = обычное действие.
+    {
+      universalIdentifier: CREDOS_TIME_ENTRY_LOG_OVERRIDE_FIELD_ID,
+      name: 'override',
+      type: FieldType.BOOLEAN,
+      label: 'Reopen (правка закрытого периода)',
+      icon: 'IconLockOpen',
+      description: 'Действие в обход закрытия периода (lockdown), совершено руководителем',
+      defaultValue: false,
     },
     // EntryLog.entry -> Entry.logs (MANY_TO_ONE, onDelete CASCADE).
     // Лог производный: при удалении записи трудозатрат снос связанных логов уместен

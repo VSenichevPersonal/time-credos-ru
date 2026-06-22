@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { parseInputSlots } from './plan-slots.logic';
+import planDef, { parseInputSlots } from './plan-slots.logic';
 
 // B3-гард мусорных слотов: parseInputSlots — единственный фильтр входа upsert.
 // periodMonth строго 'YYYY-MM'; plannedHours обязателен и конечен. Слоты, не
@@ -109,5 +109,90 @@ describe('parseInputSlots — B3-гард мусорных слотов', () => 
     expect(parseInputSlots('{not json')).toEqual([]);
     expect(parseInputSlots({ periodMonth: '2026-06' })).toEqual([]);
     expect(parseInputSlots(null)).toEqual([]);
+  });
+});
+
+// PERIOD-LOCKDOWN: план прошлых периодов тоже не править (тот же guard, что в
+// time-entry, SSOT). Закрытый месяц → LOCKED_PERIOD, КРОМЕ руководителя (override).
+describe('plan-slots: lockdown прошлых периодов', () => {
+  const handler = (
+    planDef as unknown as { config: { handler: (event: unknown) => Promise<unknown> } }
+  ).config.handler;
+  const PROJECT = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+  const WM = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+  const workerEmp = { data: { credosTimeEmployees: [{ id: 'w1', name: 'W', isManager: false }] } };
+  const managerEmp = { data: { credosTimeEmployees: [{ id: 'm1', name: 'M', isManager: true }] } };
+  const lockedSettings = { data: { credosTimeSettings: [{ lockdownDate: '2026-05-31T00:00:00.000Z', lockdownGraceDays: 0 }] } };
+  const emptySlots = { data: { credosTimePlanSlots: [], pageInfo: { hasNextPage: false } } };
+
+  const event = (body: Record<string, unknown>) => ({
+    headers: {}, queryStringParameters: {}, pathParameters: {}, body,
+    isBase64Encoded: false,
+    requestContext: { http: { method: 'POST', path: '/plan-slots' } },
+    userWorkspaceId: null,
+  });
+
+  const mockFetch = (responses: unknown[]) => {
+    let i = 0;
+    return vi.fn().mockImplementation(() => {
+      const data = responses[i++] ?? {};
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(data), text: () => Promise.resolve('') });
+    });
+  };
+
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it('upsert плана на ЗАКРЫТЫЙ месяц (рядовой) → LOCKED_PERIOD, без мутаций', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor
+      lockedSettings, // readLockdownConfig
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      mode: 'upsert', projectId: PROJECT, workspaceMemberRef: WM,
+      slots: JSON.stringify([{ periodMonth: '2026-04', plannedHours: 40 }]),
+    }));
+    expect(result).toMatchObject({ ok: false, error: 'LOCKED_PERIOD', periodMonth: '2026-04' });
+    const mutations = mockFn.mock.calls.filter((c) => {
+      const m = (c[1] as { method?: string })?.method;
+      return m === 'POST' || m === 'PATCH' || m === 'DELETE';
+    });
+    expect(mutations).toHaveLength(0);
+  });
+
+  it('upsert плана на ОТКРЫТЫЙ месяц → проходит', async () => {
+    const mockFn = mockFetch([
+      workerEmp, // resolveActor
+      lockedSettings, // readLockdownConfig
+      emptySlots, // restGetAllSlots (existing)
+      { data: { createCredosTimePlanSlot: { id: 's1' } } }, // POST
+      emptySlots, // restGetAllSlots (final)
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      mode: 'upsert', projectId: PROJECT, workspaceMemberRef: WM,
+      slots: JSON.stringify([{ periodMonth: '2026-07', plannedHours: 40 }]),
+    }));
+    expect(result).toMatchObject({ ok: true, mode: 'upsert' });
+  });
+
+  it('upsert плана на закрытый месяц РУКОВОДИТЕЛЕМ → проходит (overridden=true)', async () => {
+    const mockFn = mockFetch([
+      managerEmp, // resolveActor (isManager)
+      lockedSettings, // readLockdownConfig
+      emptySlots, // existing
+      { data: { createCredosTimePlanSlot: { id: 's2' } } }, // POST
+      emptySlots, // final
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(event({
+      mode: 'upsert', projectId: PROJECT, workspaceMemberRef: WM,
+      slots: JSON.stringify([{ periodMonth: '2026-04', plannedHours: 40 }]),
+    }));
+    expect(result).toMatchObject({ ok: true, overridden: true });
   });
 });
