@@ -44,9 +44,9 @@ describe('default-role — security invariants (CISO-002 / [bug]#1)', () => {
     expect(role.canUpdateAllObjectRecords).toBe(true);
   });
 
-  it('objectPermissions содержит 8 объектов модуля', () => {
+  it('objectPermissions содержит 9 объектов (8 time + 1 каталог, ADR-0010)', () => {
     const perms = role.objectPermissions as ObjPerm[];
-    expect(perms).toHaveLength(8);
+    expect(perms).toHaveLength(9);
   });
 
   // [bug]#1 (UC-TS-07): destroy разрешён ТОЛЬКО на credosTimeEntries (REST DELETE =

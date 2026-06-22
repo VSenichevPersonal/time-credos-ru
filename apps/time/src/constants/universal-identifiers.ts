@@ -1032,3 +1032,31 @@ export const PROJECT_MARKETING_LOG_UPDATED_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   'd99054ca-e561-4025-8f55-d838f681e941';
 // Card-view marketing: нативный whole-record updatedBy ядра (бесплатно, «кто менял»).
 export const CREDOS_TIME_PROJECT_MK_VF_15 = '25b01645-7040-4df8-a507-08fa23e04155';
+
+// ====================================================================
+// МОДУЛЬ «КАТАЛОГ УСЛУГ» (credosCatalog*) — логический модуль внутри
+// единого app (ADR-0010). Cross-app кастом-ссылки в Twenty 2.14 не
+// работают → каталог живёт в том же app, что и time; связи intra-app.
+// ====================================================================
+// Phase 0: PoC-объект credosCatalogService (услуга каталога).
+export const CREDOS_CATALOG_SERVICE_OBJECT_UNIVERSAL_IDENTIFIER =
+  'b39e1bfd-cf93-47e5-9a6e-ad642e143e80';
+export const CREDOS_CATALOG_SERVICE_NAME_FIELD_ID =
+  'a1db1cd7-4077-4e01-9157-bf755af275b9';
+export const CREDOS_CATALOG_SERVICE_SLUG_FIELD_ID =
+  '1ac6eb78-d18d-46ab-ba9f-5c5bda3b342e';
+export const CREDOS_CATALOG_SERVICE_STATUS_FIELD_ID =
+  'bf85d387-ad52-4bf3-9384-5091960e5d62';
+// Service.owner -> credosTimeEmployee.ownedServices (intra-app MANY_TO_ONE).
+export const CREDOS_CATALOG_SERVICE_OWNER_FIELD_ID =
+  'a328ecce-7ce6-4659-9272-d800a3ce5a2e';
+// Обратная сторона на credosTimeEmployee (ONE_TO_MANY) — оба объекта в одном app.
+export const CREDOS_TIME_EMPLOYEE_OWNED_SERVICES_FIELD_ID =
+  '8e1e2001-9b42-4de4-98eb-15aa8f973855';
+// Layout: index-view + nav (папка «Каталог услуг»).
+export const CREDOS_CATALOG_SERVICE_INDEX_VIEW_UNIVERSAL_IDENTIFIER =
+  '9508c80c-3100-4461-97e9-ae580b4cbc33';
+export const CREDOS_CATALOG_NAV_UNIVERSAL_IDENTIFIER =
+  'b8c349d4-bee2-4387-aaed-b630e2130783';
+export const FOLDER_CATALOG_NAV_UNIVERSAL_IDENTIFIER =
+  '099adb89-5590-4196-86a0-4dc4f4e6f70f';

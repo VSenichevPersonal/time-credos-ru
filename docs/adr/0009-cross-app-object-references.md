@@ -1,6 +1,8 @@
 # ADR-0009 — Cross-app ссылки между SDK-app (catalog ↔ time, общие мастер-данные)
 
-**Статус:** Accepted (2026-06-22)
+> ⚠️ **SUPERSEDED by [ADR-0010](0010-single-app-logical-modules.md)** (2026-06-22, в тот же день). PoC опроверг основную посылку: Twenty 2.14 НЕ резолвит cross-app ссылку на чужой кастомный объект (`OBJECT_METADATA_NOT_FOUND` на apply). Решение — единый app + логические модули. Cross-app допустим ТОЛЬКО на стандартные объекты Twenty. Деталь механизма (relationTargetObjectMetadataUniversalIdentifier) верна для intra-app и для стандартных объектов.
+
+**Статус:** SUPERSEDED (ADR-0010)
 **Контекст-теги:** каталог, мульти-app, мастер-данные, relation
 **Связано:** [ADR-0003](0003-catalog-separate-app-shared-master-data.md) (отдельный app + Service-мост), [ADR-0004](0004-naming-alignment-credos-crm.md) (префиксы/UUID-SSOT)
 

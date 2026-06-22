@@ -3,16 +3,16 @@
 **Дата:** 2026-06-22
 **Статус:** Phase 0 СТАРТОВАЛ (AITEAM: Dev2/Dev1/аналитик); time-app стабилен v1.0.0
 **Назначение:** каталог = **модуль стыковки продаж и производства**. Услуга — общий язык. Продажи: что продаём + можем ли оказать (gap). Производство: кто/ёмкость/факт. Дорастает до **производственной CRM** (лог хода работ + 1С, см. Phase 7).
-**Связано:** [SDK_DESIGN.md](SDK_DESIGN.md) · [OSS_REFERENCES.md](OSS_REFERENCES.md) · [RECON.md](RECON.md) · [ADR-0003](../adr/0003-catalog-separate-app-shared-master-data.md) · [ADR-0009](../adr/0009-cross-app-object-references.md)
+**Связано:** [SDK_DESIGN.md](SDK_DESIGN.md) · [OSS_REFERENCES.md](OSS_REFERENCES.md) · [RECON.md](RECON.md) · [ADR-0003](../adr/0003-catalog-separate-app-shared-master-data.md) · [ADR-0010](../adr/0010-single-app-logical-modules.md)
 
 ## Принципы (стандарты, которым план следует)
 
 | Стандарт | Как соблюдаем |
 |---|---|
-| **ADR-0002** изолированный app | каталог = отдельный `apps/catalog/`, свой package.json/CI |
-| **ADR-0003** Service-мост | каталог владеет Service; time/CRM ссылаются |
-| **ADR-0004** префикс + UUID-SSOT | все объекты `credosCatalog*`; UUID в `constants/`, неизменны |
-| **ADR-0009** cross-app refs | оргмастер (Employee/Department) не дублируем — ссылка по UUID |
+| **ADR-0010** единый app, модули | каталог = логический модуль в app `apps/time` (cross-app кастом-ссылки не работают в 2.14); модули = nav-папки + префиксы; связи intra-app |
+| **ADR-0003** Service-мост (контент) | модель Service, контур CRM/продаж — в силе (физ. разделение app — нет, см. 0010) |
+| **ADR-0004** префикс + UUID-SSOT | объекты каталога `credosCatalog*`; UUID в `apps/time/src/constants/`, неизменны |
+| **SDK-грабля §6** | cross-app ссылка только на СТАНДАРТНЫЕ объекты Twenty; общий кастом = один app |
 | **ADR-0008** change-log | аудит компетенций (level/expiry) через паттерн журнала |
 | **SDK-грабли** (память) | SELECT без запятых (тире); slugs `name`/`role`/`status`/`probability` зарезервированы; labelIdentifier НЕ в том же sync; DROP падает; FOLDER-nav two-phase; apply ≠ dry-run; apply не транзакционен |
 | **Зоны Dev1/Dev2** | back (objects/fields/logic) = Dev2; front (components/views/layouts/nav) = Dev1; constants — согласовывать |
@@ -24,42 +24,42 @@
 ## Архитектура (итог)
 
 ```
-            Twenty workspace (один)
-  ┌─ time (credosTime*) ─────────────────────────────────┐
+  ОДИН app (apps/time) · ОДИН workspace · логические модули (ADR-0010)
+
+  ┌─ Модуль ТРУДОЗАТРАТЫ (credosTime*) ──────────────────┐
   │  Employee · Department · Project · Booking · PlanSlot │
   └──▲──────▲────────────▲─────────▲──────────▲──────────┘
-     │ ref  │ ref        │ catalog РАСШИРЯЕТ time-объекты │
-     │(owner)(department) │ полем →service (ADR-0009 §1a) │
-  ┌─ catalog (credosCatalog*, отдельный app) ─────────────┐
+     │ owner│ department  │  все связи INTRA-app          │
+     │      │             │  (резолвятся штатно)          │
+  ┌─ Модуль КАТАЛОГ УСЛУГ (credosCatalog*) ───────────────┐
   │  Service ─▶ Category ─▶ (Department)                  │
-  │     │  └─owner─▶ (Employee)                           │
+  │     │  └─owner─▶ (Employee)   ← PoC Phase 0 ✓          │
   │     ├─ ServiceProduct ─▶ Product ─▶ Vendor            │
   │     ├─ ServiceCompetency ─▶ Competency ◀─ EmployeeComp│
   │     ├─ ServiceRelation (typed, cross-sell)            │
   │     └─ ServiceDocument ─▶ Document                    │
   └───────────────────────────────────────────────────────┘
 
-  Услуга = разрез по всему time:
+  Услуга = разрез по всему модулю трудозатрат (intra-app поля):
    Project.service  → факт-часы по услуге (что реально делали)
    PlanSlot.service → план/спрос по услуге (что собираемся)
    Booking.service  → бронь ресурса под услугу
    + Employee↔Competency gap → можем ли услугу оказать
+  Разделение в UI: nav-папки «Трудозатраты» / «Каталог услуг» / «Производство».
 ```
 
 ---
 
 ## Фазы (волны)
 
-### Phase 0 — Каркас + PoC cross-app (риск-бёрндаун) 🔴 ПЕРВЫМ
-**Цель:** доказать, что cross-app relation реально применяется в workspace (не только в теории).
-- Scaffold: `npx create-twenty-app@latest apps/catalog` → application-config (свой UUID), role.config, tsconfig, CI-зеркало time.
-- `constants/shared-identifiers.ts` — UUID оргмастера time + guard-тест-инвариант (ADR-0009).
-- `constants/universal-identifiers.ts` — свои UUID каталога (SSOT).
-- **PoC:** минимальный `credosCatalogService` (name, slug, status) + 1 relation `owner → credosTimeEmployee` → **dry-run → apply → проверить в workspace, что связь резолвится.**
-- **Gate:** apply прошёл, объект+связь видны в Settings, обратная сторона на Employee есть.
-- ❗ Если PoC падает — стоп, репланируем (вся модель зависит).
+### Phase 0 — PoC связи Service↔Employee (риск-бёрндаун) ✅ ВЫПОЛНЕН
+**Цель:** доказать, что услуга реально связывается с данными time в одном workspace.
+**Что было:** сначала пробовали ОТДЕЛЬНЫЙ catalog-app + cross-app ссылку → `OBJECT_METADATA_NOT_FOUND` (Twenty 2.14 не резолвит чужой кастомный объект). Пивот на **единый app + логические модули** (ADR-0010).
+- Модуль каталога в `apps/time/src/` (объекты/поля/views/nav с префиксом `credosCatalog*`), UUID — в общем `apps/time/src/constants/universal-identifiers.ts` (секция модуля каталога).
+- **PoC применён на проде:** `credosCatalogService` (title/serviceSlug/serviceStatus) + intra-app relation `owner ↔ credosTimeEmployee.ownedServices` + index-view + nav-папка «Каталог услуг». labelIdentifier=title (two-phase).
+- **Gate пройден:** lint 0 · test:unit 2792 · `dev --once` synced; обе стороны связи (owner на Service + ownedServices на Employee) подтверждены в метаданных workspace.
 
-**Зона:** Dev2 + arch. **Выход:** работающий app-каркас, подтверждённый cross-app ref.
+**Зона:** arch. **Выход:** доказана модель «единый app, связи intra-app» — фундамент для Phase 1+.
 
 ---
 
@@ -69,7 +69,7 @@
 - SELECT-опции из SSOT `constants/select-options.ts`: serviceStatus (draft/active/…), productCategory (СЗИ-НСД/VPN/SIEM/…), **тире вместо запятых**.
 - Junctions: `ServiceProduct`, `ServiceRelation` (relationType: related/prerequisite/followup/alternative).
 - Reverse-relation поля (`src/fields/`).
-- **Связь проект↔услуга (явная, по запросу заказчика):** каталог расширяет `credosTimeProject` полем `service → credosCatalogService` (ADR-0009 §1a). Проект классифицируется услугой → факт-часы аккумулируются по услуге. Это самая ценная и простая интеграция — делаем сразу.
+- **Связь проект↔услуга (явная, по запросу заказчика):** каталог-модуль добавляет на `credosTimeProject` поле `service → credosCatalogService` (intra-app, ADR-0010). Проект классифицируется услугой → факт-часы аккумулируются по услуге. Это самая ценная и простая интеграция — делаем сразу.
 - View: список услуг + базовая карточка (проверить рендер).
 
 **Зона:** Dev2 (объекты/поля) → Dev1 (базовый view). **Gate:** стандартный + проверка что поле `service` появилось на карточке проекта time.
@@ -79,7 +79,7 @@
 ### Phase 2 — Компетенции + gap-светофор (главный приём CASS) ⭐
 **Цель:** «знать что можем продавать» (ядро VISION).
 - `credosCatalogCompetency` (name, category: skill/cert/technology, issuingOrg) + самосвязь `requires` (M:N на себя).
-- `credosCatalogEmployeeCompetency` (→Employee[cross-app], →Competency, **level** SELECT, **expiresOn** DATE, certificateNumber, issuedBy) — надстройка над плоским прототипом.
+- `credosCatalogEmployeeCompetency` (→credosTimeEmployee[intra-app], →Competency, **level** SELECT, **expiresOn** DATE, certificateNumber, issuedBy) — надстройка над плоским прототипом.
 - `credosCatalogServiceCompetency` (→Service, →Competency, requiredLevel, isRequired).
 - **logic-function `gap-analysis`**: для услуги Σ требуемых vs актуальных (не истёкших) у отдела → светофор «можем / дефицит / просрочено».
 - **Аудит компетенций** (ADR-0008): `credosCatalogCompetencyLog` + onUpdate-триггер (кто/когда подтвердил, было→стало).
@@ -108,7 +108,7 @@
 
 ### Phase 5 — Интеграция time↔услуга (план/бронь/факт по услуге) ⭐
 **Цель:** услуга как сквозной разрез ресурсного учёта (по запросу заказчика).
-- Каталог расширяет time-объекты полем `→service` (ADR-0009 §1a):
+- Каталог-модуль добавляет на time-объекты поле `→service` (intra-app, ADR-0010):
   - `credosTimePlanSlot.service` → **план/спрос по услуге** (сколько часов планируем на услугу).
   - `credosTimeBooking.service` → **бронь ресурса под услугу**.
   - (опц.) `credosTimeDeptPlan.service` → план отдела в разрезе услуг.

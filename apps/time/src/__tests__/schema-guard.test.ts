@@ -69,12 +69,14 @@ describe('schema-guard: SDK-определения валидны (success + б�
   );
 });
 
-describe('нейминг credosTime (ADR-0004)', () => {
+describe('нейминг credos (ADR-0004 + ADR-0010 модули)', () => {
+  // Единый app, логические модули (ADR-0010): time = credosTime*, каталог =
+  // credosCatalog*. Префикс credos<Модуль> обязателен (изоляция от CRM-объектов).
   it.each(objects.map((o) => [o.path, o.res] as const))(
-    '%s — nameSingular/namePlural с префиксом credosTime',
+    '%s — nameSingular/namePlural с префиксом credos<Модуль>',
     (_path, res) => {
-      expect(cfg<string>(res, 'nameSingular')).toMatch(/^credosTime/);
-      expect(cfg<string>(res, 'namePlural')).toMatch(/^credosTime/);
+      expect(cfg<string>(res, 'nameSingular')).toMatch(/^credos(Time|Catalog)/);
+      expect(cfg<string>(res, 'namePlural')).toMatch(/^credos(Time|Catalog)/);
     },
   );
 });
