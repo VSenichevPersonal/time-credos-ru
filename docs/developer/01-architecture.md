@@ -28,7 +28,7 @@ C4Context
 C4Container
     title time-credos-ru — слои SDK App
 
-    Container(objects, "objects/ + fields/", "TypeScript / defineObject", "Схема данных: 10 объектов credosTime*, поля, связи")
+    Container(objects, "objects/ + fields/", "TypeScript / defineObject", "Схема данных: 16 объектов credosTime* (12 доменных + волна identity/planning: plan-slot, entry-log, booking, settings)")
     Container(logic, "logic-functions/", "TypeScript / defineLogicFunction", "Серверная логика: CRUD, approval, reports, rollup-триггеры")
     Container(front, "front-components/", "React / TSX", "UI в изолированном Web Worker: сетка, отчёты, capacity, calendar")
     Container(layout, "views/ + page-layouts/ + navigation-menu-items/", "TypeScript", "Декларативный UI: списки, карточки, навигация")
