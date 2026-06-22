@@ -2,7 +2,10 @@ import { defineView, ViewKey } from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_PROJECT_CAN_PUBLISH_ON_SITE_FIELD_ID,
+  CREDOS_TIME_PROJECT_CAN_USE_IN_PROPOSALS_FIELD_ID,
+  CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID,
   CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID,
   CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_MK_VF_1,
   CREDOS_TIME_PROJECT_MK_VF_2,
@@ -10,9 +13,14 @@ import {
   CREDOS_TIME_PROJECT_MK_VF_4,
   CREDOS_TIME_PROJECT_MK_VF_5,
   CREDOS_TIME_PROJECT_MK_VF_6,
+  CREDOS_TIME_PROJECT_MK_VF_7,
+  CREDOS_TIME_PROJECT_MK_VF_8,
+  CREDOS_TIME_PROJECT_MK_VF_9,
+  CREDOS_TIME_PROJECT_MK_VF_10,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
+  CREDOS_TIME_PROJECT_REFERENCE_READY_FIELD_ID,
   CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID,
 } from 'src/constants/universal-identifiers';
@@ -20,7 +28,8 @@ import {
 // Card-view «Проект — маркетинг». НЕ index-view сайдбара (нет navigationMenuItem):
 // служит набором полей для FIELDS-виджета вкладки «Маркетинг» карточки проекта.
 // Поля: уровень NDA, можно публиковать, опубликовано, ссылка на публикацию,
-// опубликован отзыв, ссылка на отзыв.
+// опубликован отзыв, ссылка на отзыв, + sales-enablement (P1): можно в КП/тендерах,
+// можно логотип, готов как референс, отрасль клиента.
 export default defineView({
   universalIdentifier:
     CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
@@ -74,6 +83,38 @@ export default defineView({
       position: 5,
       isVisible: true,
       size: 360,
+    },
+    // Группа «разрешения / sales-enablement» (P1, MARKETING_SALES_B2B §3).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_7,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_CAN_USE_IN_PROPOSALS_FIELD_ID,
+      position: 6,
+      isVisible: true,
+      size: 220,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_8,
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID,
+      position: 7,
+      isVisible: true,
+      size: 240,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_9,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_REFERENCE_READY_FIELD_ID,
+      position: 8,
+      isVisible: true,
+      size: 220,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_10,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID,
+      position: 9,
+      isVisible: true,
+      size: 220,
     },
   ],
 });

@@ -244,7 +244,9 @@ export const WEEK_STARTS_ON_DEFAULT = "'MONDAY'";
 // Гранулярность согласования (REQ-0007).
 export const APPROVAL_PERIOD_OPTIONS: SelectOption[] = [
   { value: 'WEEK', label: 'Неделя', position: 0, color: 'green' },
-  { value: 'MONTH', label: 'Месяц', position: 1, color: 'blue' },
+  // BIWEEK (B4.9, UI_ANSWERS → Ref=Timetta настраиваемый период) — раз в две недели.
+  { value: 'BIWEEK', label: 'Две недели', position: 1, color: 'turquoise' },
+  { value: 'MONTH', label: 'Месяц', position: 2, color: 'blue' },
 ];
 export const APPROVAL_PERIOD_DEFAULT = "'WEEK'";
 
@@ -320,4 +322,28 @@ export const NDA_LEVEL_DEFAULT = "'NONE'";
 export const ndaLevelLabel = (code: string | null | undefined): string => {
   if (!code) return '';
   return NDA_LEVEL_OPTIONS.find((option) => option.value === code)?.label ?? '';
+};
+
+// Отрасль/вертикаль клиента (P1 sales-enablement, MARKETING_SALES_B2B §3).
+// Для ABM-подбора похожего референса под открытую сделку. Значения UPPER_CASE
+// (требование SDK), ярлыки русские БЕЗ запятых (запятая в SELECT-label = INVALID).
+export const INDUSTRY_OPTIONS: SelectOption[] = [
+  { value: 'FINANCE', label: 'Финансы и банки', position: 0, color: 'green' },
+  { value: 'GOVERNMENT', label: 'Госсектор', position: 1, color: 'blue' },
+  { value: 'INDUSTRY', label: 'Промышленность', position: 2, color: 'gray' },
+  { value: 'ENERGY', label: 'Энергетика', position: 3, color: 'orange' },
+  { value: 'TELECOM', label: 'Телеком', position: 4, color: 'sky' },
+  { value: 'RETAIL', label: 'Ритейл и e-commerce', position: 5, color: 'pink' },
+  { value: 'TRANSPORT', label: 'Транспорт и логистика', position: 6, color: 'turquoise' },
+  { value: 'HEALTHCARE', label: 'Здравоохранение', position: 7, color: 'red' },
+  { value: 'EDUCATION', label: 'Образование', position: 8, color: 'yellow' },
+  { value: 'IT', label: 'ИТ и технологии', position: 9, color: 'purple' },
+  { value: 'OTHER', label: 'Другое', position: 10, color: 'gray' },
+];
+
+// Русский ярлык отрасли клиента по коду (SSOT — берётся из INDUSTRY_OPTIONS).
+// Неизвестный/пустой код → пустая строка (безопасно для UI).
+export const industryLabel = (code: string | null | undefined): string => {
+  if (!code) return '';
+  return INDUSTRY_OPTIONS.find((option) => option.value === code)?.label ?? '';
 };

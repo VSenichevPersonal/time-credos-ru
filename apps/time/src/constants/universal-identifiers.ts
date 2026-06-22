@@ -364,6 +364,21 @@ export const CREDOS_TIME_PROJECT_MK_VF_3 = '168723d0-c1d6-4439-991b-bbf3be61561e
 export const CREDOS_TIME_PROJECT_MK_VF_4 = '96fa45ad-7072-4ef5-af03-7b215bbcb3e4';
 export const CREDOS_TIME_PROJECT_MK_VF_5 = '681ddfa1-0a12-42c4-9758-1f68c4179d25';
 export const CREDOS_TIME_PROJECT_MK_VF_6 = '0e349404-cfcf-4de4-b731-d65a35d0c512';
+// P1 sales-enablement (MARKETING_SALES_B2B §3): разрешения тоньше публичного
+// сайта + reference-ready + отрасль клиента (ABM). ADDITIVE-поля credosTimeProject.
+export const CREDOS_TIME_PROJECT_CAN_USE_IN_PROPOSALS_FIELD_ID =
+  '2f5b9c84-6a1d-4e72-9c83-5b1d2e6f7a04';
+export const CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID =
+  '3a6c0d95-7b2e-4f83-8d94-6c2e3f708b15';
+export const CREDOS_TIME_PROJECT_REFERENCE_READY_FIELD_ID =
+  '4b7d1ea6-8c3f-4094-9ea5-7d3f4081c026';
+export const CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID =
+  '5c8e2fb7-9d40-41a5-8fb6-8e405192d137';
+// ViewField-UUID этих 4 колонок в card-view маркетинга (после reviewUrl).
+export const CREDOS_TIME_PROJECT_MK_VF_7 = '6d9f30c8-ae51-42b6-90c7-9f5162a3e248';
+export const CREDOS_TIME_PROJECT_MK_VF_8 = '7e0a41d9-bf62-43c7-81d8-a06273b4f359';
+export const CREDOS_TIME_PROJECT_MK_VF_9 = '8f1b52ea-c073-44d8-92e9-b17384c5046a';
+export const CREDOS_TIME_PROJECT_MK_VF_10 = '901c63fb-d184-45e9-83fa-c28495d6157b';
 // Таб «Маркетинг» карточки проекта + его FIELDS-виджет.
 export const CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER =
   'b2ba6840-d14a-4a81-a395-adf382c2717c';

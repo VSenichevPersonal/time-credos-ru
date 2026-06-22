@@ -8,6 +8,7 @@ import {
 } from 'twenty-sdk/define';
 
 import {
+  INDUSTRY_OPTIONS,
   NDA_LEVEL_DEFAULT,
   NDA_LEVEL_OPTIONS,
   PLAN_METHOD_DEFAULT,
@@ -28,6 +29,9 @@ import {
   CREDOS_TIME_PROJECT_EXTERNAL_CODE_FIELD_ID,
   CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID,
   CREDOS_TIME_PROJECT_CAN_PUBLISH_ON_SITE_FIELD_ID,
+  CREDOS_TIME_PROJECT_CAN_USE_IN_PROPOSALS_FIELD_ID,
+  CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID,
+  CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID,
   CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
@@ -35,6 +39,7 @@ import {
   CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
   CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID,
   CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
+  CREDOS_TIME_PROJECT_REFERENCE_READY_FIELD_ID,
   CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_MANAGED_PROJECTS_FIELD_ID,
@@ -241,6 +246,45 @@ export default defineObject({
       icon: 'IconLink',
       isNullable: true,
       defaultValue: null,
+    },
+    // --- Sales-enablement P1 (MARKETING_SALES_B2B §3): разрешения тоньше сайта ---
+    // Закрытый канал отдельно от публичного сайта: КП/тендеры/питчи. NDA-vs-разрешение
+    // НЕ валидируем (доверие пользователю, MVP).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_CAN_USE_IN_PROPOSALS_FIELD_ID,
+      name: 'canUseInProposals',
+      type: FieldType.BOOLEAN,
+      label: 'Можно в КП/тендерах/питчах',
+      icon: 'IconFileText',
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID,
+      name: 'canUseLogo',
+      type: FieldType.BOOLEAN,
+      label: 'Можно использовать логотип клиента',
+      icon: 'IconPhoto',
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_REFERENCE_READY_FIELD_ID,
+      name: 'referenceReady',
+      type: FieldType.BOOLEAN,
+      label: 'Готов как референс для продаж',
+      icon: 'IconThumbUp',
+      defaultValue: false,
+    },
+    // Отрасль клиента (для ABM-подбора похожего референса под сделку). nullable —
+    // отрасль может быть не указана.
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID,
+      name: 'clientIndustry',
+      type: FieldType.SELECT,
+      label: 'Отрасль клиента',
+      icon: 'IconBuildingFactory',
+      isNullable: true,
+      defaultValue: null,
+      options: INDUSTRY_OPTIONS,
     },
     // Project.company -> стандартный Company (MANY_TO_ONE, nullable).
     {

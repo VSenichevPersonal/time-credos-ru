@@ -9,6 +9,8 @@ import {
   ENTRY_STATUS_DEFAULT,
   ENTRY_STATUS_OPTIONS,
   ENTRY_TAG_OPTIONS,
+  INDUSTRY_OPTIONS,
+  industryLabel,
   NDA_LEVEL_DEFAULT,
   NDA_LEVEL_OPTIONS,
   ndaLevelLabel,
@@ -30,6 +32,7 @@ const ALL_OPTION_SETS = {
   BILLING_DOC_TYPE_OPTIONS,
   WORKDAY_TYPE_OPTIONS,
   PROJECT_STATUS_OPTIONS,
+  INDUSTRY_OPTIONS,
 };
 
 // SDK требует value SELECT в UPPER_CASE snake_case. Эти инварианты держат
@@ -213,5 +216,51 @@ describe('NDA_LEVEL_OPTIONS (маркетинг проекта)', () => {
     expect(ndaLevelLabel(undefined)).toBe('');
     expect(ndaLevelLabel('')).toBe('');
     expect(ndaLevelLabel('WAT')).toBe('');
+  });
+});
+
+describe('INDUSTRY_OPTIONS (отрасль клиента, P1 sales-enablement)', () => {
+  const EXPECTED = [
+    'FINANCE',
+    'GOVERNMENT',
+    'INDUSTRY',
+    'ENERGY',
+    'TELECOM',
+    'RETAIL',
+    'TRANSPORT',
+    'HEALTHCARE',
+    'EDUCATION',
+    'IT',
+    'OTHER',
+  ];
+
+  it('11 RU-вертикалей в заданном порядке', () => {
+    expect(INDUSTRY_OPTIONS.map((o) => o.value)).toEqual(EXPECTED);
+  });
+
+  it('значения UPPER_SNAKE_CASE (требование SDK)', () => {
+    for (const o of INDUSTRY_OPTIONS) {
+      expect(o.value).toMatch(/^[A-Z][A-Z0-9_]*$/);
+    }
+  });
+
+  it('label непустой и БЕЗ запятых (запятая в SELECT-label = INVALID)', () => {
+    for (const o of INDUSTRY_OPTIONS) {
+      expect(o.label.length).toBeGreaterThan(0);
+      expect(o.label).not.toContain(',');
+    }
+  });
+
+  it('industryLabel маппит код в русский ярлык из SSOT', () => {
+    expect(industryLabel('FINANCE')).toBe('Финансы и банки');
+    expect(industryLabel('GOVERNMENT')).toBe('Госсектор');
+    expect(industryLabel('OTHER')).toBe('Другое');
+  });
+
+  it('industryLabel: пустой/неизвестный код → пустая строка', () => {
+    expect(industryLabel(null)).toBe('');
+    expect(industryLabel(undefined)).toBe('');
+    expect(industryLabel('')).toBe('');
+    expect(industryLabel('WAT')).toBe('');
   });
 });
