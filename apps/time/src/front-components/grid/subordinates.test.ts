@@ -1,11 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { EmployeeRef } from 'src/front-components/grid/types';
 import {
   departmentsHeadedBy,
+  fetchManagedDepartmentIds,
   isEnteredByManager,
   subordinatesOf,
 } from 'src/front-components/grid/subordinates';
+
+const mockGet = vi.fn();
+vi.mock('twenty-client-sdk/rest', () => ({
+  RestApiClient: vi.fn().mockImplementation(() => ({ get: mockGet })),
+}));
+beforeEach(() => vi.clearAllMocks());
 
 const emp = (id: string, departmentId: string | null, name = ''): EmployeeRef => ({
   id,
@@ -96,5 +103,45 @@ describe('isEnteredByManager', () => {
   it('actor задан, владелец неизвестен → считаем on-behalf', () => {
     expect(isEnteredByManager('mgr', null)).toBe(true);
     expect(isEnteredByManager('mgr', undefined)).toBe(true);
+  });
+});
+
+describe('fetchManagedDepartmentIds — REST + CISO-006 guard', () => {
+  const DEPT_RESP = (ids: string[]) => ({
+    data: { credosTimeDepartments: ids.map((id) => ({ id })) },
+  });
+
+  it('null managerEmployeeId → [] без запроса', async () => {
+    const r = await fetchManagedDepartmentIds(null);
+    expect(r).toEqual([]);
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('не-UUID → [] без запроса (CISO-006)', async () => {
+    const r = await fetchManagedDepartmentIds('not-a-uuid');
+    expect(r).toEqual([]);
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+
+  it('валидный UUID → GET /rest/credosTimeDepartments с filter', async () => {
+    const mgr = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    mockGet.mockResolvedValueOnce(DEPT_RESP(['d1', 'd2']));
+    const r = await fetchManagedDepartmentIds(mgr);
+    expect(r).toEqual(['d1', 'd2']);
+    expect(mockGet).toHaveBeenCalledWith('/rest/credosTimeDepartments', expect.objectContaining({
+      query: expect.objectContaining({ filter: expect.stringContaining(mgr) }),
+    }));
+  });
+
+  it('нет отделов → []', async () => {
+    mockGet.mockResolvedValueOnce(DEPT_RESP([]));
+    const r = await fetchManagedDepartmentIds('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(r).toEqual([]);
+  });
+
+  it('fetch throws → [] (деградация, не отказ — селектор скрывается)', async () => {
+    mockGet.mockRejectedValueOnce(new Error('network'));
+    const r = await fetchManagedDepartmentIds('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(r).toEqual([]);
   });
 });

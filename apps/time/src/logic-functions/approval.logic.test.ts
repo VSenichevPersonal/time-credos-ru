@@ -21,10 +21,16 @@ const event = (
   userWorkspaceId: opts.userWorkspaceId ?? null,
 });
 
-// Мок fetch-ответа (одноразовый JSON).
+// Мок fetch-ответа (одноразовый JSON по индексу).
+// AUDIT-LOG STATUS: POST /rest/credosTimeEntryLogs — побочный вызов, НЕ потребляет
+// индекс последовательности (иначе сдвигал бы порядок ответов entry/PATCH). Лог-тесты
+// инспектируют сам вызов через mock.calls; здесь он просто отвечает ok без сдвига.
 const mockFetch = (responses: unknown[]) => {
   let i = 0;
-  return vi.fn().mockImplementation(() => {
+  return vi.fn().mockImplementation((url?: string) => {
+    if (typeof url === 'string' && url.includes('/rest/credosTimeEntryLogs')) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}), text: () => Promise.resolve('') });
+    }
     const data = responses[i++];
     return Promise.resolve({
       ok: true,
@@ -989,6 +995,97 @@ describe('approval.logic — WI-57 reject-defense (полнота submit)', () =
     const casEntry1 = { data: { credosTimeEntries: [{ id: ID1, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
     vi.stubGlobal('fetch', mockFetch([casEntry1, {}]));
     const result = await handler(event({ op: 'reject', ids: ID1 }));
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+});
+
+// AUDIT-LOG STATUS follow-up: при смене статуса (approve/reject/recall/revoke)
+// пишется строка credosTimeEntryLog action=STATUS с old→new + actor (server-truth).
+describe('approval.logic — AUDIT-LOG STATUS (approve/reject/recall/revoke)', () => {
+  const REF = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const UW = 'ffffffff-1111-4fff-8fff-ffffffffffff';
+  const ID = '00000000-0000-4000-8000-000000000001';
+  beforeEach(() => {
+    vi.stubEnv('TWENTY_API_URL', 'http://test');
+    vi.stubEnv('TWENTY_APP_ACCESS_TOKEN', 'test-token');
+  });
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  // POST-вызов лога (credosTimeEntryLogs) из записанных вызовов fetch.
+  const logBody = (mockFn: ReturnType<typeof mockFetch>): Record<string, unknown> | null => {
+    const call = mockFn.mock.calls.find(
+      (c) => typeof c[0] === 'string' && (c[0] as string).includes('/rest/credosTimeEntryLogs')
+        && (c[1] as { method?: string })?.method === 'POST',
+    );
+    if (!call) return null;
+    return JSON.parse((call[1] as { body: string }).body);
+  };
+
+  it('approve: пишется STATUS-лог SUBMITTED→APPROVED + actor=employeeId', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const entryOther = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, entryOther, {}, {}]); // entry, PATCH, log
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'approve', ids: ID }, { userWorkspaceId: UW }));
+    const log = logBody(mockFn);
+    expect(log).toBeTruthy();
+    expect(log!.action).toBe('STATUS');
+    expect(log!.oldStatus).toBe('SUBMITTED');
+    expect(log!.newStatus).toBe('APPROVED');
+    expect(log!.actor).toBe('e-mgr');
+    expect(log!.entryId).toBe(ID);
+  });
+
+  it('reject: пишется STATUS-лог SUBMITTED→REJECTED', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const entryOther = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e-other', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, entryOther, {}, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'reject', ids: ID, comment: 'fix' }, { userWorkspaceId: UW }));
+    const log = logBody(mockFn);
+    expect(log).toMatchObject({ action: 'STATUS', oldStatus: 'SUBMITTED', newStatus: 'REJECTED' });
+  });
+
+  it('recall: пишется STATUS-лог SUBMITTED→DRAFT', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e1', isManager: false, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const ownEntry = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e1', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, ownEntry, {}, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'recall', ids: ID }, { userWorkspaceId: UW }));
+    const log = logBody(mockFn);
+    expect(log).toMatchObject({ action: 'STATUS', oldStatus: 'SUBMITTED', newStatus: 'DRAFT', actor: 'e1' });
+  });
+
+  it('revoke: пишется STATUS-лог APPROVED→SUBMITTED', async () => {
+    const byUw = { data: { credosTimeEmployees: [{ id: 'e-mgr', isManager: true, workspaceMemberRef: REF, userWorkspaceRef: UW }] } };
+    const approvedOther = { data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e-other', projectId: 'p1' }] } };
+    const mockFn = mockFetch([byUw, approvedOther, {}, {}]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'revoke', ids: ID }, { userWorkspaceId: UW }));
+    const log = logBody(mockFn);
+    expect(log).toMatchObject({ action: 'STATUS', oldStatus: 'APPROVED', newStatus: 'SUBMITTED' });
+  });
+
+  // CAS-skip (статус уже сменился) → STATUS-лог НЕ пишется (нет факта смены).
+  it('approve CAS-skip (уже APPROVED): STATUS-лог НЕ пишется', async () => {
+    const already = { data: { credosTimeEntries: [{ id: ID, status: 'APPROVED', employeeId: 'e2', projectId: 'p1' }] } };
+    const mockFn = mockFetch([already]);
+    vi.stubGlobal('fetch', mockFn);
+    await handler(event({ op: 'approve', ids: ID }));
+    expect(logBody(mockFn)).toBeNull();
+  });
+
+  // Сбой лога (POST 500) НЕ валит операцию — approve остаётся updated:1.
+  it('approve: сбой STATUS-лога (POST 500) НЕ валит операцию (updated:1)', async () => {
+    const entryOther = { data: { credosTimeEntries: [{ id: ID, status: 'SUBMITTED', employeeId: 'e2', projectId: 'p1' }] } };
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/rest/credosTimeEntryLogs')) {
+        return Promise.resolve({ ok: false, status: 500, text: () => Promise.resolve('boom'), json: () => Promise.resolve({}) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(entryOther), text: () => Promise.resolve('') });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const result = await handler(event({ op: 'approve', ids: ID }));
     expect(result).toMatchObject({ ok: true, updated: 1 });
   });
 });

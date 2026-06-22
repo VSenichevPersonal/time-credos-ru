@@ -18,7 +18,15 @@ const EMPTY = (
 ): ProjectsPlanFactResponse => ({
   ok: false,
   period: { from, to },
-  totals: { planned: 0, fact: 0, remaining: 0, overrunCount: 0 },
+  totals: {
+    planned: 0,
+    allocated: 0,
+    fact: 0,
+    remaining: 0,
+    unallocated: 0,
+    overrunCount: 0,
+    overbookedCount: 0,
+  },
   count: 0,
   rows: [],
   error,

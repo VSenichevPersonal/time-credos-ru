@@ -15,6 +15,11 @@ import { isIsoDate, isUuid } from './params-validate';
 // CISO-005 server-truth актор вынесен в общий SSOT-модуль (shared/resolve-actor),
 // переиспользуется time-entry-api/plan-slots. Поведение approval идентично прежнему.
 import { type Actor, resolveActor } from './shared/resolve-actor';
+// AUDIT-LOG (SSOT shared/write-entry-log): подключаем STATUS-строку журнала при
+// смене статуса (approve/reject/recall/revoke). Лог НИКОГДА не роняет операцию
+// (try/catch внутри writeEntryLog). Подключение follow-up audit-log агента: STATUS
+// раньше не писался (approval.logic — не его зона), теперь источник статуса — здесь.
+import { writeEntryLog } from './shared/write-entry-log';
 
 // /s/approval — согласование трудозатрат (фиксирует userWorkspaceId руководителя).
 //   submit  — записи периода сотрудника (где требуется согласование) DRAFT → SUBMITTED.
@@ -198,6 +203,8 @@ const runSubmit = async (params: Record<string, string>): Promise<object> => {
 //     повторное approve = no-op — эталон Timetta single-resolver), запись НЕ затираем;
 //   - запись принадлежит актору и нарушает SoD → skipOwn (вызывающий считает отдельно);
 //   - PATCH упал → НЕ бросаем на середине батча, собираем в failed и идём дальше.
+// SoD по OWNER (approver != employeeId=owner) корректна; руководитель МОЖЕТ согласовать
+// внесённое за подчинённого (иначе ломается «довнести за отсутствующего + согласовать»).
 // Возврат: 'done' | 'skipped' (CAS-устарел/нет записи) | 'skippedOwn' | 'failed'.
 type CasOutcome = 'done' | 'skipped' | 'skippedOwn' | 'failed';
 const casApply = async (
@@ -228,6 +235,15 @@ const casApply = async (
       return 'skippedOwn';
     }
     await setStatus(id, targetStatus, action, actorId, comment);
+    // AUDIT-LOG STATUS: фиксируем переход expectedFrom→targetStatus + actor (server-truth).
+    // Только для смены статуса approval-операциями (submit логируется в своём домене).
+    // Побочно — writeEntryLog глотает ошибки, сбой лога НЕ валит операцию.
+    await writeEntryLog(actor, {
+      entryId: id,
+      action: 'STATUS',
+      oldStatus: expectedFrom,
+      newStatus: targetStatus,
+    });
     return 'done';
   } catch (err) {
     failed.push({ id, error: err instanceof Error ? err.message : String(err) });
