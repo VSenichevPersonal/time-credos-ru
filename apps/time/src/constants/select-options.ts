@@ -278,3 +278,13 @@ export const PLAN_METHOD_OPTIONS: SelectOption[] = [
   { value: 'MANUAL', label: 'Вручную по месяцам', position: 1, color: 'purple' },
 ];
 export const PLAN_METHOD_DEFAULT = "'EVEN'";
+
+// AUDIT-LOG: тип действия в журнале изменений трудозатрат (credosTimeEntryLog.action).
+// CREATE = запись создана; UPDATE = правка часов; DELETE = удаление; STATUS = смена
+// статуса согласования (submit/approve/reject/revoke). Значения UPPER_CASE (SDK).
+export const ENTRY_LOG_ACTION_OPTIONS: SelectOption[] = [
+  { value: 'CREATE', label: 'Создание', position: 0, color: 'green' },
+  { value: 'UPDATE', label: 'Правка часов', position: 1, color: 'blue' },
+  { value: 'DELETE', label: 'Удаление', position: 2, color: 'red' },
+  { value: 'STATUS', label: 'Смена статуса', position: 3, color: 'orange' },
+];

@@ -855,3 +855,42 @@ export const CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID =
 // /s/plan-slots — read (byProjectId) + upsert помесячно.
 export const PLAN_SLOTS_LOGIC_FUNCTION_UNIVERSAL_IDENTIFIER =
   '92237709-0601-438c-a4f0-21d115bd505b';
+
+// --- AUDIT-LOG: журнал изменений трудозатрат (MVP-гибрид) ---
+// credosTimeEntryLog — узкий лог diff-правок записи трудозатрат: кто (actor,
+// server-truth resolveActor) / когда (loggedAt) / что (action + old/new часы/статус).
+// Рекомендация аналитика (AUDIT_LOG_PERIOD_LOCKDOWN.md §3): создание покрывает
+// нативный createdBy/createdAt ядра, лог — для diff правок/удаления/смены статуса
+// (но MVP пишет и create-строку для единого реестра). entry MANY_TO_ONE → CASCADE
+// (лог производный — без записи смысла не имеет; история диффа уже снята в строках).
+// [[twenty-sdk-apply-gotchas]]: имена полей НЕ резервные (actor/action/loggedAt вместо
+// who/createdBy/at); labelIdentifier на синтетический action (НЕ name). Техн.объект:
+// nav-item скрыт (как plan-slot), index-view есть (SDK-pitfall + админ-аудит по ссылке).
+export const CREDOS_TIME_ENTRY_LOG_OBJECT_UNIVERSAL_IDENTIFIER =
+  '9c9c0945-253b-44cd-9fef-51aa26581009';
+// Скаляры лога.
+export const CREDOS_TIME_ENTRY_LOG_ACTOR_FIELD_ID =
+  '79a3bffb-5877-47be-96c2-d416125e267a';
+export const CREDOS_TIME_ENTRY_LOG_ACTION_FIELD_ID =
+  '6a591f92-7d29-421c-a1b5-e4603ed729a9';
+export const CREDOS_TIME_ENTRY_LOG_OLD_HOURS_FIELD_ID =
+  '76e69027-291c-455c-bcc9-4f64dd27b54c';
+export const CREDOS_TIME_ENTRY_LOG_NEW_HOURS_FIELD_ID =
+  '5c1803cd-44d8-47d3-8147-e383cda79e8a';
+export const CREDOS_TIME_ENTRY_LOG_OLD_STATUS_FIELD_ID =
+  '6dbb3c61-ad9e-4ad4-b479-9f04b2544ad0';
+export const CREDOS_TIME_ENTRY_LOG_NEW_STATUS_FIELD_ID =
+  'b8b84da2-bbcb-4042-8a3e-a8bd281af67e';
+export const CREDOS_TIME_ENTRY_LOG_ENTRY_DATE_FIELD_ID =
+  'e744b406-c86f-4813-9f18-7c2f53a93948';
+export const CREDOS_TIME_ENTRY_LOG_LOGGED_AT_FIELD_ID =
+  '63845bd1-b114-4de6-9fe9-af0466a83450';
+// EntryLog.entry -> Entry.logs (MANY_TO_ONE CASCADE + обратная ONE_TO_MANY).
+export const CREDOS_TIME_ENTRY_LOG_ENTRY_FIELD_ID =
+  '6a42faed-d7e0-4b11-921a-60ec8c0bcdd9';
+export const CREDOS_TIME_ENTRY_LOGS_FIELD_ID =
+  '3c221faa-e0d6-4e7c-a50a-b48256332fac';
+// Index-view (техн.объект; nav-item НЕ создаём — журнал доступен по прямой ссылке,
+// исключён из nav-guard через TECHNICAL_VIEWS, как plan-slot).
+export const CREDOS_TIME_ENTRY_LOG_VIEW_UNIVERSAL_IDENTIFIER =
+  '3b75f9f8-8b8f-491f-85a1-d5a753a7c906';

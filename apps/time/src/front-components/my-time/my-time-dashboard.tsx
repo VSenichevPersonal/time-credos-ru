@@ -5,6 +5,8 @@ import { Center } from 'src/front-components/grid/center';
 import { Segmented } from 'src/front-components/capacity/mode-switcher';
 import { ErrorBoundary } from 'src/front-components/shared/error-boundary';
 import { useSelfEmployee } from 'src/front-components/shared/use-self-employee';
+import { OwnerBadge } from 'src/front-components/grid/owner-badge';
+import { useMyOwner } from 'src/front-components/my-time/use-my-owner';
 import { MyHours } from 'src/front-components/my-time/my-hours';
 import { MyPeriods } from 'src/front-components/my-time/my-periods';
 
@@ -31,6 +33,9 @@ const Unlinked = () => (
 
 export const MyTimeDashboard = () => {
   const { employeeId, loading } = useSelfEmployee();
+  // REQ on-behalf #1 (read-only): «чей это таймшит» — даже в своём ЛК виден свой
+  // ФИО · отдел (ПДн через revealEmployeeNames, CISO-007).
+  const owner = useMyOwner(employeeId);
   const [tab, setTab] = useState<Tab>('hours');
 
   return (
@@ -57,6 +62,7 @@ export const MyTimeDashboard = () => {
         }}
       >
         <span style={{ fontSize: 15, fontWeight: 600 }}>Мои трудозатраты</span>
+        {owner && <OwnerBadge owner={owner} />}
         {employeeId && (
           <span style={{ marginLeft: 'auto' }}>
             <Segmented

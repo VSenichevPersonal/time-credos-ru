@@ -248,7 +248,7 @@ describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
       op: 'upsert', hours: '8', date: '2026-06-10',
     }));
     expect(result).toMatchObject({ ok: true });
-    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST');
+    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'));
     const patches = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'PATCH');
     expect(posts).toHaveLength(1); // создана
     expect(patches).toHaveLength(0); // не апдейт
@@ -267,7 +267,7 @@ describe('SCOUT-B: upsert по ключу (анти-дубль)', () => {
       op: 'upsert', hours: '4', date: '2026-06-10',
     }));
     expect(result).toMatchObject({ ok: true });
-    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST');
+    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'));
     const patches = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'PATCH');
     expect(posts).toHaveLength(0); // дубль НЕ создан
     expect(patches).toHaveLength(1); // обновлена существующая
@@ -361,7 +361,7 @@ describe('валидация: уровни Ошибка/Предупрежден
       ok: true,
       warnings: [{ level: 'warning', code: 'overtime_per_day' }],
     });
-    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST');
+    const posts = mockFn.mock.calls.filter((c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'));
     expect(posts).toHaveLength(1); // WARNING не блокирует — запись создана
   });
 
@@ -468,7 +468,7 @@ describe('нормализация date к дню (WI-51)', () => {
     ]);
     vi.stubGlobal('fetch', mockFn);
     await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10T15:30:00.000Z' }));
-    const post = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'POST');
+    const post = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'));
     const body = JSON.parse(String((post?.[1] as { body?: string })?.body ?? '{}'));
     expect(body.date).toBe('2026-06-10T00:00:00.000Z');
   });
@@ -480,7 +480,7 @@ describe('нормализация date к дню (WI-51)', () => {
     ]);
     vi.stubGlobal('fetch', mockFn);
     await handler(event({ op: 'upsert', hours: '8', date: '2026-06-10' }));
-    const post = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'POST');
+    const post = mockFn.mock.calls.find((c) => (c[1] as { method?: string })?.method === 'POST' && !String(c[0]).includes('credosTimeEntryLogs'));
     const body = JSON.parse(String((post?.[1] as { body?: string })?.body ?? '{}'));
     expect(body.date).toBe('2026-06-10T00:00:00.000Z');
   });

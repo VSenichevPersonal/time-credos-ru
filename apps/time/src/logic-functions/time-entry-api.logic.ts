@@ -17,6 +17,9 @@ import { recalcProjectFactHours } from './project-fact-rollup';
 // CISO-005 server-truth актор (фундамент on-behalf/lockdown/аудита). Резолвится на
 // входе для БУДУЩИХ фаз; CRUD пока работает на текущем resolveEmployeeId (деградация).
 import { type Actor, resolveActor } from './shared/resolve-actor';
+// AUDIT-LOG (MVP-гибрид): запись строки журнала изменений на каждой мутации.
+// Побочная — НИКОГДА не роняет CRUD (writeEntryLog глотает ошибки внутри).
+import { writeEntryLog } from './shared/write-entry-log';
 
 // /s/time-entry — CRUD трудозатрат для front-компонента (песочница без доступа к БД).
 // Работает поверх Core REST воркспейса (TWENTY_API_URL + TWENTY_APP_ACCESS_TOKEN
@@ -225,8 +228,9 @@ const run = async (event: RoutePayload) => {
     if (!params.id) return { ok: false, error: 'id required' };
     // CISO-006: id идёт в REST-путь — только UUID (защита от инъекции в path).
     if (!isUuid(params.id)) return { ok: false, error: 'invalid id' };
-    // Читаем status + projectId до удаления (CISO-011 guard + rollup пересчёт).
-    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
+    // Читаем status + projectId + hours + date до удаления (CISO-011 guard +
+    // rollup пересчёт + AUDIT-LOG: oldHours/entryDate для строки журнала).
+    const preRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string; hours: number | null; date: string | null }> } }>(
       '/rest/credosTimeEntries',
       { filter: `id[eq]:${params.id}`, limit: '1' },
     );
@@ -237,6 +241,17 @@ const run = async (event: RoutePayload) => {
     }
     const deletedProjectId = preEntry?.projectId ?? null;
     await api.delete(`/rest/credosTimeEntries/${params.id}`);
+    // AUDIT-LOG (action=DELETE): кто удалил + сколько часов было. Пишется ДО
+    // recalc (entry уже снесён в REST, но строка лога с entryId успеет лечь
+    // перед CASCADE-сносом связанных логов на следующих операциях; deletedProjectId
+    // recalc не зависит от лога). Побочно — не роняет операцию.
+    await writeEntryLog(actor, {
+      entryId: params.id,
+      action: 'DELETE',
+      oldHours: preEntry?.hours ?? null,
+      newHours: null,
+      entryDate: preEntry?.date ?? null,
+    });
     if (deletedProjectId && isUuid(deletedProjectId)) {
       await recalcProjectFactHours(deletedProjectId);
     }
@@ -254,8 +269,11 @@ const run = async (event: RoutePayload) => {
     // актора — иначе 'employee not resolved'/'hours out of range' маскируют guard
     // целостности. Один GET; prevProjectId переиспользуем ниже для rollup-пересчёта.
     let prevProjectId: string | null = null;
+    // AUDIT-LOG: часы ДО правки (для diff oldHours→newHours в строке журнала).
+    // null = новая запись (create), не было прежнего значения.
+    let prevHours: number | null = null;
     if (params.id) {
-      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
+      const prevRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string; hours: number | null }> } }>(
         '/rest/credosTimeEntries',
         { filter: `id[eq]:${params.id}`, limit: '1' },
       );
@@ -264,6 +282,7 @@ const run = async (event: RoutePayload) => {
         return { ok: false, error: 'cannot_modify_approved' };
       }
       prevProjectId = prevEntry?.projectId ?? null;
+      prevHours = prevEntry?.hours ?? null;
     }
 
     const hours = Number(params.hours);
@@ -319,7 +338,7 @@ const run = async (event: RoutePayload) => {
       // Найденную по ключу запись тоже защищаем (CISO-011) и собираем её проект
       // для пересчёта (смены проекта тут быть не может — ключ совпадает).
       if (targetId) {
-        const exRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string }> } }>(
+        const exRes = await api.get<{ data: { credosTimeEntries: Array<{ projectId: string | null; status: string; hours: number | null }> } }>(
           '/rest/credosTimeEntries',
           { filter: `id[eq]:${targetId}`, limit: '1' },
         );
@@ -328,6 +347,7 @@ const run = async (event: RoutePayload) => {
           return { ok: false, error: 'cannot_modify_approved' };
         }
         prevProjectId = ex?.projectId ?? null;
+        prevHours = ex?.hours ?? null;
       }
     }
 
@@ -336,6 +356,18 @@ const run = async (event: RoutePayload) => {
         `/rest/credosTimeEntries/${targetId}`,
         data,
       );
+      // AUDIT-LOG (action=UPDATE): diff часов prevHours→hours. Пишется только при
+      // реальном изменении часов (если часы те же — правка прочих полей, не diff
+      // часов; лог часов не плодим). Побочно — не роняет операцию.
+      if (prevHours !== hours) {
+        await writeEntryLog(actor, {
+          entryId: targetId,
+          action: 'UPDATE',
+          oldHours: prevHours,
+          newHours: hours,
+          entryDate: data.date as string | undefined,
+        });
+      }
       const projectIdsToRecalc = new Set<string>(
         [prevProjectId, newProjectId].filter((id): id is string => !!id && isUuid(id)),
       );
@@ -350,10 +382,21 @@ const run = async (event: RoutePayload) => {
       '/rest/credosTimeEntries',
       data,
     );
+    const createdEntry = res.data?.createCredosTimeEntry;
+    // AUDIT-LOG (action=CREATE): newHours новой записи + кто создал. Native
+    // createdBy/createdAt ядра уже фиксируют «кто/когда создал»; строку CREATE
+    // пишем для единого читаемого реестра действий + diff-семантики (oldHours=null).
+    await writeEntryLog(actor, {
+      entryId: createdEntry?.id ?? null,
+      action: 'CREATE',
+      oldHours: null,
+      newHours: hours,
+      entryDate: data.date as string | undefined,
+    });
     if (newProjectId) await recalcProjectFactHours(newProjectId);
     return {
       ok: true,
-      entry: res.data?.createCredosTimeEntry,
+      entry: createdEntry,
       ...(warnings.length ? { warnings } : {}),
     };
   }

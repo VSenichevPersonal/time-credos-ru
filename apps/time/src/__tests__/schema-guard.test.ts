@@ -48,6 +48,7 @@ const isRegistryView = (path: string): boolean => REGISTRY_VIEWS.has(path);
 // Добавлять сюда только по согласованию с arch (комментарий в view обязателен).
 const TECHNICAL_VIEWS = new Set([
   'credos-time-plan-slot.view.ts', // план правится через панели «Планировать» (B4)
+  'credos-time-entry-log.view.ts', // audit-log пишется логик-функцией, nav скрыт (журнал по прямой ссылке)
 ]);
 const isTechnicalView = (path: string): boolean => TECHNICAL_VIEWS.has(path);
 

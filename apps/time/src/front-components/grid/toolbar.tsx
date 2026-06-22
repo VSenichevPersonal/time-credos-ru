@@ -6,6 +6,8 @@ import { PeriodNav } from 'src/front-components/grid/period-nav';
 import { CopyMenu } from 'src/front-components/grid/copy-menu';
 import { Cheatsheet } from 'src/front-components/grid/cheatsheet';
 import { SaveIndicator } from 'src/front-components/grid/save-indicator';
+import { OwnerBadge } from 'src/front-components/grid/owner-badge';
+import type { TimesheetOwner } from 'src/front-components/grid/whose-timesheet';
 import type { SaveStatus } from 'src/front-components/grid/use-save-status';
 import type { ViewMode } from 'src/front-components/grid/types';
 
@@ -24,6 +26,9 @@ type Props = {
   onClearWeek?: () => void;
   onFillStandardWeek?: () => void;
   copyDisabled?: boolean;
+  // «Чей таймшит» (REQ on-behalf #1, read-only): null/undefined — пока не резолвлен
+  // → запасной заголовок «Таймшит». Резолвится в weekly-grid (свой/выбранный).
+  owner?: TimesheetOwner | null;
 };
 
 const actionBtn = (disabled?: boolean) =>
@@ -54,6 +59,7 @@ export const Toolbar = ({
   onClearWeek,
   onFillStandardWeek,
   copyDisabled,
+  owner,
 }: Props) => {
   const [help, setHelp] = useState(false);
 
@@ -68,7 +74,11 @@ export const Toolbar = ({
         position: 'relative',
       }}
     >
-      <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Таймшит</span>
+      {owner ? (
+        <OwnerBadge owner={owner} />
+      ) : (
+        <span style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Таймшит</span>
+      )}
       <SaveIndicator status={saveStatus} />
       <ModeSwitcher value={mode} onChange={onModeChange} />
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>

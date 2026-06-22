@@ -16,6 +16,7 @@ import { calcWeekGaps } from 'src/front-components/grid/gaps';
 import { useTimesheetActions } from 'src/front-components/grid/use-timesheet-actions';
 import { useApproval } from 'src/front-components/grid/use-approval';
 import { useActorName } from 'src/front-components/grid/actor-names';
+import { buildTimesheetOwner } from 'src/front-components/grid/whose-timesheet';
 import { ApprovalBar } from 'src/front-components/grid/approval-bar';
 import { useValidation } from 'src/front-components/grid/use-validation';
 import { ValidationToast } from 'src/front-components/grid/validation-toast';
@@ -241,6 +242,21 @@ export const WeeklyGrid = () => {
     );
   }
 
+  // REQ on-behalf #1 (read-only): «чей это таймшит» — индикатор ФИО · отдел над
+  // сеткой. Владелец = выбранный сотрудник (фаза on-behalf) или свой. ПДн через
+  // revealNames (CISO-007): ФИО или КОД. Пока резолва нет (selfEmployeeId=null) →
+  // null → тулбар покажет запасной заголовок «Таймшит».
+  const owner = useMemo(
+    () =>
+      buildTimesheetOwner(
+        viewEmployeeId ?? data.selfEmployeeId,
+        data.employees,
+        data.departments,
+        revealNames,
+      ),
+    [viewEmployeeId, data.selfEmployeeId, data.employees, data.departments, revealNames],
+  );
+
   const periodTitle = mode === 'day' ? week.dayTitle : week.weekTitle;
   const onPrev = mode === 'day' ? week.prevDay : week.prevWeek;
   const onNext = mode === 'day' ? week.nextDay : week.nextWeek;
@@ -266,6 +282,7 @@ export const WeeklyGrid = () => {
         onPrev={onPrev}
         onNext={onNext}
         onToday={week.reset}
+        owner={owner}
         onCopyWeek={
           mode === 'week'
             ? () => setExtraRowKeys((prev) => [...new Set([...prev, ...actions.copyPreviousWeek()])])
