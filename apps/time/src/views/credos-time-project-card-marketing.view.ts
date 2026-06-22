@@ -1,4 +1,8 @@
-import { defineView, ViewKey } from 'twenty-sdk/define';
+import {
+  defineView,
+  generateDefaultFieldUniversalIdentifier,
+  ViewKey,
+} from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_PROJECT_CAN_PUBLISH_ON_SITE_FIELD_ID,
@@ -21,6 +25,9 @@ import {
   CREDOS_TIME_PROJECT_MK_VF_10,
   CREDOS_TIME_PROJECT_MK_VF_11,
   CREDOS_TIME_PROJECT_MK_VF_12,
+  CREDOS_TIME_PROJECT_MK_VF_13,
+  CREDOS_TIME_PROJECT_MK_VF_14,
+  CREDOS_TIME_PROJECT_MARKETING_ACTUAL_ON_FIELD_ID,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
@@ -35,6 +42,14 @@ import {
 // опубликован отзыв, ссылка на отзыв, + sales-enablement (P1): можно в КП/тендерах,
 // можно логотип, готов как референс, отрасль клиента, + рассылка/consent клиента
 // (плейсхолдеры): согласие на рассылку, отписка.
+// Нативное whole-record updatedAt ядра адресуется детерминированным UUID (объект+имя)
+// БЕЗ объявления в objects/ — даёт «когда проект последний раз менялся» бесплатно.
+const nativeFieldId = (fieldName: string): string =>
+  generateDefaultFieldUniversalIdentifier({
+    objectUniversalIdentifier: CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
+    fieldName,
+  });
+
 export default defineView({
   universalIdentifier:
     CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
@@ -138,6 +153,23 @@ export default defineView({
       position: 11,
       isVisible: true,
       size: 240,
+    },
+    // Актуальность маркетинг-данных: ручная дата ревью + нативный whole-record
+    // updatedAt ядра (бесплатно, без объявления поля) — «когда проект менялся».
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_13,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_MARKETING_ACTUAL_ON_FIELD_ID,
+      position: 12,
+      isVisible: true,
+      size: 240,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_14,
+      fieldMetadataUniversalIdentifier: nativeFieldId('updatedAt'),
+      position: 13,
+      isVisible: true,
+      size: 200,
     },
   ],
 });

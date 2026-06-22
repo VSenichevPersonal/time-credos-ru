@@ -36,6 +36,7 @@ import {
   CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID,
   CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
+  CREDOS_TIME_PROJECT_MARKETING_ACTUAL_ON_FIELD_ID,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
@@ -306,6 +307,21 @@ export default defineObject({
       label: 'Клиент отписался от рассылки',
       icon: 'IconMailOff',
       defaultValue: false,
+    },
+    // Актуальность маркетинг-данных: ручная дата ревью («маркетинг проверен/актуален
+    // на»). Заполняется маркетологом при проверке кейса/разрешений; ядровой нативный
+    // updatedAt (whole-record) выводится рядом в card-view бесплатно — авто-дату по
+    // маркетинг-блоку отдельно НЕ заводим (дублировала бы ядро без выгоды).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MARKETING_ACTUAL_ON_FIELD_ID,
+      name: 'marketingActualOn',
+      type: FieldType.DATE_TIME,
+      label: 'Маркетинг-данные актуальны на',
+      icon: 'IconCalendarCheck',
+      description:
+        'Ручная дата ревью маркетинг-данных проекта (кейс/разрешения/отзыв проверены).',
+      isNullable: true,
+      defaultValue: null,
     },
     // Project.company -> стандартный Company (MANY_TO_ONE, nullable).
     {

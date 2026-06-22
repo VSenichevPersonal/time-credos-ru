@@ -388,6 +388,15 @@ export const CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID =
 // ViewField-UUID этих 2 колонок в card-view маркетинга (группа «рассылка/consent»).
 export const CREDOS_TIME_PROJECT_MK_VF_11 = 'c07fa1a8-51f3-4971-b0a9-b42cf03409cf';
 export const CREDOS_TIME_PROJECT_MK_VF_12 = '20926558-7e2b-4ac3-8998-9889e8dde598';
+// Актуальность маркетинг-данных: ручная дата ревью «маркетинг проверен/актуален на».
+// marketingUpdatedAt (авто-последнее-изменение) НЕ заводим: ядро Twenty уже даёт
+// нативный whole-record updatedAt бесплатно (выводится в view через nativeFieldId),
+// а отдельный авто-триггер только на маркетинг-блок дублирует ядро без выгоды.
+export const CREDOS_TIME_PROJECT_MARKETING_ACTUAL_ON_FIELD_ID =
+  '44682cfc-aad5-4bdb-be37-332b0c3f7f65';
+// ViewField-UUID: ручная дата актуальности + нативный updatedAt (whole-record).
+export const CREDOS_TIME_PROJECT_MK_VF_13 = '83537d8c-61e2-4325-8ae0-bc879a65e0a4';
+export const CREDOS_TIME_PROJECT_MK_VF_14 = '4d6457b2-33be-44d6-806f-ccc1cc18460f';
 // Таб «Маркетинг» карточки проекта + его FIELDS-виджет.
 export const CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER =
   'b2ba6840-d14a-4a81-a395-adf382c2717c';
