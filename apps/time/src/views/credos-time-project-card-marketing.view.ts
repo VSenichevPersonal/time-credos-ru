@@ -6,6 +6,8 @@ import {
   CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID,
   CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID,
+  CREDOS_TIME_PROJECT_CLIENT_MARKETING_CONSENT_FIELD_ID,
+  CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID,
   CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_MK_VF_1,
   CREDOS_TIME_PROJECT_MK_VF_2,
@@ -17,6 +19,8 @@ import {
   CREDOS_TIME_PROJECT_MK_VF_8,
   CREDOS_TIME_PROJECT_MK_VF_9,
   CREDOS_TIME_PROJECT_MK_VF_10,
+  CREDOS_TIME_PROJECT_MK_VF_11,
+  CREDOS_TIME_PROJECT_MK_VF_12,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
@@ -29,7 +33,8 @@ import {
 // служит набором полей для FIELDS-виджета вкладки «Маркетинг» карточки проекта.
 // Поля: уровень NDA, можно публиковать, опубликовано, ссылка на публикацию,
 // опубликован отзыв, ссылка на отзыв, + sales-enablement (P1): можно в КП/тендерах,
-// можно логотип, готов как референс, отрасль клиента.
+// можно логотип, готов как референс, отрасль клиента, + рассылка/consent клиента
+// (плейсхолдеры): согласие на рассылку, отписка.
 export default defineView({
   universalIdentifier:
     CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
@@ -115,6 +120,24 @@ export default defineView({
       position: 9,
       isVisible: true,
       size: 220,
+    },
+    // Группа «рассылка / consent клиента» (плейсхолдеры): sync с сайтом +
+    // Unisender и карточкой организации — follow-up.
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_11,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_CLIENT_MARKETING_CONSENT_FIELD_ID,
+      position: 10,
+      isVisible: true,
+      size: 280,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_12,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID,
+      position: 11,
+      isVisible: true,
+      size: 240,
     },
   ],
 });

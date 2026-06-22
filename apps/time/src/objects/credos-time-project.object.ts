@@ -32,6 +32,8 @@ import {
   CREDOS_TIME_PROJECT_CAN_USE_IN_PROPOSALS_FIELD_ID,
   CREDOS_TIME_PROJECT_CAN_USE_LOGO_FIELD_ID,
   CREDOS_TIME_PROJECT_CLIENT_INDUSTRY_FIELD_ID,
+  CREDOS_TIME_PROJECT_CLIENT_MARKETING_CONSENT_FIELD_ID,
+  CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID,
   CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
@@ -285,6 +287,25 @@ export default defineObject({
       isNullable: true,
       defaultValue: null,
       options: INDUSTRY_OPTIONS,
+    },
+    // --- Группа «рассылка / consent клиента» (ПЛЕЙСХОЛДЕРЫ) ---
+    // Относится к клиенту; sync с сайтом (форма согласия) + Unisender API и с
+    // карточкой организации — follow-up. Сейчас только поля, интеграции нет.
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_CLIENT_MARKETING_CONSENT_FIELD_ID,
+      name: 'clientMarketingConsent',
+      type: FieldType.BOOLEAN,
+      label: 'Согласие клиента на рассылку (с сайта)',
+      icon: 'IconMailCheck',
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID,
+      name: 'clientUnsubscribed',
+      type: FieldType.BOOLEAN,
+      label: 'Клиент отписался от рассылки',
+      icon: 'IconMailOff',
+      defaultValue: false,
     },
     // Project.company -> стандартный Company (MANY_TO_ONE, nullable).
     {

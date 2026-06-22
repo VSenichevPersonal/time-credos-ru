@@ -379,6 +379,15 @@ export const CREDOS_TIME_PROJECT_MK_VF_7 = '6d9f30c8-ae51-42b6-90c7-9f5162a3e248
 export const CREDOS_TIME_PROJECT_MK_VF_8 = '7e0a41d9-bf62-43c7-81d8-a06273b4f359';
 export const CREDOS_TIME_PROJECT_MK_VF_9 = '8f1b52ea-c073-44d8-92e9-b17384c5046a';
 export const CREDOS_TIME_PROJECT_MK_VF_10 = '901c63fb-d184-45e9-83fa-c28495d6157b';
+// Consent клиента на рассылку (плейсхолдеры): синк с сайт-формой + Unisender и
+// карточкой организации — follow-up. Сейчас только ADDITIVE-поля credosTimeProject.
+export const CREDOS_TIME_PROJECT_CLIENT_MARKETING_CONSENT_FIELD_ID =
+  'e7a310e0-b2f3-45af-b7a6-d2727609afb7';
+export const CREDOS_TIME_PROJECT_CLIENT_UNSUBSCRIBED_FIELD_ID =
+  '68892414-5837-4a8e-a67b-f28c24843d66';
+// ViewField-UUID этих 2 колонок в card-view маркетинга (группа «рассылка/consent»).
+export const CREDOS_TIME_PROJECT_MK_VF_11 = 'c07fa1a8-51f3-4971-b0a9-b42cf03409cf';
+export const CREDOS_TIME_PROJECT_MK_VF_12 = '20926558-7e2b-4ac3-8998-9889e8dde598';
 // Таб «Маркетинг» карточки проекта + его FIELDS-виджет.
 export const CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER =
   'b2ba6840-d14a-4a81-a395-adf382c2717c';
