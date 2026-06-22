@@ -349,6 +349,11 @@ export const CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID =
   '2e9f4732-2f7a-4371-956c-cdbb39ff72f3';
 export const CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID =
   '3bc60f36-8b0d-44ea-9b4c-a738781d02f6';
+// Отзыв клиента на сайте (рядом с публикацией).
+export const CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID =
+  '6831e2a0-39fc-4bcc-b814-9e6fc14a89c6';
+export const CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID =
+  '81267b0f-b8bf-4781-975b-ddaf61f23958';
 // Card-view «Проект — маркетинг» (набор полей для FIELDS-виджета вкладки).
 export const CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER =
   '0e51aac1-7931-489c-bd25-bb618176c6c1';
@@ -357,6 +362,8 @@ export const CREDOS_TIME_PROJECT_MK_VF_1 = '174f8b51-e338-4dc5-82e7-caee2385b5d8
 export const CREDOS_TIME_PROJECT_MK_VF_2 = '3ba0aac5-0dd5-4ad8-9efa-fe555adf7af1';
 export const CREDOS_TIME_PROJECT_MK_VF_3 = '168723d0-c1d6-4439-991b-bbf3be61561e';
 export const CREDOS_TIME_PROJECT_MK_VF_4 = '96fa45ad-7072-4ef5-af03-7b215bbcb3e4';
+export const CREDOS_TIME_PROJECT_MK_VF_5 = '681ddfa1-0a12-42c4-9758-1f68c4179d25';
+export const CREDOS_TIME_PROJECT_MK_VF_6 = '0e349404-cfcf-4de4-b731-d65a35d0c512';
 // Таб «Маркетинг» карточки проекта + его FIELDS-виджет.
 export const CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER =
   'b2ba6840-d14a-4a81-a395-adf382c2717c';

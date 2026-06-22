@@ -35,6 +35,8 @@ import {
   CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
   CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID,
   CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
+  CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID,
+  CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_MANAGED_PROJECTS_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_OWNED_PROJECTS_FIELD_ID,
 } from 'src/constants/universal-identifiers';
@@ -218,6 +220,24 @@ export default defineObject({
       name: 'publishedUrl',
       type: FieldType.TEXT,
       label: 'Ссылка на публикацию',
+      icon: 'IconLink',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // Отзыв клиента: опубликован ли на сайте + ссылка (рядом с публикацией).
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID,
+      name: 'reviewPublished',
+      type: FieldType.BOOLEAN,
+      label: 'Опубликован отзыв на сайте',
+      icon: 'IconMessageStar',
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID,
+      name: 'reviewUrl',
+      type: FieldType.TEXT,
+      label: 'Ссылка на отзыв',
       icon: 'IconLink',
       isNullable: true,
       defaultValue: null,

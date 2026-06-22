@@ -8,14 +8,19 @@ import {
   CREDOS_TIME_PROJECT_MK_VF_2,
   CREDOS_TIME_PROJECT_MK_VF_3,
   CREDOS_TIME_PROJECT_MK_VF_4,
+  CREDOS_TIME_PROJECT_MK_VF_5,
+  CREDOS_TIME_PROJECT_MK_VF_6,
   CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
+  CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID,
+  CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID,
 } from 'src/constants/universal-identifiers';
 
 // Card-view «Проект — маркетинг». НЕ index-view сайдбара (нет navigationMenuItem):
 // служит набором полей для FIELDS-виджета вкладки «Маркетинг» карточки проекта.
-// Поля: уровень NDA, можно публиковать, опубликовано, ссылка на публикацию.
+// Поля: уровень NDA, можно публиковать, опубликовано, ссылка на публикацию,
+// опубликован отзыв, ссылка на отзыв.
 export default defineView({
   universalIdentifier:
     CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
@@ -52,6 +57,21 @@ export default defineView({
       fieldMetadataUniversalIdentifier:
         CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
       position: 3,
+      isVisible: true,
+      size: 360,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_5,
+      fieldMetadataUniversalIdentifier:
+        CREDOS_TIME_PROJECT_REVIEW_PUBLISHED_FIELD_ID,
+      position: 4,
+      isVisible: true,
+      size: 200,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_MK_VF_6,
+      fieldMetadataUniversalIdentifier: CREDOS_TIME_PROJECT_REVIEW_URL_FIELD_ID,
+      position: 5,
       isVisible: true,
       size: 360,
     },
