@@ -241,6 +241,72 @@ describe('approval.logic — runSubmit', () => {
     );
     expect(result).toMatchObject({ ok: true, updated: 1 });
   });
+
+  // ON-BEHALF submit-gate ([arch→Dev2] submit-on-behalf, 77f6165): trusted-актор
+  // (server-identity, userWorkspaceId) отправляет период ЧУЖОГО сотрудника → требуем
+  // canWriteFor. isManager=true → admin-деградация в canWriteFor пропускает; isManager
+  // =false без head/PM → FORBIDDEN. Свой submit (owner==actor) — без гейта.
+  const ACTOR_UWID = 'dddddddd-4444-4ddd-8ddd-dddddddddddd';
+  const ACTOR_EMP = 'eeeeeeee-5555-4eee-8eee-eeeeeeeeeeee';
+
+  it('submit on-behalf: trusted руковод (isManager) за подчинённого → canWriteFor ок, updated:1', async () => {
+    const mockFn = mockFetch([
+      // resolveActor ветка-1 (userWorkspaceId) → trusted actor isManager
+      { data: { credosTimeEmployees: [{ id: ACTOR_EMP, isManager: true, workspaceMemberRef: 'wm' }] } },
+      // canWriteFor → isHeadOfEmployeeDept: отделов-под-actor нет → false; isManager=true → admin-проход
+      { data: { credosTimeDepartments: [] } },
+      // buildApprovalMap
+      { data: { credosTimeProjects: [{ id: PROJ_UUID, approvalRequired: true, departmentId: null }] } },
+      { data: { credosTimeDepartments: [] } },
+      // entries владельца EMP_UUID (≠ actor) — submit разрешён
+      { data: { credosTimeEntries: [{ id: ENTRY_UUID, status: 'DRAFT', projectId: PROJ_UUID, employeeId: EMP_UUID }] } },
+      {}, // PATCH
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event(
+        { op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID },
+        { userWorkspaceId: ACTOR_UWID },
+      ),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 1 });
+  });
+
+  it('submit on-behalf: trusted НЕ-руковод за чужого → FORBIDDEN_ON_BEHALF (без submit)', async () => {
+    const mockFn = mockFetch([
+      // resolveActor → trusted actor, НЕ manager
+      { data: { credosTimeEmployees: [{ id: ACTOR_EMP, isManager: false, workspaceMemberRef: 'wm' }] } },
+      // canWriteFor → isHeadOfEmployeeDept: не руковод отдела target → false; PM нет (projectId null) → false
+      { data: { credosTimeDepartments: [] } },
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event(
+        { op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: EMP_UUID },
+        { userWorkspaceId: ACTOR_UWID },
+      ),
+    );
+    expect(result).toMatchObject({ ok: false, error: 'FORBIDDEN_ON_BEHALF' });
+    // gate сработал ДО buildApprovalMap — entries не запрашивались (2 fetch: actor + head-check)
+    expect(mockFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('submit свой период (owner==actor) → гейт скип, canWriteFor НЕ вызван, ok', async () => {
+    const mockFn = mockFetch([
+      { data: { credosTimeEmployees: [{ id: ACTOR_EMP, isManager: true, workspaceMemberRef: 'wm' }] } }, // resolveActor
+      { data: { credosTimeProjects: [] } }, // buildApprovalMap (НЕ canWriteFor — свой ввод)
+      { data: { credosTimeDepartments: [] } },
+      emptyEntries,
+    ]);
+    vi.stubGlobal('fetch', mockFn);
+    const result = await handler(
+      event(
+        { op: 'submit', from: '2026-06-01', to: '2026-06-30', employeeId: ACTOR_EMP },
+        { userWorkspaceId: ACTOR_UWID },
+      ),
+    );
+    expect(result).toMatchObject({ ok: true, updated: 0 });
+  });
 });
 
 describe('approval.logic — runResolve: RBAC (CISO-002)', () => {

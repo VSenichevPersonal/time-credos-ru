@@ -4,6 +4,7 @@ import {
   parseEffort,
   planEffortFromInput,
 } from 'src/front-components/capacity/project-plan-row';
+import { methodOf } from 'src/front-components/capacity/project-plan-panel';
 
 // БАГ заказчика: «в планировании если пишу 0 в строке проекта — ОШИБКА».
 // Причина — 0 порождал валидный, но бессмысленный патч {plannedEffort:0,
@@ -53,5 +54,30 @@ describe('planEffortFromInput — решение строки (0 = снять п
   it('невалидное (отриц./нечисло) → skip (revert, ничего не шлём)', () => {
     expect(planEffortFromInput('-1')).toEqual({ skip: true });
     expect(planEffortFromInput('xyz')).toEqual({ skip: true });
+  });
+});
+
+describe('methodOf — режим панели планирования', () => {
+  const proj = (planMethod: string | null | undefined) =>
+    ({ planMethod } as import('src/front-components/capacity/types').CapProject);
+
+  it('planMethod=MANUAL → MANUAL', () => {
+    expect(methodOf(proj('MANUAL'))).toBe('MANUAL');
+  });
+
+  it('planMethod=EVEN → EVEN (дефолт)', () => {
+    expect(methodOf(proj('EVEN'))).toBe('EVEN');
+  });
+
+  it('planMethod=null → EVEN (нет метода = дефолт EVEN)', () => {
+    expect(methodOf(proj(null))).toBe('EVEN');
+  });
+
+  it('planMethod=undefined → EVEN', () => {
+    expect(methodOf(proj(undefined))).toBe('EVEN');
+  });
+
+  it('неизвестный метод → EVEN (безопасный fallback)', () => {
+    expect(methodOf(proj('UNKNOWN'))).toBe('EVEN');
   });
 });

@@ -20,6 +20,10 @@ import { type Actor, resolveActor } from './shared/resolve-actor';
 // (try/catch внутри writeEntryLog). Подключение follow-up audit-log агента: STATUS
 // раньше не писался (approval.logic — не его зона), теперь источник статуса — здесь.
 import { writeEntryLog } from './shared/write-entry-log';
+// ON-BEHALF submit-gate ([arch→Dev2] submit-on-behalf, W10): trusted-актор может
+// ОТПРАВИТЬ (submit) период ЧУЖОГО сотрудника, если он руковод его отдела / PM / админ.
+// Тот же canWriteFor что в time-entry-api (write/delete) — SSOT правила «за кого можно».
+import { canWriteFor } from './shared/can-write-for';
 
 // /s/approval — согласование трудозатрат (фиксирует userWorkspaceId руководителя).
 //   submit  — записи периода сотрудника (где требуется согласование) DRAFT → SUBMITTED.
@@ -161,7 +165,10 @@ const setStatus = async (
 // reject (нет перехода REJECTED→SUBMITTED). setStatus при SUBMITTED обнуляет rejectComment
 // и аудит-поля — новая попытка согласования начинается «с чистого листа».
 const SUBMITTABLE = new Set<string>([ENTRY_STATUS.DRAFT, ENTRY_STATUS.REJECTED]);
-const runSubmit = async (params: Record<string, string>): Promise<object> => {
+const runSubmit = async (
+  params: Record<string, string>,
+  actor: Actor | null = null,
+): Promise<object> => {
   const { from, to, employeeId } = params;
   if (!from || !to || !employeeId) return { ok: false, error: 'from/to/employeeId required' };
   // CISO-006 вектор A: эти три параметра идут в filter-строку, где запятая —
@@ -169,6 +176,16 @@ const runSubmit = async (params: Record<string, string>): Promise<object> => {
   // дала бы submit чужих записей. Валидируем формат.
   if (!isIsoDate(from) || !isIsoDate(to)) return { ok: false, error: 'invalid from/to' };
   if (!isUuid(employeeId)) return { ok: false, error: 'invalid employeeId' };
+  // ON-BEHALF submit-gate ([arch→Dev2] submit-on-behalf): trusted-актор отправляет
+  // период ЧУЖОГО сотрудника (owner ≠ actor) → требуем canWriteFor (руковод отдела /
+  // PM проекта / админ), иначе FORBIDDEN_ON_BEHALF. Свой submit (owner == actor) —
+  // без гейта. Untrusted (dev/legacy без identity) — деградация на прежнее поведение
+  // (owner из client-params). Зеркало write/delete-гейта в time-entry-api. projectId
+  // не передаём: submit охватывает период (мульти-проект) → ветки руковод-отдела/админ.
+  if (actor?.trusted && actor.employeeId && employeeId !== actor.employeeId) {
+    const allowed = await canWriteFor(actor, employeeId, { projectId: null });
+    if (!allowed) return { ok: false, error: 'FORBIDDEN_ON_BEHALF' };
+  }
   const approvalMap = await buildApprovalMap();
   // Статус-условие НЕ в filter ([in]:DRAFT,REJECTED конфликтует с запятой-разделителем
   // условий REST) — фильтруем статус в коде (как projectId-фильтр ниже).
@@ -446,7 +463,7 @@ const run = async (event: RoutePayload) => {
   // userWorkspaceId (dev/legacy).
   const actor = await resolveActor(event, params.workspaceMemberRef);
   const op = params.op ?? '';
-  if (op === 'submit') return runSubmit(params);
+  if (op === 'submit') return runSubmit(params, actor);
   if (op === 'approve') return runResolve(params, ENTRY_STATUS.APPROVED, actorId, actor);
   if (op === 'reject') return runResolve(params, ENTRY_STATUS.REJECTED, actorId, actor);
   if (op === 'recall') return runRecall(params, actorId, actor);
