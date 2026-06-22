@@ -339,6 +339,30 @@ export const CREDOS_TIME_PROJECT_CARD_VF_3 = '27b0f7e2-d2bd-47fa-a2ca-05f0bb50cd
 export const CREDOS_TIME_PROJECT_CARD_VF_4 = '7fc790c3-f9a9-43dc-b5fe-e426f4ca666d';
 export const CREDOS_TIME_PROJECT_CARD_VF_5 = '94bccf56-ad28-48ca-bd23-cf0b1058a258';
 
+// --- Маркетинг проекта (NDA + публикация на сайте) ---
+// Поля credosTimeProject: уровень NDA, можно/опубликовано на сайте, ссылка.
+export const CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID =
+  'c3f80490-4161-4db3-bc4a-07ff4bbaa127';
+export const CREDOS_TIME_PROJECT_CAN_PUBLISH_ON_SITE_FIELD_ID =
+  '7bb00d79-814d-4126-bd46-720026a40310';
+export const CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID =
+  '2e9f4732-2f7a-4371-956c-cdbb39ff72f3';
+export const CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID =
+  '3bc60f36-8b0d-44ea-9b4c-a738781d02f6';
+// Card-view «Проект — маркетинг» (набор полей для FIELDS-виджета вкладки).
+export const CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER =
+  '0e51aac1-7931-489c-bd25-bb618176c6c1';
+// ViewField-UUID колонок card-view маркетинга.
+export const CREDOS_TIME_PROJECT_MK_VF_1 = '174f8b51-e338-4dc5-82e7-caee2385b5d8';
+export const CREDOS_TIME_PROJECT_MK_VF_2 = '3ba0aac5-0dd5-4ad8-9efa-fe555adf7af1';
+export const CREDOS_TIME_PROJECT_MK_VF_3 = '168723d0-c1d6-4439-991b-bbf3be61561e';
+export const CREDOS_TIME_PROJECT_MK_VF_4 = '96fa45ad-7072-4ef5-af03-7b215bbcb3e4';
+// Таб «Маркетинг» карточки проекта + его FIELDS-виджет.
+export const CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER =
+  'b2ba6840-d14a-4a81-a395-adf382c2717c';
+export const CREDOS_TIME_PROJECT_RP_W_MARKETING_UNIVERSAL_IDENTIFIER =
+  '095e4f5e-109b-4bff-87be-d34c65c457e3';
+
 // --- Wave 2 (REPORTS): агрегатная аналитика /s/reports ---
 // Logic-функция /s/reports (утилизация + загрузка/недогруз, группировки
 // dept/project/employee). Контракт для Dev 1 — docs/data-model/REPORTS_CONTRACT.md.

@@ -9,6 +9,9 @@ import {
   ENTRY_STATUS_DEFAULT,
   ENTRY_STATUS_OPTIONS,
   ENTRY_TAG_OPTIONS,
+  NDA_LEVEL_DEFAULT,
+  NDA_LEVEL_OPTIONS,
+  ndaLevelLabel,
   PROJECT_STATUS_DEFAULT,
   PROJECT_STATUS_OPTIONS,
   WORKDAY_TYPE_DEFAULT,
@@ -165,5 +168,50 @@ describe('BOOKING_TYPE_OPTIONS (REQ-0004)', () => {
       expect(o.label.length).toBeGreaterThan(0);
       expect(o.color).toBeTruthy();
     }
+  });
+});
+
+describe('NDA_LEVEL_OPTIONS (маркетинг проекта)', () => {
+  it('три уровня: NONE / CLIENT_ONLY / CLIENT_SECRET', () => {
+    const values = NDA_LEVEL_OPTIONS.map((o) => o.value);
+    expect(values).toEqual(['NONE', 'CLIENT_ONLY', 'CLIENT_SECRET']);
+  });
+
+  it('значения UPPER_SNAKE_CASE', () => {
+    for (const o of NDA_LEVEL_OPTIONS) {
+      expect(o.value).toMatch(/^[A-Z][A-Z0-9_]*$/);
+    }
+  });
+
+  it('позиции уникальны и начинаются с 0', () => {
+    const positions = NDA_LEVEL_OPTIONS.map((o) => o.position);
+    expect(new Set(positions).size).toBe(positions.length);
+    expect(Math.min(...positions)).toBe(0);
+  });
+
+  it('все options имеют русский label и color', () => {
+    for (const o of NDA_LEVEL_OPTIONS) {
+      expect(o.label.length).toBeGreaterThan(0);
+      expect(o.color).toBeTruthy();
+    }
+  });
+
+  it('NDA_LEVEL_DEFAULT = NONE (безопасный дефолт)', () => {
+    expect(NDA_LEVEL_DEFAULT).toContain('NONE');
+  });
+
+  it('ndaLevelLabel маппит код в русский ярлык из SSOT', () => {
+    expect(ndaLevelLabel('NONE')).toBe(
+      'НДА нет — можно говорить о клиенте и о работах',
+    );
+    expect(ndaLevelLabel('CLIENT_ONLY')).toBe('Можно о клиенте — нельзя о работах');
+    expect(ndaLevelLabel('CLIENT_SECRET')).toBe('Нельзя говорить о клиенте');
+  });
+
+  it('ndaLevelLabel: пустой/неизвестный код → пустая строка', () => {
+    expect(ndaLevelLabel(null)).toBe('');
+    expect(ndaLevelLabel(undefined)).toBe('');
+    expect(ndaLevelLabel('')).toBe('');
+    expect(ndaLevelLabel('WAT')).toBe('');
   });
 });

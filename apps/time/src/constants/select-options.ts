@@ -288,3 +288,36 @@ export const ENTRY_LOG_ACTION_OPTIONS: SelectOption[] = [
   { value: 'DELETE', label: 'Удаление', position: 2, color: 'red' },
   { value: 'STATUS', label: 'Смена статуса', position: 3, color: 'orange' },
 ];
+
+// Уровень NDA проекта (маркетинг/публикация). Чем выше — тем строже секретность.
+// NONE — НДА нет, можно говорить и о клиенте, и о работах (дефолт, безопасный).
+// CLIENT_ONLY — можно называть клиента, нельзя раскрывать характер работ.
+// CLIENT_SECRET — нельзя называть клиента. Значения UPPER_CASE (SDK).
+export const NDA_LEVEL_OPTIONS: SelectOption[] = [
+  {
+    value: 'NONE',
+    label: 'НДА нет — можно говорить о клиенте и о работах',
+    position: 0,
+    color: 'green',
+  },
+  {
+    value: 'CLIENT_ONLY',
+    label: 'Можно о клиенте — нельзя о работах',
+    position: 1,
+    color: 'orange',
+  },
+  {
+    value: 'CLIENT_SECRET',
+    label: 'Нельзя говорить о клиенте',
+    position: 2,
+    color: 'red',
+  },
+];
+export const NDA_LEVEL_DEFAULT = "'NONE'";
+
+// Русский ярлык уровня NDA по коду (SSOT — берётся из NDA_LEVEL_OPTIONS).
+// Неизвестный/пустой код → пустая строка (безопасно для UI).
+export const ndaLevelLabel = (code: string | null | undefined): string => {
+  if (!code) return '';
+  return NDA_LEVEL_OPTIONS.find((option) => option.value === code)?.label ?? '';
+};

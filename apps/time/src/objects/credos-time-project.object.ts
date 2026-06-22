@@ -8,6 +8,8 @@ import {
 } from 'twenty-sdk/define';
 
 import {
+  NDA_LEVEL_DEFAULT,
+  NDA_LEVEL_OPTIONS,
   PLAN_METHOD_DEFAULT,
   PLAN_METHOD_OPTIONS,
   PROJECT_CATEGORY_DEFAULT,
@@ -25,10 +27,14 @@ import {
   CREDOS_TIME_PROJECT_DESCRIPTION_FIELD_ID,
   CREDOS_TIME_PROJECT_EXTERNAL_CODE_FIELD_ID,
   CREDOS_TIME_PROJECT_FACT_HOURS_FIELD_ID,
+  CREDOS_TIME_PROJECT_CAN_PUBLISH_ON_SITE_FIELD_ID,
+  CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
   CREDOS_TIME_PROJECT_MANAGER_FIELD_ID,
+  CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
   CREDOS_TIME_PROJECT_OBJECT_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_OWNER_FIELD_ID,
   CREDOS_TIME_PROJECT_PLAN_METHOD_FIELD_ID,
+  CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_MANAGED_PROJECTS_FIELD_ID,
   CREDOS_TIME_WORKSPACE_MEMBER_OWNED_PROJECTS_FIELD_ID,
 } from 'src/constants/universal-identifiers';
@@ -174,6 +180,45 @@ export default defineObject({
       label: 'Типовая услуга (каталог)',
       icon: 'IconBriefcase',
       description: 'Задел под каталог услуг (фаза 2)',
+      isNullable: true,
+      defaultValue: null,
+    },
+    // --- Маркетинг проекта: NDA + публикация на сайте (ADDITIVE) ---
+    // Уровень NDA определяет, что можно говорить о проекте в публичных кейсах.
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_NDA_LEVEL_FIELD_ID,
+      name: 'ndaLevel',
+      type: FieldType.SELECT,
+      label: 'Уровень NDA',
+      icon: 'IconLock',
+      description:
+        'NONE — НДА нет; CLIENT_ONLY — можно о клиенте, нельзя о работах; CLIENT_SECRET — нельзя о клиенте.',
+      isNullable: true,
+      defaultValue: NDA_LEVEL_DEFAULT,
+      options: NDA_LEVEL_OPTIONS,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_CAN_PUBLISH_ON_SITE_FIELD_ID,
+      name: 'canPublishOnSite',
+      type: FieldType.BOOLEAN,
+      label: 'Можно публиковать на сайте',
+      icon: 'IconWorldCheck',
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_IS_PUBLISHED_FIELD_ID,
+      name: 'isPublished',
+      type: FieldType.BOOLEAN,
+      label: 'Опубликовано на сайте',
+      icon: 'IconWorldUpload',
+      defaultValue: false,
+    },
+    {
+      universalIdentifier: CREDOS_TIME_PROJECT_PUBLISHED_URL_FIELD_ID,
+      name: 'publishedUrl',
+      type: FieldType.TEXT,
+      label: 'Ссылка на публикацию',
+      icon: 'IconLink',
       isNullable: true,
       defaultValue: null,
     },

@@ -91,10 +91,18 @@ describe('aggregateByMonth — группировка по месяцам', () =
     expect(result[4].workHours).toBe(15);
   });
 
-  // [bug]#2 (P3): monthIndex('invalid') → NaN; guard `NaN < 0 || NaN > 11` = false → months[NaN]
-  // = undefined → TypeError. Исправить: добавить `isNaN(m)` в guard или DATE_RE валидацию.
-  // Практически не достижимо (все даты из БД YYYY-MM-DD), но делает код хрупким.
-  it.todo('invalid date (некорректный месяц) игнорируется без crash — [bug]#2 fix needed');
+  // [bug]#2 FIXED: Number.isNaN(m) guard добавлен на строке 19 calc-month.ts.
+  it('invalid date → пропускается без crash, валидная дата считается (guard Number.isNaN — [bug]#2 fix)', () => {
+    const days = [
+      { date: 'invalid-date', dayType: 'WORKDAY', hours: 8 },
+      { date: '2026-06-01', dayType: 'WORKDAY', hours: 4 },
+    ] as CalDay[];
+    expect(() => aggregateByMonth(days)).not.toThrow();
+    const result = aggregateByMonth(days);
+    // Июнь = индекс 5. Только валидная запись считается (invalid пропущена).
+    expect(result[5].workDays).toBe(1);
+    expect(result[5].workHours).toBe(4);
+  });
 });
 
 describe('sumAgg', () => {

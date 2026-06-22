@@ -2,6 +2,7 @@ import { definePageLayout, PageLayoutTabLayoutMode } from 'twenty-sdk/define';
 
 import {
   CREDOS_TIME_PROJECT_CARD_BILLING_LINKS_VIEW_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_OVERVIEW_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_STAGES_VIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_CARD_TIME_ENTRIES_VIEW_UNIVERSAL_IDENTIFIER,
@@ -10,6 +11,7 @@ import {
   CREDOS_TIME_PROJECT_RP_TAB_BILLING_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_TAB_BUDGET_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_TAB_DOCS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_TAB_OVERVIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_TAB_STAGES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_TAB_TEAM_UNIVERSAL_IDENTIFIER,
@@ -17,6 +19,7 @@ import {
   CREDOS_TIME_PROJECT_RP_W_BILLING_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_BUDGET_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_DOCS_UNIVERSAL_IDENTIFIER,
+  CREDOS_TIME_PROJECT_RP_W_MARKETING_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_OVERVIEW_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_STAGES_UNIVERSAL_IDENTIFIER,
   CREDOS_TIME_PROJECT_RP_W_TEAM_UNIVERSAL_IDENTIFIER,
@@ -352,6 +355,31 @@ export default definePageLayout({
           gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
           configuration: {
             configurationType: 'FILES',
+          },
+        },
+      ],
+    },
+    // 6. Маркетинг — NDA проекта + публикация на сайте (FIELDS по card-view
+    // «Проект — маркетинг»): уровень NDA, можно/опубликовано на сайте, ссылка.
+    {
+      universalIdentifier:
+        CREDOS_TIME_PROJECT_RP_TAB_MARKETING_UNIVERSAL_IDENTIFIER,
+      title: 'Маркетинг',
+      position: 10,
+      icon: 'IconSpeakerphone',
+      layoutMode: PageLayoutTabLayoutMode.VERTICAL_LIST,
+      widgets: [
+        {
+          universalIdentifier:
+            CREDOS_TIME_PROJECT_RP_W_MARKETING_UNIVERSAL_IDENTIFIER,
+          title: 'NDA и публикация',
+          type: 'FIELDS',
+          gridPosition: { row: 0, column: 0, rowSpan: 12, columnSpan: 12 },
+          configuration: {
+            configurationType: 'FIELDS',
+            viewUniversalIdentifier:
+              CREDOS_TIME_PROJECT_CARD_MARKETING_VIEW_UNIVERSAL_IDENTIFIER,
+            newFieldDefaultVisibility: true,
           },
         },
       ],
