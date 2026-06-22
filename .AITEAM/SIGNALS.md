@@ -12,6 +12,34 @@
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [taking] b1-reports-slots
+
+Беру B1: отчёты читают plan-slots → 3 величины (Бюджет/Распланировано/Факт). Зона reports-calc/projects-plan-fact/reports.logic + новый shared/plan-slots-read. read-only, ADDITIVE. НЕ трогаю time-entry-api/approval/plan-slots.logic/calc-load.
+
+### 2026-06-22 — [report] b1-reports-slots (готово, lint 0 / test 0 failed / dry-run чисто)
+
+**Суть (решение заказчика [[planning-identity-decisions]]):** отчёты теперь показывают ТРИ РАЗНЫЕ величины на проект — **Бюджет** (`plannedEffort`, неизменен) / **Распланировано** (Σ plan-slots) / **Факт** (Σ записей). Раньше план в отчётах = `plannedEffort` скаляр, слоты не читались (аудит B1 в PERSON_PLAN_CONSISTENCY_AUDIT + PLAN_VS_BUDGET_COVERAGE). Всё ADDITIVE, прежние поля сохранены.
+
+**SSOT чтения слотов:** новый `src/logic-functions/shared/plan-slots-read.ts` — один контракт `RawPlanSlot` + агрегаторы `allocatedByProject` / `allocatedByMonth` / `allocatedByEmployee` + `isUsableSlot` (B3-гард: пустой месяц/0/null отсеиваются) + `slotMonthInPeriod` (срез по месяцу слота, семантика «целый месяц»). НЕ дублирует и НЕ импортирует front calc-load (он React-зона, недоступен на бэке) — отдельный простой контракт. Семантика «распланировано» в отчёте = Σ plannedHours (целостная величина), а НЕ помесячный EVEN-раскид по дням (тем занимается доска).
+
+**1. Отчёт «Проекты план/факт» (`projects-plan-fact.ts`)** — 3 величины + производные по ДВУМ осям (не путать):
+  - ось ОСВОЕНИЯ (была): `remaining`=бюджет−факт, `pct`=факт/бюджет, `overrun`=факт>бюджет;
+  - ось РАСПРЕДЕЛЕНИЯ (новое): `allocated`=Σслотов, `unallocated`=бюджет−распланировано, `allocatedPct`=распл/бюджет, `overbooked`=распланировано>бюджет (warning, не блок). Totals: +allocated/unallocated/overbookedCount.
+
+**2. Помесячно/person (сделано, не follow-up):**
+  - timeseries (Тренд): `TimeseriesPoint.allocated` = Σслотов месяца (опц. фильтр отдела) — план по месяцам из доски, а не plannedEffort/период.
+  - OLAP: `OlapRow.allocated` для осей **employee** (Σ персон-слотов) и **project** (Σслотов проекта); прочие оси → null (слот не маппится 1:1). Слоты фетчатся только для этих осей.
+
+**Где фетч:** `reports.logic.ts` — lazy `restGetAll('credosTimePlanSlots')` ТОЛЬКО в ветках projects-plan-fact / timeseries / OLAP(employee|project), при ошибке → []. Прочие срезы (Сводка/Детали/Т13/незаполненные) слоты НЕ грузят — не сломаны.
+
+**Фронт-тип:** обновил только `report-types.ts ProjectPlanFactRow/Totals` (additive, нужно для компиляции rest-обёртки EMPTY). UI-рендеринг колонок — зона Dev1 (поля в ответе уже есть).
+
+**Валидация:** `yarn lint` 0/0 · `yarn test:unit` 2577 passed, 0 failed (новые тесты: shared/plan-slots-read.test.ts 13, +6 кейсов в projects-plan-fact.test.ts — 3 величины раздельны, переаллокация видна, период-срез, мусор-слоты) · `yarn twenty dev --once --dry-run` чисто (метадата-диф = только хеши кода/viewSort Dev1, схему НЕ трогал — read-only).
+
+**Файлы:** `src/logic-functions/shared/plan-slots-read.ts` (+test), `projects-plan-fact.ts` (+test), `reports-calc.ts` (timeseries+OLAP allocated), `reports.logic.ts` (фетч), `front-components/reports/report-types.ts` + `projects-plan-fact-rest.ts` (тип/EMPTY).
+
+**Follow-up (флаг арху, НЕ блокеры):** (a) SSOT-конфликт `plannedEffort` в MANUAL — панель пишет `plannedEffort=Σслотов` (project-plan-panel.tsx:212, зона Dev1) → пока так, бюджет затирается и unallocated≈0; для настоящего coverage нужно решение W11.12(а) «не перезаписывать бюджет». (b) timeseries «целый месяц слота» vs EVEN-раскид доски по дням могут расходиться на границах периода — для тренда приемлемо; (c) OLAP dept-ось allocated (Σ слотов отдела) не сделана — слот dept-уровня без проекта-факта, отдельная агрегация, P2.
+
 ### 2026-06-22 — [report] audit-log (готово, dry-run чисто)
 
 AUDIT-LOG изменений трудозатрат, MVP-гибрид (рекомендация аналитика AUDIT_LOG_PERIOD_LOCKDOWN.md §3). Всё ADDITIVE, моя зона.
@@ -1326,6 +1354,30 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 144 · 2026-06-22]**
+@Dev1 @arch [signal-arch]
+
+on-behalf-selector (этап-2 UX) принят — мой on-behalf #2 UX завершён. Сверка:
+- селектор «за кого» (руководителю, список=его отдел по Department.head, поиск >6, ПДн reveal ФИО/КОД) = мой итер.131/143 ✓. Рядовой не видит (onSelectEmployee+subordinates гейт).
+- viewEmployeeId stateful → OwnerBadge показывает выбранного автоматом (whose-timesheet #1 переиспользован — «жить рядом с селектором» сработало, не переделывали) ✓
+- пометка «введено руководителем» (чип 🧑 рук. по enteredByActor≠employeeId, нейтральный не цвет-сигнал) = моё «введено X за Y» показ ✓
+- FORBIDDEN_ON_BEHALF snackbar ✓ · **клиент-фильтр=UX, сервер canWriteFor=истина** (UI не доверенный) — правильно ✓
+
+**🎯 ON-BEHALF FULL-STACK ГОТОВ:** server-gate (этап-1, Dev2) + UX-селектор+пометка (этап-2, Dev1). + whose-timesheet #1 + lockdown + audit-log + resolveActor = **IDENTITY-ДОМЕН СОБРАН** (бэк+UX).
+
+**QA:** 1 failed (projects-plan-fact) = мок-конфликт дерева Dev1, изолированно зелёный (11/11), НЕ баг. Полный прогон QA 2564, 0 failed.
+
+**ОТКРЫТО (follow-up, не блокеры):**
+- PM-команда как источник подчинённых в UI-списке (сервер canWriteFor PM уже разрешает, UI-список = только отдел; расширить позже).
+- per-cell tooltip ФИО+дата на чипе «рук.» (сейчас per-row агрегат) — если заказчик попросит.
+- **W10-решения** (SoD при self-approve внесённой записи · статус on-behalf · уведомление сотрудника) — вопрос заказчику/арху (мой итер.143: SoD по АВТОРУ-сотруднику не по enteredBy).
+- RBAC-волна: строгий admin (canWriteFor ветка-4 деградирует на isManager).
+- B1: reports-calc allocByKey warning + projects-plan-fact мок (зона Dev2).
+
+**Картина:** identity-домен полный (whose-timesheet+on-behalf+lockdown+audit+resolveActor, бэк+UX). Остаётся W10-решения + RBAC-волна + B1 + UX-follow-ups. Луп держу.
+
+---
 
 **[Аналитик · итерация 143 · 2026-06-22]**
 @Dev2 @arch @Dev1 [signal-arch]
@@ -7825,6 +7877,14 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-22 — [arch→Dev2] ЗАДАЧА: audit-STATUS-follow-up + SoD-enforcement (approval.logic)
+Финал identity-пласта. ОДИН файл approval.logic.ts (+ shared/write-entry-log использовать), backend single-sequential.
+1. **STATUS-лог:** на approve/reject/recall/revoke вызвать `writeEntryLog(action=STATUS, oldStatus→newStatus, actor=resolveActor)`. Сейчас статус НЕ логируется (audit-агент оставил follow-up — не его зона). Сбой лога не валит операцию.
+2. **SoD on-behalf** (решение арха выше): approve/reject БЛОК если `actor == entry.enteredByActor` → `SOD_ENTERED_CANNOT_APPROVE` «вы вносили — согласует другой». enteredByActor в проде (7ba8936). Только approve/reject (не recall/revoke). Свой-ввод — обычная SoD.
++тесты. НЕ ломать submit-REJECTED/CAS/resolvedBy-revokedBy/CISO-005/lockdown-override.
+Гейт: lint+test 0+dry-run чисто. Сигналь `[report]`, arch гейтит+деплоит+push.
+⚠️ КООРДИНАЦИЯ: arch-субагент уже стартовал эту же задачу. Чтобы НЕ клоббер на approval.logic — ОДИН исполнитель: если берёшь ты (Dev2-окно), сигналь `[taking] audit-status-sod` СЕЙЧАС, arch остановит субагента; если молчишь — субагент доведёт. НЕ редактировать approval.logic вдвоём. — arch
 
 ### 2026-06-22 — [arch РЕШЕНИЕ] SoD при on-behalf: вносивший НЕ согласует
 Вопрос Dev: руководитель внёс за сотрудника (enteredByActor=рук) → может ли сам approve?
@@ -15116,3 +15176,27 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 ## QA → Dev 1 [07:56] — FORBIDDEN_ON_BEHALF нужен в serverErrorMessage
 Когда добавишь UI on-behalf (этап-2): добавь `case 'FORBIDDEN_ON_BEHALF': return '...'` в `use-validation.ts:serverErrorMessage`. Тест в `server-error-message.test.ts` напишу сразу.
 **Текущий счёт: 2543 + 15 todo, 94 файла, 0 failed.**
+
+## Dev 1 → arch [08:10] — on-behalf-selector (этап-2 UX, сервер уже защищает)
+
+`[taking] on-behalf-selector` → `[report]` Селектор «за кого» + пометка «введено руководителем» + FORBIDDEN-snackbar готовы. Dry-run, НЕ коммит, НЕ деплой.
+
+**1. Селектор «Таймшит сотрудника» (только руководитель)** — `grid/employee-selector.tsx` (поповер, паттерн CopyMenu: useState + fixed-оверлей, RemDOM-safe; глиф «двое» a11y; поиск при >6 подчинённых; «Мой таймшит» сверху с галкой; ПДн через reveal — ФИО/КОД). Встроен в `grid/toolbar.tsx` рядом с OwnerBadge. Рисуется ТОЛЬКО когда `onSelectEmployee && subordinates.length>0` → рядовой/нет команды селектора НЕ видит. Выбор → `viewEmployeeId` (теперь stateful в `weekly-grid.tsx`, был useState(null)) → грид грузит/пишет записи цели (инфра upsert/upsertMany/remove уже шла через targetId). Индикатор OwnerBadge показывает выбранного автоматически (проп owner уже считался от viewEmployeeId).
+
+**2. Список подчинённых** — `grid/subordinates.ts` (чистые: `departmentsHeadedBy` = отделы где Department.head=я, `subordinatesOf` = активные сотрудники этих отделов кроме себя, сорт по ФИО; хук `useSubordinates` тянет headId[eq]:<myEmployeeId> из credosTimeDepartments). Id руководителя = `useSelfEmployee().employeeId` (роль-резолв, совпадает с head). КЛИЕНТ-ФИЛЬТР = UX, сервер canWriteFor — истина.
+
+**3. Пометка «введено руководителем»** — поле `enteredByActor` добавлено в `ApiEntry` (types.ts), Core REST отдаёт его в fetchEntries. `use-grid-model.ts`: `onBehalfByDay[]` + чистая `isEnteredByManager(enteredByActor, employeeId)` (actor задан и ≠ владелец). `grid-row.tsx`: тихий чип «🧑 рук.» рядом с видом работ (нейтральный panelBg, не цвет-сигнал; title/aria «Введено руководителем за сотрудника»). Проброшено из week-grid + project-view (`onBehalf={row.onBehalfByDay.some(Boolean)}`).
+
+**4. FORBIDDEN_ON_BEHALF snackbar** — добавлен `case 'FORBIDDEN_ON_BEHALF'` в `use-validation.ts:serverErrorMessage` → «Нет прав вести этот таймшит. Можно только за сотрудников своего отдела.» (как QA просил [07:56]). Маршрут уже несёт серверный error в showServerResult → красная плашка.
+
+**5. Не-руководитель** — селектор скрыт (onSelectEmployee=undefined при !isManager + пустой subordinates).
+
+**Тесты (+15):** `grid/subordinates.test.ts` (14: departmentsHeadedBy / subordinatesOf — себя нет, чужой отдел/без отдела исключены, сорт ФИО / isEnteredByManager) · `server-error-message.test.ts` (+1: FORBIDDEN_ON_BEHALF не сырой код).
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0 errors (1 warning — `reports-calc.ts:510 allocByKey`, зона Dev2/B1, не моя) · `yarn test:unit` мои 3 файла 46 passed; общий прогон 2557 passed/15 todo, **1 failed = `logic-functions/projects-plan-fact.test.ts` (зона Dev2/B1 reports, в рабочем дереве до меня, не трогал logic-functions)** · `yarn twenty dev --once --dry-run` ЧИСТО — typecheck OK, 5 updated (2 frontComponent = бандл виджета, logicFunction+viewSort чужие), нет INVALID. НЕ коммитил, НЕ деплоил.
+
+**Follow-up (не делал, MVP):** PM-проектная команда как источник подчинённых (сейчас только отдел руковода — сервер canWriteFor уже разрешает PM, UI-список можно расширить позже). Tooltip ФИО+дата на чипе «рук.» — сейчас обобщённый title (per-row агрегат, не per-cell); точечный per-cell tooltip с датой — если заказчик попросит.
+
+## QA → all [08:07] — failed-диагноз + счёт
+`projects-plan-fact.test.ts` 1 failed у Dev1: изолированно зелёный (11/11) — мок-конфликт рабочего дерева Dev1, не баг кода. У QA полный прогон: **2564 + 15 todo, 95 файлов, 0 failed**.
+Dev1 покрыл: `subordinates.test.ts` (14 тестов), `server-error-message.test.ts` +FORBIDDEN_ON_BEHALF. Дырок нет.
