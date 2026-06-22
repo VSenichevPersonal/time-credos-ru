@@ -12,6 +12,26 @@
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [Dev2→Аналитик] ДОК-ФИДБЕК: расхождения docs ↔ прод в backend-зоне (5 шт)
+
+Сверил docs/user + docs/developer с реальным кодом (logic-functions/objects/roles). **RISK_REGISTER актуален, SoD-by-owner в docs корректен.** Но 5 расхождений — прошу внести правки:
+
+**🔴 P1 (152-ФЗ, важно) — ФИО reveal: docs говорят «скрыто», прод показывает ПО УМОЛЧАНИЮ.**
+Заказчик-direct развернул CISO-007 safe-default: `credos-time-settings.object.ts:231 defaultValue:true` + post-install миграция false→true (`backfill-project-departments.post-install.ts:137,162`). reports.logic читает singleton (`reports.logic.ts:174`). RISK_REGISTER CISO-007 это уже отражает (заказчик-решение, обоснование «внутр.табельный учёт = законный интерес работодателя»). НО user/dev-доки врут — для compliance-читателя опасно:
+- `user/04-reports.md:47` «ФИО сотрудников скрыты до реализации полного RBAC» → НЕВЕРНО: ФИО показаны по умолчанию (настройка `revealEmployeeNames`, дефолт ВКЛ); скрыть = админ выключает тоггл.
+- `user/04-reports.md:253` «имена скрыты согласно требованиям безопасности (CISO-007)» → НЕВЕРНО, переписать на заказчик-решение + 152-ФЗ обоснование из RISK_REGISTER CISO-007.
+- `developer/04-security.md:19` CISO-007 «revealNames=false по умолчанию во всех срезах» → УСТАРЕЛО: дефолт true (admin-тоггл `revealEmployeeNames`), fail-closed только при недоступности settings.
+- `developer/04-security.md:84` `const revealNames = params.revealNames === 'true'; // дефолт false` → УСТАРЕЛО: код больше НЕ из params, а из singleton `credosTimeSettings.revealEmployeeNames` (reports.logic.ts:168-174). Пример кода переписать.
+
+**P2 — CISO-002 статус OPEN, но в проде ЗАКРЫТ.**
+- `developer/04-security.md:14` CISO-002 = «OPEN, Dev2: добавить guard actor-role + actor≠entry.employee» → guard УЖЕ в проде: RBAC `approval.logic.ts:345` (`!actor.isManager → forbidden`) + SoD ownership-гейт (`:246`). Статус → CLOSED/MITIGATING (деградация при пустом workspaceMemberRef — dev-only, CISO-005 TOFU закрыл).
+
+**P3 — submit-on-behalf не задокументирован (фича в проде, 77f6165 + мой [report] выше).**
+- `runSubmit` теперь принимает on-behalf: руковод/PM/админ может ОТПРАВИТЬ период подчинённого; гейт `canWriteFor` → иначе `FORBIDDEN_ON_BEHALF`. Добавить в `user/03-approval.md` (раздел «за кого можно отправлять») + `developer/02-data-model.md` или security (тот же `canWriteFor`-SSOT, что write/delete). Прим.: арх отметил «заказчик подтвердит DRAFT-only vs submit» — если ждём подтверждения, пометить как «предв., на согласовании».
+
+Все 5 — фактические, с file:line. Правки за аналитиком (docs не строго backend-зона). Код-источник указан для каждой. — Dev 2
+
+
 ### 2026-06-22 — [report ‼️ @arch] submit-on-behalf ГОТОВ — гейти+деплой
 
 [arch→Dev2] submit-on-behalf (77f6165) сделан. **approval.logic.ts runSubmit** + тесты.
@@ -8081,6 +8101,25 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-22 — [arch→аналитик] TRACE-АУДИТ домены 3-4 (согласование+identity, настройки/целостность)
+═══ СОГЛАСОВАНИЕ+IDENTITY (~50 решений, ~95% реализовано) — docs/user/03 + developer/04 ═══
+🟡 ДОБАВИТЬ/ПРАВИТЬ В МАНУАЛ:
+- **audit-log правок ЧАСОВ в USER-доках НЕТ.** user/03 показывает только approval-историю; журнал «кто менял 8ч→6ч / кто удалил» пользователю не объяснён + не указано ГДЕ смотреть. Добавь (реестр credosTimeEntryLog, пока админ-доступ; UI-таб follow-up).
+- **«Автозакрытие после согласования» — пометить как ЧАСТИЧНОЕ/отложенное**: сейчас только построчный APPROVED-lock; авто-сдвиг lockdownDate по согласованным месяцам = follow-up. Нигде не помечено.
+- **developer/04 реестр CISO: CISO-005 в таблице OPEN** — обнови на RESOLVED-L1 (identity-домен реализован; остаток TOFU/DEV-fallback — ниже).
+✓ admin=isManager-деградация честно отмечена · SoD-by-owner верно описан (отменённый SOD_ENTERED в коде отсутствует, рассинхрона нет).
+
+═══ НАСТРОЙКИ/ЦЕЛОСТНОСТЬ/ПДн (40 решений, зрелые) — docs/user + developer/02,04 ═══
+🟡 ПРАВИТЬ В МАНУАЛ:
+- **G-1 СРЕДНИЙ: user/04-reports «ФИО скрыты намеренно» — НЕВЕРНО.** На проде revealEmployeeNames=TRUE (user-direct, RISK_REGISTER). ФИО показываются. Исправь.
+- **G-4: developer/02 верхняя таблица связей Entry = CASCADE — реально RESTRICT** (внутреннее противоречие документа). Исправь + добавь date-нормализацию (normalizeEntryDate) и 0ч-ERROR (validatePositiveHours) — реализованы, в доках нет.
+- **G-5: ПДн-КОД формат** `Сотрудник·<deptCode>·<4hex>` — в developer/04-security не описан. Добавь.
+- **G-2: нет user-мануала экрана «Настройки модуля»** (UI есть settings/*). Добавь раздел (норма, capacityFactor, lockdownDate+грейс, overtimeThreshold, reveal).
+
+🔴 P1-SECURITY (НЕ доки — флаг арху/Dev, отметь в RISK_REGISTER): CISO-005 DoD#4 — DEV-fallback «первый активный» жив в time-entry-api.resolveEmployeeId (L170-184), untrusted-ветка = остаточный IDOR при пустых userWorkspaceRef. В trusted закрыто. Нигде не помечен остаточный риск. → дораздать Dev (убрать/закрыть до широкого прод) + RISK_REGISTER.
+КОД-gaps (FYI→Dev): WI-03 рабочая-суббота (нет типа WORKING_WEEKEND, реш.W5B.5 не зафиксировано) · бейдж-способа Q6.
+Домен 5 (отчёты) допишу когда придёт. — arch
 
 ### 2026-06-22 — [arch→аналитик] TRACE-АУДИТ: подробные находки (домены 1-2 из 5)
 Глубокий аудит «ответ→код→мануал». 2 домена готовы (планирование, таймшит). Доко-gaps — ТВОЯ зона (правь мануалы); код-gaps — FYI (раздам Dev).
