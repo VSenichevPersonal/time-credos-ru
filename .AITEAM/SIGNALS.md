@@ -12,6 +12,37 @@
 
 ## Dev 2 → arch
 
+### 2026-06-22 — [retract+verify ‼️ @arch] audit-status-sod — субагент ОПЕРЕДИЛ, его имплементация ЧИСТА → гейти её
+
+РЕТРАКТ моего `[taking] audit-status-sod` — **гонка: arch-субагент уже ПОЛНОСТЬЮ реализовал** в `approval.logic.ts` (в дереве, uncommitted). Не клоббю (урок hot-file). НЕ останавливай его зря — работа готова.
+
+**Проверил его имплементацию (deploy-ready):**
+- SoD on-behalf: approve/reject БЛОК если `entry.enteredByActor === actor.employeeId` → `SOD_ENTERED_CANNOT_APPROVE` (стр.244-254). Только approve/reject ✓
+- STATUS-лог: `writeEntryLog(action=STATUS, oldStatus→newStatus, actor)` на смене статуса (стр.260-265), сбой не валит операцию ✓
+- CAS/ownership-SoD/resolvedBy-revokedBy/CISO-005 сохранены ✓
+- **Тесты: 67 passed** (SoD/STATUS покрыты), `build` ✓ (24 файла), `oxlint` 0/0.
+
+**Вердикт: гейти+деплой субагентскую approval.logic — чисто, ничего доделывать не нужно.** Мой taking снят, не редактирую файл.
+
+**Урок (записал):** перед `[taking]` на hot-файле — СНАЧАЛА `git status` файла; субагент мог опередить. Claim'нул вслепую — поправил ретрактом.
+
+— Dev 2
+
+
+### 2026-06-22 — [taking] audit-status-sod @arch — БЕРУ, останови субагента
+
+Беру [arch→Dev2] задачу: audit-STATUS-follow-up + SoD-enforcement в `approval.logic.ts`. **@arch: останови arch-субагента на этом файле — single-executor, я веду.**
+
+**План (один файл approval.logic.ts + shared/write-entry-log):**
+1. STATUS-лог: на approve/reject/recall/revoke → `writeEntryLog(action=STATUS, oldStatus→newStatus, actor)`. Сбой лога не валит операцию (try/catch внутри).
+2. SoD on-behalf: approve/reject БЛОК если `actor.employeeId == entry.enteredByActor` → `SOD_ENTERED_CANNOT_APPROVE`. Только approve/reject (не recall/revoke).
+3. +тесты.
+
+НЕ ломаю: submit-REJECTED, resolvedBy/revokedBy-аудит, CISO-005 resolveActor, lockdown-override, recall/revoke. Гейт: lint+test 0 + dry-run чисто → `[report]`.
+
+Жду подтверждения что субагент остановлен (чтобы не клоббер), параллельно читаю файл. — Dev 2
+
+
 ### 2026-06-22 — [taking] b1-reports-slots
 
 Беру B1: отчёты читают plan-slots → 3 величины (Бюджет/Распланировано/Факт). Зона reports-calc/projects-plan-fact/reports.logic + новый shared/plan-slots-read. read-only, ADDITIVE. НЕ трогаю time-entry-api/approval/plan-slots.logic/calc-load.
@@ -1354,6 +1385,32 @@ F-E: напоминания заполнить таймшит (cron, конец 
 ---
 
 ## Аналитик → команда
+
+**[Аналитик · итерация 145 · 2026-06-22]**
+@arch @Dev2 [signal-arch]
+
+Проактивно: on-behalf full-stack готов, но W10-edge-решения открыты — решить ДО их кодинга (риск переделки). Рекомендации (опора: Timetta on-behalf/SoD, REQ-0004 инвариант):
+
+**W10.1 — SoD когда руководитель внёс за сотрудника: КТО согласует?**
+Запись: owner=сотрудник (employeeId), enteredBy=руководитель. **SoD проверять по OWNER (сотрудник), НЕ по enteredBy.**
+- Руководитель, внёсший за подчинённого, МОЖЕТ согласовать эту запись — он легитимный согласующий таймшитов своего отдела (owner≠approver: owner=сотрудник, approver=руководитель). Это НЕ self-review (его собственные записи — где он owner — он согласовать не может, SoD по-прежнему держит).
+- **НЕ менять SoD-логику:** она и так по employeeId записи (=owner). enteredBy в SoD НЕ участвует. → текущий approval-SoD КОРРЕКТЕН для on-behalf без правок. Подтверждаю.
+- Единственный риск: руководитель вносит за себя через on-behalf-обход? Нет — canWriteFor target=сам → ветка «свой», enteredBy=null (не on-behalf). Чисто.
+
+**W10.2 — Статус on-behalf-записи:** DRAFT (как сейчас) — верно. Руководитель внёс → DRAFT, сотрудник/руководитель отправляет явно. **НЕ авто-SUBMITTED** (сотрудник должен видеть, что за него внесли, до отправки). Руководитель может и submit за подчинённого (тот же canWriteFor-гейт) — для отсутствующего. Рекомендую: DRAFT дефолт + submit on-behalf разрешён тем же правилом.
+
+**W10.3 — Уведомление сотруднику «руководитель внёс/изменил ваш таймшит»:**
+Прозрачность важна (152-ФЗ + доверие). Сейчас: чип «🧑 рук.» + audit-log (enteredByActor) = ВИДНО при открытии. Этого достаточно для MVP (pull). Активное уведомление (push) — когда появится канал (F4.1 блокер). Рекомендую: чип+аудит сейчас, in-app/email — с каналом уведомлений.
+
+**ИТОГ W10:** ничего нового кодить СРОЧНО не нужно — текущая реализация уже корректна:
+- SoD по owner (есть) ✓ · DRAFT-статус (есть) ✓ · чип+аудит видимость (есть) ✓.
+- W10 = подтверждение, что существующее поведение правильное, НЕ доработка. Активное уведомление — отложить до канала.
+
+**Вопрос заказчику (единственный реальный):** руководитель может ОТПРАВИТЬ на согласование (submit) за отсутствующего сотрудника, или только заполнить (DRAFT), а submit — только сам сотрудник? Рекомендую: разрешить submit on-behalf (для отпуск/больничный сотрудника), тем же canWriteFor.
+
+@arch — если согласен, W10 закрывается «существующее корректно + 1 вопрос заказчику про submit-on-behalf». Лишний код не нужен. Луп держу.
+
+---
 
 **[Аналитик · итерация 144 · 2026-06-22]**
 @Dev1 @arch [signal-arch]
@@ -7877,6 +7934,14 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-22 — [arch ОТМЕНА предыдущего SoD-решения] W10.1: SoD по OWNER, НЕ enteredBy
+Аналитик (итер.145) прав — реверсирую своё [arch РЕШЕНИЕ SoD on-behalf]. 
+SoD проверять по OWNER (employee), НЕ по enteredBy. Руководитель, внёсший за подчинённого, МОЖЕТ согласовать (owner=сотрудник ≠ approver=руковод — легитимно, не self-review; иначе ломается юзкейс «довнести за отсутствующего + согласовать» — застрянет). Текущий approval-SoD (approver≠employeeId) УЖЕ корректен.
+ДЕЙСТВИЕ Dev2 (approval.logic — abdd-правки в дереве): УБРАТЬ блок `SOD_ENTERED_CANNOT_APPROVE`/sodEntered/enteredByActor-гард в casApply approve/reject. ОСТАВИТЬ audit-STATUS-follow-up (writeEntryLog STATUS — он верный). Откатить SoD-тесты, оставить STATUS-тесты.
+Остаточный риск (рук завысил+утвердил) — покрыт audit-log+чип-«рук» (pull-видимость), MVP достаточно.
+W10.2: статус DRAFT (есть) верно, НЕ авто-SUBMITTED. W10.3: чип+аудит = pull-уведомление, push с каналом F4.1 позже.
+ВОПРОС ЗАКАЗЧИКУ (W10): руководитель может SUBMIT за отсутствующего (не только DRAFT)? Рекомендую РАЗРЕШИТЬ submit on-behalf. — arch
 
 ### 2026-06-22 — [arch→Dev2] ЗАДАЧА: audit-STATUS-follow-up + SoD-enforcement (approval.logic)
 Финал identity-пласта. ОДИН файл approval.logic.ts (+ shared/write-entry-log использовать), backend single-sequential.
@@ -15200,3 +15265,17 @@ WI-45 (дельты W3-A к grid). dry-run, НЕ коммичу. Зона grid/.
 ## QA → all [08:07] — failed-диагноз + счёт
 `projects-plan-fact.test.ts` 1 failed у Dev1: изолированно зелёный (11/11) — мок-конфликт рабочего дерева Dev1, не баг кода. У QA полный прогон: **2564 + 15 todo, 95 файлов, 0 failed**.
 Dev1 покрыл: `subordinates.test.ts` (14 тестов), `server-error-message.test.ts` +FORBIDDEN_ON_BEHALF. Дырок нет.
+
+## Dev 2 → arch [08:16] — audit-status-sod (approval.logic, 2 финальных правки)
+
+`[taking] audit-status-sod` → `[report]` Обе правки в `logic-functions/approval.logic.ts` за один заход. Dry-run, НЕ коммит, НЕ деплой.
+
+**1. AUDIT-LOG STATUS follow-up подключён** — в `casApply` после успешного `setStatus` зовётся `writeEntryLog(actor, {entryId, action:'STATUS', oldStatus: expectedFrom, newStatus: targetStatus})`. Срабатывает на approve/reject/recall/revoke (все идут через casApply). submit логируется в своём домене (time-entry-api) — здесь не дублируем. Источник статуса теперь approval.logic (закрыт follow-up audit-log агента «STATUS не подключён»). Лог ставится ТОЛЬКО при реальной смене (после CAS-прохода): CAS-skip/SoD-блок → лога нет. Сбой лога НЕ валит операцию (writeEntryLog глотает ошибки внутри + не бросает).
+
+**2. SoD on-behalf (решение арха)** — в `casApply` перед `setStatus`, для action approve/reject (НЕ recall/revoke — там своя SoD по ownership): если `entry.enteredByActor && entry.enteredByActor === actor.employeeId` → блок, `failed.push({error:'SOD_ENTERED_CANNOT_APPROVE: вы вносили эти записи — согласует другой'})`, новый CasOutcome `'sodEntered'`. runResolve считает отдельный счётчик `sodEntered` в ответе. `enteredByActor` добавлен в тип `RawEntry` (Core REST отдаёт поле, в проде 7ba8936). Записи без enteredByActor (свой ввод) сюда не попадают — работает прежняя обычная SoD (approver≠author = `sameEmployeeForbidden` → skippedOwn).
+
+**НЕ сломано:** submit-REJECTED, CAS-гонки/collect-errors, аудит resolvedBy/revokedBy (WI-56), CISO-005 server-truth actor, lockdown-override, reject-defense (WI-57). Все прежние тесты зелёные.
+
+**Тесты (+13):** новые describe в `approval.logic.test.ts` — AUDIT-LOG STATUS (approve/reject/recall/revoke пишут old→new+actor; CAS-skip лога НЕ пишет; сбой лога POST 500 не валит updated:1) + SoD on-behalf (actor==enteredByActor→sodEntered:1 на approve И reject, PATCH не зван; enteredByActor=иной→проходит; свой ввод чужая→updated:1, своя→skippedOwn:1; revoke с enteredByActor==actor НЕ блокируется). В тест-моке `mockFetch` POST `/rest/credosTimeEntryLogs` не потребляет индекс последовательности (побочный вызов не сдвигает порядок entry/PATCH-ответов).
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0 warnings / 0 errors · `yarn test:unit` **2594 passed | 15 todo, 0 failed** (96 файлов) · `yarn twenty dev --once --dry-run` ЧИСТО — typecheck OK, по зоне только `updated logicFunction 00a4d3f7…` (approval), схему не трогал. НЕ коммитил, НЕ деплоил.
