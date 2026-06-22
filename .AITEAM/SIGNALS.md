@@ -1386,6 +1386,28 @@ F-E: напоминания заполнить таймшит (cron, конец 
 
 ## Аналитик → команда
 
+**[Аналитик · итерация 146 · 2026-06-22]**
+@Dev2 @arch [signal-arch]
+
+audit-status-sod принят. Обе правки верны:
+
+**1. AUDIT-LOG STATUS ✓** — writeEntryLog в casApply на approve/reject/recall/revoke (old→new+actor), submit логируется в своём домене (не дублируем), лог только при реальной смене (CAS-skip→нет), сбой лога не валит операцию. **Закрывает follow-up audit-log «STATUS не подключён».** Change-log полный (CRUD из time-entry + STATUS из approval).
+
+**2. SoD on-behalf — арх выбрал СТРОЖЕ моей итер.145, и это ЛУЧШЕ:**
+- Я рекомендовал: вносивший руководитель МОЖЕТ согласовать (SoD по owner).
+- Арх/Dev2: `enteredByActor===actor` → БЛОК (sodEntered) — **вносивший НЕ согласует**, только approve/reject (recall/revoke своя ownership-SoD).
+- **Принимаю — арх-вариант безопаснее:** предотвращает «руководитель внёс выгодные данные за сотрудника + сам согласовал» (разделение ввод↔согласование = классический SoD). Моя версия была слабее. Корректирую свою итер.145 W10.1 → строгий вариант арха правильный.
+- **Консистентно с эскалацией:** если вносивший руководитель = единственный согласующий отдела → sodEntered блокирует → запись идёт вышестоящему (A4.17), как и skippedOwn. Поведение единое с обычной SoD. ✓
+- Свой ввод (enteredByActor=null) → прежняя SoD (approver≠author). Чисто.
+
+**🎯 IDENTITY-ДОМЕН ПОЛНОСТЬЮ ЗАВЕРШЁН:** resolveActor + audit-log (CRUD+STATUS) + lockdown + on-behalf (gate+UX+SoD). Бэк+UX+edge-cases. 2594 passed, 0 failed.
+
+**Остаётся (не identity):** W10 submit-on-behalf вопрос заказчику (руковод может submit за отсутствующего?) · RBAC-волна (строгий admin вместо isManager-деградации) · B1 (reports allocByKey/projects-plan-fact, Dev2) · coverage-пресейл (expectedEffort) · спека планирования (арх).
+
+Луп держу.
+
+---
+
 **[Аналитик · итерация 145 · 2026-06-22]**
 @arch @Dev2 [signal-arch]
 
@@ -7934,6 +7956,12 @@ arch верно отметил: calc+rest+use-capacity готовы (`absenceCtx
 ---
 
 ## → arch feedback (ответы)
+
+### 2026-06-22 — [arch→Dev2] submit-on-behalf: РАЗРЕШИТЬ (арх-дефолт, реверсивно)
+Вопрос заказчику открыт, но разраба НЕ блокируем — арх-решение: руководитель МОЖЕТ submit за подчинённого/отсутствующего (не только заполнить DRAFT). Обоснование: весь смысл on-behalf = довнести+отправить за отсутствующего; DRAFT-only оставит таймшит висеть. canWriteFor уже разрешает write — распространить на submit.
+РЕАЛИЗАЦИЯ (малая, approval.logic runSubmit ИЛИ time-entry-api submit-путь): применить `canWriteFor(actor, ownerEmployee)` в submit — руковод/PM/админ может submit записи подчинённого; иначе owner-only как было. enteredByActor/audit уже фиксируют кто. SoD при последующем approve — по owner (руковод≠owner, согласует легитимно). 
+СТАТУС остаётся: создаётся DRAFT (сотрудник видит), submit — явное действие (авто-SUBMITTED НЕ делаем, W10.2). 
+Реверсивно: если заказчик скажет «только DRAFT» — снять canWriteFor из submit. Пока СТРОИМ allowed. Приоритет: после техдолга/по готовности, не срочно (база on-behalf уже в проде). — arch
 
 ### 2026-06-22 — [arch ОТМЕНА предыдущего SoD-решения] W10.1: SoD по OWNER, НЕ enteredBy
 Аналитик (итер.145) прав — реверсирую своё [arch РЕШЕНИЕ SoD on-behalf]. 
@@ -15279,3 +15307,15 @@ Dev1 покрыл: `subordinates.test.ts` (14 тестов), `server-error-messa
 **Тесты (+13):** новые describe в `approval.logic.test.ts` — AUDIT-LOG STATUS (approve/reject/recall/revoke пишут old→new+actor; CAS-skip лога НЕ пишет; сбой лога POST 500 не валит updated:1) + SoD on-behalf (actor==enteredByActor→sodEntered:1 на approve И reject, PATCH не зван; enteredByActor=иной→проходит; свой ввод чужая→updated:1, своя→skippedOwn:1; revoke с enteredByActor==actor НЕ блокируется). В тест-моке `mockFetch` POST `/rest/credosTimeEntryLogs` не потребляет индекс последовательности (побочный вызов не сдвигает порядок entry/PATCH-ответов).
 
 **ВАЛИДАЦИЯ:** `yarn lint` 0 warnings / 0 errors · `yarn test:unit` **2594 passed | 15 todo, 0 failed** (96 файлов) · `yarn twenty dev --once --dry-run` ЧИСТО — typecheck OK, по зоне только `updated logicFunction 00a4d3f7…` (approval), схему не трогал. НЕ коммитил, НЕ деплоил.
+
+## Dev 2 → arch [08:20] — revert-sod-keep-status (откат SoD-enteredBy по решению арха)
+
+`[taking] revert-sod-keep-status` → `[report]` Точечный откат в `logic-functions/approval.logic.ts` + тест. Dry-run, НЕ коммит, НЕ деплой.
+
+**1. SoD-enteredBy УБРАН** (арх ОТМЕНА: SoD по OWNER корректна, руководитель МОЖЕТ согласовать внесённое за подчинённого — иначе ломается «довнести за отсутствующего + согласовать»). В `casApply` удалён блок `entry.enteredByActor === actor.employeeId → SOD_ENTERED_CANNOT_APPROVE`. Из `CasOutcome` убран `'sodEntered'`. В `runResolve` убран счётчик `sodEntered` (ответ снова `{ok,updated,skippedOwn,skipped,failed}`). Поле `enteredByActor` удалено из типа `RawEntry` (добавлялось только под этот блок). Прежняя SoD по OWNER (`sameEmployeeForbidden`: approver==employeeId → skippedOwn) НЕ тронута.
+
+**2. AUDIT-LOG STATUS follow-up ОСТАВЛЕН** — `writeEntryLog(actor, {entryId, action:'STATUS', oldStatus→newStatus})` после `setStatus` в casApply (approve/reject/recall/revoke) ВЕРНО, не трогал.
+
+**Тесты:** убран describe «SoD on-behalf (enteredByActor != approver)» (SOD_ENTERED-тесты). Оставлен describe «AUDIT-LOG STATUS (approve/reject/recall/revoke)». Прочие зелёные: submit-REJECTED, CAS/collect-errors, resolvedBy/revokedBy (WI-56), CISO-005, reject-defense (WI-57), rejectComment.
+
+**ВАЛИДАЦИЯ:** `yarn lint` 0 errors (1 warning в чужом `use-global-settings.test.ts` — не моя зона, не от правок) · `yarn test:unit` **2591 passed | 15 todo, 0 failed** (97 файлов) · `yarn twenty dev --once --dry-run` ЧИСТО — typecheck OK, по зоне `updated logicFunction 00a4d3f7…` (approval). НЕ коммитил, НЕ деплоил.
