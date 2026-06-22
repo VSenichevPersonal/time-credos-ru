@@ -6,6 +6,7 @@ import {
   computeOlap,
   computeReports,
   computeTimeseries,
+  empName,
   employeeCode,
   finalize,
   fteHeadcountByDept,
@@ -839,5 +840,34 @@ describe('employeeCode', () => {
     const code = employeeCode({ id, departmentId: 'd1' }, deptMap);
     expect(code).not.toContain(id);
     expect(code.length).toBeLessThan(30);
+  });
+});
+
+describe('empName — ФИО или КОД fallback (CISO-007 минимизация)', () => {
+  const e = (lastName: string | null, firstName: string | null, id = '11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa', departmentId: string | null = null) =>
+    ({ id, lastName, firstName, departmentId }) as unknown as RawEmployee;
+
+  it('Фамилия + Имя → «Фамилия Имя»', () => {
+    expect(empName(e('Иванов', 'Иван'))).toBe('Иванов Иван');
+  });
+
+  it('только Фамилия → «Фамилия» (без лишнего пробела)', () => {
+    expect(empName(e('Иванов', null))).toBe('Иванов');
+  });
+
+  it('только Имя → «Имя»', () => {
+    expect(empName(e(null, 'Иван'))).toBe('Иван');
+  });
+
+  it('ФИО пусто → employeeCode fallback (не пустая строка, не UUID)', () => {
+    const code = empName(e(null, null));
+    expect(code).toBeTruthy();
+    expect(code).not.toContain('11111111-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(code).toContain('Сотрудник');
+  });
+
+  it('пустые строки → employeeCode fallback', () => {
+    const code = empName(e('', ''));
+    expect(code).toContain('Сотрудник');
   });
 });

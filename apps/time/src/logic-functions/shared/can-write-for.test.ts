@@ -68,6 +68,24 @@ describe('canWriteFor (ON-BEHALF server-gate)', () => {
     expect(await canWriteFor(actor({ isManager: true }), T, { projectId: P }, denyDeps)).toBe(true);
   });
 
+  it('admin + head: isManager=true + isHeadOfEmployeeDept=true → true (scope-ветка внутри admin-пути)', async () => {
+    const deps: CanWriteForDeps = {
+      isHeadOfEmployeeDept: vi.fn().mockResolvedValue(true),
+      isProjectManager: vi.fn().mockResolvedValue(false),
+    };
+    expect(await canWriteFor(actor({ isManager: true }), T, {}, deps)).toBe(true);
+    expect(deps.isHeadOfEmployeeDept).toHaveBeenCalledWith(A, T);
+  });
+
+  it('admin + PM: isManager=true + head=false + PM=true → true (PM-ветка внутри admin-пути)', async () => {
+    const deps: CanWriteForDeps = {
+      isHeadOfEmployeeDept: vi.fn().mockResolvedValue(false),
+      isProjectManager: vi.fn().mockResolvedValue(true),
+    };
+    expect(await canWriteFor(actor({ isManager: true }), T, { projectId: P }, deps)).toBe(true);
+    expect(deps.isProjectManager).toHaveBeenCalledWith(A, P);
+  });
+
   it('деградация identity: actor=null → false (вызывающий не применяет gate)', async () => {
     expect(await canWriteFor(null, T, { projectId: P }, denyDeps)).toBe(false);
   });

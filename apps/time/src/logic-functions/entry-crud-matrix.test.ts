@@ -48,14 +48,32 @@ const EMP_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const ENTRY_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const PROJ_OLD = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const PROJ_NEW = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const ACTOR_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+const OTHER_EMP = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
 const empRes = { data: { credosTimeEmployees: [{ id: EMP_ID, name: 'Тест' }] } };
 const emptyEmployees = { data: { credosTimeEmployees: [] } };
 const emptyEntries = { data: { credosTimeEntries: [] } };
 const settingsRes = { data: { credosTimeSettings: [{ maxHoursPerDay: 24, overtimeWarnHours: 12, warnOnScheduleDeviation: true }] } };
+const lockedSettingsRes = { data: { credosTimeSettings: [{ maxHoursPerDay: 24, overtimeWarnHours: 12, warnOnScheduleDeviation: true, lockdownDate: '2026-05-31', lockdownGraceDays: 0 }] } };
 
-const preRead = (status: string, projectId: string | null = null) => ({
-  data: { credosTimeEntries: [{ id: ENTRY_ID, status, projectId }] },
+const preRead = (status: string, projectId: string | null = null, employeeId: string | null = null) => ({
+  data: { credosTimeEntries: [{ id: ENTRY_ID, status, projectId, employeeId, hours: 8, date: '2026-06-01' }] },
+});
+
+// Trusted actor (server-identity via userWorkspaceId). НЕ менеджер → canWriteFor может отказать.
+const UW_ID = 'cccccccc-0000-4000-8000-000000000001';
+const actorTrustedRes = { data: { credosTimeEmployees: [{ id: ACTOR_ID, isManager: false, workspaceMemberRef: null, userWorkspaceRef: UW_ID }] } };
+const noDepts = { data: { credosTimeDepartments: [] } };
+
+const eventTrusted = (body: Record<string, unknown>) => ({
+  headers: {},
+  queryStringParameters: {},
+  pathParameters: {},
+  body,
+  isBase64Encoded: false,
+  requestContext: { http: { method: 'POST', path: '/time-entry' } },
+  userWorkspaceId: UW_ID,
 });
 
 beforeEach(() => {
@@ -325,5 +343,105 @@ describe('op=list: чтение записей + справочники', () => 
     // Имя берётся как есть (без повторного добавления code — иначе дубль «А-001 — А-001 — …»)
     expect(projects[0].name).toBe('А-001 — Авторизация');
     expect(projects[0].name).not.toMatch(/А-001.*А-001/);
+  });
+});
+
+// ─── ON-BEHALF gate (FORBIDDEN_ON_BEHALF) ────────────────────────────────────
+
+describe('FORBIDDEN_ON_BEHALF (on-behalf gate, trusted actor)', () => {
+  it('delete чужой записи, актор не руководитель → FORBIDDEN_ON_BEHALF', async () => {
+    // resolveActor (trusted) → preRead (owner=OTHER_EMP) → canWriteFor → noDepts → denied
+    const mock = mockFetch([
+      actorTrustedRes,            // resolveActor: GET employees by userWorkspaceRef → trusted actor
+      preRead('DRAFT', null, OTHER_EMP),  // preRead: entry принадлежит OTHER_EMP
+      noDepts,                    // canWriteFor → isHeadOfEmployeeDept: GET departments → пусто
+    ]);
+    vi.stubGlobal('fetch', mock);
+    const r = await handler(eventTrusted({ op: 'delete', id: ENTRY_ID }));
+    expect(r).toMatchObject({ ok: false, error: 'FORBIDDEN_ON_BEHALF' });
+  });
+
+  it('delete своей записи (actor === owner) → gate не применяется, ok', async () => {
+    // actor === owner → canWriteFor возвращает true (свой ввод)
+    const mock = mockFetch([
+      actorTrustedRes,                    // resolveActor
+      preRead('DRAFT', null, ACTOR_ID),   // preRead: owner = actor сам
+      settingsRes,                        // readSettings (lockdown off)
+      { ok: true, status: 200 } as unknown, // DELETE /rest/credosTimeEntries/:id
+      { ok: true, status: 200 } as unknown, // writeEntryLog POST
+    ]);
+    vi.stubGlobal('fetch', mock);
+    const r = await handler(eventTrusted({ op: 'delete', id: ENTRY_ID }));
+    expect(r).toMatchObject({ ok: true });
+  });
+});
+
+// ─── LOCKED_PERIOD gate ───────────────────────────────────────────────────────
+
+describe('LOCKED_PERIOD (lockdown gate, trusted actor)', () => {
+  it('delete своей записи в закрытом периоде → LOCKED_PERIOD', async () => {
+    // actor trusted, запись в мае 2026, lockdownDate='2026-05-31' → locked
+    const mock = mockFetch([
+      actorTrustedRes,             // resolveActor
+      {                            // preRead: запись в закрытом периоде, owner = actor
+        data: { credosTimeEntries: [{ id: ENTRY_ID, status: 'DRAFT', employeeId: ACTOR_ID, projectId: null, hours: 8, date: '2026-05-15' }] },
+      },
+      lockedSettingsRes,           // readSettings: lockdownDate='2026-05-31' (май закрыт)
+    ]);
+    vi.stubGlobal('fetch', mock);
+    const r = await handler(eventTrusted({ op: 'delete', id: ENTRY_ID }));
+    expect(r).toMatchObject({ ok: false, error: 'LOCKED_PERIOD' });
+  });
+
+  it('delete записи ПОСЛЕ lockdownDate → не заблокирован', async () => {
+    // Запись в июне (после lockdown мая) → ok
+    const mock = mockFetch([
+      actorTrustedRes,
+      preRead('DRAFT', null, ACTOR_ID),  // date='2026-06-01' (по умолчанию в preRead)
+      lockedSettingsRes,                 // lockdownDate='2026-05-31' → июнь открыт
+      { ok: true, status: 200 } as unknown, // DELETE
+      { ok: true, status: 200 } as unknown, // writeEntryLog
+    ]);
+    vi.stubGlobal('fetch', mock);
+    const r = await handler(eventTrusted({ op: 'delete', id: ENTRY_ID }));
+    expect(r).toMatchObject({ ok: true });
+  });
+});
+
+// ─── upsert: on-behalf gate + lockdown ───────────────────────────────────────
+
+describe('upsert: FORBIDDEN_ON_BEHALF (trusted actor пишет за чужого без прав)', () => {
+  it('upsert чужой записи, актор не руководитель → FORBIDDEN_ON_BEHALF', async () => {
+    // employeeId=OTHER_EMP ≠ ACTOR_ID → isOnBehalf=true → canWriteFor → noDepts → denied
+    const mock = mockFetch([
+      actorTrustedRes,  // resolveActor
+      settingsRes,      // readSettings (unlocked)
+      noDepts,          // canWriteFor → isHeadOfEmployeeDept: нет подведомственных отделов
+    ]);
+    vi.stubGlobal('fetch', mock);
+    const r = await handler(eventTrusted({
+      op: 'upsert',
+      employeeId: OTHER_EMP,
+      date: '2026-06-10T00:00:00.000Z',
+      hours: 8,
+    }));
+    expect(r).toMatchObject({ ok: false, error: 'FORBIDDEN_ON_BEHALF' });
+  });
+});
+
+describe('upsert: LOCKED_PERIOD (trusted actor, запись в закрытом периоде)', () => {
+  it('upsert на закрытую дату → LOCKED_PERIOD (lockdown guard до мутаций)', async () => {
+    // date=май, lockdownDate=31 мая → period locked
+    const mock = mockFetch([
+      actorTrustedRes,     // resolveActor
+      lockedSettingsRes,   // readSettings (lockdown active)
+    ]);
+    vi.stubGlobal('fetch', mock);
+    const r = await handler(eventTrusted({
+      op: 'upsert',
+      date: '2026-05-15T00:00:00.000Z',
+      hours: 8,
+    }));
+    expect(r).toMatchObject({ ok: false, error: 'LOCKED_PERIOD' });
   });
 });
