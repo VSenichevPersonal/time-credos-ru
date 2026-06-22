@@ -16,6 +16,7 @@ import { useDrill, type DrillLevel } from 'src/front-components/shared/use-drill
 import { TrendView, type DeptOption } from 'src/front-components/reports/trend-view';
 import { MissingView } from 'src/front-components/reports/missing-view';
 import { ProjectsView } from 'src/front-components/reports/projects-view';
+import { TimesheetGridScreen } from 'src/front-components/reports/timesheet-grid/timesheet-grid';
 import { useOlap } from 'src/front-components/reports/use-olap';
 import { DrillView } from 'src/front-components/reports/drill-view';
 import { dimLabel, nextAxis, valueLabel } from 'src/front-components/reports/drill-axis';
@@ -34,7 +35,7 @@ const CATEGORY_OPTS: Option[] = WORK_CATEGORY_OPTIONS.map((o) => ({ value: o.val
 // Верхний режим дашборда: сводка (срезы/период), тренд (помесячная динамика),
 // проекты (план/факт/остаток по проектам) или незаполненные (статус заполнения
 // таймшита за текущую неделю — руководителю).
-type View = 'summary' | 'trend' | 'projects' | 'missing';
+type View = 'summary' | 'trend' | 'projects' | 'missing' | 'timesheet';
 
 // Дашборд «Отчёты»: утилизация + загрузка/недогруз по периоду и срезу
 // (отдел/проект/человек). Данные — /s/reports. Светлая тема, тинт-нейтрали.
@@ -323,6 +324,7 @@ export const ReportsDashboard = () => {
             { value: 'summary', label: 'Сводка' },
             { value: 'trend', label: 'Тренд' },
             { value: 'projects', label: 'Проекты' },
+            { value: 'timesheet', label: 'Табель Т-13' },
             { value: 'missing', label: 'Незаполненные' },
           ]}
           onChange={(v: View) => setView(v)}
@@ -386,7 +388,11 @@ export const ReportsDashboard = () => {
         )}
       </div>
 
-      {view === 'missing' ? (
+      {view === 'timesheet' ? (
+        // Табель Т-13 несёт собственную навигацию по месяцам и экспорт (useTimesheetGrid),
+        // поэтому период/гранулярность дашборда ему не передаются.
+        <TimesheetGridScreen />
+      ) : view === 'missing' ? (
         <ErrorBoundary title="Не удалось показать раздел">
           <MissingView />
         </ErrorBoundary>
@@ -447,6 +453,8 @@ export const ReportsDashboard = () => {
                 rowDrillable={olapRowDrillable}
                 onRoot={reset}
                 onLevel={goToLevel}
+                from={period.from}
+                to={period.to}
               />
             )}
           </div>

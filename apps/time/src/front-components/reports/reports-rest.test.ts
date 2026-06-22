@@ -5,7 +5,7 @@ vi.mock('twenty-client-sdk/rest', () => ({
   RestApiClient: vi.fn().mockImplementation(() => ({ post: mockPost })),
 }));
 
-import { fetchReports, fetchDetailCsv } from './reports-rest';
+import { fetchReports, fetchDetailCsv, fetchDetailRows } from './reports-rest';
 
 const FROM = '2026-06-01T00:00:00.000Z';
 const TO = '2026-06-30T23:59:59.999Z';
@@ -161,5 +161,81 @@ describe('fetchDetailCsv', () => {
     const res = await fetchDetailCsv('2026-06-01', '2026-06-30');
     expect(res.ok).toBe(true);
     expect(res.filename).toBe('timesheet-detail_2026-06-01_2026-06-30.csv');
+  });
+});
+
+describe('fetchDetailRows (drill-до-записей)', () => {
+  const rowsResp = (overrides = {}) => ({
+    ok: true,
+    groupBy: 'detail',
+    period: { from: FROM, to: TO },
+    count: 1,
+    rows: [
+      {
+        date: '2026-06-01',
+        employeeName: 'ОПИБ-007',
+        deptName: 'ОПИБ',
+        projectName: 'PRJ-1 — Демо',
+        workTypeName: 'Разработка',
+        hours: 8,
+        status: 'Approved',
+      },
+    ],
+    ...overrides,
+  });
+
+  it('POST groupBy=detail БЕЗ format=csv', async () => {
+    mockPost.mockResolvedValueOnce(rowsResp());
+    await fetchDetailRows(FROM, TO);
+    expect(mockPost).toHaveBeenCalledWith('/s/reports', {
+      from: FROM,
+      to: TO,
+      groupBy: 'detail',
+    });
+    const body = mockPost.mock.calls[0][1];
+    expect(body).not.toHaveProperty('format');
+  });
+
+  it('добавляет только заданные drill-фильтры', async () => {
+    mockPost.mockResolvedValueOnce(rowsResp());
+    await fetchDetailRows(FROM, TO, { deptId: 'd1', projectId: null, employeeId: 'e9' });
+    expect(mockPost).toHaveBeenCalledWith('/s/reports', {
+      from: FROM,
+      to: TO,
+      groupBy: 'detail',
+      deptId: 'd1',
+      employeeId: 'e9',
+    });
+  });
+
+  it('успешный ответ → rows + count', async () => {
+    mockPost.mockResolvedValueOnce(rowsResp());
+    const res = await fetchDetailRows(FROM, TO);
+    expect(res.ok).toBe(true);
+    expect(res.count).toBe(1);
+    expect(res.rows[0].employeeName).toBe('ОПИБ-007');
+  });
+
+  it('ответ без rows → пустой массив + count из rows.length', async () => {
+    mockPost.mockResolvedValueOnce({ ok: true });
+    const res = await fetchDetailRows(FROM, TO);
+    expect(res.ok).toBe(true);
+    expect(res.rows).toEqual([]);
+    expect(res.count).toBe(0);
+  });
+
+  it('ok=false → ошибка с сообщением сервера', async () => {
+    mockPost.mockResolvedValueOnce({ ok: false, error: 'Нет записей' });
+    const res = await fetchDetailRows(FROM, TO);
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('Нет записей');
+    expect(res.rows).toEqual([]);
+  });
+
+  it('исключение сети → ошибка', async () => {
+    mockPost.mockRejectedValueOnce(new Error('Network'));
+    const res = await fetchDetailRows(FROM, TO);
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('Network');
   });
 });

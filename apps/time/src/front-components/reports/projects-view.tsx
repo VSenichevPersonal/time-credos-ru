@@ -11,15 +11,19 @@ import type {
   ProjectsPlanFactTotals,
 } from 'src/front-components/reports/report-types';
 
-// Отчёт «Проекты — план/факт/остаток» (REPORTS_COMPLETENESS P1, аналог Timetta
-// «Список проектов в работе»). Часы, без денег [[no-billable-concept]]. РП видит
-// сверху проекты в перерасходе (бэк сортирует overrun → факт), подсветка терракотом
-// + знак не только цветом (▲ + бейдж «перерасход»). Опц. фильтр статуса.
+// Отчёт «Проекты — бюджет/распланировано/факт/остаток» (REPORTS_COMPLETENESS P1,
+// аналог Timetta «Список проектов в работе»). Часы, без денег [[no-billable-concept]].
+// B1-витрина: бэк отдаёт ТРИ величины (бюджет=planned · распланировано=allocated ·
+// факт) + остаток освоения + переаллокацию (overbooked). РП видит сверху проекты в
+// перерасходе (бэк сортирует overrun → факт), подсветка терракотом + знак не только
+// цветом: ▲ «перерасход» (факт>бюджет, терракот) и ⚠ «переаллокация» (распланировано>
+// бюджет, янтарь). Опц. фильтр статуса.
 
-type SortKey = 'name' | 'status' | 'planned' | 'fact' | 'remaining' | 'pct';
+type SortKey = 'name' | 'status' | 'planned' | 'allocated' | 'fact' | 'remaining' | 'pct';
 
-// 7 колонок: проект (код+имя) · статус · план · факт · остаток · % · флаг.
-const COLS = '1fr 116px 92px 92px 104px 64px 116px';
+// 8 колонок: проект (код+имя) · статус · бюджет · распланировано (+покрытие) · факт ·
+// остаток · % освоения · флаги.
+const COLS = '1fr 110px 88px 132px 88px 96px 60px 124px';
 
 const cell = (align: 'left' | 'right' = 'left') =>
   ({
@@ -71,25 +75,45 @@ const STATUS_OPTS = [
   ...PROJECT_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
 ];
 
-// KPI-полоска: Σ план / факт / остаток / кол-во перерасходов (из totals).
+// KPI-полоска (B1): Σ бюджет / распланировано / факт / остаток + счётчики
+// перерасхода (факт>бюджет, терракот) и переаллокации (распланировано>бюджет, янтарь).
 const Kpi = ({ totals }: { totals: ProjectsPlanFactTotals }) => {
   const overWarn = totals.overrunCount > 0;
+  const obWarn = (totals.overbookedCount ?? 0) > 0;
   const remNeg = totals.remaining < 0;
+  // Остаток распределения = бюджет − распланировано (< 0 = распланировано сверх бюджета).
+  const unalloc = totals.unallocated ?? 0;
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '12px 14px' }}>
-      <KpiCard label="План, ч" value={fmtHrs(totals.planned)} hint="суммарно по проектам" />
+      <KpiCard label="Бюджет, ч" value={fmtHrs(totals.planned)} hint="план по проектам" />
+      <KpiCard
+        label="Распланировано, ч"
+        value={fmtHrs(totals.allocated ?? 0)}
+        hint={
+          unalloc < 0
+            ? `сверх бюджета на ${fmtHrs(-unalloc)} ч`
+            : `${fmtHrs(unalloc)} ч свободно`
+        }
+        color={unalloc < 0 ? T.warn : T.text}
+      />
       <KpiCard label="Факт, ч" value={fmtHrs(totals.fact)} hint="списано за период" />
       <KpiCard
         label="Остаток, ч"
         value={remNeg ? `−${fmtHrs(-totals.remaining)}` : fmtHrs(totals.remaining)}
-        hint={remNeg ? 'план превышен' : 'до плана'}
+        hint={remNeg ? 'бюджет освоен сверх плана' : 'бюджета до факта'}
         color={remNeg ? T.over : T.text}
       />
       <KpiCard
         label="Перерасход"
         value={`${totals.overrunCount}`}
-        hint={overWarn ? 'проектов сверх плана' : 'нет перерасхода'}
+        hint={overWarn ? 'проектов: факт сверх бюджета' : 'нет перерасхода'}
         color={overWarn ? T.over : T.text}
+      />
+      <KpiCard
+        label="Переаллокация"
+        value={`${totals.overbookedCount ?? 0}`}
+        hint={obWarn ? 'проектов: план сверх бюджета' : 'нет переаллокации'}
+        color={obWarn ? T.warn : T.text}
       />
     </div>
   );
@@ -163,7 +187,10 @@ const HeaderRow = ({
       <SortHeader label="Статус" active={sortKey === 'status'} dir={dir} onSort={() => toggle('status')} />
     </span>
     <span style={cell('right')}>
-      <SortHeader label="План, ч" align="right" active={sortKey === 'planned'} dir={dir} onSort={() => toggle('planned')} />
+      <SortHeader label="Бюджет, ч" align="right" active={sortKey === 'planned'} dir={dir} onSort={() => toggle('planned')} />
+    </span>
+    <span style={cell('right')}>
+      <SortHeader label="Распланировано, ч" align="right" active={sortKey === 'allocated'} dir={dir} onSort={() => toggle('allocated')} />
     </span>
     <span style={cell('right')}>
       <SortHeader label="Факт, ч" align="right" active={sortKey === 'fact'} dir={dir} onSort={() => toggle('fact')} />
@@ -193,14 +220,14 @@ const SkeletonRows = () => (
           alignItems: 'center',
         }}
       >
-        {[0, 1, 2, 3, 4, 5, 6].map((c) => (
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((c) => (
           <span key={c} style={{ padding: '0 10px' }}>
             <span
               style={{
                 display: 'block',
                 height: 10,
-                width: c === 0 ? '70%' : c === 1 ? '80%' : c === 6 ? '60%' : '50%',
-                marginLeft: c >= 2 && c <= 5 ? 'auto' : 0,
+                width: c === 0 ? '70%' : c === 1 ? '80%' : c === 7 ? '60%' : '50%',
+                marginLeft: c >= 2 && c <= 6 ? 'auto' : 0,
                 borderRadius: 6,
                 background: T.headerBg,
                 animation: 'credosPulse 1200ms ease-in-out infinite',
@@ -244,6 +271,8 @@ const sortValue = (key: SortKey | null, r: ProjectPlanFactRow): number | string 
       return (r.status ? STATUS_META[r.status]?.label ?? r.status : '').toLowerCase();
     case 'planned':
       return r.planned ?? -1;
+    case 'allocated':
+      return r.allocated ?? -1;
     case 'remaining':
       return r.remaining ?? Number.POSITIVE_INFINITY; // «нет плана» — в конец при сорте
     case 'pct':
@@ -347,12 +376,21 @@ export const ProjectsView = ({ from, to }: Props) => {
 
 const Row = ({ r, alt }: { r: ProjectPlanFactRow; alt: boolean }) => {
   const over = r.overrun || (r.remaining !== null && r.remaining < 0);
+  // Переаллокация = распланировано сверх бюджета (warning, янтарь — отдельно от
+  // перерасхода факта). Подсветка строки терракотом приоритетнее (перерасход важнее).
+  const overbooked = r.overbooked || (r.allocatedPct !== null && r.allocatedPct > 1);
   const remVal =
     r.remaining === null
       ? '—'
       : r.remaining < 0
         ? `−${fmtHrs(-r.remaining)}`
         : fmtHrs(r.remaining);
+  // Подпись покрытия бюджета планом: «X из Y» (распланировано из бюджета).
+  // Нет бюджета → только распланировано без знаменателя.
+  const coverage =
+    r.planned === null
+      ? null
+      : `${fmtHrs(r.allocated)} из ${fmtHrs(r.planned)} (${fmtPct(r.allocatedPct)})`;
   return (
     <div
       style={{
@@ -382,6 +420,26 @@ const Row = ({ r, alt }: { r: ProjectPlanFactRow; alt: boolean }) => {
         {r.planned === null ? '—' : fmtHrs(r.planned)}
       </span>
 
+      {/* Распланировано (allocated) + покрытие бюджета «X из Y (Z%)». Переаллокация
+          (распланировано > бюджет) — янтарём. */}
+      <span
+        style={{
+          ...cell('right'),
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          gap: 1,
+          color: overbooked ? T.warn : T.text,
+        }}
+      >
+        <span style={{ fontWeight: 600, lineHeight: 1.1 }}>{fmtHrs(r.allocated)}</span>
+        {coverage && (
+          <span style={{ fontSize: 10.5, color: overbooked ? T.warn : T.textFaint, lineHeight: 1.1 }}>
+            {coverage}
+          </span>
+        )}
+      </span>
+
       <span style={{ ...cell('right'), fontWeight: 600 }}>{fmtHrs(r.fact)}</span>
 
       <span style={{ ...cell('right'), fontWeight: 500, color: r.remaining === null ? T.textFaint : over ? T.over : T.ok }}>
@@ -390,8 +448,9 @@ const Row = ({ r, alt }: { r: ProjectPlanFactRow; alt: boolean }) => {
 
       <span style={{ ...cell('right'), color: over ? T.over : T.textMuted }}>{fmtPct(r.pct)}</span>
 
-      {/* Флаг перерасхода — знак не только цветом: иконка ▲ + текст-бейдж. */}
-      <span style={cell()}>
+      {/* Флаги — знак не только цветом: ▲ «перерасход» (факт>бюджет, терракот) и
+          ⚠ «переаллокация» (распланировано>бюджет, янтарь). */}
+      <span style={{ ...cell(), gap: 4, flexWrap: 'wrap' }}>
         {over ? (
           <span
             style={{
@@ -408,6 +467,25 @@ const Row = ({ r, alt }: { r: ProjectPlanFactRow; alt: boolean }) => {
             }}
           >
             <span aria-hidden>▲</span> перерасход
+          </span>
+        ) : null}
+        {overbooked ? (
+          <span
+            title="Распланировано (план слотов) больше бюджета проекта"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 11,
+              fontWeight: 700,
+              color: T.warnSolid,
+              background: T.warnTint,
+              border: `1px solid ${T.warnBorder}`,
+              padding: '1px 7px',
+              borderRadius: 999,
+            }}
+          >
+            <span aria-hidden>⚠</span> переаллокация
           </span>
         ) : null}
       </span>

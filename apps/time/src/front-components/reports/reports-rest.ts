@@ -70,6 +70,59 @@ type RawCsvResp = {
   error?: string;
 };
 
+// --- Drill-до-записей (REQ-0006 п.3): лист отдельных записей (НЕ CSV) ---
+// Контракт бэка (reports.logic groupBy=detail без format): { ok, groupBy:'detail',
+// period, count, rows: DetailRow[] }. 7 колонок MVP по каждой записи. Фильтры
+// deptId/projectId/employeeId — для drill-down с агрегатного среза в лист.
+// CISO-007 (152-ФЗ): ФИО НЕ отдаётся по умолчанию (revealNames=false на бэке →
+// employeeName = код сотрудника, не ПДн). reveal ПДн — отдельным контуром (TODO).
+export type DetailRow = {
+  date: string;
+  employeeName: string;
+  deptName: string;
+  projectName: string;
+  workTypeName: string;
+  hours: number;
+  status: string;
+};
+
+export type DetailRowsResult = {
+  ok: boolean;
+  count: number;
+  rows: DetailRow[];
+  error?: string;
+};
+
+type RawDetailResp = {
+  ok?: boolean;
+  count?: number;
+  rows?: DetailRow[];
+  error?: string;
+};
+
+export const fetchDetailRows = async (
+  from: string,
+  to: string,
+  filters: DetailFilters = {},
+): Promise<DetailRowsResult> => {
+  const fail = (error: string): DetailRowsResult => ({ ok: false, count: 0, rows: [], error });
+  try {
+    const resp = await client().post<RawDetailResp>('/s/reports', {
+      from,
+      to,
+      groupBy: 'detail',
+      ...(filters.deptId ? { deptId: filters.deptId } : {}),
+      ...(filters.projectId ? { projectId: filters.projectId } : {}),
+      ...(filters.employeeId ? { employeeId: filters.employeeId } : {}),
+    });
+    if (!resp?.ok) return fail(resp?.error ?? 'Сервис отчётов недоступен');
+    const rows = resp.rows ?? [];
+    return { ok: true, count: resp.count ?? rows.length, rows };
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : 'Ошибка загрузки записей');
+  }
+};
+
 export const fetchDetailCsv = async (
   from: string,
   to: string,
